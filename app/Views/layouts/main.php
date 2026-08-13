@@ -1028,6 +1028,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                     <li class="nav-item">
                         <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> <?= __('nav.forwarding', 'Redirecionamento') ?></a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/desapego"><i class="fas fa-hand-holding-heart"></i> Desapego</a>
+                    </li>
                 </ul>
                 
                 <ul class="navbar-nav align-items-center gap-1">

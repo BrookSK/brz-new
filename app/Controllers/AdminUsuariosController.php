@@ -18,9 +18,10 @@ class AdminUsuariosController extends Controller {
             $offset = ($pagina - 1) * $limite;
             $busca = $request->getParam('busca', '');
             $ordem = $request->getParam('ordem', 'nome_asc');
+            $tipo = $request->getParam('tipo', '');
             
-            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset, $ordem);
-            $total = $helper->getTotalUsuarios($busca);
+            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset, $ordem, $tipo);
+            $total = $helper->getTotalUsuarios($busca, $tipo);
             $totalPaginas = ceil($total / $limite);
             $stats = $helper->getStatsUsuarios();
             
@@ -176,6 +177,10 @@ class AdminUsuariosController extends Controller {
                         <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>Carteira maior→menor</option>
                         <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>Carteira menor→maior</option>
                     </select>
+                    <select name="tipo" onchange="this.form.submit()">
+                        <option value="">Todos os tipos</option>
+                        <option value="desapeguista"' . ($request->getParam('tipo') === 'desapeguista' ? ' selected' : '') . '>Desapeguistas</option>
+                    </select>
                     <button type="submit" class="btn btn-search"><i class="bi bi-search"></i> Buscar</button>
                     <a href="/admin/usuarios" class="btn btn-clear"><i class="bi bi-x-lg"></i> Limpar</a>
                 </form>
@@ -205,6 +210,8 @@ class AdminUsuariosController extends Controller {
                     $suite = htmlspecialchars($u['suite'] ?? '');
                     $pedidos = (int)($u['total_pedidos'] ?? 0);
                     $userId = (int)$u['id'];
+                    $isDesapeguista = !empty($u['is_desapeguista']);
+                    $desapeguistaBadge = $isDesapeguista ? ' <span class="role-badge" style="background:rgba(8,145,178,.12);color:#0891b2;font-size:.7rem;"><i class="bi bi-heart-fill"></i> Desapeguista</span>' : '';
 
                     // Desktop row
                     echo '<div class="user-row">
@@ -213,7 +220,7 @@ class AdminUsuariosController extends Controller {
                             <div class="user-data">
                                 <div class="user-name-line">
                                     <span class="user-name">' . $nome . '</span>
-                                    <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>
+                                    <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>' . $desapeguistaBadge . '
                                 </div>
                                 <div class="user-email">' . $email . '</div>'
                                 . ($suite ? '<div class="user-suite">Suite: ' . $suite . '</div>' : '') .
@@ -247,7 +254,7 @@ class AdminUsuariosController extends Controller {
                             <div class="user-data">
                                 <div class="user-name-line">
                                     <span class="user-name">' . $nome . '</span>
-                                    <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>
+                                    <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>' . $desapeguistaBadge . '
                                 </div>
                                 <div class="user-email">' . $email . '</div>'
                                 . ($suite ? '<div class="user-suite">Suite: ' . $suite . '</div>' : '') .
@@ -617,6 +624,28 @@ class AdminUsuariosController extends Controller {
                         </div>
 
                         <hr class="my-4">
+                        <h5 class="mb-3"><i class="fas fa-hand-holding-heart me-2"></i>Desapego Brasiliano</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="isDesapeguista" name="is_desapeguista" value="1" ' . (!empty($usuario['is_desapeguista']) ? 'checked' : '') . '>
+                                    <label class="form-check-label fw-semibold" for="isDesapeguista">Este usuário é um Desapeguista</label>
+                                </div>
+                                <small class="text-muted">Se marcado, este usuário poderá ser selecionado como dono de produtos de desapego.</small>
+                            </div>
+                            <div class="col-md-6" id="comissaoDesapeguistaWrap" style="' . (empty($usuario['is_desapeguista']) ? 'display:none' : '') . '">
+                                <label class="form-label">Comissão (%)</label>
+                                <input type="number" class="form-control" name="desapeguista_comissao" step="0.01" min="0" max="100" value="' . htmlspecialchars((string) ($usuario['desapeguista_comissao'] ?? '30.00')) . '">
+                                <small class="text-muted">Percentual de comissão sobre vendas de produtos vinculados (padrão: 30%).</small>
+                            </div>
+                        </div>
+                        <script>
+                        document.getElementById("isDesapeguista").addEventListener("change", function() {
+                            document.getElementById("comissaoDesapeguistaWrap").style.display = this.checked ? "" : "none";
+                        });
+                        </script>
+
+                        <hr class="my-4">
                         <h5 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Endereço Principal</h5>
                         <input type="hidden" name="endereco_id" value="' . (int) ($endereco['id'] ?? 0) . '">';
 
@@ -806,6 +835,23 @@ class AdminUsuariosController extends Controller {
 
             if (!empty($id)) {
                 $helper->atualizarUsuario($id, $dados);
+
+                // Salvar campos de desapeguista
+                try {
+                    $dbDesp = \Config\Database::getConnection();
+                    $colsUsr = [];
+                    try { $stCU = $dbDesp->query('DESCRIBE usuarios'); $colsUsr = $stCU ? ($stCU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) { $colsUsr = []; }
+                    if (in_array('is_desapeguista', $colsUsr, true)) {
+                        $isDesapeguista = $request->getParam('is_desapeguista') ? 1 : 0;
+                        $comissao = (float) ($request->getParam('desapeguista_comissao') ?: 30.00);
+                        if ($comissao < 0) $comissao = 0;
+                        if ($comissao > 100) $comissao = 100;
+                        $stUpd = $dbDesp->prepare('UPDATE usuarios SET is_desapeguista = ?, desapeguista_comissao = ? WHERE id = ?');
+                        $stUpd->execute([$isDesapeguista, $comissao, (int) $id]);
+                    }
+                } catch (\Throwable $e) {
+                    // Silencioso se coluna não existe
+                }
 
                 // Salvar endereço principal
                 try {
@@ -1069,6 +1115,7 @@ class AdminUsuariosController extends Controller {
                                 <h5>' . htmlspecialchars($usuario['nome']) . '</h5>
                                 <p class="text-muted">' . htmlspecialchars($usuario['email']) . '</p>
                                 <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                                ' . (!empty($usuario['is_desapeguista']) ? '<span class="badge bg-info mt-2"><i class="fas fa-hand-holding-heart me-1"></i>Desapeguista (' . htmlspecialchars((string) ($usuario['desapeguista_comissao'] ?? '30')) . '%)</span>' : '') . '
                             </div>
                         </div>
                         

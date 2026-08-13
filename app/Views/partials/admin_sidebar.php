@@ -241,6 +241,7 @@ function renderAdminSidebar($activePage = '') {
         'pacotes-wordpress' => ['icon' => 'fab fa-wordpress', 'label' => 'Pacotes WordPress', 'url' => '/admin/pacotes-wordpress', 'roles' => ['admin','vendedor','suporte']],
         'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => 'UPS', 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
         'usuarios' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.users', 'Usuários'), 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
+        'desapego' => ['icon' => 'fas fa-hand-holding-heart', 'label' => 'Desapego Comissões', 'url' => '/admin/desapego/comissoes', 'roles' => ['admin','suporte']],
         // 'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.payments', 'Pagamentos'), 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         'carnes' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Carnê Braziliana', 'url' => '/admin/carnes', 'roles' => ['admin','vendedor']],
         'carnes-compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras do Carnê', 'url' => '/admin/carnes/compras', 'roles' => ['admin','vendedor']],
@@ -453,7 +454,7 @@ function renderAdminSidebar($activePage = '') {
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
                 'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
-                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
+                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'desapego', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];
 
             foreach ($menuGroups as $groupName => $group) {

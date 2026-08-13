@@ -55,7 +55,7 @@ class AdminUsuariosHelper {
         return substr($text, 0, 120);
     }
     
-    public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0, $ordem = '') {
+    public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0, $ordem = '', $tipo = '') {
         $colunasUsuarios = $this->getColunasUsuarios();
         $buscaCols = ['u.nome', 'u.email'];
         if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
@@ -83,6 +83,11 @@ class AdminUsuariosHelper {
             }
             $sql .= " AND (" . implode(' OR ', $conds) . ")";
             $params[':busca'] = "%{$busca}%";
+        }
+
+        // Filtro por tipo (desapeguista)
+        if ($tipo === 'desapeguista' && is_array($colunasUsuarios) && in_array('is_desapeguista', $colunasUsuarios, true)) {
+            $sql .= " AND u.is_desapeguista = 1";
         }
 
         if ($ordem === 'carteira_desc') {
@@ -123,7 +128,7 @@ class AdminUsuariosHelper {
         return $usuarios;
     }
     
-    public function getTotalUsuarios($busca = '') {
+    public function getTotalUsuarios($busca = '', $tipo = '') {
         $colunasUsuarios = $this->getColunasUsuarios();
         $buscaCols = ['nome', 'email'];
         if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
@@ -136,7 +141,7 @@ class AdminUsuariosHelper {
             $buscaCols[] = 'suite';
         }
 
-        $sql = "SELECT COUNT(*) as total FROM usuarios u";
+        $sql = "SELECT COUNT(*) as total FROM usuarios u WHERE 1=1";
         $params = [];
         
         if (!empty($busca)) {
@@ -144,8 +149,13 @@ class AdminUsuariosHelper {
             foreach ($buscaCols as $c) {
                 $conds[] = 'u.' . $c . ' LIKE :busca';
             }
-            $sql .= " WHERE (" . implode(' OR ', $conds) . ")";
+            $sql .= " AND (" . implode(' OR ', $conds) . ")";
             $params[':busca'] = "%{$busca}%";
+        }
+
+        // Filtro por tipo (desapeguista)
+        if ($tipo === 'desapeguista' && is_array($colunasUsuarios) && in_array('is_desapeguista', $colunasUsuarios, true)) {
+            $sql .= " AND u.is_desapeguista = 1";
         }
         
         $stmt = $this->pdo->prepare($sql);

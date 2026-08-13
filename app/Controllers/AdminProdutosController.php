@@ -1983,6 +1983,14 @@ class AdminProdutosController extends Controller {
         $outletLote = $request->getParam('outlet') ? 1 : 0;
         if (in_array('outlet', $cols, true)) $data['outlet'] = $outletLote;
 
+        // Desapego Brasiliano
+        $desapegoLote = $request->getParam('desapego') ? 1 : 0;
+        if (in_array('desapego', $cols, true)) $data['desapego'] = $desapegoLote;
+        $desapeguistaIdLote = (int) $request->getParam('desapeguista_id', 0);
+        if ($desapeguistaIdLote > 0 && in_array('desapeguista_id', $cols, true)) {
+            $data['desapeguista_id'] = $desapeguistaIdLote;
+        }
+
         // Custo = valor do produto
         if ($request->getParam('custo_igual_preco') && in_array('cost_price', $cols, true)) {
             $data['cost_price'] = $price;
@@ -2173,6 +2181,21 @@ class AdminProdutosController extends Controller {
         } catch (\Throwable $e) {}
         $lojasJson = json_encode($lojas);
 
+        // Buscar desapeguistas (usuários marcados como is_desapeguista = 1)
+        $desapeguistas = [];
+        try {
+            $pdoD = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            // Verificar se a coluna existe
+            $colsUsr = [];
+            try { $stCU = $pdoD->query('DESCRIBE usuarios'); $colsUsr = $stCU ? $stCU->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) { $colsUsr = []; }
+            if (in_array('is_desapeguista', $colsUsr, true)) {
+                $nomeCol = in_array('nome', $colsUsr, true) ? 'nome' : (in_array('name', $colsUsr, true) ? 'name' : 'nome');
+                $stD = $pdoD->query("SELECT id, {$nomeCol} AS nome, desapeguista_comissao FROM usuarios WHERE is_desapeguista = 1 ORDER BY {$nomeCol} ASC");
+                $desapeguistas = $stD ? ($stD->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Throwable $e) {}
+        $desapeguistasJson = json_encode($desapeguistas);
+
         $successHtmlJs = json_encode($successHtml);
 
         echo '<!DOCTYPE html>
@@ -2248,6 +2271,17 @@ class AdminProdutosController extends Controller {
                 <i class="fas fa-chevron-right text-muted"></i>
             </div>
         </div>
+        <!-- Opção: Desapego Brasiliano -->
+        <div class="glass p-3 mb-3">
+            <div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" id="btnDesapego" style="cursor:pointer;border:2px solid transparent;">
+                <i class="fas fa-hand-holding-heart fa-lg text-info"></i>
+                <div class="flex-fill">
+                    <div class="fw-semibold">Desapego Brasiliano</div>
+                    <div class="small text-muted">Produto de desapego (venda somente para EUA)</div>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+        </div>
         <!-- Form novo grupo (inline) -->
         <div class="glass p-3" id="formNovoGrupo" style="display:none">
             <div class="fw-semibold mb-3">Novo grupo de compras</div>
@@ -2296,6 +2330,14 @@ class AdminProdutosController extends Controller {
             <div class="fw-semibold mb-3">Novo produto — <span id="grupoNomeProduto" class="text-primary"></span></div>
             <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data" id="formProduto">
                 <input type="hidden" name="grupo_compras_id" id="inputGrupoId">
+                <input type="hidden" name="desapego" id="inputDesapego" value="0">
+                <div class="mb-3" id="desapeguistaFieldSingle" style="display:none">
+                    <label class="form-label fw-semibold">Desapeguista <span class="text-muted fw-normal small">Opcional</span></label>
+                    <select class="form-select" name="desapeguista_id" id="desapeguistaSelectSingle">
+                        <option value="">Nenhum (produto próprio)</option>
+                    </select>
+                    <small class="text-muted">Selecione o desapeguista dono deste produto (se houver).</small>
+                </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Foto do produto</label>
                     <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
@@ -2552,8 +2594,10 @@ class AdminProdutosController extends Controller {
 const GRUPOS = ' . $gruposJson . ';
 const NCM_OPTIONS = ' . $ncmOptionsJson . ';
 const LOJAS = ' . $lojasJson . ';
+const DESAPEGUISTAS = ' . $desapeguistasJson . ';
 let grupoSelecionado = null;
 let modoProdutoSite = false;
+let modoDesapego = false;
 let currentStep = 1;
 
 // Popular selects de NCM
@@ -2629,7 +2673,10 @@ function renderGrupos() {
 function selecionarGrupo(g) {
     grupoSelecionado = g;
     modoProdutoSite = false;
+    modoDesapego = false;
     document.getElementById("lojaFieldSingle").style.display = "none";
+    document.getElementById("desapeguistaFieldSingle").style.display = "none";
+    document.getElementById("inputDesapego").value = "0";
     document.getElementById("grupoSelecionadoNome").textContent = g.nome;
     document.getElementById("grupoNomeProduto").textContent = g.nome;
     document.getElementById("grupoNomeLote").textContent = g.nome;
@@ -2817,6 +2864,10 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
         fd.append("oculto", document.getElementById("ocultoSwitchLote") && document.getElementById("ocultoSwitchLote").checked ? "1" : "0");
         fd.append("outlet", document.getElementById("outletSwitchLote") && document.getElementById("outletSwitchLote").checked ? "1" : "0");
+        fd.append("desapego", document.getElementById("inputDesapego").value || "0");
+        if (document.getElementById("desapeguistaSelectSingle") && document.getElementById("desapeguistaSelectSingle").value) {
+            fd.append("desapeguista_id", document.getElementById("desapeguistaSelectSingle").value);
+        }
         fd.append("custo_igual_preco", document.getElementById("custoIgualPrecoSwitchLote") && document.getElementById("custoIgualPrecoSwitchLote").checked ? "1" : "0");
         fd.append("name", descricoes[i]);
         const salePriceLote = document.getElementById("loteSalePriceInput").value.trim();
@@ -2965,11 +3016,31 @@ renderGrupos();
 // ─── Produto para o Site (sem grupo) ───
 document.getElementById("btnProdutoSite").addEventListener("click", function() {
     modoProdutoSite = true;
+    modoDesapego = false;
     grupoSelecionado = null;
     document.getElementById("inputGrupoId").value = "";
+    document.getElementById("inputDesapego").value = "0";
     document.getElementById("grupoNomeProduto").textContent = "Produto para o Site";
     document.getElementById("grupoSelecionadoNome").textContent = "Produto para o Site";
     document.getElementById("lojaFieldSingle").style.display = "";
+    document.getElementById("desapeguistaFieldSingle").style.display = "none";
+    document.getElementById("loteArea").style.display = "none";
+    document.getElementById("formProduto").style.display = "";
+    showStep(3);
+});
+
+// ─── Desapego Brasiliano ───
+document.getElementById("btnDesapego").addEventListener("click", function() {
+    modoDesapego = true;
+    modoProdutoSite = false;
+    grupoSelecionado = null;
+    document.getElementById("inputGrupoId").value = "";
+    document.getElementById("inputDesapego").value = "1";
+    document.getElementById("grupoNomeProduto").textContent = "Desapego Brasiliano";
+    document.getElementById("grupoSelecionadoNome").textContent = "Desapego Brasiliano";
+    document.getElementById("lojaFieldSingle").style.display = "none";
+    document.getElementById("desapeguistaFieldSingle").style.display = "";
+    populateDesapeguistaSelect("desapeguistaSelectSingle");
     document.getElementById("loteArea").style.display = "none";
     document.getElementById("formProduto").style.display = "";
     showStep(3);
@@ -2988,6 +3059,19 @@ function populateLojaSelect(selectId) {
     });
 }
 populateLojaSelect("lojaSelectSingle");
+
+// Popular select de desapeguistas
+function populateDesapeguistaSelect(selectId) {
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = \'<option value="">Nenhum (produto próprio)</option>\';
+    DESAPEGUISTAS.forEach(function(d) {
+        var opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = d.nome + " (" + d.desapeguista_comissao + "%)";
+        sel.appendChild(opt);
+    });
+}
 
 // Filtro de pesquisa de loja
 (function() {
@@ -3556,6 +3640,14 @@ HTML;
         // Braziliana Outlet
         $outlet = $request->getParam('outlet') ? 1 : 0;
         if (in_array('outlet', $cols, true)) $data['outlet'] = $outlet;
+
+        // Desapego Brasiliano
+        $desapego = $request->getParam('desapego') ? 1 : 0;
+        if (in_array('desapego', $cols, true)) $data['desapego'] = $desapego;
+        $desapeguistaId = (int) $request->getParam('desapeguista_id', 0);
+        if ($desapeguistaId > 0 && in_array('desapeguista_id', $cols, true)) {
+            $data['desapeguista_id'] = $desapeguistaId;
+        }
 
         // Custo = valor do produto
         if ($request->getParam('custo_igual_preco') && in_array('cost_price', $cols, true)) {

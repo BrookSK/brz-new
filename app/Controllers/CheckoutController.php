@@ -3359,6 +3359,43 @@ class CheckoutController extends Controller {
             return;
         }
 
+        // Validar: produtos de desapego só podem ser entregues nos Estados Unidos
+        $paisCheckout = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($paisCheckout === '') $paisCheckout = 'BR';
+        if ($paisCheckout !== 'US') {
+            try {
+                $dbDesapego = \Config\Database::getConnection();
+                $colsDesapego = [];
+                try { $stCD = $dbDesapego->query('DESCRIBE produtos'); $colsDesapego = $stCD ? ($stCD->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) { $colsDesapego = []; }
+
+                if (in_array('desapego', $colsDesapego, true)) {
+                    $temDesapego = false;
+                    foreach ($carrinho as $cItemD) {
+                        $pidD = (int) ($cItemD['produto_id'] ?? 0);
+                        $tipoItemD = $cItemD['tipo_item'] ?? 'produto';
+                        if ($tipoItemD !== 'produto' || $pidD <= 0 || $pidD >= 999990) continue;
+                        try {
+                            $stD = $dbDesapego->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                            $stD->execute([$pidD]);
+                            $isDesapego = (int) ($stD->fetchColumn() ?: 0);
+                            if ($isDesapego === 1) {
+                                $temDesapego = true;
+                                break;
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                    if ($temDesapego) {
+                        $this->json([
+                            'error' => 'Seu carrinho contém produto(s) da seção Desapego Brasiliano, que estão disponíveis exclusivamente para entrega nos Estados Unidos. Altere o país de entrega para EUA ou remova o(s) produto(s) de desapego do carrinho.'
+                        ], 400);
+                        return;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Se não conseguir validar, continua (coluna pode não existir ainda)
+            }
+        }
+
         // Validar valor mínimo de produtos (USD 5.00) — sempre em USD
         $subtotalCheckUsd = 0;
         $temPacoteRedirecionamento = false;
