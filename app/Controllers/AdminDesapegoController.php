@@ -2,7 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Core\Services\AuthService;
+use App\Services\AuthService;
 
 class AdminDesapegoController extends Controller {
 
@@ -230,6 +230,163 @@ class AdminDesapegoController extends Controller {
 
                 echo '</div></div>';
             }
+        }
+
+        echo '</main></div></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+    }
+
+    /**
+     * Tela de listagem de produtos desapego pendentes (pedidos até caixa_fechada)
+     */
+    public function pendentes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
+
+        $pdo = $this->getDirectPdo();
+
+        // Status que significam "ainda não enviou" (até caixa_fechada na progressão)
+        $statusAtesCaixaFechada = [
+            'pendente', 'processando', 'pago',
+            'itens_parcialmente_comprados', 'itens_comprados',
+            'invoice_liberado', 'invoice_confirmado',
+            'fatura_pendente', 'fatura_paga', 'caixa_fechada'
+        ];
+
+        $colsProd = [];
+        try { $st = $pdo->query('DESCRIBE produtos'); $colsProd = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+
+        $hasDesapego = in_array('desapego', $colsProd, true);
+        $itens = [];
+
+        if ($hasDesapego) {
+            $nameCol = in_array('name', $colsProd, true) ? 'name' : 'nome';
+            $priceCol = in_array('price', $colsProd, true) ? 'price' : 'valor';
+            $fotoCol = in_array('foto_principal', $colsProd, true) ? 'foto_principal' : null;
+
+            $inStatus = implode(',', array_fill(0, count($statusAtesCaixaFechada), '?'));
+
+            $sql = "SELECT 
+                        pi.pedido_id,
+                        pi.produto_id,
+                        pi.quantidade,
+                        pi.preco_unitario,
+                        pr.{$nameCol} AS produto_nome,
+                        pr.{$priceCol} AS produto_preco,
+                        " . ($fotoCol ? "pr.{$fotoCol} AS foto_principal," : '') . "
+                        pr.desapeguista_id,
+                        p.status AS pedido_status,
+                        p.created_at AS pedido_data,
+                        u.nome AS cliente_nome,
+                        u.email AS cliente_email,
+                        du.nome AS desapeguista_nome
+                    FROM pedido_itens pi
+                    INNER JOIN produtos pr ON pi.produto_id = pr.id AND pr.desapego = 1
+                    INNER JOIN pedidos p ON pi.pedido_id = p.id
+                    LEFT JOIN usuarios u ON p.usuario_id = u.id
+                    LEFT JOIN usuarios du ON pr.desapeguista_id = du.id
+                    WHERE p.status IN ({$inStatus})";
+
+            // Excluir pedidos deletados
+            $colsPed = [];
+            try { $stP = $pdo->query('DESCRIBE pedidos'); $colsPed = $stP ? $stP->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+            if (in_array('deleted_at', $colsPed, true)) {
+                $sql .= " AND p.deleted_at IS NULL";
+            }
+
+            $sql .= " ORDER BY p.created_at DESC";
+
+            try {
+                $st = $pdo->prepare($sql);
+                $st->execute($statusAtesCaixaFechada);
+                $itens = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                error_log('[DESAPEGO_PENDENTES] Erro: ' . $e->getMessage());
+                $itens = [];
+            }
+        }
+
+        // Incluir sidebar
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desapego - Pendentes - Braziliana Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('desapego');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div>
+                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>Desapego — Itens Pendentes</h1>
+                    <p class="text-muted mb-0">Produtos de desapego em pedidos que ainda não foram enviados (até Caixa Fechada).</p>
+                </div>
+                <a href="/admin/desapego/comissoes" class="btn btn-outline-primary btn-sm"><i class="fas fa-percentage me-1"></i>Comissões</a>
+            </div>';
+
+        if (!$hasDesapego) {
+            echo '<div class="alert alert-warning">Coluna desapego não encontrada. Execute a migration 213.</div>';
+        } elseif (empty($itens)) {
+            echo '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Nenhum item de desapego pendente no momento. Todos já foram enviados ou não há pedidos com itens de desapego.</div>';
+        } else {
+            echo '<div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Produto</th>
+                            <th>Qtd</th>
+                            <th>Preço Unit.</th>
+                            <th>Status Pedido</th>
+                            <th>Cliente</th>
+                            <th>Desapeguista</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>';
+
+            foreach ($itens as $item) {
+                $statusBadgeColor = 'secondary';
+                $st = strtolower((string) ($item['pedido_status'] ?? ''));
+                if ($st === 'pago') $statusBadgeColor = 'success';
+                elseif (str_contains($st, 'parcial')) $statusBadgeColor = 'warning';
+                elseif (str_contains($st, 'caixa')) $statusBadgeColor = 'dark';
+                elseif (str_contains($st, 'invoice') || str_contains($st, 'fatura')) $statusBadgeColor = 'info';
+
+                $data = !empty($item['pedido_data']) ? date('d/m/Y', strtotime($item['pedido_data'])) : '—';
+
+                echo '<tr>
+                    <td><a href="/admin/pedidos/detalhes/' . (int) $item['pedido_id'] . '" class="fw-bold">#' . str_pad((int) $item['pedido_id'], 6, '0', STR_PAD_LEFT) . '</a></td>
+                    <td>' . htmlspecialchars($item['produto_nome'] ?? 'Produto #' . $item['produto_id']) . '</td>
+                    <td class="text-center">' . (int) ($item['quantidade'] ?? 1) . '</td>
+                    <td>US$ ' . number_format((float) ($item['preco_unitario'] ?? $item['produto_preco'] ?? 0), 2) . '</td>
+                    <td><span class="badge bg-' . $statusBadgeColor . '">' . htmlspecialchars(str_replace('_', ' ', ucfirst($item['pedido_status'] ?? ''))) . '</span></td>
+                    <td>
+                        <div class="small fw-semibold">' . htmlspecialchars($item['cliente_nome'] ?? '—') . '</div>
+                        <div class="small text-muted">' . htmlspecialchars($item['cliente_email'] ?? '') . '</div>
+                    </td>
+                    <td>' . (!empty($item['desapeguista_nome']) ? '<span class="badge" style="background:rgba(8,145,178,.12);color:#0891b2;"><i class="bi bi-person-heart me-1"></i>' . htmlspecialchars($item['desapeguista_nome']) . '</span>' : '<span class="text-muted">—</span>') . '</td>
+                    <td class="small text-muted">' . $data . '</td>
+                </tr>';
+            }
+
+            echo '</tbody></table></div></div>';
         }
 
         echo '</main></div></div>

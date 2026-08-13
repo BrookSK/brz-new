@@ -417,6 +417,13 @@ class LiveShoppingService {
                             $qtdPedido = (int) ($it['quantidade'] ?? 0);
                             if ($produtoId <= 0 || $qtdPedido <= 0) continue;
 
+                            // Pular produtos de desapego (não entram na lista de compras)
+                            try {
+                                $stDesapLive = $this->pdo->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                                $stDesapLive->execute([$produtoId]);
+                                if ((int) ($stDesapLive->fetchColumn() ?: 0) === 1) continue;
+                            } catch (\Throwable $e) {}
+
                             $colsIns = ['produto_id', 'pedido_id'];
                             $valsIns = [':produto_id', ':pedido_id'];
                             $paramsIns = [':produto_id' => $produtoId, ':pedido_id' => $orderId];

@@ -2323,6 +2323,17 @@ class PedidoEcommerce {
                                     $qtdPedido = (int) ($it['quantidade'] ?? 0);
                                     if ($produtoId <= 0 || $qtdPedido <= 0) continue;
 
+                                    // Pular produtos de desapego (não entram na lista de compras)
+                                    try {
+                                        $colsProdEC = [];
+                                        try { $stCPEC = $this->connection->query('DESCRIBE produtos'); $colsProdEC = $stCPEC ? $stCPEC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) { $colsProdEC = []; }
+                                        if (in_array('desapego', $colsProdEC, true)) {
+                                            $stDesapEC = $this->connection->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                                            $stDesapEC->execute([$produtoId]);
+                                            if ((int) ($stDesapEC->fetchColumn() ?: 0) === 1) continue;
+                                        }
+                                    } catch (\Throwable $e) {}
+
                                     $qtdReservada = 0;
                                     if ($temPedIdRes && $temProdIdRes && $temQtdRes) {
                                         try {

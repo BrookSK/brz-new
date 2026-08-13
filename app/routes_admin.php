@@ -90,6 +90,7 @@ $router->get('/admin/usuarios/detalhes/{id}', 'AdminUsuariosController', 'detalh
 
 // Desapego Brasiliano (Comissões)
 $router->get('/admin/desapego/comissoes', 'AdminDesapegoController', 'comissoes');
+$router->get('/admin/desapego/pendentes', 'AdminDesapegoController', 'pendentes');
 $router->post('/admin/desapego/comissoes/marcar-pago', 'AdminDesapegoController', 'marcarPago');
 $router->post('/admin/desapego/comissoes/marcar-aprovado', 'AdminDesapegoController', 'marcarAprovado');
 $router->get('/admin/usuarios/editar/{id}', 'AdminUsuariosController', 'editar');

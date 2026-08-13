@@ -143,6 +143,49 @@
                 </div>
             </div>
 
+            <!-- Bloco Desapeguista (se aplicável) -->
+            <?php if (!empty($is_desapeguista)): ?>
+            <div class="card shadow-sm border-0 mb-4" style="border-left: 4px solid #0891b2 !important;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px; background: rgba(8, 145, 178, 0.12); border: 1px solid rgba(8, 145, 178, 0.2); color: #0891b2;">
+                            <i class="fas fa-hand-holding-heart fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold" style="color: #0891b2;">Desapego Brasiliano</h5>
+                            <small class="text-muted">Você é um desapeguista credenciado</small>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background: rgba(8, 145, 178, 0.06);">
+                                <small class="text-muted d-block mb-1">Comissão Pendente</small>
+                                <h5 class="mb-0 fw-bold" style="color: #0891b2;">
+                                    US$ <?= number_format((float) ($desapego_comissao_pendente ?? 0), 2, ',', '.') ?>
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background: rgba(16, 185, 129, 0.06);">
+                                <small class="text-muted d-block mb-1">Comissão Paga</small>
+                                <h5 class="mb-0 fw-bold text-success">
+                                    US$ <?= number_format((float) ($desapego_comissao_paga ?? 0), 2, ',', '.') ?>
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background: rgba(99, 102, 241, 0.06);">
+                                <small class="text-muted d-block mb-1">Produtos Cadastrados</small>
+                                <h5 class="mb-0 fw-bold" style="color: #4f46e5;">
+                                    <?= (int) ($desapego_total_produtos ?? 0) ?>
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Endereço de Redirecionamento -->
             <div class="card shadow-sm mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#collapseEnderecoRed" aria-expanded="false" aria-controls="collapseEnderecoRed">

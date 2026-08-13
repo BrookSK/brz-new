@@ -2207,6 +2207,28 @@ JS;
                 $warningsMap = [];
             }
 
+            // Detectar pedidos com itens de desapego
+            $desapegoMap = [];
+            try {
+                if (!empty($pedidoIds)) {
+                    $colsProd = [];
+                    try { $stCP = $pdo->query('DESCRIBE produtos'); $colsProd = $stCP ? $stCP->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) { $colsProd = []; }
+                    if (in_array('desapego', $colsProd, true)) {
+                        $itensTable = '';
+                        try { $pdo->query('SELECT 1 FROM pedido_itens LIMIT 1'); $itensTable = 'pedido_itens'; } catch (\Throwable $e) {}
+                        if ($itensTable !== '') {
+                            $inPlaceholders = implode(',', array_fill(0, count($pedidoIds), '?'));
+                            $stDesp = $pdo->prepare("SELECT DISTINCT pi.pedido_id FROM {$itensTable} pi INNER JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id IN ({$inPlaceholders}) AND pr.desapego = 1");
+                            $stDesp->execute($pedidoIds);
+                            $despIds = $stDesp->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                            foreach ($despIds as $did) {
+                                $desapegoMap[(int) $did] = true;
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // Detectar pedidos offline aguardando comprovante
             $aguardandoComprovanteMap = [];
             try {
@@ -2747,7 +2769,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2868,7 +2890,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2988,7 +3010,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -3488,6 +3510,20 @@ HTML;
             if (!empty($pedido['sem_comissao'])) {
                 echo '<div class="alert alert-info py-2 px-3 d-inline-block mb-3"><i class="fas fa-store me-1"></i> Já lançado no vendas.braziliana <span class="badge bg-secondary ms-1">Sem comissão</span></div>';
             }
+
+            // Badge: pedido contém itens de desapego
+            try {
+                $dbDespDet = \Config\Database::getConnection();
+                $colsProdDet = [];
+                try { $stCPD = $dbDespDet->query('DESCRIBE produtos'); $colsProdDet = $stCPD ? $stCPD->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+                if (in_array('desapego', $colsProdDet, true)) {
+                    $stDespDet = $dbDespDet->prepare("SELECT COUNT(*) FROM pedido_itens pi INNER JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = ? AND pr.desapego = 1");
+                    $stDespDet->execute([(int) $pedido['id']]);
+                    if ((int) $stDespDet->fetchColumn() > 0) {
+                        echo '<div class="alert py-2 px-3 d-inline-block mb-3" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.3);color:#0891b2;border-radius:10px;"><i class="fas fa-hand-holding-heart me-2"></i><strong>Desapego Brasiliano</strong> — Este pedido contém produto(s) de desapego (somente EUA)</div>';
+                    }
+                }
+            } catch (\Throwable $e) {}
 
             // Destaque: pendência de pagamento (diferença)
             $colsPedido = [];
@@ -3998,6 +4034,22 @@ HTML;
                                                 if (in_array($statusPedidoAtual, ['itens_parcialmente_comprados', 'pago'])) {
                                                     $nomeHtml .= ' <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Aguardando compra</span>';
                                                 }
+                                            }
+
+                                            // Badge de desapego
+                                            if ($itemProdId > 0 && $itemProdId < 999990) {
+                                                try {
+                                                    if (!isset($__desapegoCache)) $__desapegoCache = [];
+                                                    if (!isset($__desapegoCache[$itemProdId])) {
+                                                        $dbDesp = \Config\Database::getConnection();
+                                                        $stDesp = $dbDesp->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                                                        $stDesp->execute([$itemProdId]);
+                                                        $__desapegoCache[$itemProdId] = (int) ($stDesp->fetchColumn() ?: 0);
+                                                    }
+                                                    if (!empty($__desapegoCache[$itemProdId])) {
+                                                        $nomeHtml .= ' <span class="badge" style="background:rgba(8,145,178,.15);color:#0891b2;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>';
+                                                    }
+                                                } catch (\Throwable $e) {}
                                             }
 
                                             $extraHtml = '';
@@ -7343,6 +7395,13 @@ HTML;
                         $produtoId = (int) ($it['produto_id'] ?? 0);
                         $qtdPedido = (int) ($it['quantidade'] ?? 0);
                         if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                        // Pular produtos de desapego (não entram na lista de compras)
+                        try {
+                            $stDesapAP = $pdo->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                            $stDesapAP->execute([$produtoId]);
+                            if ((int) ($stDesapAP->fetchColumn() ?: 0) === 1) continue;
+                        } catch (\Throwable $e) {}
 
                         // Pular itens marcados como já comprados
                         if (in_array($produtoId, $itensJaComprados, true)) continue;

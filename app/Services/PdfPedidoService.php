@@ -53,11 +53,34 @@ class PdfPedidoService {
 
         $rows = '';
         $idx = 1;
+        $temDesapegoPdf = false;
         foreach ($itens as $it) {
             $nome = (string) ($it['nome_produto'] ?? $it['produto_nome'] ?? 'Produto');
             $qtd = (int) ($it['quantidade'] ?? 0);
             $pu = (float) ($it['preco_unitario'] ?? $it['valor_unitario'] ?? 0);
             $sub = (float) ($it['subtotal'] ?? ($pu * $qtd));
+
+            // Verificar se é item de desapego
+            $isDesapegoPdf = false;
+            $pidPdf = (int) ($it['produto_id'] ?? 0);
+            if ($pidPdf > 0 && $pidPdf < 999990) {
+                try {
+                    $dbPdf = \Config\Database::getConnection();
+                    $stPdf = $dbPdf->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                    $stPdf->execute([$pidPdf]);
+                    $isDesapegoPdf = ((int) ($stPdf->fetchColumn() ?: 0)) === 1;
+                } catch (\Throwable $e) {}
+            }
+            if ($isDesapegoPdf) {
+                $temDesapegoPdf = true;
+                $nome .= ' [DESAPEGO]';
+            }
+
+            // Verificar se é pacote de redirecionamento
+            $tipoItemPdf = $it['tipo_item'] ?? 'produto';
+            if ($tipoItemPdf === 'pacote_redirecionamento' || $pidPdf >= 999990) {
+                $nome .= ' [REDIR.]';
+            }
 
             $rows .= '<tr>'
                 . '<td style="text-align:center;">' . $idx . '</td>'
@@ -118,7 +141,9 @@ class PdfPedidoService {
             . '<div class="box">'
             . '<div class="box-title">Dados do Pedido</div>'
             . '<table class="kv">'
-            . '<tr><td>Status:</td><td><strong>' . htmlspecialchars($status, ENT_QUOTES, 'UTF-8') . '</strong></td></tr>'
+            . '<tr><td>Status:</td><td><strong>' . htmlspecialchars($status, ENT_QUOTES, 'UTF-8') . '</strong>'
+            . ($temDesapegoPdf ? ' <strong style="color:#0891b2;">[DESAPEGO]</strong>' : '')
+            . '</td></tr>'
             . '<tr><td>Moeda:</td><td>' . htmlspecialchars($moeda, ENT_QUOTES, 'UTF-8') . '</td></tr>'
             . '<tr><td>Pagamento:</td><td>' . htmlspecialchars($paymentGateway, ENT_QUOTES, 'UTF-8') . ' ' . htmlspecialchars($paymentStatus, ENT_QUOTES, 'UTF-8') . '</td></tr>'
             . '<tr><td>Payment ID:</td><td>' . htmlspecialchars($paymentId, ENT_QUOTES, 'UTF-8') . '</td></tr>'

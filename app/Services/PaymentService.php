@@ -4500,6 +4500,17 @@ class PaymentService {
                 $qtdPedido = (int) ($it['quantidade'] ?? 0);
                 if ($produtoId <= 0 || $qtdPedido <= 0) continue;
 
+                // Pular produtos de desapego (não entram na lista de compras)
+                try {
+                    $colsProdLC = [];
+                    try { $stCPLC = $db->query('DESCRIBE produtos'); $colsProdLC = $stCPLC ? $stCPLC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) { $colsProdLC = []; }
+                    if (in_array('desapego', $colsProdLC, true)) {
+                        $stDesapLC = $db->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                        $stDesapLC->execute([$produtoId]);
+                        if ((int) ($stDesapLC->fetchColumn() ?: 0) === 1) continue;
+                    }
+                } catch (\Throwable $e) {}
+
                 $qtdReservada = 0;
                 if ($temPedIdRes && $temProdIdRes && $temQtdRes) {
                     try {

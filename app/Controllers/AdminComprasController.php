@@ -2973,7 +2973,7 @@ class AdminComprasController extends Controller {
                 $totalItens = 0;
                 if ($itensTable !== '') {
                     try {
-                        // Excluir itens de pacote/redirecionamento da contagem (não precisam ser comprados)
+                        // Excluir itens de pacote/redirecionamento e desapego da contagem (não precisam ser comprados)
                         $hasTipoItem = false;
                         try {
                             $stCI = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = 'tipo_item'");
@@ -2981,12 +2981,26 @@ class AdminComprasController extends Controller {
                             $hasTipoItem = (int) $stCI->fetchColumn() > 0;
                         } catch (\Exception $e) {}
 
-                        $sqlCount = "SELECT COALESCE(SUM(quantidade), 0) FROM {$itensTable} WHERE pedido_id = ?";
-                        if ($hasTipoItem) {
-                            $sqlCount .= " AND (tipo_item IS NULL OR tipo_item = 'produto')";
+                        $hasDesapegoCol = false;
+                        try {
+                            $stCD = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produtos' AND column_name = 'desapego'");
+                            $stCD->execute();
+                            $hasDesapegoCol = (int) $stCD->fetchColumn() > 0;
+                        } catch (\Exception $e) {}
+
+                        if ($hasDesapegoCol) {
+                            $sqlCount = "SELECT COALESCE(SUM(pi.quantidade), 0) FROM {$itensTable} pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = ? AND (pr.desapego IS NULL OR pr.desapego = 0)";
                         } else {
-                            // Filtrar produto_id virtual de pacotes
-                            $sqlCount .= " AND (produto_id IS NULL OR produto_id < 999990)";
+                            $sqlCount = "SELECT COALESCE(SUM(quantidade), 0) FROM {$itensTable} WHERE pedido_id = ?";
+                        }
+                        if ($hasTipoItem) {
+                            $sqlCount .= $hasDesapegoCol
+                                ? " AND (pi.tipo_item IS NULL OR pi.tipo_item = 'produto')"
+                                : " AND (tipo_item IS NULL OR tipo_item = 'produto')";
+                        } else {
+                            $sqlCount .= $hasDesapegoCol
+                                ? " AND (pi.produto_id IS NULL OR pi.produto_id < 999990)"
+                                : " AND (produto_id IS NULL OR produto_id < 999990)";
                         }
                         $stIt = $this->connection->prepare($sqlCount);
                         $stIt->execute([$pedidoId]);

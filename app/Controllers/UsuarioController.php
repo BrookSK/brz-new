@@ -430,6 +430,49 @@ class UsuarioController extends Controller {
         } catch (\Exception $e) {
             $carteiraTransacoes = [];
         }
+
+        // Dados do Desapego (se o usuário for desapeguista)
+        $isDesapeguista = false;
+        $desapegoComissaoPendente = 0.0;
+        $desapegoComissaoPaga = 0.0;
+        $desapegoTotalProdutos = 0;
+        try {
+            $dbDesp = \Config\Database::getConnection();
+            $colsUsr = [];
+            try { $stCU = $dbDesp->query('DESCRIBE usuarios'); $colsUsr = $stCU ? $stCU->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) { $colsUsr = []; }
+            if (in_array('is_desapeguista', $colsUsr, true)) {
+                $stD = $dbDesp->prepare('SELECT is_desapeguista, desapeguista_comissao FROM usuarios WHERE id = ? LIMIT 1');
+                $stD->execute([(int) $usuario['id']]);
+                $rowD = $stD->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $isDesapeguista = !empty($rowD['is_desapeguista']);
+
+                if ($isDesapeguista) {
+                    // Contar produtos vinculados
+                    $colsProd = [];
+                    try { $stCP = $dbDesp->query('DESCRIBE produtos'); $colsProd = $stCP ? $stCP->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+                    if (in_array('desapeguista_id', $colsProd, true)) {
+                        $stProd = $dbDesp->prepare('SELECT COUNT(*) FROM produtos WHERE desapeguista_id = ? AND desapego = 1');
+                        $stProd->execute([(int) $usuario['id']]);
+                        $desapegoTotalProdutos = (int) $stProd->fetchColumn();
+                    }
+
+                    // Buscar comissões (se tabela existir)
+                    try {
+                        $dbDesp->query('SELECT 1 FROM desapego_comissoes LIMIT 1');
+                        $stCom = $dbDesp->prepare("SELECT status, SUM(valor_comissao) AS total FROM desapego_comissoes WHERE desapeguista_id = ? GROUP BY status");
+                        $stCom->execute([(int) $usuario['id']]);
+                        $rowsCom = $stCom->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($rowsCom as $rc) {
+                            if (in_array($rc['status'], ['pendente', 'aprovado'])) {
+                                $desapegoComissaoPendente += (float) $rc['total'];
+                            } elseif ($rc['status'] === 'pago') {
+                                $desapegoComissaoPaga += (float) $rc['total'];
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+        } catch (\Throwable $e) {}
         
         $this->view('usuario/minha-conta', [
             'usuario' => $usuario,
@@ -454,7 +497,11 @@ class UsuarioController extends Controller {
             'carteira_total_disponivel' => (float) $carteiraTotalDisponivel,
             'carteira_turbo_recargas' => $carteiraTurboRecargas,
             'stripe_enabled' => (bool) $this->paymentService->isStripeEnabled(),
-            'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey()
+            'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey(),
+            'is_desapeguista' => $isDesapeguista,
+            'desapego_comissao_pendente' => $desapegoComissaoPendente,
+            'desapego_comissao_paga' => $desapegoComissaoPaga,
+            'desapego_total_produtos' => $desapegoTotalProdutos,
         ]);
     }
 
