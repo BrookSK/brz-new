@@ -88,7 +88,7 @@ $router->get('/admin/pedidos-wp/export-xlsx', 'AdminPedidosWpController', 'expor
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');
 $router->get('/admin/usuarios/detalhes/{id}', 'AdminUsuariosController', 'detalhes');
 
-// Desapego Brasiliano (Comissões)
+// Desapego Braziliana (Comissões)
 $router->get('/admin/desapego/comissoes', 'AdminDesapegoController', 'comissoes');
 $router->get('/admin/desapego/pendentes', 'AdminDesapegoController', 'pendentes');
 $router->post('/admin/desapego/comissoes/marcar-pago', 'AdminDesapegoController', 'marcarPago');

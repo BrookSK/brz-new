@@ -1983,7 +1983,7 @@ class AdminProdutosController extends Controller {
         $outletLote = $request->getParam('outlet') ? 1 : 0;
         if (in_array('outlet', $cols, true)) $data['outlet'] = $outletLote;
 
-        // Desapego Brasiliano
+        // Desapego Braziliana
         $desapegoLote = $request->getParam('desapego') ? 1 : 0;
         if (in_array('desapego', $cols, true)) $data['desapego'] = $desapegoLote;
         $desapeguistaIdLote = (int) $request->getParam('desapeguista_id', 0);
@@ -2271,12 +2271,12 @@ class AdminProdutosController extends Controller {
                 <i class="fas fa-chevron-right text-muted"></i>
             </div>
         </div>
-        <!-- Opção: Desapego Brasiliano -->
+        <!-- Opção: Desapego Braziliana -->
         <div class="glass p-3 mb-3">
             <div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" id="btnDesapego" style="cursor:pointer;border:2px solid transparent;">
                 <i class="fas fa-hand-holding-heart fa-lg text-info"></i>
                 <div class="flex-fill">
-                    <div class="fw-semibold">Desapego Brasiliano</div>
+                    <div class="fw-semibold">Desapego Braziliana</div>
                     <div class="small text-muted">Produto de desapego (venda somente para EUA)</div>
                 </div>
                 <i class="fas fa-chevron-right text-muted"></i>
@@ -3029,15 +3029,15 @@ document.getElementById("btnProdutoSite").addEventListener("click", function() {
     showStep(3);
 });
 
-// ─── Desapego Brasiliano ───
+// ─── Desapego Braziliana ───
 document.getElementById("btnDesapego").addEventListener("click", function() {
     modoDesapego = true;
     modoProdutoSite = false;
     grupoSelecionado = null;
     document.getElementById("inputGrupoId").value = "";
     document.getElementById("inputDesapego").value = "1";
-    document.getElementById("grupoNomeProduto").textContent = "Desapego Brasiliano";
-    document.getElementById("grupoSelecionadoNome").textContent = "Desapego Brasiliano";
+    document.getElementById("grupoNomeProduto").textContent = "Desapego Braziliana";
+    document.getElementById("grupoSelecionadoNome").textContent = "Desapego Braziliana";
     document.getElementById("lojaFieldSingle").style.display = "none";
     document.getElementById("desapeguistaFieldSingle").style.display = "";
     populateDesapeguistaSelect("desapeguistaSelectSingle");
@@ -3641,7 +3641,7 @@ HTML;
         $outlet = $request->getParam('outlet') ? 1 : 0;
         if (in_array('outlet', $cols, true)) $data['outlet'] = $outlet;
 
-        // Desapego Brasiliano
+        // Desapego Braziliana
         $desapego = $request->getParam('desapego') ? 1 : 0;
         if (in_array('desapego', $cols, true)) $data['desapego'] = $desapego;
         $desapeguistaId = (int) $request->getParam('desapeguista_id', 0);

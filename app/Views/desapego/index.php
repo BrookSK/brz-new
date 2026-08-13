@@ -4,7 +4,7 @@
     <!-- Header -->
     <div class="text-center mb-4">
         <h1 class="fw-bold" style="color: var(--primary-color);">
-            <i class="fas fa-hand-holding-heart me-2"></i>Desapego Brasiliano
+            <i class="fas fa-hand-holding-heart me-2"></i>Desapego Braziliana
         </h1>
         <p class="text-muted fs-5">Produtos disponíveis para venda direta nos Estados Unidos</p>
     </div>
@@ -91,6 +91,6 @@
 
 <?php
 $content = ob_get_clean();
-$title = 'Desapego Brasiliano';
+$title = 'Desapego Braziliana';
 require __DIR__ . '/../layouts/main.php';
 ?>

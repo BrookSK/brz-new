@@ -624,7 +624,7 @@ class AdminUsuariosController extends Controller {
                         </div>
 
                         <hr class="my-4">
-                        <h5 class="mb-3"><i class="fas fa-hand-holding-heart me-2"></i>Desapego Brasiliano</h5>
+                        <h5 class="mb-3"><i class="fas fa-hand-holding-heart me-2"></i>Desapego Braziliana</h5>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="form-check form-switch">

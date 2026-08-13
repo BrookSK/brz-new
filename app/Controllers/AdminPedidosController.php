@@ -3520,7 +3520,7 @@ HTML;
                     $stDespDet = $dbDespDet->prepare("SELECT COUNT(*) FROM pedido_itens pi INNER JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = ? AND pr.desapego = 1");
                     $stDespDet->execute([(int) $pedido['id']]);
                     if ((int) $stDespDet->fetchColumn() > 0) {
-                        echo '<div class="alert py-2 px-3 d-inline-block mb-3" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.3);color:#0891b2;border-radius:10px;"><i class="fas fa-hand-holding-heart me-2"></i><strong>Desapego Brasiliano</strong> — Este pedido contém produto(s) de desapego (somente EUA)</div>';
+                        echo '<div class="alert py-2 px-3 d-inline-block mb-3" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.3);color:#0891b2;border-radius:10px;"><i class="fas fa-hand-holding-heart me-2"></i><strong>Desapego Braziliana</strong> — Este pedido contém produto(s) de desapego (somente EUA)</div>';
                     }
                 }
             } catch (\Throwable $e) {}

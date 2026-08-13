@@ -1,4 +1,4 @@
--- Migration 213: Desapego Brasiliano
+-- Migration 213: Desapego Braziliana
 -- Adiciona coluna desapego e desapeguista_id na tabela produtos
 -- Adiciona colunas is_desapeguista e desapeguista_comissao na tabela usuarios
 -- Cria tabela desapego_comissoes para controle de comissões

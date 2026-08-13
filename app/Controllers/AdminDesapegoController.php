@@ -126,7 +126,7 @@ class AdminDesapegoController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>Desapego Brasiliano — Comissões</h1>
+                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>Desapego Braziliana — Comissões</h1>
                     <p class="text-muted mb-0">Gerencie desapeguistas, produtos vinculados e comissões.</p>
                 </div>
             </div>';
