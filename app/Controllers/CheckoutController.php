@@ -2443,7 +2443,7 @@ class CheckoutController extends Controller {
             return;
         }
 
-        // Validar itens de redirecionamento: exigir declaration_value e comprovante
+        // Validar itens de redirecionamento: exigir declaration_value e comprovante (somente itens ativos)
         $pacoteSemDados = false;
         try {
             $db = \Config\Database::getConnection();
@@ -2454,12 +2454,21 @@ class CheckoutController extends Controller {
                 $cartId = (int) $stCart->fetchColumn();
                 if ($cartId > 0) {
                     $stPacotes = $db->prepare(
-                        "SELECT id, nome_item, declaration_value, comprovante_url FROM carrinho_items 
+                        "SELECT id, produto_id, COALESCE(produto_variacao_id, 0) AS var_id, nome_item, declaration_value, comprovante_url FROM carrinho_items 
                          WHERE carrinho_id = ? AND tipo_item = 'pacote_redirecionamento'"
                     );
                     $stPacotes->execute([$cartId]);
                     $pacotesNoCarrinho = $stPacotes->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    if (session_status() === PHP_SESSION_NONE) session_start();
+                    $ativosMapPac = (isset($_SESSION['carrinho_itens_ativos']) && is_array($_SESSION['carrinho_itens_ativos'])) ? $_SESSION['carrinho_itens_ativos'] : [];
+
                     foreach ($pacotesNoCarrinho as $pac) {
+                        // Verificar se o item está ativo na sessão
+                        $pacKey = ((string) (int) $pac['produto_id']) . ':' . ((string) (int) $pac['var_id']);
+                        if (array_key_exists($pacKey, $ativosMapPac) && !$ativosMapPac[$pacKey]) {
+                            continue; // Item desativado, não exigir declaration_value
+                        }
                         if (empty($pac['declaration_value']) || (float) $pac['declaration_value'] <= 0) {
                             $pacoteSemDados = true;
                             break;
@@ -2684,24 +2693,10 @@ class CheckoutController extends Controller {
                     $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
                     if (!empty($row)) {
-                        $cartMoedaFromDb = strtoupper(trim((string) ($row['moeda'] ?? '')));
-                        // Só usar subtotal_produtos do DB se estiver em USD (moeda base)
-                        if (array_key_exists('subtotal_produtos', $row) && (!isset($cartMoedaFromDb) || $cartMoedaFromDb !== 'BRL')) {
-                            $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
-                            if ($subtotalFromDb > 0) {
-                                $subtotal = $subtotalFromDb;
-                            }
-                        }
-                        if (array_key_exists('peso_total', $row)) {
-                            $pesoFromDb = (float) ($row['peso_total'] ?? 0);
-                            if ($pesoFromDb > 0) {
-                                $pesoTotal = $pesoFromDb;
-                            }
-                        }
+                        // NÃO usar subtotal_produtos e peso_total do DB pois eles incluem itens desativados.
+                        // Os cálculos do loop acima já filtram corretamente pelos itens ativos.
+                        // Apenas usar frete_manual (definido pelo admin) e dados do Clube.
 
-                        if (array_key_exists('taxa_servico', $row)) $taxaServicoFromDb = (float) ($row['taxa_servico'] ?? 0);
-                        if (array_key_exists('valor_impostos', $row)) $impostosFromDb = (float) ($row['valor_impostos'] ?? 0);
-                        if (array_key_exists('valor_total', $row)) $totalFromDb = (float) ($row['valor_total'] ?? 0);
                         if (array_key_exists('frete_manual', $row) && $row['frete_manual'] !== null && $row['frete_manual'] !== '') {
                             $freteFromDb = (float) $row['frete_manual'];
                         }
@@ -2758,24 +2753,13 @@ class CheckoutController extends Controller {
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
         // Se o DB tiver valores válidos, usar; senão manter cálculo atual
-        $skipPersistedTotals = (isset($cartMoedaFromDb) && $cartMoedaFromDb === 'BRL');
-        if (!$skipPersistedTotals) {
-            if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
-                $taxaServico = (float) $taxaServicoFromDb;
-            }
-            if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
-                $impostos = (float) $impostosFromDb;
-            }
-        }
+        // Não usar totais persistidos do DB pois eles não consideram itens desativados.
+        // Manter apenas frete_manual que é definido pelo admin e deve ser respeitado.
         // Frete 0 é valor válido (frete grátis)
         if (isset($freteFromDb) && (float) $freteFromDb >= 0) {
             $frete = (float) $freteFromDb;
         }
-        if (!$skipPersistedTotals && isset($totalFromDb) && (float) $totalFromDb > 0) {
-            $total = (float) $totalFromDb;
-        } else {
-            $total = (float) $subtotal + (float) $frete + (float) $taxaServico + (float) $impostos;
-        }
+        $total = (float) $subtotal + (float) $frete + (float) $taxaServico + (float) $impostos;
         
         // Nota: imposto local será adicionado ao total mais abaixo, após o cálculo do grupo de compras
         
