@@ -69,6 +69,7 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
         <?php if ($tipoPedido['itens_redirecionamento'] > 0): ?>📦 <?= $tipoPedido['itens_redirecionamento'] ?> item(ns) de redirecionamento<?php endif; ?>
         <?php if ($tipoPedido['itens_redirecionamento'] > 0 && $tipoPedido['itens_site'] > 0): ?> &nbsp;|&nbsp; <?php endif; ?>
         <?php if ($tipoPedido['itens_site'] > 0): ?>🛒 <?= $tipoPedido['itens_site'] ?> item(ns) do site<?php endif; ?>
+        <?php if (!empty($tipoPedido['itens_desapego']) && $tipoPedido['itens_desapego'] > 0): ?> &nbsp;|&nbsp; 💚 <?= $tipoPedido['itens_desapego'] ?> item(ns) de desapego<?php endif; ?>
     </p>
     <?php endif; ?>
 </div>

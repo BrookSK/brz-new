@@ -1679,6 +1679,13 @@ class AdminPedidosEditController extends Controller {
                             $qtdLC = (int) ($itemLC['quantidade'] ?? 0);
                             if ($pidLC <= 0 || $qtdLC <= 0) continue;
 
+                            // Pular produtos de desapego (não entram na lista de compras)
+                            try {
+                                $stDesapEdit = $this->connection->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                                $stDesapEdit->execute([$pidLC]);
+                                if ((int) ($stDesapEdit->fetchColumn() ?: 0) === 1) continue;
+                            } catch (\Throwable $e) {}
+
                             // Pular itens marcados como já comprados
                             if ($temJaComprado && ((int) ($itemLC['ja_comprado'] ?? 0)) === 1) continue;
 
@@ -1723,6 +1730,48 @@ class AdminPedidosEditController extends Controller {
                     } catch (\Exception $e) {
                         error_log('[PEDIDO_EDIT] Erro ao inserir na lista_compras pedido #' . $pedidoId . ': ' . $e->getMessage());
                     }
+                }
+
+                // Gerar comissões de desapego quando pedido marcado como pago via edição
+                try {
+                    $colsProdDespEdit = [];
+                    try { $stCPDE = $this->connection->query('DESCRIBE produtos'); $colsProdDespEdit = $stCPDE ? $stCPDE->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+                    if (in_array('desapego', $colsProdDespEdit, true) && in_array('desapeguista_id', $colsProdDespEdit, true)) {
+                        $tableExistsDespEdit = false;
+                        try { $this->connection->query('SELECT 1 FROM desapego_comissoes LIMIT 1'); $tableExistsDespEdit = true; } catch (\Throwable $e) {}
+                        if ($tableExistsDespEdit && $itensTableLC !== '') {
+                            $stItensDespEdit = $this->connection->prepare("SELECT pi.produto_id, pi.id AS pedido_item_id, pi.quantidade, pi.preco_unitario, pr.desapeguista_id
+                                FROM {$itensTableLC} pi
+                                INNER JOIN produtos pr ON pi.produto_id = pr.id
+                                WHERE pi.pedido_id = ? AND pr.desapego = 1 AND pr.desapeguista_id IS NOT NULL AND pr.desapeguista_id > 0");
+                            $stItensDespEdit->execute([$pedidoId]);
+                            $itensDespEdit = $stItensDespEdit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($itensDespEdit as $itemDespE) {
+                                $desapeguistaIdE = (int) $itemDespE['desapeguista_id'];
+                                $produtoIdE = (int) $itemDespE['produto_id'];
+                                $pedidoItemIdE = (int) ($itemDespE['pedido_item_id'] ?? 0);
+                                $qtdE = (int) ($itemDespE['quantidade'] ?? 1);
+                                $precoUnitE = (float) ($itemDespE['preco_unitario'] ?? 0);
+                                $valorVendaE = $precoUnitE * $qtdE;
+                                $comissaoPctE = 30.00;
+                                try {
+                                    $stComE = $this->connection->prepare('SELECT desapeguista_comissao FROM usuarios WHERE id = ? LIMIT 1');
+                                    $stComE->execute([$desapeguistaIdE]);
+                                    $pctDbE = $stComE->fetchColumn();
+                                    if ($pctDbE !== false && (float) $pctDbE > 0) $comissaoPctE = (float) $pctDbE;
+                                } catch (\Throwable $e) {}
+                                $valorComissaoE = round($valorVendaE * ($comissaoPctE / 100), 2);
+                                $stCheckE = $this->connection->prepare('SELECT COUNT(*) FROM desapego_comissoes WHERE desapeguista_id = ? AND produto_id = ? AND pedido_id = ?');
+                                $stCheckE->execute([$desapeguistaIdE, $produtoIdE, $pedidoId]);
+                                if ((int) $stCheckE->fetchColumn() === 0) {
+                                    $this->connection->prepare("INSERT INTO desapego_comissoes (desapeguista_id, produto_id, pedido_id, pedido_item_id, valor_venda, percentual_comissao, valor_comissao, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', NOW())")
+                                        ->execute([$desapeguistaIdE, $produtoIdE, $pedidoId, $pedidoItemIdE, $valorVendaE, $comissaoPctE, $valorComissaoE]);
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[DESAPEGO_COMISSAO_EDIT] Erro: ' . $e->getMessage());
                 }
             }
 

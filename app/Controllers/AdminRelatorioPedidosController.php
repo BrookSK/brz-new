@@ -432,6 +432,7 @@ class AdminRelatorioPedidosController extends Controller {
         // Analisa cada item para saber se é redirecionamento ou produto do site
         $itensRedirecionamento = 0;
         $itensSite = 0;
+        $itensDesapego = 0;
         foreach ($itens as $it) {
             $tipoItem = (string)($it['tipo_item'] ?? '');
             $prodId = (int)($it['produto_id'] ?? 0);
@@ -439,6 +440,16 @@ class AdminRelatorioPedidosController extends Controller {
                 $itensRedirecionamento++;
             } else {
                 $itensSite++;
+                // Verificar se é desapego
+                if ($prodId > 0) {
+                    try {
+                        $stDesapPdf = $this->db->prepare('SELECT desapego FROM produtos WHERE id = ? LIMIT 1');
+                        $stDesapPdf->execute([$prodId]);
+                        if ((int)($stDesapPdf->fetchColumn() ?: 0) === 1) {
+                            $itensDesapego++;
+                        }
+                    } catch (\Throwable $e) {}
+                }
             }
         }
 
@@ -501,10 +512,28 @@ class AdminRelatorioPedidosController extends Controller {
             ];
         }
 
+        // Sobrescrever tipo se contém itens de desapego
+        if ($itensDesapego > 0 && $itensRedirecionamento === 0) {
+            if ($itensDesapego === $itensSite) {
+                // Todos os itens são desapego
+                $tipoPedido = [
+                    'codigo' => 'desapego',
+                    'label' => 'Desapego Braziliana',
+                    'descricao' => 'Pedido de produto(s) do Desapego Braziliana (entrega somente EUA).',
+                    'cor' => '#0891b2', // teal
+                    'icone' => '💚',
+                ];
+            } else {
+                // Mix de desapego + site
+                $tipoPedido['descricao'] .= ' Contém ' . $itensDesapego . ' item(ns) de Desapego Braziliana.';
+            }
+        }
+
         // Suite do cliente (importante para redirecionamento)
         $tipoPedido['suite'] = $suite;
         $tipoPedido['itens_redirecionamento'] = $itensRedirecionamento;
         $tipoPedido['itens_site'] = $itensSite;
+        $tipoPedido['itens_desapego'] = $itensDesapego;
 
         require __DIR__ . '/../Views/admin/relatorio-pedidos/imprimir.php';
         exit;

@@ -6803,6 +6803,60 @@ HTML;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
 
+            // Gerar comissões de desapego quando pedido marcado como pago
+            if ($isPaid) {
+                try {
+                    $colsProdDesp = [];
+                    try { $stCPD = $pdo->query('DESCRIBE produtos'); $colsProdDesp = $stCPD ? $stCPD->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+                    if (in_array('desapego', $colsProdDesp, true) && in_array('desapeguista_id', $colsProdDesp, true)) {
+                        // Verificar se tabela desapego_comissoes existe
+                        $tableExists = false;
+                        try { $pdo->query('SELECT 1 FROM desapego_comissoes LIMIT 1'); $tableExists = true; } catch (\Throwable $e) {}
+                        if ($tableExists) {
+                            // Buscar itens do pedido que são desapego com desapeguista
+                            $itensTableDesp = 'pedido_itens';
+                            try { $pdo->query('SELECT 1 FROM pedido_itens LIMIT 1'); } catch (\Throwable $e) { $itensTableDesp = 'pedido_items'; }
+                            $stItensDesp = $pdo->prepare("SELECT pi.produto_id, pi.id AS pedido_item_id, pi.quantidade, pi.preco_unitario, pr.desapeguista_id
+                                FROM {$itensTableDesp} pi
+                                INNER JOIN produtos pr ON pi.produto_id = pr.id
+                                WHERE pi.pedido_id = ? AND pr.desapego = 1 AND pr.desapeguista_id IS NOT NULL AND pr.desapeguista_id > 0");
+                            $stItensDesp->execute([(int) $id]);
+                            $itensDesp = $stItensDesp->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                            foreach ($itensDesp as $itemDesp) {
+                                $desapeguistaIdC = (int) $itemDesp['desapeguista_id'];
+                                $produtoIdC = (int) $itemDesp['produto_id'];
+                                $pedidoItemIdC = (int) ($itemDesp['pedido_item_id'] ?? 0);
+                                $qtdC = (int) ($itemDesp['quantidade'] ?? 1);
+                                $precoUnitC = (float) ($itemDesp['preco_unitario'] ?? 0);
+                                $valorVendaC = $precoUnitC * $qtdC;
+
+                                // Buscar percentual de comissão do desapeguista
+                                $comissaoPct = 30.00;
+                                try {
+                                    $stCom = $pdo->prepare('SELECT desapeguista_comissao FROM usuarios WHERE id = ? LIMIT 1');
+                                    $stCom->execute([$desapeguistaIdC]);
+                                    $pctDb = $stCom->fetchColumn();
+                                    if ($pctDb !== false && (float) $pctDb > 0) $comissaoPct = (float) $pctDb;
+                                } catch (\Throwable $e) {}
+
+                                $valorComissao = round($valorVendaC * ($comissaoPct / 100), 2);
+
+                                // Verificar se já existe comissão para este item/pedido (evitar duplicata)
+                                $stCheck = $pdo->prepare('SELECT COUNT(*) FROM desapego_comissoes WHERE desapeguista_id = ? AND produto_id = ? AND pedido_id = ?');
+                                $stCheck->execute([$desapeguistaIdC, $produtoIdC, (int) $id]);
+                                if ((int) $stCheck->fetchColumn() === 0) {
+                                    $stIns = $pdo->prepare("INSERT INTO desapego_comissoes (desapeguista_id, produto_id, pedido_id, pedido_item_id, valor_venda, percentual_comissao, valor_comissao, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', NOW())");
+                                    $stIns->execute([$desapeguistaIdC, $produtoIdC, (int) $id, $pedidoItemIdC, $valorVendaC, $comissaoPct, $valorComissao]);
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[DESAPEGO_COMISSAO] Erro ao gerar comissão: ' . $e->getMessage());
+                }
+            }
+
             // Enviar e-mail quando status muda para invoice_liberado
             if ($novoStatusKey === 'invoice_liberado') {
                 // Criar invoice se não existir

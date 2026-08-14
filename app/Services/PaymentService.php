@@ -4553,6 +4553,50 @@ class PaymentService {
             }
 
             error_log('[LISTA_COMPRAS_INSERT] pedido=' . $pedidoId . ' caller=PaymentService::recalcularStatusPagamentoPedidoSplit (webhook)');
+
+            // Gerar comissões de desapego automaticamente
+            try {
+                $colsProdDesp = [];
+                try { $stCPD = $db->query('DESCRIBE produtos'); $colsProdDesp = $stCPD ? $stCPD->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+                if (in_array('desapego', $colsProdDesp, true) && in_array('desapeguista_id', $colsProdDesp, true)) {
+                    $tableExistsDesp = false;
+                    try { $db->query('SELECT 1 FROM desapego_comissoes LIMIT 1'); $tableExistsDesp = true; } catch (\Throwable $e) {}
+                    if ($tableExistsDesp) {
+                        $stItensDesp = $db->prepare("SELECT pi.produto_id, pi.id AS pedido_item_id, pi.quantidade, pi.preco_unitario, pr.desapeguista_id
+                            FROM {$itensTable} pi
+                            INNER JOIN produtos pr ON pi.produto_id = pr.id
+                            WHERE pi.pedido_id = ? AND pr.desapego = 1 AND pr.desapeguista_id IS NOT NULL AND pr.desapeguista_id > 0");
+                        $stItensDesp->execute([$pedidoId]);
+                        $itensDesp = $stItensDesp->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($itensDesp as $itemDesp) {
+                            $desapeguistaIdC = (int) $itemDesp['desapeguista_id'];
+                            $produtoIdC = (int) $itemDesp['produto_id'];
+                            $pedidoItemIdC = (int) ($itemDesp['pedido_item_id'] ?? 0);
+                            $qtdC = (int) ($itemDesp['quantidade'] ?? 1);
+                            $precoUnitC = (float) ($itemDesp['preco_unitario'] ?? 0);
+                            $valorVendaC = $precoUnitC * $qtdC;
+
+                            $comissaoPct = 30.00;
+                            try {
+                                $stCom = $db->prepare('SELECT desapeguista_comissao FROM usuarios WHERE id = ? LIMIT 1');
+                                $stCom->execute([$desapeguistaIdC]);
+                                $pctDb = $stCom->fetchColumn();
+                                if ($pctDb !== false && (float) $pctDb > 0) $comissaoPct = (float) $pctDb;
+                            } catch (\Throwable $e) {}
+
+                            $valorComissao = round($valorVendaC * ($comissaoPct / 100), 2);
+                            $stCheck = $db->prepare('SELECT COUNT(*) FROM desapego_comissoes WHERE desapeguista_id = ? AND produto_id = ? AND pedido_id = ?');
+                            $stCheck->execute([$desapeguistaIdC, $produtoIdC, $pedidoId]);
+                            if ((int) $stCheck->fetchColumn() === 0) {
+                                $db->prepare("INSERT INTO desapego_comissoes (desapeguista_id, produto_id, pedido_id, pedido_item_id, valor_venda, percentual_comissao, valor_comissao, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', NOW())")
+                                    ->execute([$desapeguistaIdC, $produtoIdC, $pedidoId, $pedidoItemIdC, $valorVendaC, $comissaoPct, $valorComissao]);
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[DESAPEGO_COMISSAO] Erro webhook: ' . $e->getMessage());
+            }
         } catch (\Exception $e) {
             error_log('[LISTA_COMPRAS] Erro ao inserir para pedido #' . $pedidoId . ': ' . $e->getMessage());
         }
