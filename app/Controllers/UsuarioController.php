@@ -459,14 +459,33 @@ class UsuarioController extends Controller {
                     // Buscar comissões (se tabela existir)
                     try {
                         $dbDesp->query('SELECT 1 FROM desapego_comissoes LIMIT 1');
-                        $stCom = $dbDesp->prepare("SELECT status, SUM(valor_comissao) AS total FROM desapego_comissoes WHERE desapeguista_id = ? GROUP BY status");
-                        $stCom->execute([(int) $usuario['id']]);
-                        $rowsCom = $stCom->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                        foreach ($rowsCom as $rc) {
-                            if (in_array($rc['status'], ['pendente', 'aprovado'])) {
-                                $desapegoComissaoPendente += (float) $rc['total'];
-                            } elseif ($rc['status'] === 'pago') {
-                                $desapegoComissaoPaga += (float) $rc['total'];
+                        // Buscar totais reais: valor_pago é o que já foi pago, o restante é pendente
+                        $colsDesCom = [];
+                        try { $stDC = $dbDesp->query('DESCRIBE desapego_comissoes'); $colsDesCom = $stDC ? $stDC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+                        $hasValorPago = in_array('valor_pago', $colsDesCom, true);
+
+                        if ($hasValorPago) {
+                            $stCom = $dbDesp->prepare("SELECT 
+                                SUM(valor_comissao) AS total_comissao,
+                                SUM(COALESCE(valor_pago, 0)) AS total_pago
+                                FROM desapego_comissoes WHERE desapeguista_id = ? AND status != 'cancelado'");
+                            $stCom->execute([(int) $usuario['id']]);
+                            $rowCom = $stCom->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $totalComissao = (float) ($rowCom['total_comissao'] ?? 0);
+                            $totalPago = (float) ($rowCom['total_pago'] ?? 0);
+                            $desapegoComissaoPaga = $totalPago;
+                            $desapegoComissaoPendente = $totalComissao - $totalPago;
+                            if ($desapegoComissaoPendente < 0) $desapegoComissaoPendente = 0;
+                        } else {
+                            $stCom = $dbDesp->prepare("SELECT status, SUM(valor_comissao) AS total FROM desapego_comissoes WHERE desapeguista_id = ? GROUP BY status");
+                            $stCom->execute([(int) $usuario['id']]);
+                            $rowsCom = $stCom->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($rowsCom as $rc) {
+                                if (in_array($rc['status'], ['pendente', 'aprovado', 'parcialmente_pago'])) {
+                                    $desapegoComissaoPendente += (float) $rc['total'];
+                                } elseif ($rc['status'] === 'pago') {
+                                    $desapegoComissaoPaga += (float) $rc['total'];
+                                }
                             }
                         }
                     } catch (\Throwable $e) {}
