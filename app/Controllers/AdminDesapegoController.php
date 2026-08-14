@@ -207,12 +207,24 @@ class AdminDesapegoController extends Controller {
                     echo '<h6 class="fw-semibold mb-2 mt-3"><i class="bi bi-cash-stack me-1"></i>Histórico de Comissões</h6>
                         <div class="table-responsive">
                         <table class="table table-sm table-hover">
-                            <thead><tr><th>Data</th><th>Produto</th><th>Venda</th><th>%</th><th>Comissão</th><th>Status</th><th>Pago em</th></tr></thead>
+                            <thead><tr><th>Data</th><th>Produto</th><th>Venda</th><th>%</th><th>Comissão</th><th>Status</th><th>Pago em</th><th>Ações</th></tr></thead>
                             <tbody>';
                     foreach ($d['comissoes'] as $c) {
                         $statusBadge = 'badge-' . ($c['status'] ?? 'pendente');
                         $statusLabel = ucfirst($c['status'] ?? 'pendente');
                         $dataPag = !empty($c['data_pagamento']) ? date('d/m/Y', strtotime($c['data_pagamento'])) : '—';
+                        $comissaoId = (int) ($c['id'] ?? 0);
+                        $comissaoStatus = (string) ($c['status'] ?? 'pendente');
+
+                        $acoesHtml = '';
+                        if ($comissaoStatus === 'pendente') {
+                            $acoesHtml = '<button class="btn btn-sm btn-outline-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format((float) ($c['valor_comissao'] ?? 0), 2, '.', '') . ')" title="Marcar como pago"><i class="bi bi-check-circle"></i></button>';
+                        } elseif ($comissaoStatus === 'aprovado') {
+                            $acoesHtml = '<button class="btn btn-sm btn-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format((float) ($c['valor_comissao'] ?? 0), 2, '.', '') . ')" title="Confirmar pagamento"><i class="bi bi-cash-coin"></i></button>';
+                        } else {
+                            $acoesHtml = '<span class="text-muted small">—</span>';
+                        }
+
                         echo '<tr>
                             <td>' . (!empty($c['created_at']) ? date('d/m/Y', strtotime($c['created_at'])) : '—') . '</td>
                             <td>' . htmlspecialchars($c['produto_nome'] ?? 'Produto #' . ($c['produto_id'] ?? '?')) . '</td>
@@ -221,6 +233,7 @@ class AdminDesapegoController extends Controller {
                             <td class="fw-bold">US$ ' . number_format((float) ($c['valor_comissao'] ?? 0), 2) . '</td>
                             <td><span class="comissao-badge ' . $statusBadge . '">' . $statusLabel . '</span></td>
                             <td>' . $dataPag . '</td>
+                            <td>' . $acoesHtml . '</td>
                         </tr>';
                     }
                     echo '</tbody></table></div>';
@@ -233,7 +246,73 @@ class AdminDesapegoController extends Controller {
         }
 
         echo '</main></div></div>
+
+    <!-- Modal Marcar como Pago -->
+    <div class="modal fade" id="modalPagar" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content" style="border-radius:16px;">
+                <div class="modal-header border-0 pb-0">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-cash-coin me-2 text-success"></i>Registrar Pagamento</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="pagarComissaoId">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Valor pago (USD)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="pagarValor" step="0.01" min="0">
+                        </div>
+                        <small class="text-muted">Informe o valor efetivamente pago ao desapeguista.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observação (opcional)</label>
+                        <input type="text" class="form-control" id="pagarObs" placeholder="Ex: PIX, transferência...">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success btn-sm" id="btnConfirmarPago"><i class="bi bi-check2 me-1"></i>Confirmar Pagamento</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function marcarPago(id, valorSugerido) {
+        document.getElementById("pagarComissaoId").value = id;
+        document.getElementById("pagarValor").value = valorSugerido.toFixed(2);
+        document.getElementById("pagarObs").value = "";
+        var modal = new bootstrap.Modal(document.getElementById("modalPagar"));
+        modal.show();
+    }
+
+    document.getElementById("btnConfirmarPago").addEventListener("click", async function() {
+        var id = document.getElementById("pagarComissaoId").value;
+        var valor = document.getElementById("pagarValor").value;
+        var obs = document.getElementById("pagarObs").value;
+        this.disabled = true;
+        this.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Salvando...\';
+        try {
+            var resp = await fetch("/admin/desapego/comissoes/marcar-pago", {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: "id=" + id + "&valor_pago=" + encodeURIComponent(valor) + "&observacao=" + encodeURIComponent(obs)
+            });
+            var json = await resp.json();
+            if (json.ok) {
+                location.reload();
+            } else {
+                alert("Erro: " + (json.error || "Falha ao salvar"));
+            }
+        } catch(e) {
+            alert("Erro de conexão");
+        }
+        this.disabled = false;
+        this.innerHTML = \'<i class="bi bi-check2 me-1"></i>Confirmar Pagamento\';
+    });
+    </script>
 </body>
 </html>';
     }
@@ -410,10 +489,35 @@ class AdminDesapegoController extends Controller {
             exit;
         }
 
+        $valorPago = (float) ($request->getParam('valor_pago') ?? 0);
+        $observacao = trim((string) ($request->getParam('observacao') ?? ''));
+
         try {
             $pdo = $this->getDirectPdo();
-            $st = $pdo->prepare("UPDATE desapego_comissoes SET status = 'pago', data_pagamento = NOW(), updated_at = NOW() WHERE id = ?");
-            $st->execute([$id]);
+
+            // Verificar se coluna valor_pago existe (pode não estar na migration original)
+            $colsComissao = [];
+            try { $stC = $pdo->query('DESCRIBE desapego_comissoes'); $colsComissao = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+
+            // Adicionar coluna valor_pago se não existir
+            if (!in_array('valor_pago', $colsComissao, true)) {
+                try { $pdo->exec("ALTER TABLE desapego_comissoes ADD COLUMN valor_pago DECIMAL(10,2) NULL DEFAULT NULL AFTER valor_comissao"); } catch (\Throwable $e) {}
+            }
+
+            $set = "status = 'pago', data_pagamento = NOW(), updated_at = NOW()";
+            $params = [];
+            if ($valorPago > 0) {
+                $set .= ", valor_pago = ?";
+                $params[] = $valorPago;
+            }
+            if ($observacao !== '') {
+                $set .= ", observacao = ?";
+                $params[] = $observacao;
+            }
+            $params[] = $id;
+
+            $st = $pdo->prepare("UPDATE desapego_comissoes SET {$set} WHERE id = ?");
+            $st->execute($params);
             echo json_encode(['ok' => true]);
         } catch (\Throwable $e) {
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
