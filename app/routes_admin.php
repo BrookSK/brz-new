@@ -93,6 +93,7 @@ $router->get('/admin/desapego/comissoes', 'AdminDesapegoController', 'comissoes'
 $router->get('/admin/desapego/pendentes', 'AdminDesapegoController', 'pendentes');
 $router->post('/admin/desapego/comissoes/marcar-pago', 'AdminDesapegoController', 'marcarPago');
 $router->post('/admin/desapego/comissoes/marcar-aprovado', 'AdminDesapegoController', 'marcarAprovado');
+$router->post('/admin/desapego/comissoes/reverter', 'AdminDesapegoController', 'reverter');
 $router->get('/admin/usuarios/editar/{id}', 'AdminUsuariosController', 'editar');
 $router->post('/admin/usuarios/atualizar/{id}', 'AdminUsuariosController', 'atualizar');
 $router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');

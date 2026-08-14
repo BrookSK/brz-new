@@ -115,6 +115,7 @@ class AdminDesapegoController extends Controller {
         .badge-aprovado { background: #d1ecf1; color: #0c5460; }
         .badge-pago { background: #d4edda; color: #155724; }
         .badge-cancelado { background: #f8d7da; color: #721c24; }
+        .badge-parcialmente_pago { background: #fff3cd; color: #856404; }
         </style>
 </head>
 <body>
@@ -207,33 +208,40 @@ class AdminDesapegoController extends Controller {
                     echo '<h6 class="fw-semibold mb-2 mt-3"><i class="bi bi-cash-stack me-1"></i>Histórico de Comissões</h6>
                         <div class="table-responsive">
                         <table class="table table-sm table-hover">
-                            <thead><tr><th>Data</th><th>Produto</th><th>Venda</th><th>%</th><th>Comissão</th><th>Status</th><th>Pago em</th><th>Ações</th></tr></thead>
+                            <thead><tr><th>Data</th><th>Produto</th><th>Venda</th><th>%</th><th>Comissão</th><th>Pago</th><th>Restante</th><th>Status</th><th>Data Pgto</th><th>Ações</th></tr></thead>
                             <tbody>';
                     foreach ($d['comissoes'] as $c) {
                         $statusBadge = 'badge-' . ($c['status'] ?? 'pendente');
-                        $statusLabel = ucfirst($c['status'] ?? 'pendente');
+                        $statusLabel = ucfirst(str_replace('_', ' ', $c['status'] ?? 'pendente'));
                         $dataPag = !empty($c['data_pagamento']) ? date('d/m/Y', strtotime($c['data_pagamento'])) : '—';
                         $comissaoId = (int) ($c['id'] ?? 0);
                         $comissaoStatus = (string) ($c['status'] ?? 'pendente');
+                        $valorComissao = (float) ($c['valor_comissao'] ?? 0);
+                        $valorPago = (float) ($c['valor_pago'] ?? 0);
+                        $restante = $valorComissao - $valorPago;
+                        if ($restante < 0.01) $restante = 0;
 
                         $acoesHtml = '';
-                        if ($comissaoStatus === 'pendente') {
-                            $acoesHtml = '<button class="btn btn-sm btn-outline-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format((float) ($c['valor_comissao'] ?? 0), 2, '.', '') . ')" title="Marcar como pago"><i class="bi bi-check-circle"></i></button>';
-                        } elseif ($comissaoStatus === 'aprovado') {
-                            $acoesHtml = '<button class="btn btn-sm btn-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format((float) ($c['valor_comissao'] ?? 0), 2, '.', '') . ')" title="Confirmar pagamento"><i class="bi bi-cash-coin"></i></button>';
-                        } else {
-                            $acoesHtml = '<span class="text-muted small">—</span>';
+                        if ($comissaoStatus === 'pendente' || $comissaoStatus === 'aprovado' || ($comissaoStatus === 'parcialmente_pago' && $restante > 0)) {
+                            $maxPagar = $restante > 0 ? $restante : $valorComissao;
+                            $acoesHtml = '<button class="btn btn-sm btn-outline-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format($maxPagar, 2, '.', '') . ', ' . number_format($valorComissao, 2, '.', '') . ')" title="Registrar pagamento"><i class="bi bi-cash-coin"></i></button>';
                         }
+                        if ($comissaoStatus === 'pago' || $comissaoStatus === 'parcialmente_pago') {
+                            $acoesHtml .= ' <button class="btn btn-sm btn-outline-danger" onclick="reverterComissao(' . $comissaoId . ')" title="Reverter para pendente"><i class="bi bi-arrow-counterclockwise"></i></button>';
+                        }
+                        if ($acoesHtml === '') $acoesHtml = '<span class="text-muted small">—</span>';
 
                         echo '<tr>
-                            <td>' . (!empty($c['created_at']) ? date('d/m/Y', strtotime($c['created_at'])) : '—') . '</td>
-                            <td>' . htmlspecialchars($c['produto_nome'] ?? 'Produto #' . ($c['produto_id'] ?? '?')) . '</td>
-                            <td>US$ ' . number_format((float) ($c['valor_venda'] ?? 0), 2) . '</td>
-                            <td>' . htmlspecialchars((string) ($c['percentual_comissao'] ?? 30)) . '%</td>
-                            <td class="fw-bold">US$ ' . number_format((float) ($c['valor_comissao'] ?? 0), 2) . '</td>
+                            <td class="small">' . (!empty($c['created_at']) ? date('d/m/Y', strtotime($c['created_at'])) : '—') . '</td>
+                            <td class="small">' . htmlspecialchars($c['produto_nome'] ?? 'Produto #' . ($c['produto_id'] ?? '?')) . '</td>
+                            <td class="small">US$ ' . number_format((float) ($c['valor_venda'] ?? 0), 2) . '</td>
+                            <td class="small">' . htmlspecialchars((string) ($c['percentual_comissao'] ?? 30)) . '%</td>
+                            <td class="fw-bold">US$ ' . number_format($valorComissao, 2) . '</td>
+                            <td class="text-success fw-semibold">' . ($valorPago > 0 ? 'US$ ' . number_format($valorPago, 2) : '—') . '</td>
+                            <td class="' . ($restante > 0 ? 'text-danger fw-semibold' : 'text-muted') . '">' . ($restante > 0 ? 'US$ ' . number_format($restante, 2) : '—') . '</td>
                             <td><span class="comissao-badge ' . $statusBadge . '">' . $statusLabel . '</span></td>
-                            <td>' . $dataPag . '</td>
-                            <td>' . $acoesHtml . '</td>
+                            <td class="small">' . $dataPag . (!empty($c['observacao']) ? '<br><span class="text-muted" style="font-size:.7rem;">' . htmlspecialchars($c['observacao']) . '</span>' : '') . '</td>
+                            <td class="text-nowrap">' . $acoesHtml . '</td>
                         </tr>';
                     }
                     echo '</tbody></table></div>';
@@ -257,18 +265,20 @@ class AdminDesapegoController extends Controller {
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="pagarComissaoId">
+                    <input type="hidden" id="pagarMaximo">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Valor pago (USD)</label>
+                        <label class="form-label fw-semibold">Valor a pagar (USD)</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input type="number" class="form-control" id="pagarValor" step="0.01" min="0">
+                            <input type="number" class="form-control" id="pagarValor" step="0.01" min="0.01">
                         </div>
-                        <small class="text-muted">Informe o valor efetivamente pago ao desapeguista.</small>
+                        <small class="text-muted">Máximo: <strong id="pagarMaxLabel">$0.00</strong>. Não é possível pagar acima do valor devido.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Observação (opcional)</label>
                         <input type="text" class="form-control" id="pagarObs" placeholder="Ex: PIX, transferência...">
                     </div>
+                    <div id="pagarErro" class="text-danger small" style="display:none;"></div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
@@ -280,38 +290,64 @@ class AdminDesapegoController extends Controller {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    function marcarPago(id, valorSugerido) {
+    function marcarPago(id, valorRestante, valorTotal) {
         document.getElementById("pagarComissaoId").value = id;
-        document.getElementById("pagarValor").value = valorSugerido.toFixed(2);
+        document.getElementById("pagarMaximo").value = valorRestante.toFixed(2);
+        document.getElementById("pagarValor").value = valorRestante.toFixed(2);
+        document.getElementById("pagarValor").max = valorRestante.toFixed(2);
+        document.getElementById("pagarMaxLabel").textContent = "$" + valorRestante.toFixed(2);
         document.getElementById("pagarObs").value = "";
+        document.getElementById("pagarErro").style.display = "none";
         var modal = new bootstrap.Modal(document.getElementById("modalPagar"));
         modal.show();
     }
 
     document.getElementById("btnConfirmarPago").addEventListener("click", async function() {
         var id = document.getElementById("pagarComissaoId").value;
-        var valor = document.getElementById("pagarValor").value;
+        var valor = parseFloat(document.getElementById("pagarValor").value) || 0;
+        var maximo = parseFloat(document.getElementById("pagarMaximo").value) || 0;
         var obs = document.getElementById("pagarObs").value;
+        var erro = document.getElementById("pagarErro");
+
+        if (valor <= 0) { erro.textContent = "Informe um valor maior que zero."; erro.style.display = ""; return; }
+        if (valor > maximo + 0.01) { erro.textContent = "Valor não pode ser maior que $" + maximo.toFixed(2); erro.style.display = ""; return; }
+        erro.style.display = "none";
+
         this.disabled = true;
         this.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Salvando...\';
         try {
             var resp = await fetch("/admin/desapego/comissoes/marcar-pago", {
                 method: "POST",
                 headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                body: "id=" + id + "&valor_pago=" + encodeURIComponent(valor) + "&observacao=" + encodeURIComponent(obs)
+                body: "id=" + encodeURIComponent(id) + "&valor_pago=" + encodeURIComponent(valor.toFixed(2)) + "&observacao=" + encodeURIComponent(obs)
             });
             var json = await resp.json();
             if (json.ok) {
                 location.reload();
             } else {
-                alert("Erro: " + (json.error || "Falha ao salvar"));
+                erro.textContent = json.error || "Falha ao salvar";
+                erro.style.display = "";
             }
         } catch(e) {
-            alert("Erro de conexão");
+            erro.textContent = "Erro de conexão";
+            erro.style.display = "";
         }
         this.disabled = false;
         this.innerHTML = \'<i class="bi bi-check2 me-1"></i>Confirmar Pagamento\';
     });
+
+    async function reverterComissao(id) {
+        if (!confirm("Reverter esta comissão para pendente? O valor pago será zerado.")) return;
+        try {
+            var resp = await fetch("/admin/desapego/comissoes/reverter", {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: "id=" + encodeURIComponent(id)
+            });
+            var json = await resp.json();
+            if (json.ok) { location.reload(); } else { alert("Erro: " + (json.error || "Falha")); }
+        } catch(e) { alert("Erro de conexão"); }
+    }
     </script>
 </body>
 </html>';
@@ -489,35 +525,88 @@ class AdminDesapegoController extends Controller {
             exit;
         }
 
-        $valorPago = (float) ($request->getParam('valor_pago') ?? 0);
+        $valorPagoInput = trim((string) ($request->getParam('valor_pago') ?? ''));
+        $valorPago = (float) str_replace(',', '.', $valorPagoInput);
         $observacao = trim((string) ($request->getParam('observacao') ?? ''));
+
+        if ($valorPago <= 0) {
+            echo json_encode(['ok' => false, 'error' => 'Informe um valor maior que zero.']);
+            exit;
+        }
 
         try {
             $pdo = $this->getDirectPdo();
 
-            // Verificar se coluna valor_pago existe (pode não estar na migration original)
+            // Garantir coluna valor_pago existe
             $colsComissao = [];
             try { $stC = $pdo->query('DESCRIBE desapego_comissoes'); $colsComissao = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
-
-            // Adicionar coluna valor_pago se não existir
             if (!in_array('valor_pago', $colsComissao, true)) {
-                try { $pdo->exec("ALTER TABLE desapego_comissoes ADD COLUMN valor_pago DECIMAL(10,2) NULL DEFAULT NULL AFTER valor_comissao"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE desapego_comissoes ADD COLUMN valor_pago DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER valor_comissao"); } catch (\Throwable $e) {}
             }
 
-            $set = "status = 'pago', data_pagamento = NOW(), updated_at = NOW()";
-            $params = [];
-            if ($valorPago > 0) {
-                $set .= ", valor_pago = ?";
-                $params[] = $valorPago;
+            // Buscar registro atual
+            $st = $pdo->prepare('SELECT valor_comissao, COALESCE(valor_pago, 0) AS valor_pago, status FROM desapego_comissoes WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                echo json_encode(['ok' => false, 'error' => 'Comissão não encontrada.']);
+                exit;
             }
-            if ($observacao !== '') {
-                $set .= ", observacao = ?";
-                $params[] = $observacao;
+
+            $valorComissao = (float) $row['valor_comissao'];
+            $jaFoiPago = (float) $row['valor_pago'];
+            $restante = $valorComissao - $jaFoiPago;
+
+            // Bloquear pagamento acima do devido
+            if ($valorPago > $restante + 0.01) {
+                echo json_encode(['ok' => false, 'error' => 'Valor informado ($' . number_format($valorPago, 2) . ') excede o restante ($' . number_format($restante, 2) . ').']);
+                exit;
             }
+
+            $novoTotalPago = $jaFoiPago + $valorPago;
+            // Determinar novo status
+            if ($novoTotalPago >= $valorComissao - 0.01) {
+                $novoStatus = 'pago';
+                $novoTotalPago = $valorComissao; // arredondar para evitar centavos soltos
+            } else {
+                $novoStatus = 'parcialmente_pago';
+            }
+
+            $setObs = $observacao !== '' ? ', observacao = ?' : '';
+            $params = [$novoTotalPago, $novoStatus];
+            if ($observacao !== '') $params[] = $observacao;
             $params[] = $id;
 
-            $st = $pdo->prepare("UPDATE desapego_comissoes SET {$set} WHERE id = ?");
-            $st->execute($params);
+            $sql = "UPDATE desapego_comissoes SET valor_pago = ?, status = ?, data_pagamento = NOW(), updated_at = NOW(){$setObs} WHERE id = ?";
+            $stUpd = $pdo->prepare($sql);
+            $stUpd->execute($params);
+
+            echo json_encode(['ok' => true, 'status' => $novoStatus, 'total_pago' => $novoTotalPago]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Reverter comissão para pendente (AJAX)
+     */
+    public function reverter(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        $id = (int) $request->getParam('id');
+        if ($id <= 0) {
+            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            exit;
+        }
+
+        try {
+            $pdo = $this->getDirectPdo();
+            $st = $pdo->prepare("UPDATE desapego_comissoes SET status = 'pendente', valor_pago = 0, data_pagamento = NULL, observacao = NULL, updated_at = NOW() WHERE id = ?");
+            $st->execute([$id]);
             echo json_encode(['ok' => true]);
         } catch (\Throwable $e) {
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
