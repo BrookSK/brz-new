@@ -537,12 +537,13 @@ class AdminDesapegoController extends Controller {
         try {
             $pdo = $this->getDirectPdo();
 
-            // Garantir coluna valor_pago existe
+            // Garantir coluna valor_pago existe e ENUM suporta parcialmente_pago
             $colsComissao = [];
             try { $stC = $pdo->query('DESCRIBE desapego_comissoes'); $colsComissao = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
             if (!in_array('valor_pago', $colsComissao, true)) {
                 try { $pdo->exec("ALTER TABLE desapego_comissoes ADD COLUMN valor_pago DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER valor_comissao"); } catch (\Throwable $e) {}
             }
+            try { $pdo->exec("ALTER TABLE desapego_comissoes MODIFY COLUMN status ENUM('pendente','aprovado','parcialmente_pago','pago','cancelado') NOT NULL DEFAULT 'pendente'"); } catch (\Throwable $e) {}
 
             // Buscar registro atual
             $st = $pdo->prepare('SELECT valor_comissao, COALESCE(valor_pago, 0) AS valor_pago, status FROM desapego_comissoes WHERE id = ? LIMIT 1');
