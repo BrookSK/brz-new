@@ -603,13 +603,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 $dadosNovoPedido[$colTotalPedido] = round($novoSubtotal + $taxaServicoNovo + $novoImpostos + $novoFrete - $novoDesconto, 2);
             }
 
-            // Código do novo pedido: original + "-B"
+            // Código do novo pedido: original + sufixo sequencial (-B, -C, -D, ...)
             $codigoOriginal = (string) ($pedido['codigo_pedido'] ?? $pedido['numero_pedido'] ?? $pedido['codigo'] ?? $pedido['numero'] ?? $pedidoId);
             if ($codigoOriginal === '' || $codigoOriginal === '0') $codigoOriginal = (string) $pedidoId;
 
+            // Extrair o código base (sem sufixo de split anterior, ex: MAN-123-B → MAN-123)
+            $codigoBase = preg_replace('/-[A-Z]{1,2}$/', '', $codigoOriginal);
+
             $colCodigo = $this->pickCol($colsPedidos, ['codigo_pedido', 'numero_pedido', 'codigo', 'numero']);
             if ($colCodigo) {
-                $dadosNovoPedido[$colCodigo] = $codigoOriginal . '-B';
+                // Buscar splits existentes para determinar o próximo sufixo
+                $nextSuffix = $this->getNextSplitSuffix($colCodigo, $codigoBase);
+                $dadosNovoPedido[$colCodigo] = $codigoBase . '-' . $nextSuffix;
             }
 
             // Data de criação
@@ -890,6 +895,59 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         return $pesoTotal;
+    }
+
+    /**
+     * Determina o próximo sufixo disponível para split (B, C, D, ..., Z, AA, AB, ...)
+     */
+    private function getNextSplitSuffix(string $colCodigo, string $codigoBase): string {
+        try {
+            // Buscar todos os pedidos que já são splits deste código base
+            $stmt = $this->connection->prepare(
+                "SELECT {$colCodigo} FROM pedidos WHERE {$colCodigo} LIKE :pattern"
+            );
+            $stmt->execute([':pattern' => $codigoBase . '-%']);
+            $existentes = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            // Extrair os sufixos existentes (parte após o último hífen do código base)
+            $sufixosExistentes = [];
+            $prefixo = $codigoBase . '-';
+            foreach ($existentes as $codigo) {
+                if (strpos($codigo, $prefixo) === 0) {
+                    $sufixo = substr($codigo, strlen($prefixo));
+                    // Validar que é um sufixo alfabético (A-Z, AA-ZZ)
+                    if (preg_match('/^[A-Z]{1,2}$/', $sufixo)) {
+                        $sufixosExistentes[] = $sufixo;
+                    }
+                }
+            }
+
+            // Gerar sufixos em ordem: B, C, D, ..., Z, AA, AB, ..., AZ, BA, ...
+            // e retornar o primeiro que não existe
+            $letras = range('A', 'Z');
+            // Começar de B (A seria o original)
+            for ($i = 1; $i < 26; $i++) {
+                $candidato = $letras[$i]; // B, C, D, ..., Z
+                if (!in_array($candidato, $sufixosExistentes, true)) {
+                    return $candidato;
+                }
+            }
+            // Se esgotou A-Z, tentar AA, AB, ..., ZZ
+            foreach ($letras as $l1) {
+                foreach ($letras as $l2) {
+                    $candidato = $l1 . $l2;
+                    if (!in_array($candidato, $sufixosExistentes, true)) {
+                        return $candidato;
+                    }
+                }
+            }
+
+            // Fallback extremo (mais de 676 splits)
+            return 'SP' . time();
+        } catch (\Exception $e) {
+            // Em caso de erro na consulta, usar timestamp para evitar conflito
+            return 'B' . substr((string) time(), -4);
+        }
     }
 
     private function redirectWithMessage(string $url, string $message, string $type = 'success'): void {
