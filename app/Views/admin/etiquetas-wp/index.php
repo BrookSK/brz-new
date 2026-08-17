@@ -56,7 +56,6 @@
             <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
                 <input type="text" class="form-control" id="etiquetas-busca" placeholder="Buscar por pedido, cliente, tracking..." oninput="filtrarEtiquetas(this.value)">
-                <button class="btn btn-outline-primary btn-sm" id="btn-buscar-wp" style="display:none;"><i class="fas fa-cloud-arrow-down me-1"></i>Buscar no WordPress</button>
             </div>
         </div>
         <div class="card ewp-card mb-3">
@@ -179,47 +178,48 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
 const BASE='/admin/etiquetas-wp';
 
 // Filtro de busca client-side
+let filtroDebounce = null;
 function filtrarEtiquetas(termo) {
-    termo = termo.toLowerCase().trim();
-    // Filtrar tabela Caixa Fechada
+    termo = termo.trim();
+    // Filtrar tabela Caixa Fechada (sempre client-side)
+    const termoLower = termo.toLowerCase();
     document.querySelectorAll('#pedidos-body tr').forEach(tr => {
         const text = tr.textContent.toLowerCase();
-        tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
+        tr.style.display = (!termoLower || text.includes(termoLower)) ? '' : 'none';
     });
-    // Filtrar tabela Pacotes gerados (client-side)
-    let found = false;
-    document.querySelectorAll('#pacotes-body tr').forEach(tr => {
-        const text = tr.textContent.toLowerCase();
-        const match = (!termo || text.includes(termo));
-        tr.style.display = match ? '' : 'none';
-        if (match && termo) found = true;
-    });
-    // Se digitou algo e não encontrou localmente, mostrar botão de busca no WP
-    const searchBtn = document.getElementById('btn-buscar-wp');
-    if (termo.length >= 3 && !found) {
-        searchBtn.style.display = 'inline-block';
-        searchBtn.onclick = () => buscarNoWordPress(termo);
+
+    // Para pacotes: se tem 3+ chars, buscar direto no WP com debounce
+    clearTimeout(filtroDebounce);
+    if (termo.length >= 3) {
+        document.getElementById('pacotes-pagination').style.display = 'none';
+        filtroDebounce = setTimeout(() => buscarNoWordPress(termo), 400);
+    } else if (termo.length === 0) {
+        // Sem filtro: voltar pra listagem paginada normal
+        carregarPacotes(1);
     } else {
-        searchBtn.style.display = 'none';
+        // 1-2 chars: filtrar client-side na página atual
+        document.querySelectorAll('#pacotes-body tr').forEach(tr => {
+            const text = tr.textContent.toLowerCase();
+            tr.style.display = (!termoLower || text.includes(termoLower)) ? '' : 'none';
+        });
     }
-    // Esconder paginação durante busca
-    document.getElementById('pacotes-pagination').style.display = termo ? 'none' : 'flex';
 }
 
 // Busca direta no WordPress
 async function buscarNoWordPress(termo) {
     const tbody = document.getElementById('pacotes-body');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i> Buscando no WordPress...</td></tr>';
-    document.getElementById('btn-buscar-wp').style.display = 'none';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i> Buscando...</td></tr>';
     try {
         const r = await fetch(BASE + '/listar-pacotes?search=' + encodeURIComponent(termo) + '&per_page=50');
         const d = await r.json();
         tbody.innerHTML = '';
         if (d.success && d.data && d.data.length > 0) {
             d.data.forEach(p => renderPacoteRow(tbody, p));
-            tbody.innerHTML += '<tr><td colspan="6" class="text-center small text-muted py-2"><i class="fas fa-cloud me-1"></i>Resultado da busca no WordPress (' + d.data.length + ' encontrado(s)) <button class="btn btn-xs btn-outline-secondary ms-2" onclick="carregarPacotes()">Voltar</button></td></tr>';
+            document.getElementById('pacotes-pagination').innerHTML = '<small class="text-muted"><i class="fas fa-cloud me-1"></i>' + d.data.length + ' resultado(s) para "' + termo + '"</small>';
+            document.getElementById('pacotes-pagination').style.display = 'flex';
         } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-search"></i> Nenhum pacote encontrado para "' + termo + '"</td></tr><tr><td colspan="6" class="text-center"><button class="btn btn-xs btn-outline-secondary" onclick="carregarPacotes()">Voltar</button></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-search"></i> Nenhum pacote encontrado para "' + termo + '"</td></tr>';
+            document.getElementById('pacotes-pagination').style.display = 'none';
         }
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-danger">' + e.message + '</td></tr>';
