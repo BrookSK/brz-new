@@ -31,7 +31,7 @@
                 <table class="table table-sm align-middle" id="tabelaPedidos">
                     <thead>
                         <tr>
-                            <th style="width:30px;"></th>
+                            <th style="width:30px;"><input type="checkbox" class="form-check-input" id="checkAllPedidos" onclick="toggleAllPedidosShippo(this)"></th>
                             <th>Pedido</th>
                             <th>Cliente</th>
                             <th>Peso</th>
@@ -51,11 +51,11 @@
                                     $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
                                     $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
                                 ?>
-                                <tr class="pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>">
-                                    <td>
-                                        <a class="btn btn-sm btn-primary py-0 px-2" href="/admin/shippo/pedido/<?= $pid ?>"><i class="fas fa-external-link-alt"></i></a>
+                                <tr class="pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>" style="cursor:pointer;" onclick="window.location='/admin/shippo/pedido/<?= $pid ?>'">
+                                    <td onclick="event.stopPropagation();">
+                                        <input type="checkbox" class="form-check-input pedido-check" value="<?= $pid ?>">
                                     </td>
-                                    <td><a href="/admin/shippo/pedido/<?= $pid ?>">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></a></td>
+                                    <td><span class="text-primary fw-bold">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
                                     <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
                                     <td>
                                         <?php if ($peso > 0): ?>
@@ -157,13 +157,12 @@
                             $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
                             $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
                         ?>
-                        <div class="border-bottom py-2 pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>">
+                        <div class="border-bottom py-2 pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>" style="cursor:pointer;" onclick="window.location='/admin/shippo/pedido/<?= $pid ?>'">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <span class="fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
+                                    <span class="text-primary fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
                                     <span class="small ms-2"><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></span>
                                 </div>
-                                <a class="btn btn-sm btn-primary py-0 px-2" href="/admin/shippo/pedido/<?= $pid ?>">Abrir</a>
                             </div>
                             <div class="text-muted small">
                                 <?= $peso > 0 ? number_format($peso, 2, ',', '.') . 'kg' : '--' ?>
@@ -302,6 +301,11 @@ function filtrarShippo() {
         var data = (row.getAttribute('data-search') || '');
         row.style.display = (!query || data.indexOf(query) !== -1) ? '' : 'none';
     });
+}
+
+// ===== Checkbox de pedidos =====
+function toggleAllPedidosShippo(el) {
+    document.querySelectorAll('.pedido-check').forEach(function(cb) { cb.checked = el.checked; });
 }
 
 // ===== Regerar =====
