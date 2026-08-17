@@ -5553,7 +5553,126 @@ LINKSCRIPT;
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>';
+
+        // === SEÇÃO AUDITORIA / HISTÓRICO (colapsável) ===
+        $auditoriaHtml = '';
+        try {
+            $dbAudit = \Config\Database::getConnection();
+            $pidAudit = (int) $pedido['id'];
+
+            // 1. Histórico de status (pedido_status_history)
+            $statusHistRows = [];
+            try {
+                $stHist = $dbAudit->prepare("
+                    SELECT h.status_anterior, h.novo_status, h.observacao, h.created_at, u.nome AS usuario_nome
+                    FROM pedido_status_history h
+                    LEFT JOIN usuarios u ON u.id = h.alterado_por
+                    WHERE h.pedido_id = ?
+                    ORDER BY h.created_at DESC
+                ");
+                $stHist->execute([$pidAudit]);
+                $statusHistRows = $stHist->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            // 2. Etiquetas geradas (correios_packet_etiquetas)
+            $etiquetaRows = [];
+            try {
+                $stEtiq = $dbAudit->prepare("SELECT tracking_number, status, customer_control_code, wp_post_id, created_at FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY created_at DESC");
+                $stEtiq->execute([$pidAudit]);
+                $etiquetaRows = $stEtiq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            // 3. Auditoria de edições (auditoria_logs)
+            $auditRows = [];
+            try {
+                $stAudit = $dbAudit->prepare("
+                    SELECT a.acao, a.valores_antigos, a.valores_novos, a.ip, a.created_at, u.nome AS usuario_nome
+                    FROM auditoria_logs a
+                    LEFT JOIN usuarios u ON u.id = a.usuario_id
+                    WHERE a.registro_id = ? AND a.tabela = 'pedidos'
+                    ORDER BY a.created_at DESC
+                    LIMIT 30
+                ");
+                $stAudit->execute([$pidAudit]);
+                $auditRows = $stAudit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            $temDados = (!empty($statusHistRows) || !empty($etiquetaRows) || !empty($auditRows));
+
+            if ($temDados) {
+                $auditoriaHtml .= '<div class="row mt-4"><div class="col-12">';
+                $auditoriaHtml .= '<div class="card mb-4 border-secondary">';
+                $auditoriaHtml .= '<div class="card-header bg-light d-flex justify-content-between align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#collapseAuditoria" aria-expanded="false">';
+                $auditoriaHtml .= '<h6 class="mb-0"><i class="fas fa-clock-rotate-left me-2"></i>Auditoria / Histórico</h6>';
+                $auditoriaHtml .= '<i class="fas fa-chevron-down small"></i>';
+                $auditoriaHtml .= '</div>';
+                $auditoriaHtml .= '<div class="collapse" id="collapseAuditoria"><div class="card-body">';
+
+                // Histórico de status
+                if (!empty($statusHistRows)) {
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-exchange-alt me-1"></i> Histórico de Status</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Data</th><th>De</th><th>Para</th><th>Observação</th><th>Usuário</th></tr></thead><tbody>';
+                    foreach ($statusHistRows as $sh) {
+                        $auditoriaHtml .= '<tr><td class="small">' . ($sh['created_at'] ? date('d/m/Y H:i', strtotime($sh['created_at'])) : '-') . '</td>';
+                        $auditoriaHtml .= '<td><span class="badge bg-secondary">' . htmlspecialchars($sh['status_anterior'] ?? '-') . '</span></td>';
+                        $auditoriaHtml .= '<td><span class="badge bg-primary">' . htmlspecialchars($sh['novo_status'] ?? '-') . '</span></td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['observacao'] ?? '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['usuario_nome'] ?? 'Sistema') . '</td></tr>';
+                    }
+                    $auditoriaHtml .= '</tbody></table></div>';
+                }
+
+                // Etiquetas
+                if (!empty($etiquetaRows)) {
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-barcode me-1"></i> Etiquetas</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Data</th><th>Tracking</th><th>Status</th><th>WP Post ID</th></tr></thead><tbody>';
+                    foreach ($etiquetaRows as $et) {
+                        $auditoriaHtml .= '<tr><td class="small">' . ($et['created_at'] ? date('d/m/Y H:i', strtotime($et['created_at'])) : '-') . '</td>';
+                        $auditoriaHtml .= '<td><code>' . htmlspecialchars($et['tracking_number'] ?? '-') . '</code></td>';
+                        $auditoriaHtml .= '<td>' . htmlspecialchars($et['status'] ?? '-') . '</td>';
+                        $auditoriaHtml .= '<td>' . ($et['wp_post_id'] ? $et['wp_post_id'] : '<span class="text-muted">-</span>') . '</td></tr>';
+                    }
+                    $auditoriaHtml .= '</tbody></table></div>';
+                }
+
+                // Log de auditoria (edições)
+                if (!empty($auditRows)) {
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-pen me-1"></i> Log de Edições</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead class="table-light"><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Mudanças</th><th>IP</th></tr></thead><tbody>';
+                    foreach ($auditRows as $ar) {
+                        $antigos = json_decode($ar['valores_antigos'] ?? '', true);
+                        $novos = json_decode($ar['valores_novos'] ?? '', true);
+                        $mudancas = '';
+                        if (is_array($antigos) && is_array($novos)) {
+                            $diffs = [];
+                            foreach ($novos as $k => $v) {
+                                $oldVal = $antigos[$k] ?? null;
+                                if ((string) $oldVal !== (string) $v) {
+                                    $diffs[] = '<strong>' . htmlspecialchars($k) . '</strong>: ' . htmlspecialchars((string) ($oldVal ?? 'null')) . ' → ' . htmlspecialchars((string) ($v ?? 'null'));
+                                }
+                            }
+                            $mudancas = implode('<br>', array_slice($diffs, 0, 5));
+                            if (count($diffs) > 5) $mudancas .= '<br><span class="text-muted">...+' . (count($diffs) - 5) . ' campos</span>';
+                        }
+                        $auditoriaHtml .= '<tr><td class="small text-nowrap">' . ($ar['created_at'] ? date('d/m/Y H:i', strtotime($ar['created_at'])) : '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['usuario_nome'] ?? 'Sistema') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['acao'] ?? '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . ($mudancas ?: '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small text-muted">' . htmlspecialchars($ar['ip'] ?? '-') . '</td></tr>';
+                    }
+                    $auditoriaHtml .= '</tbody></table></div>';
+                }
+
+                $auditoriaHtml .= '</div></div></div></div></div>';
+            }
+        } catch (\Exception $e) {}
+
+        if ($auditoriaHtml !== '') {
+            echo $auditoriaHtml;
+        }
+
+        echo '
             </main>
         </div>
     </div>
