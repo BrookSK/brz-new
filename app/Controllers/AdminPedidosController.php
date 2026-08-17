@@ -25,7 +25,9 @@ class AdminPedidosController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$', [
+                \PDO::MYSQL_ATTR_FOUND_ROWS => true,
+            ]);
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
 
             $usuarioLogado = $auth->getUsuarioLogado();
@@ -143,9 +145,73 @@ class AdminPedidosController extends Controller {
             ];
             error_log('[ATUALIZAR_CLIENTE_DEBUG] ' . json_encode($debugInfo, JSON_UNESCAPED_UNICODE));
 
-            // NÃO atualizar tabela usuarios — edição no pedido é exclusiva deste pedido
+            // Propagar dados editados para a tabela usuarios (cadastro do cliente)
+            // O sistema lê telefone, email, nome e CPF de lá via fallback no getComDetalhes()
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
             $usuarioIdPedido = ($colUsuarioId !== '') ? (int) ($oldRow[$colUsuarioId] ?? 0) : 0;
+
+            if ($usuarioIdPedido > 0) {
+                try {
+                    $colsUsuarios = $this->getTableColumnsPdo($pdo, 'usuarios');
+                    $pickColU = function(array $candidates) use ($colsUsuarios): string {
+                        foreach ($candidates as $c) {
+                            if (is_array($colsUsuarios) && in_array($c, $colsUsuarios, true)) return $c;
+                        }
+                        return '';
+                    };
+
+                    $setU = [];
+                    $paramsU = [];
+
+                    // Telefone
+                    $telefoneVal = trim((string) $request->getParam('telefone'));
+                    if ($telefoneVal !== '') {
+                        $colTelU = $pickColU(['telefone', 'phone', 'celular', 'mobile', 'whatsapp']);
+                        if ($colTelU !== '') {
+                            $setU[] = $colTelU . ' = ?';
+                            $paramsU[] = $telefoneVal;
+                        }
+                    }
+
+                    // Email
+                    $emailVal = trim((string) $request->getParam('email'));
+                    if ($emailVal !== '') {
+                        $colEmailU = $pickColU(['email']);
+                        if ($colEmailU !== '') {
+                            $setU[] = $colEmailU . ' = ?';
+                            $paramsU[] = $emailVal;
+                        }
+                    }
+
+                    // Nome
+                    $nomeVal = trim((string) $request->getParam('nome'));
+                    if ($nomeVal !== '') {
+                        $colNomeU = $pickColU(['nome', 'name', 'full_name']);
+                        if ($colNomeU !== '') {
+                            $setU[] = $colNomeU . ' = ?';
+                            $paramsU[] = $nomeVal;
+                        }
+                    }
+
+                    // CPF/Documento
+                    $docVal = trim((string) $request->getParam('documento'));
+                    if ($docVal !== '') {
+                        $colDocU = $pickColU(['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf']);
+                        if ($colDocU !== '') {
+                            $setU[] = $colDocU . ' = ?';
+                            $paramsU[] = $docVal;
+                        }
+                    }
+
+                    if (!empty($setU)) {
+                        $paramsU[] = $usuarioIdPedido;
+                        $sqlU = 'UPDATE usuarios SET ' . implode(', ', $setU) . ' WHERE id = ?';
+                        $pdo->prepare($sqlU)->execute($paramsU);
+                    }
+                } catch (\Throwable $e) {
+                    // Silenciar — não bloquear o fluxo principal por falha na propagação
+                }
+            }
 
             // ENDEREÇO: SEMPRE criar registro NOVO exclusivo para este pedido
             // Isso garante que editar endereço de um pedido NÃO afeta outros pedidos da mesma cliente.
@@ -259,7 +325,7 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            $this->json(['success' => true, 'debug' => $debugInfo]);
+            $this->json(['success' => true, 'rows_affected' => $rowsAffected, 'endereco_id' => $enderecoIdAtualizado]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
@@ -4425,6 +4491,32 @@ CUSTOSCRIPT;
                     $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
                     $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
                     $pais = (string) ($pedido['pais_entrega'] ?? ($pedido['country_entrega'] ?? ($pedido['pais'] ?? '')));
+                    // Normalizar país para código ISO (ex: "Brasil" → "BR", "Brazil" → "BR")
+                    $paisNormMap = [
+                        'BRASIL' => 'BR', 'BRAZIL' => 'BR', 'BRA' => 'BR',
+                        'ESTADOS UNIDOS' => 'US', 'UNITED STATES' => 'US', 'USA' => 'US',
+                        'PORTUGAL' => 'PT', 'PRT' => 'PT',
+                        'JAPAO' => 'JP', 'JAPAN' => 'JP', 'JPN' => 'JP',
+                        'REINO UNIDO' => 'GB', 'UNITED KINGDOM' => 'GB', 'GBR' => 'GB',
+                        'ALEMANHA' => 'DE', 'GERMANY' => 'DE', 'DEU' => 'DE',
+                        'FRANCA' => 'FR', 'FRANCE' => 'FR', 'FRA' => 'FR',
+                        'ESPANHA' => 'ES', 'SPAIN' => 'ES', 'ESP' => 'ES',
+                        'ITALIA' => 'IT', 'ITALY' => 'IT', 'ITA' => 'IT',
+                        'CANADA' => 'CA', 'CAN' => 'CA',
+                        'AUSTRALIA' => 'AU', 'AUS' => 'AU',
+                        'ARGENTINA' => 'AR', 'ARG' => 'AR',
+                        'CHILE' => 'CL', 'CHL' => 'CL',
+                        'COLOMBIA' => 'CO', 'COL' => 'CO',
+                        'MEXICO' => 'MX', 'MEX' => 'MX',
+                    ];
+                    $paisUp = strtoupper(trim($pais));
+                    // Remover acentos para normalização
+                    $paisUpNorm = strtoupper(trim((string) @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $pais)));
+                    if (isset($paisNormMap[$paisUp])) {
+                        $pais = $paisNormMap[$paisUp];
+                    } elseif ($paisUpNorm !== '' && isset($paisNormMap[$paisUpNorm])) {
+                        $pais = $paisNormMap[$paisUpNorm];
+                    }
                     $cep = (string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''));
                     $endereco = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
                     $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
