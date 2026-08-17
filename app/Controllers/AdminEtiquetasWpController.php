@@ -888,6 +888,18 @@ class AdminEtiquetasWpController extends Controller
                                 if ($pesoFixItem <= 0 && in_array('peso_manual', $cols)) {
                                     $pesoFixItem = (float) ($it['peso_manual'] ?? 0);
                                 }
+                                // Fallback: buscar peso do pacote_recebido
+                                if ($pesoFixItem <= 0 && $isPacoteItem) {
+                                    $pacoteIdPeso = (int) ($it['pacote_id'] ?? 0);
+                                    if ($pacoteIdPeso > 0) {
+                                        try {
+                                            $stPeso = $this->connection->prepare('SELECT peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                            $stPeso->execute([$pacoteIdPeso]);
+                                            $pesoPac = (float) ($stPeso->fetchColumn() ?: 0);
+                                            if ($pesoPac > 0) $pesoFixItem = $pesoPac;
+                                        } catch (\Throwable $e) {}
+                                    }
+                                }
 
                                 $items[] = [
                                     'hsCode' => $hs,
@@ -1198,6 +1210,16 @@ class AdminEtiquetasWpController extends Controller
                                 if ($nomePac !== '') $nomeProd = $nomePac;
                             } catch (\Throwable $e) {}
                         }
+                        // Peso: fallback para pacotes_recebidos.peso_kg
+                        $pesoKgItem = (float) ($itD['peso_manual'] ?? ($itD['peso_kg'] ?? 0));
+                        if ($pesoKgItem <= 0 && $pacoteIdItem > 0) {
+                            try {
+                                $stPesoDir = $dbDireto->prepare('SELECT peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                $stPesoDir->execute([$pacoteIdItem]);
+                                $pesoDirFb = (float) ($stPesoDir->fetchColumn() ?: 0);
+                                if ($pesoDirFb > 0) $pesoKgItem = $pesoDirFb;
+                            } catch (\Throwable $e) {}
+                        }
                         $itemsIn[] = [
                             'produto_id' => $pidItem,
                             'nome_produto' => $nomeProd,
@@ -1207,7 +1229,7 @@ class AdminEtiquetasWpController extends Controller
                             'preco_unitario' => (float) ($itD['preco_unitario'] ?? 0),
                             'declaration_value' => (float) ($itD['declaration_value'] ?? 0),
                             'quantidade' => (int) ($itD['quantidade'] ?? 1),
-                            'peso_kg' => (float) ($itD['peso_manual'] ?? ($itD['peso_kg'] ?? 0)),
+                            'peso_kg' => $pesoKgItem,
                             'tipo_item' => $itD['tipo_item'] ?? 'produto',
                             'pacote_id' => $itD['pacote_id'] ?? null,
                             '_valor_ja_usd' => (($itD['tipo_item'] ?? '') === 'pacote_redirecionamento'),
@@ -1315,6 +1337,19 @@ class AdminEtiquetasWpController extends Controller
 
             if ($val < 0.01) $val = 0.01;
             $pesoItem = (float) ($it['peso_kg'] ?? 0);
+            // Fallback: buscar peso do pacote_recebido quando peso_kg está zero
+            if ($pesoItem <= 0 && $isPacote) {
+                $pacIdPeso = (int) ($it['pacote_id'] ?? 0);
+                if ($pacIdPeso > 0) {
+                    try {
+                        $dbPeso = \Config\Database::getConnection();
+                        $stPesoFb = $dbPeso->prepare('SELECT peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stPesoFb->execute([$pacIdPeso]);
+                        $pesoFb = (float) ($stPesoFb->fetchColumn() ?: 0);
+                        if ($pesoFb > 0) $pesoItem = $pesoFb;
+                    } catch (\Throwable $e) {}
+                }
+            }
             $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', ''), 'weight' => (float) number_format($pesoItem, 4, '.', '')];
         }
         if (empty($items)) return ['_error' => 'Sem itens válidos'];
