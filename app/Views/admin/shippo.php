@@ -51,11 +51,11 @@
                                     $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
                                     $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
                                 ?>
-                                <tr class="pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>" style="cursor:pointer;" onclick="window.location='/admin/shippo/pedido/<?= $pid ?>'">
-                                    <td onclick="event.stopPropagation();">
+                                <tr class="pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>">
+                                    <td>
                                         <input type="checkbox" class="form-check-input pedido-check" value="<?= $pid ?>">
                                     </td>
-                                    <td><span class="fw-bold" style="color:#e67e22;">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
+                                    <td><span class="fw-bold">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
                                     <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
                                     <td>
                                         <?php if ($peso > 0): ?>
@@ -124,7 +124,7 @@
                                 ?>
                                 <tr data-pid="<?= $pid ?>" data-ok="<?= $dadosOk ? '1' : '0' ?>">
                                     <td><input type="checkbox" class="form-check-input massa-check" value="<?= $pid ?>" onchange="updateMassaCountShippo()" <?= !$dadosOk ? 'disabled title="Dados incompletos"' : '' ?>></td>
-                                    <td><span class="fw-bold" style="color:#e67e22;">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
+                                    <td><span class="fw-bold">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
                                     <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
                                     <td class="<?= $temPeso ? '' : 'text-danger fw-bold' ?>"><?= $temPeso ? number_format($peso, 2, ',', '.') : '⚠ 0' ?></td>
                                     <td class="<?= $temDim ? '' : 'text-danger' ?>"><?= ($larg > 0 ? number_format($larg, 1) : '?') ?>×<?= ($alt > 0 ? number_format($alt, 1) : '?') ?>×<?= ($comp > 0 ? number_format($comp, 1) : '?') ?></td>
@@ -157,10 +157,10 @@
                             $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
                             $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
                         ?>
-                        <div class="border-bottom py-2 pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>" style="cursor:pointer;" onclick="window.location='/admin/shippo/pedido/<?= $pid ?>'">
+                        <div class="border-bottom py-2 pedido-row" data-search="<?= htmlspecialchars(strtolower(($p['cliente_nome'] ?? '') . ' ' . $pid)) ?>">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <span class="text-primary fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
+                                    <span class="fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
                                     <span class="small ms-2"><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></span>
                                 </div>
                             </div>
@@ -212,7 +212,7 @@
                                     $rateCurrency = (string) ($e['rate_currency'] ?? 'USD');
                                 ?>
                                 <tr class="etiqueta-row" data-search="<?= htmlspecialchars(strtolower(($e['cliente_nome'] ?? '') . ' ' . $pid . ' ' . $trk)) ?>">
-                                    <td><span class="fw-bold" style="color:#e67e22;">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
+                                    <td><span class="fw-bold">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
                                     <td><?= htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
