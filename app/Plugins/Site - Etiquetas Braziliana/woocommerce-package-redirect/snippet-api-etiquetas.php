@@ -234,6 +234,7 @@ function brz_api_create_package(WP_REST_Request $request) {
             'description' => sanitize_text_field($item['description'] ?? ''),
             'quantity' => intval($item['quantity'] ?? 1),
             'value' => floatval($item['value'] ?? 0),
+            'weight' => floatval($item['weight'] ?? 0),
         ];
     }
 

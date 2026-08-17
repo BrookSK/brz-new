@@ -1152,10 +1152,22 @@ class AdminEtiquetasWpController extends Controller
                 if (!empty($itensDireto)) {
                     $itemsIn = [];
                     foreach ($itensDireto as $itD) {
+                        $nomeProd = trim((string) ($itD['nome_produto'] ?? ($itD['nome_item'] ?? '')));
+                        // Fallback: buscar nome do pacote_recebido quando nome está vazio ou genérico
+                        $pidItem = (int) ($itD['produto_id'] ?? 0);
+                        $pacoteIdItem = (int) ($itD['pacote_id'] ?? 0);
+                        if (($nomeProd === '' || $nomeProd === 'Item' || strpos($nomeProd, 'Produto #') === 0) && $pacoteIdItem > 0) {
+                            try {
+                                $stNomePac = $dbDireto->prepare('SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                $stNomePac->execute([$pacoteIdItem]);
+                                $nomePac = trim((string) ($stNomePac->fetchColumn() ?: ''));
+                                if ($nomePac !== '') $nomeProd = $nomePac;
+                            } catch (\Throwable $e) {}
+                        }
                         $itemsIn[] = [
-                            'produto_id' => (int) ($itD['produto_id'] ?? 0),
-                            'nome_produto' => $itD['nome_produto'] ?? ($itD['nome_item'] ?? ''),
-                            'nome' => $itD['nome_produto'] ?? ($itD['nome_item'] ?? ''),
+                            'produto_id' => $pidItem,
+                            'nome_produto' => $nomeProd,
+                            'nome' => $nomeProd,
                             'ncm' => $itD['ncm'] ?? ($itD['produto_ncm'] ?? ''),
                             'produto_ncm' => $itD['produto_ncm'] ?? ($itD['ncm'] ?? ''),
                             'preco_unitario' => (float) ($itD['preco_unitario'] ?? 0),
@@ -1228,7 +1240,22 @@ class AdminEtiquetasWpController extends Controller
             $qtd = (int) ($it['quantidade'] ?? 0);
             if ($qtd <= 0) return ['_error' => 'Item #' . ($idx+1) . ' qtd inválida'];
             $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
-            if ($desc === '') $desc = 'Item ' . ($idx+1);
+            if ($desc === '' || $desc === 'Item' || strpos($desc, 'Produto #') === 0) {
+                // Fallback: buscar nome do pacote_recebido
+                $pacIdFallback = (int) ($it['pacote_id'] ?? 0);
+                if ($pacIdFallback > 0) {
+                    try {
+                        $dbFb = \Config\Database::getConnection();
+                        $stFb = $dbFb->prepare('SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stFb->execute([$pacIdFallback]);
+                        $nomeFb = trim((string) ($stFb->fetchColumn() ?: ''));
+                        if ($nomeFb !== '') $desc = $nomeFb;
+                    } catch (\Throwable $e) {}
+                }
+                if ($desc === '' || $desc === 'Item' || strpos($desc, 'Produto #') === 0) {
+                    $desc = 'Item ' . ($idx+1);
+                }
+            }
 
             // NCM: tentar múltiplas fontes (ncm, produto_ncm, ncm_code)
             $ncmRaw = (string) ($it['ncm'] ?? ($it['produto_ncm'] ?? ($it['ncm_code'] ?? '')));
@@ -1253,7 +1280,8 @@ class AdminEtiquetasWpController extends Controller
             }
 
             if ($val < 0.01) $val = 0.01;
-            $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', '')];
+            $pesoItem = (float) ($it['peso_kg'] ?? 0);
+            $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', ''), 'weight' => (float) number_format($pesoItem, 4, '.', '')];
         }
         if (empty($items)) return ['_error' => 'Sem itens válidos'];
 
