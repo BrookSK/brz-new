@@ -351,7 +351,7 @@ function brz_api_list_packages(WP_REST_Request $request) {
 
     $args = [
         'post_type' => 'package',
-        'posts_per_page' => min($per_page, 200),
+        'posts_per_page' => min($per_page, 500),
         'paged' => $page,
         'post_status' => 'publish',
         'orderby' => 'date',
