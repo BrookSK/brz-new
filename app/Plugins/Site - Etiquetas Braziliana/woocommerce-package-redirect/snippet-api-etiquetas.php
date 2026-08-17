@@ -228,8 +228,15 @@ function brz_api_create_package(WP_REST_Request $request) {
 
     // Montar items
     $items = [];
+    $items_for_json = []; // Items completos com weight (para salvar no _items_json e usar no PDF)
     foreach ($body['items'] as $item) {
         $items[] = [
+            'hsCode' => sanitize_text_field($item['hsCode'] ?? ''),
+            'description' => sanitize_text_field($item['description'] ?? ''),
+            'quantity' => intval($item['quantity'] ?? 1),
+            'value' => floatval($item['value'] ?? 0),
+        ];
+        $items_for_json[] = [
             'hsCode' => sanitize_text_field($item['hsCode'] ?? ''),
             'description' => sanitize_text_field($item['description'] ?? ''),
             'quantity' => intval($item['quantity'] ?? 1),
@@ -321,7 +328,7 @@ function brz_api_create_package(WP_REST_Request $request) {
         update_post_meta($post_id, '_recipient_zip_code', $recipient_data['recipientZipCode']);
         update_post_meta($post_id, '_recipient_email', $recipient_data['recipientEmail']);
         update_post_meta($post_id, '_recipient_phone_number', $recipient_data['recipientPhoneNumber']);
-        update_post_meta($post_id, '_items_json', wp_slash(wp_json_encode($items)));
+        update_post_meta($post_id, '_items_json', wp_slash(wp_json_encode($items_for_json)));
 
         return new WP_REST_Response([
             'success' => true,
