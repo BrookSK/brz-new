@@ -910,6 +910,7 @@ class AdminEtiquetasWpController extends Controller
                                 ];
                             }
                             $fixData['items'] = $items;
+                            error_log('[BRZ-PDF-FIX] items_to_send=' . json_encode($items));
                         }
                     }
                 } catch (\Exception $e) {
