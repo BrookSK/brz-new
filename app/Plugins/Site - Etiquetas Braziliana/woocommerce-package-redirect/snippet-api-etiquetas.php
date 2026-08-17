@@ -366,6 +366,19 @@ function brz_api_list_packages(WP_REST_Request $request) {
         ]];
     }
 
+    // Filtro de busca genérica (order_id, tracking, recipient_name)
+    $search = $request->get_param('search');
+    if ($search && strlen(trim($search)) >= 2) {
+        $search = sanitize_text_field(trim($search));
+        $args['meta_query'] = [
+            'relation' => 'OR',
+            ['key' => '_package_order_id', 'value' => $search, 'compare' => 'LIKE'],
+            ['key' => '_correios_tracking_code', 'value' => $search, 'compare' => 'LIKE'],
+            ['key' => '_recipient_name', 'value' => $search, 'compare' => 'LIKE'],
+            ['key' => '_pedido_id_local', 'value' => $search, 'compare' => 'LIKE'],
+        ];
+    }
+
     // Filtro por sem container
     if ($request->get_param('without_container') === '1') {
         $args['meta_query'] = [

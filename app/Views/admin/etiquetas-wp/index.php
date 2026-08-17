@@ -56,6 +56,7 @@
             <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
                 <input type="text" class="form-control" id="etiquetas-busca" placeholder="Buscar por pedido, cliente, tracking..." oninput="filtrarEtiquetas(this.value)">
+                <button class="btn btn-outline-primary btn-sm" id="btn-buscar-wp" style="display:none;"><i class="fas fa-cloud-arrow-down me-1"></i>Buscar no WordPress</button>
             </div>
         </div>
         <div class="card ewp-card mb-3">
@@ -82,7 +83,9 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
                 <thead class="table-light"><tr><th>Pedido</th><th>Cliente</th><th>Tracking</th><th class="d-none d-md-table-cell">Peso</th><th>PDF</th><th>Ações</th></tr></thead>
                 <tbody id="pacotes-body"><tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr></tbody>
-            </table></div></div></div>
+            </table></div>
+            <div id="pacotes-pagination" class="d-flex align-items-center justify-content-center py-2" style="display:none;"></div>
+            </div></div>
     </div>
 
     <!-- CONTAINERS -->
@@ -183,11 +186,98 @@ function filtrarEtiquetas(termo) {
         const text = tr.textContent.toLowerCase();
         tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
     });
-    // Filtrar tabela Pacotes gerados
+    // Filtrar tabela Pacotes gerados (client-side)
+    let found = false;
     document.querySelectorAll('#pacotes-body tr').forEach(tr => {
         const text = tr.textContent.toLowerCase();
-        tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
+        const match = (!termo || text.includes(termo));
+        tr.style.display = match ? '' : 'none';
+        if (match && termo) found = true;
     });
+    // Se digitou algo e não encontrou localmente, mostrar botão de busca no WP
+    const searchBtn = document.getElementById('btn-buscar-wp');
+    if (termo.length >= 3 && !found) {
+        searchBtn.style.display = 'inline-block';
+        searchBtn.onclick = () => buscarNoWordPress(termo);
+    } else {
+        searchBtn.style.display = 'none';
+    }
+    // Esconder paginação durante busca
+    document.getElementById('pacotes-pagination').style.display = termo ? 'none' : 'flex';
+}
+
+// Busca direta no WordPress
+async function buscarNoWordPress(termo) {
+    const tbody = document.getElementById('pacotes-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i> Buscando no WordPress...</td></tr>';
+    document.getElementById('btn-buscar-wp').style.display = 'none';
+    try {
+        const r = await fetch(BASE + '/listar-pacotes?search=' + encodeURIComponent(termo) + '&per_page=50');
+        const d = await r.json();
+        tbody.innerHTML = '';
+        if (d.success && d.data && d.data.length > 0) {
+            d.data.forEach(p => renderPacoteRow(tbody, p));
+            tbody.innerHTML += '<tr><td colspan="6" class="text-center small text-muted py-2"><i class="fas fa-cloud me-1"></i>Resultado da busca no WordPress (' + d.data.length + ' encontrado(s)) <button class="btn btn-xs btn-outline-secondary ms-2" onclick="carregarPacotes()">Voltar</button></td></tr>';
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-search"></i> Nenhum pacote encontrado para "' + termo + '"</td></tr><tr><td colspan="6" class="text-center"><button class="btn btn-xs btn-outline-secondary" onclick="carregarPacotes()">Voltar</button></td></tr>';
+        }
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-danger">' + e.message + '</td></tr>';
+    }
+}
+
+// Render de uma linha de pacote
+function renderPacoteRow(tbody, p) {
+    let pedidoLabel = p.order_id || '-';
+    let pedidoIdLocal = p.pedido_id_local || 0;
+    if (p.pedido_id_local && !String(p.order_id || '').toUpperCase().startsWith('REDIR')) {
+        pedidoLabel = '#' + String(p.pedido_id_local).padStart(6, '0');
+    } else if (pedidoLabel !== '-' && pedidoLabel.toUpperCase().startsWith('REDIR')) { /* manter */ }
+    const clienteNome = p.recipient_name || '-';
+    const isCancelado = p.package_status === 'cancelado';
+    const rowClass = isCancelado ? ' class="text-muted" style="opacity:0.5;text-decoration:line-through;"' : '';
+    const badge = isCancelado ? ' <span class="badge bg-secondary" style="font-size:0.65rem;">Cancelado</span>' : '';
+    tbody.innerHTML += '<tr' + rowClass + '><td>' + pedidoLabel + badge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
+}
+
+// Paginação
+let pacotesPage = 1;
+const pacotesPerPage = 50;
+let pacotesTotal = 0;
+let pacotesPages = 1;
+
+async function carregarPacotes(page) {
+    if (page) pacotesPage = page;
+    const tbody = document.getElementById('pacotes-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr>';
+    try {
+        const r = await fetch(BASE + '/listar-pacotes?without_container=1&per_page=' + pacotesPerPage + '&page=' + pacotesPage);
+        const d = await r.json();
+        tbody.innerHTML = '';
+        if (d.success && d.data && d.data.length > 0) {
+            pacotesTotal = d.total || d.data.length;
+            pacotesPages = d.pages || Math.ceil(pacotesTotal / pacotesPerPage);
+            d.data.forEach(p => renderPacoteRow(tbody, p));
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum pacote sem container</td></tr>';
+            pacotesTotal = 0;
+            pacotesPages = 1;
+        }
+        renderPacotesPagination();
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-danger">' + e.message + '</td></tr>';
+    }
+}
+
+function renderPacotesPagination() {
+    const el = document.getElementById('pacotes-pagination');
+    if (pacotesPages <= 1) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    let h = '<small class="text-muted me-2">' + pacotesTotal + ' pacote(s)</small>';
+    if (pacotesPage > 1) h += '<button class="btn btn-xs btn-outline-secondary me-1" onclick="carregarPacotes(' + (pacotesPage - 1) + ')"><i class="fas fa-chevron-left"></i></button>';
+    h += '<span class="small mx-1">' + pacotesPage + ' / ' + pacotesPages + '</span>';
+    if (pacotesPage < pacotesPages) h += '<button class="btn btn-xs btn-outline-secondary ms-1" onclick="carregarPacotes(' + (pacotesPage + 1) + ')"><i class="fas fa-chevron-right"></i></button>';
+    el.innerHTML = h;
 }
 
 function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}}
@@ -205,7 +295,7 @@ function updateMassBtn(){const n=document.querySelectorAll('.chk-pedido:checked'
 async function gerarEtiquetasMassa(){const ids=[...document.querySelectorAll('.chk-pedido:checked')].map(e=>parseInt(e.value));if(!ids.length)return;if(!confirm('Gerar '+ids.length+' etiqueta(s) via WordPress?'))return;const btn=document.getElementById('btnGerarMassa');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';try{const r=await fetch(BASE+'/gerar-etiquetas-massa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});const d=await r.json();const el=document.getElementById('pedidos-resultado');el.style.display='block';if(d.success){let h='<div class="alert alert-'+(d.failed>0?'warning':'success')+' py-2 small"><strong>'+d.generated+' gerada(s)</strong>'+(d.failed>0?', '+d.failed+' falha(s)':'');if(d.results)d.results.forEach(r=>{if(r.tracking_number)h+='<br><code>'+r.tracking_number+'</code>';if(r.error)h+='<br><span class="text-danger">#'+r.pedido_id+': '+r.error+'</span>';});h+='</div>';el.innerHTML=h;if(d.generated>0)setTimeout(()=>location.reload(),2000);}else{el.innerHTML='<div class="alert alert-danger py-2 small">'+(d.error||'Erro')+'</div>';}}catch(e){alert('Erro: '+e.message);}btn.disabled=false;updateMassBtn();}
 
 // PACOTES
-async function carregarPacotes(){const tbody=document.getElementById('pacotes-body');try{const r=await fetch(BASE+'/listar-pacotes?without_container=1&per_page=500');const d=await r.json();tbody.innerHTML='';if(d.success&&d.data&&d.data.length>0){d.data.forEach(p=>{let pedidoLabel=p.order_id||'-';let pedidoIdLocal=p.pedido_id_local||0;if(p.pedido_id_local&&!String(p.order_id||'').toUpperCase().startsWith('REDIR')){pedidoLabel='#'+String(p.pedido_id_local).padStart(6,'0');}else if(pedidoLabel!=='-'&&pedidoLabel.toUpperCase().startsWith('REDIR')){/* manter como está */}const clienteNome=p.recipient_name||'-';const isCancelado=p.package_status==='cancelado';const rowClass=isCancelado?' class="text-muted" style="opacity:0.5;text-decoration:line-through;"':'';const badge=isCancelado?' <span class="badge bg-secondary" style="font-size:0.65rem;">Cancelado</span>':'';tbody.innerHTML+='<tr'+rowClass+'><td>'+pedidoLabel+badge+'</td><td>'+clienteNome+'</td><td><code class="small">'+(p.tracking_code||'-')+'</code></td><td class="d-none d-md-table-cell">'+(p.total_weight?(p.total_weight/1000).toFixed(1)+'kg':'-')+'</td><td>'+(p.wp_post_id&&!isCancelado?'<a href="'+BASE+'/pdf/pacote/'+p.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td>'+(pedidoIdLocal&&!isCancelado?'<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp('+pedidoIdLocal+')" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>':'')+'</td></tr>';});}else{tbody.innerHTML='<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum pacote sem container</td></tr>';}}catch(e){tbody.innerHTML='<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>';}}
+// PACOTES - carregado pela função carregarPacotes() com paginação acima
 
 // CONTAINERS
 async function carregarPacotesParaContainer(){const el=document.getElementById('cnt-pacotes-lista');try{const r=await fetch(BASE+'/listar-pacotes?without_container=1&per_page=200');const d=await r.json();if(d.success&&d.data&&d.data.length>0){let h='<div class="d-flex justify-content-between mb-1"><small class="text-muted">'+d.data.length+' pacote(s)</small><a href="#" onclick="document.querySelectorAll(\'.chk-cnt-pacote\').forEach(e=>e.checked=true);updateCntCount();return false;" class="small">Todos</a></div>';d.data.forEach(p=>{h+='<div class="form-check"><input class="form-check-input chk-cnt-pacote" type="checkbox" value="'+p.tracking_code+'"><label class="form-check-label small"><code>'+p.tracking_code+'</code> — '+(p.order_id||'')+'</label></div>';});el.innerHTML=h;}else{el.innerHTML='<span class="small text-muted">Nenhum pacote disponível</span>';}}catch(e){el.innerHTML='<span class="text-danger small">'+e.message+'</span>';}autoPreencherRemessa();}

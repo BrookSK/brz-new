@@ -1002,6 +1002,8 @@ class AdminEtiquetasWpController extends Controller
         $params = [];
         if ($request->getParam('without_container')) $params['without_container'] = '1';
         if ($request->getParam('per_page')) $params['per_page'] = (int) $request->getParam('per_page');
+        if ($request->getParam('page')) $params['page'] = (int) $request->getParam('page');
+        if ($request->getParam('search')) $params['search'] = trim((string) $request->getParam('search'));
 
         $resp = $this->wp->listPackages($params);
 
