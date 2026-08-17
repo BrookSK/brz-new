@@ -648,6 +648,15 @@ $router->post('/admin/remessa-stamps/gerar-etiqueta', 'AdminRemessaStampsControl
 $router->get('/admin/remessa-shipstation', 'AdminRemessaShipstationController', 'index');
 $router->post('/admin/remessa-shipstation/gerar-etiqueta', 'AdminRemessaShipstationController', 'gerarEtiqueta');
 
+// Shippo - Etiquetas internacionais (mundo todo, exceto Brasil)
+$router->get('/admin/shippo', 'AdminShippoController', 'index');
+$router->get('/admin/shippo/pedido/{id}', 'AdminShippoController', 'pedido');
+$router->post('/admin/shippo/pedido/{id}/gerar-etiqueta', 'AdminShippoController', 'gerarEtiqueta');
+$router->post('/admin/shippo/pedido/{id}/confirmar-etiqueta', 'AdminShippoController', 'confirmarEtiqueta');
+$router->post('/admin/shippo/pedido/{id}/regerar', 'AdminShippoController', 'regerarEtiqueta');
+$router->post('/admin/shippo/gerar-etiquetas-massa', 'AdminShippoController', 'gerarEtiquetasMassa');
+$router->get('/admin/shippo/pedido/{id}/rates', 'AdminShippoController', 'rates');
+
 // Rotas de Carteira
 $router->post('/admin/usuarios/adicionar-credito', 'AdminCarteiraController', 'adicionarCredito');
 $router->post('/admin/usuarios/debitar-credito', 'AdminCarteiraController', 'debitarCredito');
