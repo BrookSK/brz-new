@@ -5648,8 +5648,10 @@ LINKSCRIPT;
                             $diffs = [];
                             foreach ($novos as $k => $v) {
                                 $oldVal = $antigos[$k] ?? null;
-                                if ((string) $oldVal !== (string) $v) {
-                                    $diffs[] = '<strong>' . htmlspecialchars($k) . '</strong>: ' . htmlspecialchars((string) ($oldVal ?? 'null')) . ' → ' . htmlspecialchars((string) ($v ?? 'null'));
+                                $oldStr = is_array($oldVal) ? json_encode($oldVal) : (string) ($oldVal ?? 'null');
+                                $newStr = is_array($v) ? json_encode($v) : (string) ($v ?? 'null');
+                                if ($oldStr !== $newStr) {
+                                    $diffs[] = '<strong>' . htmlspecialchars($k) . '</strong>: ' . htmlspecialchars(mb_substr($oldStr, 0, 80)) . ' → ' . htmlspecialchars(mb_substr($newStr, 0, 80));
                                 }
                             }
                             $mudancas = implode('<br>', array_slice($diffs, 0, 5));
