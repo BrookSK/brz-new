@@ -1,14 +1,11 @@
 <?php
 namespace App\Controllers;
 
-use App\Core\Services\AuthService;
-
 class AdminServerLogsController {
     
     public function index($request) {
-        $auth = new AuthService();
-        $usuario = $auth->getUsuarioLogado();
-        $perfil = strtolower(trim((string) ($usuario['perfil'] ?? ($_SESSION['usuario_perfil'] ?? ''))));
+        if (session_status() === PHP_SESSION_NONE) @session_start();
+        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
         if ($perfil !== 'admin') {
             header('Location: /admin');
             exit;
