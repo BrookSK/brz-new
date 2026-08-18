@@ -539,7 +539,7 @@ class AdminPedidosEditController extends Controller {
 
             // Buscar dados do cliente (nome, suite) a partir do usuario_id do pedido
             $clienteId = (int) ($pedido['usuario_id'] ?? ($pedido['cliente_id'] ?? 0));
-            if ($clienteId > 0 && empty($pedido['cliente_nome'])) {
+            if ($clienteId > 0) {
                 try {
                     $colsUser = [];
                     try { $stCU = $this->connection->query('DESCRIBE usuarios'); $colsUser = $stCU ? ($stCU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
@@ -608,7 +608,7 @@ class AdminPedidosEditController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</title>
+    <title>Editar Pedido #' . (int) $id . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
@@ -625,7 +625,7 @@ class AdminPedidosEditController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title">Editar Pedido #' . htmlspecialchars($codigoPedido) . '</h1>
+                    <h1 class="page-title">Editar Pedido #' . (int) $id . '</h1>
                     <div class="d-flex gap-2">
                         <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
