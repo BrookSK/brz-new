@@ -5816,9 +5816,9 @@ class CheckoutController extends Controller {
 
                 if (in_array('nome', $colsItens, true)) { $colsInsP[] = 'nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
                 elseif (in_array('produto_nome', $colsItens, true)) { $colsInsP[] = 'produto_nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
-                if (in_array('preco_unitario', $colsItens, true)) { $colsInsP[] = 'preco_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
-                elseif (in_array('valor_unitario', $colsItens, true)) { $colsInsP[] = 'valor_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
-                if (in_array('subtotal', $colsItens, true)) { $colsInsP[] = 'subtotal'; $valsInsP[] = $precoPacote * $qtdPacote; $phP[] = '?'; }
+                if (in_array('preco_unitario', $colsItens, true)) { $colsInsP[] = 'preco_unitario'; $valsInsP[] = ($declarationVal > 0 ? $declarationVal : $precoPacote); $phP[] = '?'; }
+                elseif (in_array('valor_unitario', $colsItens, true)) { $colsInsP[] = 'valor_unitario'; $valsInsP[] = ($declarationVal > 0 ? $declarationVal : $precoPacote); $phP[] = '?'; }
+                if (in_array('subtotal', $colsItens, true)) { $colsInsP[] = 'subtotal'; $valsInsP[] = ($declarationVal > 0 ? $declarationVal : $precoPacote) * $qtdPacote; $phP[] = '?'; }
                 if (in_array('peso_kg', $colsItens, true)) { $colsInsP[] = 'peso_kg'; $valsInsP[] = $pesoPacote; $phP[] = '?'; }
                 elseif (in_array('peso', $colsItens, true)) { $colsInsP[] = 'peso'; $valsInsP[] = $pesoPacote; $phP[] = '?'; }
                 if (in_array('declaration_value', $colsItens, true)) { $colsInsP[] = 'declaration_value'; $valsInsP[] = $declarationVal; $phP[] = '?'; }
@@ -5828,16 +5828,29 @@ class CheckoutController extends Controller {
                 if (in_array('comprovante_url', $colsItens, true)) { $colsInsP[] = 'comprovante_url'; $valsInsP[] = $comprovanteUrl; $phP[] = '?'; }
                 if (in_array('ncm', $colsItens, true)) { $colsInsP[] = 'ncm'; $valsInsP[] = $ncmPacote; $phP[] = '?'; }
                 if (in_array('nome_item', $colsItens, true)) { $colsInsP[] = 'nome_item'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
+                if (in_array('nome_produto', $colsItens, true)) { $colsInsP[] = 'nome_produto'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
 
                 $sqlInsP = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $colsInsP) . ') VALUES (' . implode(', ', $phP) . ')';
                 $stInsP = $db->prepare($sqlInsP);
                 $stInsP->execute($valsInsP);
 
-                // Atualizar status do pacote
+                // Atualizar status do pacote E salvar declaration_value como backup no pacotes_recebidos
                 if ($pacoteIdItem > 0) {
                     try {
-                        $db->prepare('UPDATE pacotes_recebidos SET status = ?, pedido_id = ? WHERE id = ?')
-                           ->execute(['pedido_criado', (int) $pedidoId, $pacoteIdItem]);
+                        // Garantir coluna declaration_value no pacotes_recebidos
+                        try {
+                            $db->exec("ALTER TABLE pacotes_recebidos ADD COLUMN declaration_value DECIMAL(10,2) NULL");
+                        } catch (\Throwable $e) {} // ignora se já existe
+
+                        $updateFields = ['status = ?', 'pedido_id = ?'];
+                        $updateParams = ['pedido_criado', (int) $pedidoId];
+                        if ($declarationVal > 0) {
+                            $updateFields[] = 'declaration_value = ?';
+                            $updateParams[] = $declarationVal;
+                        }
+                        $updateParams[] = $pacoteIdItem;
+                        $db->prepare('UPDATE pacotes_recebidos SET ' . implode(', ', $updateFields) . ' WHERE id = ?')
+                           ->execute($updateParams);
                     } catch (\Throwable $e) {}
                 }
 

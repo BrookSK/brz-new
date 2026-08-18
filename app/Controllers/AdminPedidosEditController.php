@@ -1654,6 +1654,28 @@ class AdminPedidosEditController extends Controller {
                         }
                     }
 
+                    // Fallback: buscar declaration_value do pacotes_recebidos se não veio dos extras
+                    if (empty($map['declaration_value']) && $pid >= 999990) {
+                        $pacIdFallback = $pid - 999990;
+                        if ($pacIdFallback > 0) {
+                            try {
+                                $stDeclFb = $this->connection->prepare('SELECT declaration_value FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                $stDeclFb->execute([$pacIdFallback]);
+                                $declFb = (float) ($stDeclFb->fetchColumn() ?: 0);
+                                if ($declFb > 0) {
+                                    $map['declaration_value'] = $declFb;
+                                }
+                            } catch (\Throwable $e) {}
+                        }
+                    }
+
+                    // Se preco_unitario é 0 mas declaration_value existe, usar como preço
+                    if ((float) ($map['preco_unitario'] ?? 0) <= 0 && !empty($map['declaration_value']) && (float) $map['declaration_value'] > 0) {
+                        $map['preco_unitario'] = (float) $map['declaration_value'];
+                        $map['subtotal'] = (float) $map['declaration_value'] * (int) ($item['quantidade'] ?? 1);
+                        $subtotalItem = $map['subtotal'];
+                    }
+
                     foreach ($map as $c => $v) {
                         if (in_array($c, $cols, true)) {
                             $insertCols[] = $c;
