@@ -446,17 +446,87 @@ class AdminPedidosEditController extends Controller {
             }
 
             $pedidoModel = new \App\Models\PedidoEcommerce();
-            $pedido = $pedidoModel->getComDetalhes($id);
+
+            // Carregar pedido de forma leve (sem sub-queries pesadas de getComDetalhes)
+            $pedido = null;
+            try {
+                $stPed = $this->connection->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+                $stPed->execute([$id]);
+                $pedido = $stPed->fetch(\PDO::FETCH_ASSOC) ?: null;
+            } catch (\Exception $e) {
+                $pedido = null;
+            }
             if (!$pedido) {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
                 echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
 
-            $itens = $pedido['items'] ?? [];
-            if (!is_array($itens)) {
-                $itens = [];
+            // Normalizar campos do pedido
+            if (empty($pedido['codigo_pedido']) && !empty($pedido['numero_pedido'])) {
+                $pedido['codigo_pedido'] = $pedido['numero_pedido'];
             }
+
+            // Carregar itens de forma leve (query simples, sem subqueries correlacionadas)
+            $itensTable = $this->getItensTableForPedido($id);
+            $colsItens = $this->getColsFromTable($itensTable);
+
+            $selectCols = ['id', 'pedido_id', 'produto_id', 'quantidade'];
+            // Detectar colunas de preço
+            foreach (['preco_unitario', 'valor_unitario', 'price'] as $c) {
+                if (in_array($c, $colsItens, true)) { $selectCols[] = $c; break; }
+            }
+            if (in_array('subtotal', $colsItens, true)) $selectCols[] = 'subtotal';
+            // Detectar colunas de nome
+            foreach (['nome_produto', 'produto_nome', 'nome', 'nome_item'] as $c) {
+                if (in_array($c, $colsItens, true)) $selectCols[] = $c;
+            }
+            if (in_array('nome_produto_sku', $colsItens, true)) $selectCols[] = 'nome_produto_sku';
+            if (in_array('sku', $colsItens, true) && !in_array('nome_produto_sku', $colsItens, true)) $selectCols[] = 'sku';
+            if (in_array('loja', $colsItens, true)) $selectCols[] = 'loja';
+            if (in_array('tipo_item', $colsItens, true)) $selectCols[] = 'tipo_item';
+            if (in_array('pacote_id', $colsItens, true)) $selectCols[] = 'pacote_id';
+
+            $stItens = $this->connection->prepare('SELECT ' . implode(',', $selectCols) . ' FROM ' . $itensTable . ' WHERE pedido_id = ? ORDER BY id');
+            $stItens->execute([$id]);
+            $itensRaw = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Normalizar campos dos itens para o formato esperado pela view
+            $itens = [];
+            foreach ($itensRaw as $it) {
+                $nome = '';
+                foreach (['nome_produto', 'produto_nome', 'nome', 'nome_item'] as $nc) {
+                    if (!empty($it[$nc])) { $nome = (string) $it[$nc]; break; }
+                }
+                // Fallback: buscar nome do produto na tabela produtos
+                if ($nome === '' && (int) ($it['produto_id'] ?? 0) > 0 && (int) ($it['produto_id'] ?? 0) < 999990) {
+                    try {
+                        $stN = $this->connection->prepare('SELECT COALESCE(name, nome, "") FROM produtos WHERE id = ? LIMIT 1');
+                        $stN->execute([(int) $it['produto_id']]);
+                        $nome = (string) ($stN->fetchColumn() ?: '');
+                    } catch (\Throwable $e) {}
+                }
+                if ($nome === '') $nome = 'Produto #' . ($it['produto_id'] ?? 0);
+
+                $preco = (float) ($it['preco_unitario'] ?? ($it['valor_unitario'] ?? ($it['price'] ?? 0)));
+                $qtd = (int) ($it['quantidade'] ?? 1);
+
+                $itens[] = [
+                    'id' => (int) ($it['id'] ?? 0),
+                    'produto_id' => (int) ($it['produto_id'] ?? 0),
+                    'nome_produto' => $nome,
+                    'nome_produto_sku' => (string) ($it['nome_produto_sku'] ?? ($it['sku'] ?? '')),
+                    'quantidade' => $qtd,
+                    'preco_unitario' => $preco,
+                    'subtotal' => (float) ($it['subtotal'] ?? ($preco * $qtd)),
+                    'loja' => (string) ($it['loja'] ?? 'outro'),
+                    'tipo_item' => (string) ($it['tipo_item'] ?? 'produto'),
+                    'pacote_id' => (int) ($it['pacote_id'] ?? 0),
+                ];
+            }
+            unset($itensRaw); // liberar memória
+
+            $pedido['items'] = $itens;
 
             $stmt = $this->connection->prepare("SELECT id, name, price, sku, loja FROM produtos WHERE active = 1 ORDER BY name");
             $stmt->execute();
