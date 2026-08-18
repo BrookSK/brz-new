@@ -1564,8 +1564,8 @@ class AdminPedidosEditController extends Controller {
             if (!$isPago) {
             // DELETE de TODAS as tabelas (limpar fantasmas de ambas)
             foreach ($itensTables as $t) {
-                // Preservar itens de pacote/redirecionamento (não deletar, não recriar)
-                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id AND (produto_id IS NULL OR produto_id < 999990)");
+                // Deletar TODOS os itens do pedido (o frontend reenvia a lista completa)
+                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             }
 
