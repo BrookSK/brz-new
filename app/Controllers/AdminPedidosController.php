@@ -1018,6 +1018,97 @@ class AdminPedidosController extends Controller {
         exit;
     }
 
+    public function arquivados(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) { $colsPedidos = []; }
+
+            if (!in_array('arquivado', $colsPedidos, true)) {
+                echo '<div class="alert alert-warning">Coluna "arquivado" não encontrada na tabela pedidos.</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
+
+            $colsUsuarios = [];
+            try { $st = $pdo->query('DESCRIBE usuarios'); $colsUsuarios = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+            $colUserName = in_array('name', $colsUsuarios, true) ? 'name' : (in_array('nome', $colsUsuarios, true) ? 'nome' : 'name');
+            $colUserEmail = in_array('email', $colsUsuarios, true) ? 'email' : 'email';
+
+            $colUsuarioId = in_array('usuario_id', $colsPedidos, true) ? 'usuario_id' : 'cliente_id';
+            $colNumero = in_array('numero_pedido', $colsPedidos, true) ? 'numero_pedido' : (in_array('numero', $colsPedidos, true) ? 'numero' : null);
+
+            $sql = "SELECT p.*, u.{$colUserName} AS cliente_nome, u.{$colUserEmail} AS cliente_email
+                    FROM pedidos p LEFT JOIN usuarios u ON p.{$colUsuarioId} = u.id
+                    WHERE p.arquivado = 1";
+            if (in_array('deleted_at', $colsPedidos, true)) {
+                $sql .= " AND p.deleted_at IS NULL";
+            }
+            $sql .= " ORDER BY p.id DESC LIMIT 100";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute();
+            $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            header('Content-Type: text/html; charset=UTF-8');
+            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pedidos Arquivados</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+            </head><body>';
+
+            $sidebarActive = 'pedidos';
+            include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+            echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h4><i class="fas fa-archive me-2"></i>Pedidos Arquivados</h4>
+                <a href="/admin/pedidos" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+            </div>
+            <p class="text-muted small">Pedidos cancelados automaticamente (carnê expirado, inadimplência). Para restaurar, clique em "Restaurar".</p>';
+
+            if (empty($pedidos)) {
+                echo '<div class="alert alert-info">Nenhum pedido arquivado.</div>';
+            } else {
+                echo '<div class="table-responsive"><table class="table table-sm table-hover">
+                <thead><tr>
+                    <th>#</th><th>Cliente</th><th>Status</th><th>Total</th><th>Data</th><th>Ações</th>
+                </tr></thead><tbody>';
+
+                foreach ($pedidos as $p) {
+                    $total = (float) ($p['total'] ?? 0);
+                    $data = !empty($p['created_at']) ? date('d/m/Y', strtotime($p['created_at'])) : '-';
+                    $nome = htmlspecialchars((string) ($p['cliente_nome'] ?? ''));
+                    echo '<tr>
+                        <td>' . (int) $p['id'] . '</td>
+                        <td>' . $nome . '</td>
+                        <td><span class="badge bg-secondary">' . htmlspecialchars((string) ($p['status'] ?? '')) . '</span></td>
+                        <td>R$ ' . number_format($total, 2, ',', '.') . '</td>
+                        <td class="small">' . $data . '</td>
+                        <td>
+                            <a href="/admin/pedidos/detalhes/' . (int) $p['id'] . '" class="btn btn-sm btn-outline-primary" title="Ver"><i class="fas fa-eye"></i></a>
+                            <form method="POST" action="/admin/pedidos/restaurar/' . (int) $p['id'] . '" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Restaurar"><i class="fas fa-undo"></i></button>
+                            </form>
+                        </td>
+                    </tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+            echo '</main></body></html>';
+
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+        }
+        exit;
+    }
+
     public function importarPedidosIniciar(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
@@ -2677,6 +2768,9 @@ JS;
                         <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger">
                             <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
+                        <a href="/admin/pedidos/arquivados" class="btn btn-outline-secondary">
+                            <i class="fas fa-archive me-1"></i>Arquivados
+                        </a>
                         <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
                             <i class="fas fa-download me-1"></i>Exportar XLSX
                         </a>
@@ -2695,6 +2789,7 @@ JS;
                         <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Novo Pedido</a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
                         <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Lixeira</a>
+                        <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>Arquivados</a>
                         <a class="btn btn-sm btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download me-1"></i>XLSX</a>
                         <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                     </div>

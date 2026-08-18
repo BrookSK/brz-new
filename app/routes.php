@@ -427,6 +427,7 @@ $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->post('/admin/pedidos/gerar-link-diferenca', 'AdminPedidosEditController', 'gerarLinkDiferenca');
 $router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');
+$router->get('/admin/pedidos/arquivados', 'AdminPedidosController', 'arquivados');
 $router->post('/admin/pedidos/restaurar/{id}', 'AdminPedidosController', 'restaurar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
