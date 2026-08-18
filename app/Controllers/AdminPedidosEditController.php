@@ -1562,6 +1562,29 @@ class AdminPedidosEditController extends Controller {
             $subtotal = 0;
 
             if (!$isPago) {
+            // Preservar dados extras dos itens existentes (foto_url, tipo_item, declaration_value, etc.)
+            // que o frontend não envia mas que devem ser mantidos após o re-insert
+            $dadosExtrasItens = []; // produto_id => [foto_url, tipo_item, ...]
+            try {
+                $colsPreserve = $this->getColsFromTable($itensTablePrincipal);
+                $extraCols = [];
+                foreach (['foto_url', 'tipo_item', 'pacote_id', 'declaration_value', 'comprovante_url', 'ncm', 'nome_item'] as $ec) {
+                    if (in_array($ec, $colsPreserve, true)) $extraCols[] = $ec;
+                }
+                if (!empty($extraCols)) {
+                    $stExtra = $this->connection->prepare('SELECT produto_id, ' . implode(',', $extraCols) . ' FROM ' . $itensTablePrincipal . ' WHERE pedido_id = ?');
+                    $stExtra->execute([$pedidoId]);
+                    $extraRows = $stExtra->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($extraRows as $er) {
+                        $epid = (int) ($er['produto_id'] ?? 0);
+                        if ($epid > 0) {
+                            $dadosExtrasItens[$epid] = $er;
+                        }
+                    }
+                    unset($extraRows);
+                }
+            } catch (\Throwable $e) {}
+
             // DELETE de TODAS as tabelas (limpar fantasmas de ambas)
             foreach ($itensTables as $t) {
                 // Deletar TODOS os itens do pedido (o frontend reenvia a lista completa)
@@ -1615,6 +1638,21 @@ class AdminPedidosEditController extends Controller {
                         'nome_produto_sku' => (string) ($item['nome_produto_sku'] ?? ''),
                         'loja' => (string) ($item['loja'] ?? ''),
                     ];
+
+                    // Complementar com dados extras preservados (foto_url, tipo_item, etc.)
+                    $pid = (int) ($item['produto_id'] ?? 0);
+                    if ($pid > 0 && isset($dadosExtrasItens[$pid])) {
+                        $extras = $dadosExtrasItens[$pid];
+                        foreach (['foto_url', 'tipo_item', 'pacote_id', 'declaration_value', 'comprovante_url', 'ncm'] as $extraField) {
+                            if (isset($extras[$extraField]) && $extras[$extraField] !== '' && $extras[$extraField] !== null) {
+                                $map[$extraField] = $extras[$extraField];
+                            }
+                        }
+                        // nome_item: só preencher se estiver vazio no map
+                        if (empty($map['nome_item']) && !empty($extras['nome_item'])) {
+                            $map['nome_item'] = $extras['nome_item'];
+                        }
+                    }
 
                     foreach ($map as $c => $v) {
                         if (in_array($c, $cols, true)) {
