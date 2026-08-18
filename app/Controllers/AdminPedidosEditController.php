@@ -1481,14 +1481,16 @@ class AdminPedidosEditController extends Controller {
             $subtotal = 0;
 
             if (!$isPago) {
-            error_log('[EDIT_SAVE] isPago=false, processando itens. Tabelas: ' . implode(',', $itensTables));
-            error_log('[EDIT_SAVE] Itens recebidos do frontend: ' . json_encode($dados['itens'] ?? [], JSON_UNESCAPED_UNICODE));
-
             foreach ($itensTables as $t) {
                 // Preservar itens de pacote/redirecionamento (não deletar, não recriar)
                 $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id AND (produto_id IS NULL OR produto_id < 999990)");
                 $stmt->execute([':pedido_id' => $pedidoId]);
-                error_log('[EDIT_SAVE] DELETE de itens normais em ' . $t . ' para pedido ' . $pedidoId);
+            }
+
+            // Cache de colunas por tabela (evitar DESCRIBE repetido a cada item)
+            $colsCache = [];
+            foreach ($itensTables as $t) {
+                $colsCache[$t] = $this->getColsFromTable($t);
             }
 
             // Calcular subtotal e inserir novos itens
@@ -1496,13 +1498,10 @@ class AdminPedidosEditController extends Controller {
                 $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
                 $subtotal += $subtotalItem;
 
-                error_log('[EDIT_SAVE] Item[' . $itemIdx . '] nome_produto="' . ($item['nome_produto'] ?? '') . '" produto_id=' . ($item['produto_id'] ?? 0) . ' qtd=' . ($item['quantidade'] ?? 0));
-
                 // Inserir novo item em todas as tabelas existentes (com colunas dinâmicas)
                 foreach ($itensTables as $t) {
-                    $cols = $this->getColsFromTable($t);
+                    $cols = $colsCache[$t] ?? [];
                     if (empty($cols)) {
-                        error_log('[EDIT_SAVE] Tabela ' . $t . ' sem colunas, pulando');
                         continue;
                     }
 
@@ -1545,7 +1544,6 @@ class AdminPedidosEditController extends Controller {
                     $sql = 'INSERT INTO ' . $t . ' (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertVals) . ')';
                     $stmt = $this->connection->prepare($sql);
                     $stmt->execute($params);
-                    error_log('[EDIT_SAVE] INSERT em ' . $t . ' colunas=[' . implode(',', $insertCols) . '] params=' . json_encode($params, JSON_UNESCAPED_UNICODE));
                 }
 
                 // Estoque: reservar o que houver disponível
@@ -1570,9 +1568,6 @@ class AdminPedidosEditController extends Controller {
             }
 
             } // end if (!$isPago) — processamento de itens
-            else {
-                error_log('[EDIT_SAVE] isPago=true, itens NAO processados. oldStatus=' . $oldStatus);
-            }
 
             // Se pago, recalcular subtotal a partir dos itens existentes
             if ($isPago) {
