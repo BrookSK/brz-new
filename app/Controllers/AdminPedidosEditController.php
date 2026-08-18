@@ -1510,6 +1510,9 @@ class AdminPedidosEditController extends Controller {
                         'preco_unitario' => (float) ($item['preco_unitario'] ?? 0),
                         'subtotal' => (float) $subtotalItem,
                         'nome_produto' => (string) ($item['nome_produto'] ?? ''),
+                        'produto_nome' => (string) ($item['nome_produto'] ?? ''),
+                        'nome' => (string) ($item['nome_produto'] ?? ''),
+                        'nome_item' => (string) ($item['nome_produto'] ?? ''),
                         'nome_produto_sku' => (string) ($item['nome_produto_sku'] ?? ''),
                         'loja' => (string) ($item['loja'] ?? ''),
                     ];
