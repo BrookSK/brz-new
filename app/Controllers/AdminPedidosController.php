@@ -971,6 +971,29 @@ class AdminPedidosController extends Controller {
                     $pdo->prepare("UPDATE pedidos SET arquivado = 0 WHERE id = ?")->execute([(int) $id]);
                 } catch (\Exception $e) {}
 
+                // Restaurar status do pedido para carne_pagando (se era carnê cancelado)
+                try {
+                    $stCheckCarne = $pdo->prepare("SELECT id, quantidade_parcelas FROM carnes WHERE pedido_id = ? LIMIT 1");
+                    $stCheckCarne->execute([(int) $id]);
+                    $carneRow = $stCheckCarne->fetch(\PDO::FETCH_ASSOC);
+                    if (!empty($carneRow)) {
+                        // Verificar quantas parcelas já foram pagas
+                        $stPagas = $pdo->prepare("SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = ? AND status = 'paga'");
+                        $stPagas->execute([(int) $carneRow['id']]);
+                        $parcelasPagas = (int) ($stPagas->fetchColumn() ?: 0);
+                        $totalParcelas = (int) ($carneRow['quantidade_parcelas'] ?? 0);
+
+                        // Se todas parcelas pagas = pago, senão = carne_pagando
+                        $novoStatusPedido = ($parcelasPagas >= $totalParcelas && $totalParcelas > 0) ? 'pago' : 'carne_pagando';
+                        $pdo->prepare("UPDATE pedidos SET status = ? WHERE id = ? AND status = 'cancelado'")
+                            ->execute([$novoStatusPedido, (int) $id]);
+                    } else {
+                        // Não é carnê, restaurar para pendente
+                        $pdo->prepare("UPDATE pedidos SET status = 'pendente' WHERE id = ? AND status = 'cancelado'")
+                            ->execute([(int) $id]);
+                    }
+                } catch (\Exception $e) {}
+
                 // Restaurar parcelas canceladas que não foram pagas (cancelada -> pendente)
                 $pdo->prepare("UPDATE carne_parcelas cp
                     JOIN carnes c ON cp.carne_id = c.id
@@ -1014,7 +1037,7 @@ class AdminPedidosController extends Controller {
         } catch (\Exception $e) {
         }
 
-        header('Location: /admin/pedidos/lixeira');
+        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/pedidos/lixeira'));
         exit;
     }
 
