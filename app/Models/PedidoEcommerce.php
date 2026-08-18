@@ -1610,6 +1610,12 @@ class PedidoEcommerce {
             $stmtItens = $this->connection->prepare($sqlItens);
             $stmtItens->execute([':id' => $pedidoId]);
             $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            error_log('[PEDIDO_DETALHES] pedido_id=' . $pedidoId . ' itensTable=' . $itensTable . ' colNomeProduto=' . ($colNomeProduto ?? 'NULL') . ' total_itens=' . count($itens));
+            if (!empty($itens)) {
+                foreach ($itens as $_dbgIdx => $_dbgItem) {
+                    error_log('[PEDIDO_DETALHES] Item[' . $_dbgIdx . '] nome_produto="' . ($_dbgItem['nome_produto'] ?? 'N/A') . '" nome_produto_fallback="' . ($_dbgItem['nome_produto_fallback'] ?? 'N/A') . '" produto_id=' . ($_dbgItem['produto_id'] ?? 0));
+                }
+            }
 
             // Fallback de imagem via tabela produtos (quando não há produto_fotos)
             $stmtProdImg = null;
