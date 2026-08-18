@@ -537,6 +537,48 @@ class AdminPedidosEditController extends Controller {
                 $codigoPedido = (string) $id;
             }
 
+            // Buscar dados do cliente (nome, suite) a partir do usuario_id do pedido
+            $clienteId = (int) ($pedido['usuario_id'] ?? ($pedido['cliente_id'] ?? 0));
+            if ($clienteId > 0 && empty($pedido['cliente_nome'])) {
+                try {
+                    $colsUser = [];
+                    try { $stCU = $this->connection->query('DESCRIBE usuarios'); $colsUser = $stCU ? ($stCU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
+                    
+                    $nameCol = 'name';
+                    foreach (['name', 'nome', 'nome_completo'] as $c) {
+                        if (in_array($c, $colsUser, true)) { $nameCol = $c; break; }
+                    }
+                    $suiteCol = '';
+                    foreach (['numero_suite', 'suite', 'suite_number'] as $c) {
+                        if (in_array($c, $colsUser, true)) { $suiteCol = $c; break; }
+                    }
+
+                    $selectUser = [$nameCol . ' AS cliente_nome'];
+                    if ($suiteCol) $selectUser[] = $suiteCol . ' AS cliente_suite';
+                    
+                    $stUser = $this->connection->prepare('SELECT ' . implode(',', $selectUser) . ' FROM usuarios WHERE id = ? LIMIT 1');
+                    $stUser->execute([$clienteId]);
+                    $userData = $stUser->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    
+                    if (!empty($userData['cliente_nome'])) {
+                        $pedido['cliente_nome'] = $userData['cliente_nome'];
+                    }
+                    if (!empty($userData['cliente_suite'])) {
+                        $pedido['cliente_suite'] = $userData['cliente_suite'];
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // Suíte: fallback do próprio pedido se existir coluna
+            if (empty($pedido['cliente_suite'])) {
+                foreach (['suite_cliente', 'numero_suite', 'suite'] as $sc) {
+                    if (!empty($pedido[$sc])) {
+                        $pedido['cliente_suite'] = $pedido[$sc];
+                        break;
+                    }
+                }
+            }
+
             $statusLower = strtolower((string) ($pedido['status'] ?? ''));
             $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
             $canEditItens = ($statusLower !== 'pago');
