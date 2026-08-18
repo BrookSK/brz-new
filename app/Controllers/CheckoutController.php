@@ -2247,7 +2247,7 @@ class CheckoutController extends Controller {
         foreach ($carrinho as $item) {
             $qtd = (int) ($item['quantidade'] ?? 0);
             if ($qtd <= 0) continue;
-            $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+            $pesoUnit = (float) ($item['peso'] ?? ($item['peso_kg'] ?? ($item['weight'] ?? 0)));
             if ($pesoUnit <= 0) {
                 $pesoUnit = 0.5;
             }
@@ -2858,6 +2858,27 @@ class CheckoutController extends Controller {
                 }
             }
         } catch (\Throwable $e) {}
+
+        // === Redirecionamento: zerar subtotal e impostos no checkout ===
+        // Quando o carrinho contém SOMENTE pacotes de redirecionamento (sem produtos normais),
+        // o cliente paga apenas a taxa de serviço. Subtotal e impostos ficam zerados.
+        $isSomenteRedirecionamentoCheckout = true;
+        foreach ($carrinho as $cItemRedirCk) {
+            $tipoRedirCk = $cItemRedirCk['tipo_item'] ?? 'produto';
+            $pidRedirCk = (int) ($cItemRedirCk['produto_id'] ?? 0);
+            if ($tipoRedirCk !== 'pacote_redirecionamento' && $pidRedirCk < 999990 && $tipoRedirCk !== 'fatura_adicional') {
+                $isSomenteRedirecionamentoCheckout = false;
+                break;
+            }
+        }
+        if ($isSomenteRedirecionamentoCheckout) {
+            $subtotal = 0.0;
+            $impostos = 0.0;
+            $impostosCalculado = 0.0;
+            $impostoLocal = 0.0;
+            $frete = 0.0;
+            $total = $taxaServico;
+        }
 
         $rateBRL = 5.5;
         try {
@@ -7271,6 +7292,27 @@ class CheckoutController extends Controller {
             } catch (\Throwable $e) {}
 
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd + $impostoLocalUsd;
+
+            // === Redirecionamento: zerar subtotal e impostos, cobrar apenas taxa de serviço ===
+            // Quando o carrinho contém SOMENTE pacotes de redirecionamento (sem produtos normais),
+            // o cliente paga apenas a taxa de serviço (inclui seguro + armazenamento). Subtotal e impostos ficam zerados.
+            $isSomenteRedirecionamentoCheckout = true;
+            foreach ($carrinho as $cItemRedirCheck) {
+                $tipoRedirCheck = $cItemRedirCheck['tipo_item'] ?? 'produto';
+                $pidRedirCheck = (int) ($cItemRedirCheck['produto_id'] ?? 0);
+                if ($tipoRedirCheck !== 'pacote_redirecionamento' && $pidRedirCheck < 999990 && $tipoRedirCheck !== 'fatura_adicional') {
+                    $isSomenteRedirecionamentoCheckout = false;
+                    break;
+                }
+            }
+            if ($isSomenteRedirecionamentoCheckout) {
+                $this->debugLog('[CRIAR_PEDIDO] Carrinho somente redirecionamento: zerando subtotal/impostos, cobrando só taxa de serviço');
+                $subtotal = 0.0;
+                $impostosUsd = 0.0;
+                $freteUsd = 0.0;
+                $impostoLocalUsd = 0.0;
+                $totalUsd = $taxaServicoUsd;
+            }
 
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
                 $taxaServico = $taxaServicoUsd * $taxaConversao;
