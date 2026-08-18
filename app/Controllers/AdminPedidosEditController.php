@@ -434,6 +434,10 @@ class AdminPedidosEditController extends Controller {
 
     public function editar($request) {
         try {
+            // Pedidos grandes podem exceder o limite padrão de memória
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(120);
+
             $id = (int) $request->getParam('id');
             if ($id <= 0) {
                 echo '<div class="alert alert-danger">Pedido inválido</div>';
@@ -1300,6 +1304,10 @@ class AdminPedidosEditController extends Controller {
 
     public function salvar($request) {
         try {
+            // Pedidos grandes podem exceder o limite padrão de memória/tempo
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(120);
+
             error_log('[EDIT_SAVE_V2] AdminPedidosEditController::salvar() chamado - versao sem lista_compras');
             $dados = json_decode(file_get_contents('php://input'), true);
 
