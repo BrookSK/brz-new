@@ -61,7 +61,7 @@ function fmtBrlArq($v) { return 'R$ ' . number_format((float)($v ?? 0), 2, ',', 
                     <?php foreach ($carnes as $c): ?>
                         <tr>
                             <td><?= $c['id'] ?></td>
-                            <td><a href="/admin/pedidos/detalhe/<?= $c['pedido_id'] ?>" class="text-decoration-none">#<?= $c['pedido_id'] ?></a></td>
+                            <td><a href="/admin/pedidos/detalhes/<?= $c['pedido_id'] ?>" class="text-decoration-none">#<?= $c['pedido_id'] ?></a></td>
                             <td><?= htmlspecialchars($c['cliente_nome'] ?? '') ?></td>
                             <td class="fw-semibold"><?= fmtBrlArq($c['total_geral']) ?></td>
                             <td><?= (int)($c['parcelas_pagas'] ?? 0) ?>/<?= (int)($c['quantidade_parcelas'] ?? 0) ?></td>
