@@ -1628,6 +1628,7 @@ class PedidoEcommerce {
                 if ($pick(['nome_item']) !== null) $simpleCols[] = 'pi.nome_item';
                 if ($pick(['declaration_value']) !== null) $simpleCols[] = 'pi.declaration_value';
                 if ($pick(['loja']) !== null) $simpleCols[] = 'pi.loja';
+                if ($pick(['created_at']) !== null) $simpleCols[] = 'pi.created_at';
                 $simpleCols[] = "'' AS ncm";
                 $simpleCols[] = "NULL AS peso_kg";
                 $simpleCols[] = "NULL AS imagem_principal";

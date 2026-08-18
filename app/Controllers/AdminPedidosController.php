@@ -4224,7 +4224,7 @@ HTML;
                                                     ? '<span class="badge bg-success">GRÁTIS</span>'
                                                     : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
-                                                <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
+                                                <td>' . ((!empty($item['created_at'])) ? date('d/m/Y H:i', strtotime($item['created_at'])) : '-') . '</td>
                                                 <td>' . $acoesHtml . '</td>
                                             </tr>';
                                         }
