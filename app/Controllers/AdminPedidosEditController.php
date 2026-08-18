@@ -1556,9 +1556,13 @@ class AdminPedidosEditController extends Controller {
             if ($this->tableExists('pedido_items')) $itensTables[] = 'pedido_items';
             if (empty($itensTables)) $itensTables[] = $this->getItensTable();
 
+            // Tabela principal para INSERT (a mesma usada na leitura do pedido)
+            $itensTablePrincipal = $this->getItensTableForPedido($pedidoId);
+
             $subtotal = 0;
 
             if (!$isPago) {
+            // DELETE de TODAS as tabelas (limpar fantasmas de ambas)
             foreach ($itensTables as $t) {
                 // Preservar itens de pacote/redirecionamento (não deletar, não recriar)
                 $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id AND (produto_id IS NULL OR produto_id < 999990)");
@@ -1567,21 +1571,32 @@ class AdminPedidosEditController extends Controller {
 
             // Cache de colunas por tabela (evitar DESCRIBE repetido a cada item)
             $colsCache = [];
-            foreach ($itensTables as $t) {
-                $colsCache[$t] = $this->getColsFromTable($t);
-            }
+            $colsCache[$itensTablePrincipal] = $this->getColsFromTable($itensTablePrincipal);
 
-            // Calcular subtotal e inserir novos itens
-            foreach (($dados['itens'] ?? []) as $itemIdx => $item) {
+            // Calcular subtotal e inserir novos itens (APENAS na tabela principal)
+            // De-duplicar itens (evitar que itens repetidos do frontend sejam inseridos múltiplas vezes)
+            $itensParaSalvar = $dados['itens'] ?? [];
+            $itensDedup = [];
+            foreach ($itensParaSalvar as $item) {
+                $dedupKey = (string) ($item['produto_id'] ?? '0') . '|' . (string) ($item['nome_produto'] ?? '') . '|' . (string) ($item['preco_unitario'] ?? '0');
+                if (isset($itensDedup[$dedupKey])) {
+                    // Somar quantidade em vez de duplicar
+                    $itensDedup[$dedupKey]['quantidade'] = (int) ($itensDedup[$dedupKey]['quantidade'] ?? 0) + (int) ($item['quantidade'] ?? 0);
+                } else {
+                    $itensDedup[$dedupKey] = $item;
+                }
+            }
+            $itensParaSalvar = array_values($itensDedup);
+            unset($itensDedup);
+
+            foreach ($itensParaSalvar as $itemIdx => $item) {
                 $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
                 $subtotal += $subtotalItem;
 
-                // Inserir novo item em todas as tabelas existentes (com colunas dinâmicas)
-                foreach ($itensTables as $t) {
-                    $cols = $colsCache[$t] ?? [];
-                    if (empty($cols)) {
-                        continue;
-                    }
+                // Inserir novo item apenas na tabela principal
+                $t = $itensTablePrincipal;
+                $cols = $colsCache[$t] ?? [];
+                if (!empty($cols)) {
 
                     $insertCols = [];
                     $insertVals = [];
