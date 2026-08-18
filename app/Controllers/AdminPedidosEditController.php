@@ -541,30 +541,28 @@ class AdminPedidosEditController extends Controller {
             $clienteId = (int) ($pedido['usuario_id'] ?? ($pedido['cliente_id'] ?? 0));
             if ($clienteId > 0) {
                 try {
-                    $colsUser = [];
-                    try { $stCU = $this->connection->query('DESCRIBE usuarios'); $colsUser = $stCU ? ($stCU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
-                    
-                    $nameCol = 'name';
-                    foreach (['name', 'nome', 'nome_completo'] as $c) {
-                        if (in_array($c, $colsUser, true)) { $nameCol = $c; break; }
-                    }
-                    $suiteCol = '';
-                    foreach (['numero_suite', 'suite', 'suite_number'] as $c) {
-                        if (in_array($c, $colsUser, true)) { $suiteCol = $c; break; }
-                    }
-
-                    $selectUser = [$nameCol . ' AS cliente_nome'];
-                    if ($suiteCol) $selectUser[] = $suiteCol . ' AS cliente_suite';
-                    
-                    $stUser = $this->connection->prepare('SELECT ' . implode(',', $selectUser) . ' FROM usuarios WHERE id = ? LIMIT 1');
+                    $stUser = $this->connection->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
                     $stUser->execute([$clienteId]);
                     $userData = $stUser->fetch(\PDO::FETCH_ASSOC) ?: [];
                     
-                    if (!empty($userData['cliente_nome'])) {
-                        $pedido['cliente_nome'] = $userData['cliente_nome'];
-                    }
-                    if (!empty($userData['cliente_suite'])) {
-                        $pedido['cliente_suite'] = $userData['cliente_suite'];
+                    if (!empty($userData)) {
+                        // Nome: tentar várias colunas
+                        $nomeCliente = '';
+                        foreach (['name', 'nome', 'nome_completo', 'full_name'] as $nc) {
+                            if (!empty($userData[$nc])) { $nomeCliente = (string) $userData[$nc]; break; }
+                        }
+                        if ($nomeCliente !== '') {
+                            $pedido['cliente_nome'] = $nomeCliente;
+                        }
+                        
+                        // Suíte
+                        $suiteCliente = '';
+                        foreach (['numero_suite', 'suite', 'suite_number'] as $sc) {
+                            if (!empty($userData[$sc])) { $suiteCliente = (string) $userData[$sc]; break; }
+                        }
+                        if ($suiteCliente !== '') {
+                            $pedido['cliente_suite'] = $suiteCliente;
+                        }
                     }
                 } catch (\Throwable $e) {}
             }
@@ -641,7 +639,7 @@ class AdminPedidosEditController extends Controller {
                 <div class="card mb-4 border-info">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex flex-wrap gap-4 align-items-center">
-                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>Pedido:</strong> ' . htmlspecialchars($codigoPedido) . ' <span class="text-secondary">(ID: ' . (int)$id . ')</span></span>
+                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>Pedido:</strong> #' . (int)$id . ' <span class="text-secondary">(' . htmlspecialchars($codigoPedido) . ')</span></span>
                             <span class="text-muted small"><i class="fas fa-user me-1"></i><strong>Cliente:</strong> ' . htmlspecialchars((string)($pedido['cliente_nome'] ?? '—')) . '</span>
                             ' . (!empty($pedido['cliente_cpf_cnpj']) ? '<span class="text-muted small"><i class="fas fa-id-card me-1"></i><strong>CPF/CNPJ:</strong> ' . htmlspecialchars((string)$pedido['cliente_cpf_cnpj']) . '</span>' : '') . '
                             ' . (!empty($pedido['cliente_suite']) ? '<span class="text-muted small"><i class="fas fa-box me-1"></i><strong>Suíte:</strong> ' . htmlspecialchars((string)$pedido['cliente_suite']) . '</span>' : '') . '
