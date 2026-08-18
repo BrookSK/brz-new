@@ -498,6 +498,9 @@ $router->post('/admin/backup/restaurar/{id}', 'AdminBackupController', 'restaura
 $router->post('/admin/backup/excluir/{id}', 'AdminBackupController', 'excluir');
 $router->post('/admin/backup/enviar-externo/{id}', 'AdminBackupController', 'enviarExterno');
 
+// Busca de Logs do Servidor
+$router->get('/admin/server-logs', 'AdminServerLogsController', 'index');
+
 // Log de Emails do sistema
 $router->get('/admin/emails', 'AdminEmailLogsController', 'index');
 
