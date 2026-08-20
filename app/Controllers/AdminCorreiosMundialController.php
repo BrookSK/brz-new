@@ -1494,7 +1494,7 @@ class AdminCorreiosMundialController extends Controller {
         $this->ensureEtiquetasHasContainerIdColumn();
         if (!$this->tableExists('correios_packet_etiquetas')) return [];
         try {
-            $st = $this->connection->prepare('SELECT pedido_id, tracking_number FROM correios_packet_etiquetas WHERE tracking_number IS NOT NULL AND tracking_number <> \'\' AND (container_id IS NULL OR container_id = 0) ORDER BY created_at DESC LIMIT 500');
+            $st = $this->connection->prepare('SELECT pedido_id, tracking_number FROM correios_packet_etiquetas WHERE tracking_number IS NOT NULL AND tracking_number <> \'\' AND (container_id IS NULL OR container_id = 0) AND (status IS NULL OR LOWER(status) NOT IN (\'cancelado\', \'cancelada\', \'cancelled\')) ORDER BY created_at DESC LIMIT 500');
             $st->execute();
             return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {
@@ -2322,13 +2322,17 @@ class AdminCorreiosMundialController extends Controller {
                     $pid = (int) $t;
                     if ($pid > 0 && $this->tableExists('correios_packet_etiquetas')) {
                         try {
-                            $st = $this->connection->prepare('SELECT tracking_number, container_id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                            $st = $this->connection->prepare('SELECT tracking_number, container_id, status FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
                             $st->execute([$pid]);
                             $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
                             if (is_array($row)) {
                                 $tracking = (string) ($row['tracking_number'] ?? '');
                                 $cid = (int) ($row['container_id'] ?? 0);
-                                if ($tracking !== '' && $cid > 0) {
+                                $rowStatus = strtolower(trim((string) ($row['status'] ?? '')));
+                                if ($tracking !== '' && in_array($rowStatus, ['cancelado', 'cancelada', 'cancelled'], true)) {
+                                    $notFound[] = $t . ' (cancelado)';
+                                    $tracking = '';
+                                } elseif ($tracking !== '' && $cid > 0) {
                                     $alreadyUsed[] = $t . ' -> ' . $tracking;
                                     $tracking = '';
                                 }
@@ -2340,12 +2344,19 @@ class AdminCorreiosMundialController extends Controller {
                     $tracking = strtoupper(trim($t));
                     if ($tracking !== '' && $this->tableExists('correios_packet_etiquetas')) {
                         try {
-                            $st = $this->connection->prepare('SELECT container_id FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
+                            $st = $this->connection->prepare('SELECT container_id, status FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
                             $st->execute([$tracking]);
-                            $cid = (int) ($st->fetchColumn() ?: 0);
-                            if ($cid > 0) {
-                                $alreadyUsed[] = $tracking;
-                                $tracking = '';
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                            if (is_array($row)) {
+                                $cid = (int) ($row['container_id'] ?? 0);
+                                $rowStatus = strtolower(trim((string) ($row['status'] ?? '')));
+                                if (in_array($rowStatus, ['cancelado', 'cancelada', 'cancelled'], true)) {
+                                    $notFound[] = $tracking . ' (cancelado)';
+                                    $tracking = '';
+                                } elseif ($cid > 0) {
+                                    $alreadyUsed[] = $tracking;
+                                    $tracking = '';
+                                }
                             }
                         } catch (\Exception $e) {
                         }
@@ -2434,13 +2445,14 @@ class AdminCorreiosMundialController extends Controller {
                     $pid = (int) $t;
                     if ($pid > 0 && $this->tableExists('correios_packet_etiquetas')) {
                         try {
-                            $st = $this->connection->prepare('SELECT tracking_number, container_id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                            $st = $this->connection->prepare('SELECT tracking_number, container_id, status FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
                             $st->execute([$pid]);
                             $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
                             if (is_array($row)) {
                                 $trk = strtoupper(trim((string) ($row['tracking_number'] ?? '')));
                                 $cid = (int) ($row['container_id'] ?? 0);
-                                if ($trk !== '' && $cid <= 0) {
+                                $rowStatus = strtolower(trim((string) ($row['status'] ?? '')));
+                                if ($trk !== '' && $cid <= 0 && !in_array($rowStatus, ['cancelado', 'cancelada', 'cancelled'], true)) {
                                     $resolved[] = $trk;
                                 }
                             }
@@ -2494,21 +2506,31 @@ class AdminCorreiosMundialController extends Controller {
         // valida se todos existem e não estão usados
         $invalid = [];
         $already = [];
+        $cancelled = [];
         if ($this->tableExists('correios_packet_etiquetas')) {
             foreach ($trackingNumbers as $t) {
                 try {
-                    $st = $this->connection->prepare('SELECT container_id FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
+                    $st = $this->connection->prepare('SELECT container_id, status FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
                     $st->execute([$t]);
-                    $cid = $st->fetchColumn();
-                    if ($cid === false) {
+                    $row = $st->fetch(\PDO::FETCH_ASSOC);
+                    if ($row === false) {
                         $invalid[] = $t;
                     } else {
-                        if ((int) $cid > 0) $already[] = $t;
+                        $rowStatus = strtolower(trim((string) ($row['status'] ?? '')));
+                        if (in_array($rowStatus, ['cancelado', 'cancelada', 'cancelled'], true)) {
+                            $cancelled[] = $t;
+                        } elseif ((int) ($row['container_id'] ?? 0) > 0) {
+                            $already[] = $t;
+                        }
                     }
                 } catch (\Exception $e) {
                     $invalid[] = $t;
                 }
             }
+        }
+        if (!empty($cancelled)) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Etiqueta cancelada (não pode ser usada): ' . implode(', ', array_slice($cancelled, 0, 20))));
+            exit;
         }
         if (!empty($invalid)) {
             header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Tracking não encontrado: ' . implode(', ', array_slice($invalid, 0, 20))));
