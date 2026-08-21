@@ -460,9 +460,9 @@ class AdminDashboardController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Produtos</div>
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">' . __('admin.menu.products', 'Produtos') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">' . (int) ($stats['produtos_total'] ?? 0) . '</div>
-                                        <div class="text-xs text-muted">Nos seus pedidos</div>
+                                        <div class="text-xs text-muted">' . __('admin.dashboard.in_your_orders', 'Nos seus pedidos') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-box fa-2x text-gray-300"></i></div>
                                 </div>
@@ -474,9 +474,9 @@ class AdminDashboardController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Pedidos</div>
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">' . __('admin.sidebar.orders', 'Pedidos') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">' . (int) ($stats['pedidos_total'] ?? 0) . '</div>
-                                        <div class="text-xs text-muted">Total</div>
+                                        <div class="text-xs text-muted">' . __('common.total', 'Total') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-shopping-cart fa-2x text-gray-300"></i></div>
                                 </div>
@@ -488,9 +488,9 @@ class AdminDashboardController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Clientes</div>
+                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">' . __('admin.dashboard.clients', 'Clientes') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">' . (int) ($stats['usuarios_total'] ?? 0) . '</div>
-                                        <div class="text-xs text-muted">Com pedidos</div>
+                                        <div class="text-xs text-muted">' . __('admin.dashboard.with_orders', 'Com pedidos') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
                                 </div>
@@ -502,9 +502,9 @@ class AdminDashboardController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Faturamento</div>
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">' . __('admin.dashboard.total_revenue', 'Faturamento') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">' . htmlspecialchars((string) ($stats['faturamento_display'] ?? 'R$ 0,00')) . '</div>
-                                        <div class="text-xs text-muted">Pedidos pagos</div>
+                                        <div class="text-xs text-muted">' . __('admin.dashboard.paid_orders', 'Pedidos pagos') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
                                 </div>
@@ -632,6 +632,8 @@ class AdminDashboardController extends Controller {
             renderAdminScripts();
 
             echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>window.USD_BRL_RATE=' . (class_exists('\\App\\Core\\ExchangeRate') ? \App\Core\ExchangeRate::getUsdToBrl() : 5.85) . ';window.ADMIN_PREF_MOEDA="' . ($_SESSION['admin_pref_moeda'] ?? 'USD') . '";window.ADMIN_PREF_IDIOMA="' . ($_SESSION['admin_pref_idioma'] ?? 'pt-BR') . '";</script>
+<script src="/assets/js/admin-currency-prefs.js"></script>
 </body>
 </html>';
             exit;
@@ -686,41 +688,41 @@ class AdminDashboardController extends Controller {
         echo '<section class="kpi-grid">
                 <article class="kpi-card">
                     <div>
-                        <div class="kpi-label">Produtos</div>
+                        <div class="kpi-label">' . __('admin.menu.products', 'Produtos') . '</div>
                         <div class="kpi-value">' . (int)$stats['produtos_total'] . '</div>
-                        <div class="kpi-subtext">' . (int)$stats['produtos_ativos'] . ' ativos</div>
+                        <div class="kpi-subtext">' . (int)$stats['produtos_ativos'] . ' ' . __('admin.dashboard.active_lc', 'ativos') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-box-seam-fill"></i></div>
                 </article>
                 <article class="kpi-card">
                     <div>
-                        <div class="kpi-label">Pedidos</div>
+                        <div class="kpi-label">' . __('admin.sidebar.orders', 'Pedidos') . '</div>
                         <div class="kpi-value">' . (int)$stats['pedidos_total'] . '</div>
-                        <div class="kpi-subtext">Total</div>
+                        <div class="kpi-subtext">' . __('common.total', 'Total') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-cart-fill"></i></div>
                 </article>
                 <article class="kpi-card">
                     <div>
-                        <div class="kpi-label">Usuários</div>
+                        <div class="kpi-label">' . __('admin.menu.users', 'Usuários') . '</div>
                         <div class="kpi-value">' . number_format((int)$stats['usuarios_total']) . '</div>
-                        <div class="kpi-subtext">Cadastrados</div>
+                        <div class="kpi-subtext">' . __('admin.dashboard.registered_lc', 'Cadastrados') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
                 </article>
                 <article class="kpi-card is-featured">
                     <div>
-                        <div class="kpi-label">Faturamento BRL</div>
-                        <div class="kpi-value">R$ ' . number_format((float)($stats['faturamento_brl'] ?? 0), 2, ',', '.') . '</div>
-                        <div class="kpi-subtext">Pedidos pagos</div>
+                        <div class="kpi-label">' . __('admin.dashboard.revenue_brl', 'Faturamento BRL') . '</div>
+                        <div class="kpi-value" data-value-brl="' . (float)($stats['faturamento_brl'] ?? 0) . '">R$ ' . number_format((float)($stats['faturamento_brl'] ?? 0), 2, ',', '.') . '</div>
+                        <div class="kpi-subtext">' . __('admin.dashboard.paid_orders', 'Pedidos pagos') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
                 </article>
                 <article class="kpi-card is-featured">
                     <div>
-                        <div class="kpi-label">Faturamento USD</div>
-                        <div class="kpi-value">US$ ' . number_format((float)($stats['faturamento_usd'] ?? 0), 2, ',', '.') . '</div>
-                        <div class="kpi-subtext">Pedidos pagos</div>
+                        <div class="kpi-label">' . __('admin.dashboard.revenue_usd', 'Faturamento USD') . '</div>
+                        <div class="kpi-value" data-value-usd="' . (float)($stats['faturamento_usd'] ?? 0) . '">US$ ' . number_format((float)($stats['faturamento_usd'] ?? 0), 2, ',', '.') . '</div>
+                        <div class="kpi-subtext">' . __('admin.dashboard.paid_orders', 'Pedidos pagos') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
                 </article>
@@ -730,58 +732,58 @@ class AdminDashboardController extends Controller {
         echo '<section class="executive-grid">
                 <article class="section-card">
                     <header class="section-card-header">
-                        <h2 class="section-title">Resumo Gerencial</h2>
+                        <h2 class="section-title">' . __('admin.dashboard.executive_summary', 'Resumo Gerencial') . '</h2>
                     </header>
                     <div class="section-body">
                         <div class="summary-list">
                             <div class="summary-item">
-                                <div class="summary-label">Faturamento total</div>
+                                <div class="summary-label">' . __('admin.dashboard.total_revenue', 'Faturamento total') . '</div>
                                 <div class="summary-value">' . ($stats['faturamento_display'] ?: 'R$ 0,00') . '</div>
-                                <div class="summary-note">Pedidos pagos e processados</div>
+                                <div class="summary-note">' . __('admin.dashboard.paid_processed', 'Pedidos pagos e processados') . '</div>
                             </div>
                             <div class="summary-item">
-                                <div class="summary-label">Pedidos totais</div>
+                                <div class="summary-label">' . __('admin.dashboard.total_orders_label', 'Pedidos totais') . '</div>
                                 <div class="summary-value">' . (int)$stats['pedidos_total'] . '</div>
-                                <div class="summary-note">Todos os status</div>
+                                <div class="summary-note">' . __('admin.dashboard.all_statuses', 'Todos os status') . '</div>
                             </div>
                             <div class="summary-item">
-                                <div class="summary-label">Produtos ativos</div>
+                                <div class="summary-label">' . __('admin.dashboard.active_products', 'Produtos ativos') . '</div>
                                 <div class="summary-value">' . (int)$stats['produtos_ativos'] . '</div>
-                                <div class="summary-note">Disponíveis para venda</div>
+                                <div class="summary-note">' . __('admin.dashboard.available_for_sale', 'Disponíveis para venda') . '</div>
                             </div>
                             <div class="summary-item">
-                                <div class="summary-label">Usuários cadastrados</div>
+                                <div class="summary-label">' . __('admin.dashboard.registered_users', 'Usuários cadastrados') . '</div>
                                 <div class="summary-value">' . number_format((int)$stats['usuarios_total']) . '</div>
-                                <div class="summary-note">Total na plataforma</div>
+                                <div class="summary-note">' . __('admin.dashboard.total_platform', 'Total na plataforma') . '</div>
                             </div>
                         </div>
                     </div>
                 </article>
                 <article class="section-card">
                     <header class="section-card-header">
-                        <h2 class="section-title">Pontos de Atenção</h2>
+                        <h2 class="section-title">' . __('admin.dashboard.attention_points', 'Pontos de Atenção') . '</h2>
                     </header>
                     <div class="section-body">
                         <div class="insight-list">
                             <div class="insight-item">
                                 <div class="insight-icon"><i class="bi bi-cash-stack"></i></div>
                                 <div>
-                                    <div class="insight-title">Validar pedidos não pagos</div>
-                                    <div class="insight-text">Pedidos pendentes não devem entrar no total financeiro realizado.</div>
+                                    <div class="insight-title">' . __('admin.dashboard.validate_unpaid', 'Validar pedidos não pagos') . '</div>
+                                    <div class="insight-text">' . __('admin.dashboard.validate_unpaid_desc', 'Pedidos pendentes não devem entrar no total financeiro realizado.') . '</div>
                                 </div>
                             </div>
                             <div class="insight-item">
                                 <div class="insight-icon"><i class="bi bi-box-seam"></i></div>
                                 <div>
-                                    <div class="insight-title">Acompanhar estoque e validade</div>
-                                    <div class="insight-text">Produtos próximos do vencimento precisam continuar destacados no painel.</div>
+                                    <div class="insight-title">' . __('admin.dashboard.track_inventory', 'Acompanhar estoque e validade') . '</div>
+                                    <div class="insight-text">' . __('admin.dashboard.track_inventory_desc', 'Produtos próximos do vencimento precisam continuar destacados no painel.') . '</div>
                                 </div>
                             </div>
                             <div class="insight-item">
                                 <div class="insight-icon"><i class="bi bi-graph-up-arrow"></i></div>
                                 <div>
-                                    <div class="insight-title">Monitorar produtos campeões</div>
-                                    <div class="insight-text">Use os mais vendidos para direcionar lives, campanhas e reposição.</div>
+                                    <div class="insight-title">' . __('admin.dashboard.monitor_top_products', 'Monitorar produtos campeões') . '</div>
+                                    <div class="insight-text">' . __('admin.dashboard.monitor_top_products_desc', 'Use os mais vendidos para direcionar lives, campanhas e reposição.') . '</div>
                                 </div>
                             </div>
                         </div>
@@ -846,34 +848,34 @@ class AdminDashboardController extends Controller {
         echo '</div></section>';
 
         // === AÇÕES RÁPIDAS ===
-        echo '<h2 class="quick-title">Ações Rápidas</h2>
+        echo '<h2 class="quick-title">' . __('admin.dashboard.quick_actions', 'Ações Rápidas') . '</h2>
             <section class="quick-grid">
                 <a href="/admin/produtos/novo" class="quick-card">
                     <div>
                         <div class="quick-icon"><i class="bi bi-plus-lg"></i></div>
-                        <div class="quick-label">Novo Produto</div>
-                        <div class="quick-subtext">Adicionar produto</div>
+                        <div class="quick-label">' . __('admin.dashboard.new_product', 'Novo Produto') . '</div>
+                        <div class="quick-subtext">' . __('admin.dashboard.add_product', 'Adicionar produto') . '</div>
                     </div>
                 </a>
                 <a href="/admin/pedidos" class="quick-card">
                     <div>
                         <div class="quick-icon"><i class="bi bi-cart-fill"></i></div>
-                        <div class="quick-label">Pedidos</div>
-                        <div class="quick-subtext">Gerenciar pedidos</div>
+                        <div class="quick-label">' . __('admin.sidebar.orders', 'Pedidos') . '</div>
+                        <div class="quick-subtext">' . __('admin.dashboard.manage_orders', 'Gerenciar pedidos') . '</div>
                     </div>
                 </a>
                 <a href="/admin/usuarios" class="quick-card">
                     <div>
                         <div class="quick-icon"><i class="bi bi-people-fill"></i></div>
-                        <div class="quick-label">Usuários</div>
-                        <div class="quick-subtext">Gerenciar clientes</div>
+                        <div class="quick-label">' . __('admin.menu.users', 'Usuários') . '</div>
+                        <div class="quick-subtext">' . __('admin.dashboard.manage_clients', 'Gerenciar clientes') . '</div>
                     </div>
                 </a>
                 <a href="/admin/configuracoes" class="quick-card">
                     <div>
                         <div class="quick-icon"><i class="bi bi-gear-fill"></i></div>
-                        <div class="quick-label">Configurações</div>
-                        <div class="quick-subtext">Configurar loja</div>
+                        <div class="quick-label">' . __('admin.menu.settings', 'Configurações') . '</div>
+                        <div class="quick-subtext">' . __('admin.dashboard.configure_store', 'Configurar loja') . '</div>
                     </div>
                 </a>
             </section>';

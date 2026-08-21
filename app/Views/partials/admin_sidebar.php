@@ -448,16 +448,16 @@ function renderAdminSidebar($activePage = '') {
             // Definir grupos de menu
             $menuGroups = [
                 '_solo_dashboard' => ['items' => ['dashboard']],
-                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pacotes-recebidos', 'faturas-adicionais', 'pedidos-conferencia', 'split-order', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
-                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
-                'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
-                'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'etiquetas-wp', 'documentacao-envios', 'pacotes-wordpress', 'remessa-shipstation', 'shippo']],
-                'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
-                'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos', 'demandas-arquivados']],
-                'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
-                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site']],
-                'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
-                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'desapego', 'desapego-pendentes', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
+                __('admin.sidebar.orders', 'Pedidos') => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pacotes-recebidos', 'faturas-adicionais', 'pedidos-conferencia', 'split-order', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
+                __('admin.sidebar.catalog', 'Catálogo') => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
+                __('admin.sidebar.inventory', 'Estoque & Compras') => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
+                __('admin.sidebar.shipping', 'Envios & Etiquetas') => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'etiquetas-wp', 'documentacao-envios', 'pacotes-wordpress', 'remessa-shipstation', 'shippo']],
+                __('admin.sidebar.financial', 'Financeiro') => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
+                __('admin.sidebar.demands', 'Demandas') => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos', 'demandas-arquivados']],
+                __('admin.sidebar.live_shop', 'Live Shop') => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
+                __('admin.sidebar.marketing', 'Marketing') => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site']],
+                __('admin.sidebar.forwarding', 'Redirecionamento') => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
+                __('admin.sidebar.settings', 'Configurações') => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'desapego', 'desapego-pendentes', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];
 
             foreach ($menuGroups as $groupName => $group) {
