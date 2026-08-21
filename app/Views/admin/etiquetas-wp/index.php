@@ -9,7 +9,8 @@
     .ewp-status.ok{background:#28a745}.ewp-status.err{background:#dc3545}
     .ewp-empty{text-align:center;padding:30px 20px;color:#999}
     .ewp-empty i{font-size:1.5rem;margin-bottom:8px;display:block}
-    @media(max-width:768px){.ewp-tabs{overflow-x:auto;white-space:nowrap}.ewp-tab-btn{padding:8px 12px;font-size:.85rem}}
+    .ewp-tabs{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+    @media(max-width:768px){.ewp-tab-btn{padding:8px 12px;font-size:.85rem}}
     .cnt-row{cursor:pointer;transition:background .15s}
     .cnt-row:hover{background:#f0f4ff}
     .cnt-row .cnt-chevron{display:inline-flex;align-items:center;justify-content:center;transition:transform .2s;color:#6c757d;width:16px;height:16px}
