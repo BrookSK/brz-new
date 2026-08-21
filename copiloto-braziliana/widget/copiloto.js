@@ -12,8 +12,8 @@
     backend_url: (scriptTag && scriptTag.getAttribute('data-backend')) || 'https://copiloto.braziliana.com.br',
     gatilho_tempo_ms: 30000,
     max_historico_enviado: 10,
-    whatsapp_suporte: '5517996203062',
-    whatsapp_vendas: '5517996203062',
+    whatsapp_suporte: '13053638204',
+    whatsapp_vendas: '13053638204',
     rotas_idioma: { BRL: '/lang/pt', USD: '/lang/en' },
     storage_prefix: 'bz_copiloto_'
   }

@@ -9,7 +9,7 @@ ob_start();
                 <p class="text-muted mb-4">
                     Para solicitar redirecionamento, entre em contato com nosso atendimento pelo WhatsApp.
                 </p>
-                <a href="https://wa.me/5517996203062?text=Ol%C3%A1%2C%20gostaria%20de%20solicitar%20um%20redirecionamento" 
+                <a href="https://wa.me/13053638204?text=Ol%C3%A1%2C%20gostaria%20de%20solicitar%20um%20redirecionamento" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    class="btn btn-success btn-lg px-4">
