@@ -49,7 +49,6 @@
         <button class="ewp-tab-btn" onclick="switchTab('containers')">📋 Containers</button>
         <button class="ewp-tab-btn" onclick="switchTab('faturas')">🧾 Faturas</button>
         <button class="ewp-tab-btn" onclick="switchTab('embarques')">✈️ Embarques</button>
-        <button class="ewp-tab-btn" onclick="switchTab('documentacao')">📄 Documentação</button>
     </div>
     <!-- ETIQUETAS -->
     <div class="ewp-panel" id="panel-etiquetas">
@@ -175,21 +174,6 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
             </table></div></div>
         </div>
     </div>
-
-    <!-- DOCUMENTAÇÃO -->
-    <div class="ewp-panel" id="panel-documentacao" style="display:none;">
-        <div class="card ewp-card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center py-2">
-                <strong class="small">Documentação por Embarque</strong>
-                <button class="btn btn-sm btn-outline-primary" onclick="carregarDocumentacao()"><i class="fas fa-sync me-1"></i>Atualizar</button>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">Baixe os PDFs dos containers e da fatura de cada embarque. Selecione um embarque para ver os documentos disponíveis.</p>
-                <div id="doc-loading" class="text-center py-3" style="display:none;"><i class="fas fa-spinner fa-spin me-1"></i> Carregando...</div>
-                <div id="doc-lista"></div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -210,7 +194,7 @@ function filtrarEtiquetas(termo) {
     });
 }
 
-function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}if(t==='documentacao'){carregarDocumentacao();}}
+function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}}
 document.addEventListener('DOMContentLoaded',()=>{checkConnection();carregarPacotes();});
 document.addEventListener('change',e=>{if(e.target.classList.contains('chk-pedido'))updateMassBtn();if(e.target.classList.contains('chk-cnt-pacote'))updateCntCount();});
 
