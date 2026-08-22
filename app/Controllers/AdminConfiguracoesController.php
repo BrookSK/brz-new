@@ -1841,6 +1841,115 @@ class AdminConfiguracoesController extends Controller {
                                                 <label class="form-label">Display Scheme</label>
                                                 <input type="text" class="form-control" name="entrega_shipstation_display_scheme" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_display_scheme', 'label') . '" placeholder="label">
                                             </div>
+
+                                <hr class="my-4">
+                                <h6 class="mb-3">Shippo (Internacional) - Mundo todo exceto Brasil</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ativo</label>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="shippo_enabled" name="shippo_enabled" value="1" ' . ($this->getConfigValue($config, 'shippo', 'enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="shippo_enabled">Habilitar Shippo</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente</label>
+                                                        <select class="form-select" name="shippo_ambiente">
+                                                            <option value="production" ' . ($this->getConfigValue($config, 'shippo', 'ambiente', 'production') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                            <option value="test" ' . ($this->getConfigValue($config, 'shippo', 'ambiente', 'production') === 'test' ? 'selected' : '') . '>Teste (Sandbox)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">API Token</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" name="shippo_api_token" value="' . $this->getConfigValue($config, 'shippo', 'api_token', '') . '" placeholder="shippo_live_... ou shippo_test_...">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Token da API Shippo. Obtenha em <a href="https://apps.goshippo.com/settings/api" target="_blank">goshippo.com/settings/api</a></small>
+                                            </div>
+
+                                            <h6 class="mb-2 mt-4 small text-muted">Endereço do Remetente (From Address)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Nome</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_name" value="' . $this->getConfigValue($config, 'shippo', 'sender_name', 'Braziliana Shop') . '" placeholder="Nome do remetente">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Empresa</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_company" value="' . $this->getConfigValue($config, 'shippo', 'sender_company', 'Braziliana Shop LLC') . '" placeholder="Nome da empresa">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Endereço (Linha 1)</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_street1" value="' . $this->getConfigValue($config, 'shippo', 'sender_street1', '') . '" placeholder="1227 W Broad St">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Complemento</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_street2" value="' . $this->getConfigValue($config, 'shippo', 'sender_street2', '') . '" placeholder="Suite, Apt, etc.">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Cidade</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_city" value="' . $this->getConfigValue($config, 'shippo', 'sender_city', '') . '" placeholder="Saint Pauls">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Estado</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_state" value="' . $this->getConfigValue($config, 'shippo', 'sender_state', '') . '" placeholder="NC" maxlength="2">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">ZIP Code</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_zip" value="' . $this->getConfigValue($config, 'shippo', 'sender_zip', '') . '" placeholder="28384">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">País</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_country" value="' . $this->getConfigValue($config, 'shippo', 'sender_country', 'US') . '" placeholder="US" maxlength="2">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Telefone</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_phone" value="' . $this->getConfigValue($config, 'shippo', 'sender_phone', '') . '" placeholder="+1 843 222 8518">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Email</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_email" value="' . $this->getConfigValue($config, 'shippo', 'sender_email', '') . '" placeholder="email@empresa.com">
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -4698,8 +4807,11 @@ HTML;
                 'promocao' => ['taxa_servico_ativo', 'taxa_servico_tipo', 'taxa_servico_valor'],
                 'desconto' => ['emails_autorizadores']
             ];
+
+            // Shippo fields
+            $configMap['shippo'] = ['enabled', 'ambiente', 'api_token', 'sender_name', 'sender_company', 'sender_street1', 'sender_street2', 'sender_city', 'sender_state', 'sender_zip', 'sender_country', 'sender_phone', 'sender_email'];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'assessoria_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo', 'conversao_moeda_ativa'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'assessoria_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo', 'conversao_moeda_ativa', 'enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {

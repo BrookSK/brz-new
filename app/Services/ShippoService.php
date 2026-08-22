@@ -20,10 +20,22 @@ class ShippoService {
     private function loadConfig(): array {
         try {
             $pdo = Database::getConnection();
-            $stmt = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'shippo_%'");
+            // Tentar buscar por categoria 'shippo'
+            $stmt = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE categoria = 'shippo'");
             $stmt->execute();
-            $rows = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
-            return $rows;
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $config = [];
+            foreach ($rows as $row) {
+                $config['shippo_' . $row['chave']] = $row['valor'];
+            }
+            // Fallback: buscar por chave direta (compatibilidade)
+            if (empty($config)) {
+                $stmt2 = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'shippo_%'");
+                $stmt2->execute();
+                $rows2 = $stmt2->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
+                $config = $rows2;
+            }
+            return $config;
         } catch (\Exception $e) {
             return [];
         }
