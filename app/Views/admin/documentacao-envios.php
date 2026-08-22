@@ -50,7 +50,7 @@ async function carregarDocumentacao() {
         let html = '';
         faturas.forEach((fat, idx) => {
             const cn38 = fat.cn38_code || '-';
-            const dns = Array.isArray(fat.dispatch_numbers) ? fat.dispatch_numbers : [];
+            const dns = Array.isArray(fat.dispatch_numbers) ? fat.dispatch_numbers.map(d => String(d)) : [];
             const isFirst = idx === 0;
             const badge = isFirst ? ' <span class="badge bg-info text-dark" style="font-size:.65rem;">Última</span>' : '';
             const status = fat.departure_id
@@ -83,7 +83,7 @@ async function carregarDocumentacao() {
             // Containers
             html += '<div class="col-md-8 mb-3">';
             html += '<h6 class="small fw-bold mb-2"><i class="fas fa-box me-1 text-primary"></i>Containers (Remessas)</h6>';
-            const fatContainers = containers.filter(c => dns.includes(c.dispatch_number));
+            const fatContainers = containers.filter(c => dns.includes(String(c.dispatch_number)));
             if (fatContainers.length > 0) {
                 fatContainers.forEach(c => {
                     html += '<div class="d-flex align-items-center gap-2 mb-2 p-2 border rounded">';
