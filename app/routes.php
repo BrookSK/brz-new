@@ -657,9 +657,6 @@ $router->post('/admin/shippo/pedido/{id}/regerar', 'AdminShippoController', 'reg
 $router->post('/admin/shippo/gerar-etiquetas-massa', 'AdminShippoController', 'gerarEtiquetasMassa');
 $router->get('/admin/shippo/pedido/{id}/rates', 'AdminShippoController', 'rates');
 
-// Documentação de Envios
-$router->get('/admin/documentacao-envios', 'AdminDocumentacaoEnviosController', 'index');
-
 // Rotas de Carteira
 $router->post('/admin/usuarios/adicionar-credito', 'AdminCarteiraController', 'adicionarCredito');
 $router->post('/admin/usuarios/debitar-credito', 'AdminCarteiraController', 'debitarCredito');
