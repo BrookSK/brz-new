@@ -1032,6 +1032,31 @@ class AdminEtiquetasWpController extends Controller
             } catch (\Exception $e) {}
         }
 
+        // Enriquecer com informação de mala
+        if (!empty($resp['success']) && !empty($resp['data']) && is_array($resp['data'])) {
+            try {
+                $this->ensureMalasTable();
+                $trackingsAll = array_filter(array_map(function($p) { return $p['tracking_code'] ?? ''; }, $resp['data']));
+                if (!empty($trackingsAll)) {
+                    $in = implode(',', array_fill(0, count($trackingsAll), '?'));
+                    $stMala = $this->connection->prepare("SELECT mp.tracking_code, m.id AS mala_id, m.nome AS mala_nome FROM etiquetas_mala_pacotes mp INNER JOIN etiquetas_malas m ON m.id = mp.mala_id WHERE mp.tracking_code IN ({$in})");
+                    $stMala->execute(array_values($trackingsAll));
+                    $mapMala = [];
+                    foreach ($stMala->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                        $mapMala[$row['tracking_code']] = ['id' => (int) $row['mala_id'], 'nome' => $row['mala_nome']];
+                    }
+                    foreach ($resp['data'] as &$pkg) {
+                        $tc = $pkg['tracking_code'] ?? '';
+                        if (isset($mapMala[$tc])) {
+                            $pkg['mala_id'] = $mapMala[$tc]['id'];
+                            $pkg['mala_nome'] = $mapMala[$tc]['nome'];
+                        }
+                    }
+                    unset($pkg);
+                }
+            } catch (\Exception $e) {}
+        }
+
         $this->json($resp);
     }
 
@@ -1330,6 +1355,223 @@ class AdminEtiquetasWpController extends Controller
             ]);
         } catch (\Exception $e) {
             error_log('[ETIQUETAS_WP] Erro ao salvar etiqueta local: ' . $e->getMessage());
+        }
+    }
+
+    // =========================================================
+    // MALAS (Agrupamento de pacotes para seleção rápida)
+    // =========================================================
+
+    private function ensureMalasTable(): void {
+        try {
+            $this->connection->query("SELECT 1 FROM etiquetas_malas LIMIT 1");
+        } catch (\Exception $e) {
+            try {
+                $this->connection->exec("CREATE TABLE IF NOT EXISTS etiquetas_malas (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nome VARCHAR(100) NOT NULL,
+                    descricao VARCHAR(255) NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    KEY idx_nome (nome)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            } catch (\Exception $ex) {}
+        }
+
+        // Tabela de vínculo pacote -> mala
+        try {
+            $this->connection->query("SELECT 1 FROM etiquetas_mala_pacotes LIMIT 1");
+        } catch (\Exception $e) {
+            try {
+                $this->connection->exec("CREATE TABLE IF NOT EXISTS etiquetas_mala_pacotes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    mala_id INT NOT NULL,
+                    tracking_code VARCHAR(120) NOT NULL,
+                    pedido_id INT NULL,
+                    peso_gramas INT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    KEY idx_mala_id (mala_id),
+                    KEY idx_tracking (tracking_code),
+                    UNIQUE KEY uniq_tracking (tracking_code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            } catch (\Exception $ex) {}
+        }
+    }
+
+    /**
+     * Listar malas com contagem de pacotes e peso total.
+     * GET /admin/etiquetas-wp/listar-malas
+     */
+    public function listarMalas(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $this->ensureMalasTable();
+
+        try {
+            $st = $this->connection->prepare("
+                SELECT m.*, 
+                       COUNT(mp.id) AS pacotes_count,
+                       COALESCE(SUM(mp.peso_gramas), 0) AS peso_total_gramas
+                FROM etiquetas_malas m
+                LEFT JOIN etiquetas_mala_pacotes mp ON mp.mala_id = m.id
+                GROUP BY m.id
+                ORDER BY m.created_at DESC
+            ");
+            $st->execute();
+            $malas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Buscar pacotes de cada mala
+            foreach ($malas as &$mala) {
+                $stP = $this->connection->prepare("SELECT tracking_code, pedido_id, peso_gramas FROM etiquetas_mala_pacotes WHERE mala_id = ? ORDER BY created_at ASC");
+                $stP->execute([(int) $mala['id']]);
+                $mala['pacotes'] = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+            unset($mala);
+
+            $this->json(['success' => true, 'data' => $malas]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Criar uma nova mala.
+     * POST /admin/etiquetas-wp/criar-mala
+     * Body: { nome: string, descricao?: string }
+     */
+    public function criarMala(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $this->ensureMalasTable();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $nome = trim((string) ($body['nome'] ?? ''));
+        $descricao = trim((string) ($body['descricao'] ?? ''));
+
+        if ($nome === '') {
+            $this->json(['success' => false, 'error' => 'Nome da mala é obrigatório.'], 400);
+            return;
+        }
+
+        try {
+            $st = $this->connection->prepare("INSERT INTO etiquetas_malas (nome, descricao) VALUES (?, ?)");
+            $st->execute([$nome, $descricao]);
+            $id = (int) $this->connection->lastInsertId();
+            $this->json(['success' => true, 'id' => $id, 'nome' => $nome]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Deletar uma mala (e desvincular pacotes).
+     * POST /admin/etiquetas-wp/deletar-mala
+     * Body: { mala_id: int }
+     */
+    public function deletarMala(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $this->ensureMalasTable();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $malaId = (int) ($body['mala_id'] ?? 0);
+
+        if ($malaId <= 0) {
+            $this->json(['success' => false, 'error' => 'mala_id inválido.'], 400);
+            return;
+        }
+
+        try {
+            $this->connection->prepare("DELETE FROM etiquetas_mala_pacotes WHERE mala_id = ?")->execute([$malaId]);
+            $this->connection->prepare("DELETE FROM etiquetas_malas WHERE id = ?")->execute([$malaId]);
+            $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Atribuir pacotes (tracking codes) a uma mala.
+     * POST /admin/etiquetas-wp/atribuir-mala
+     * Body: { mala_id: int, tracking_codes: [string], pedido_ids?: [int] }
+     */
+    public function atribuirMala(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $this->ensureMalasTable();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $malaId = (int) ($body['mala_id'] ?? 0);
+        $trackingCodes = $body['tracking_codes'] ?? [];
+        $pedidoIds = $body['pedido_ids'] ?? [];
+
+        if ($malaId <= 0) {
+            $this->json(['success' => false, 'error' => 'mala_id inválido.'], 400);
+            return;
+        }
+        if (!is_array($trackingCodes) || empty($trackingCodes)) {
+            $this->json(['success' => false, 'error' => 'Nenhum tracking code informado.'], 400);
+            return;
+        }
+
+        try {
+            $stIns = $this->connection->prepare("INSERT IGNORE INTO etiquetas_mala_pacotes (mala_id, tracking_code, pedido_id, peso_gramas) VALUES (?, ?, ?, ?)");
+
+            $added = 0;
+            foreach ($trackingCodes as $idx => $tc) {
+                $tc = trim((string) $tc);
+                if ($tc === '') continue;
+                $pid = isset($pedidoIds[$idx]) ? (int) $pedidoIds[$idx] : null;
+
+                // Buscar peso do pacote
+                $peso = null;
+                if ($pid && $pid > 0) {
+                    try {
+                        $stPeso = $this->connection->prepare("SELECT peso_total FROM pedidos WHERE id = ? LIMIT 1");
+                        $stPeso->execute([$pid]);
+                        $pesoKg = (float) ($stPeso->fetchColumn() ?: 0);
+                        if ($pesoKg > 0) $peso = (int) round($pesoKg * 1000);
+                    } catch (\Exception $e) {}
+                }
+
+                $stIns->execute([$malaId, $tc, $pid, $peso]);
+                if ($stIns->rowCount() > 0) $added++;
+            }
+
+            $this->json(['success' => true, 'added' => $added]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Remover pacotes de uma mala.
+     * POST /admin/etiquetas-wp/remover-da-mala
+     * Body: { tracking_codes: [string] }
+     */
+    public function removerDaMala(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $this->ensureMalasTable();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $trackingCodes = $body['tracking_codes'] ?? [];
+
+        if (!is_array($trackingCodes) || empty($trackingCodes)) {
+            $this->json(['success' => false, 'error' => 'Nenhum tracking code.'], 400);
+            return;
+        }
+
+        try {
+            $in = implode(',', array_fill(0, count($trackingCodes), '?'));
+            $this->connection->prepare("DELETE FROM etiquetas_mala_pacotes WHERE tracking_code IN ({$in})")->execute(array_values($trackingCodes));
+            $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 }

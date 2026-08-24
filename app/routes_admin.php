@@ -170,6 +170,13 @@ $router->post('/admin/etiquetas-wp/deletar-fatura', 'AdminEtiquetasWpController'
 $router->post('/admin/etiquetas-wp/deletar-embarque', 'AdminEtiquetasWpController', 'deletarEmbarque');
 $router->post('/admin/etiquetas-wp/regerar-etiqueta', 'AdminEtiquetasWpController', 'regerarEtiqueta');
 
+// Malas (agrupamento de pacotes)
+$router->get('/admin/etiquetas-wp/listar-malas', 'AdminEtiquetasWpController', 'listarMalas');
+$router->post('/admin/etiquetas-wp/criar-mala', 'AdminEtiquetasWpController', 'criarMala');
+$router->post('/admin/etiquetas-wp/deletar-mala', 'AdminEtiquetasWpController', 'deletarMala');
+$router->post('/admin/etiquetas-wp/atribuir-mala', 'AdminEtiquetasWpController', 'atribuirMala');
+$router->post('/admin/etiquetas-wp/remover-da-mala', 'AdminEtiquetasWpController', 'removerDaMala');
+
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
 $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');
