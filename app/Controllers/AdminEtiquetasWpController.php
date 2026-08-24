@@ -1029,53 +1029,6 @@ class AdminEtiquetasWpController extends Controller
                         unset($pkg);
                     } catch (\Exception $e) {}
                 }
-        // Enriquecer com grupo de triagem (mala) baseado no CEP/estado do destinatário
-                if (!empty($pedidoIds)) {
-                    try {
-                        $colsP2 = [];
-                        try { $stC2 = $this->connection->query('DESCRIBE pedidos'); $colsP2 = $stC2 ? $stC2->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
-
-                        $colCep = '';
-                        foreach (['cep_entrega', 'cep', 'zip', 'postal_code'] as $c) {
-                            if (in_array($c, $colsP2, true)) { $colCep = $c; break; }
-                        }
-                        $colEstado = '';
-                        foreach (['estado_entrega', 'estado', 'state'] as $c) {
-                            if (in_array($c, $colsP2, true)) { $colEstado = $c; break; }
-                        }
-
-                        if ($colCep !== '' || $colEstado !== '') {
-                            $selectCol = $colCep !== '' ? $colCep : $colEstado;
-                            $in4 = implode(',', array_fill(0, count($pedidoIds), '?'));
-                            $st4 = $this->connection->prepare("SELECT id, " . ($colCep !== '' ? $colCep . " AS cep_dest" : "''" . " AS cep_dest") . ", " . ($colEstado !== '' ? $colEstado . " AS estado_dest" : "''" . " AS estado_dest") . " FROM pedidos WHERE id IN ({$in4})");
-                            $st4->execute(array_values($pedidoIds));
-                            $mapTriagem = [];
-                            foreach ($st4->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                                $cep = trim((string) ($row['cep_dest'] ?? ''));
-                                $estado = strtoupper(trim((string) ($row['estado_dest'] ?? '')));
-                                // Determinar grupo de triagem pelo estado
-                                $grupo = '5'; // Default: Curitiba
-                                if (in_array($estado, ['SP'], true)) {
-                                    $grupo = (substr($cep, 0, 2) >= '13' && substr($cep, 0, 2) <= '13') ? '2' : '1';
-                                } elseif (in_array($estado, ['RJ', 'ES', 'MG'], true)) {
-                                    $grupo = '3';
-                                } elseif (in_array($estado, ['PR', 'SC', 'RS'], true)) {
-                                    $grupo = '5';
-                                } else {
-                                    $grupo = '5';
-                                }
-                                $mapTriagem[(int) $row['id']] = $grupo;
-                            }
-                            foreach ($resp['data'] as &$pkg) {
-                                $pid = $pkg['pedido_id_local'] ?? null;
-                                if ($pid && isset($mapTriagem[$pid])) {
-                                    $pkg['triage_group'] = $mapTriagem[$pid];
-                                }
-                            }
-                            unset($pkg);
-                        }
-                    } catch (\Exception $e) {}
-                }
             } catch (\Exception $e) {}
         }
 
