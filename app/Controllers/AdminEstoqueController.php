@@ -642,11 +642,13 @@ class AdminEstoqueController extends Controller {
             $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
             $selectPedido = $temPedidoEmLista ? ', pedido_id' : '';
             $stmt = $this->connection->prepare(
-                "SELECT id, quantidade_faltante
+                "SELECT lc.id, lc.quantidade_faltante
                  {$selectPedido}
-                 FROM lista_compras
-                 WHERE produto_id = :produto_id AND status = 'pendente'
-                 ORDER BY COALESCE(data_solicitacao, created_at) ASC, id ASC"
+                 FROM lista_compras lc
+                 " . ($temPedidoEmLista ? "LEFT JOIN pedidos p ON p.id = lc.pedido_id" : "") . "
+                 WHERE lc.produto_id = :produto_id AND lc.status = 'pendente'
+                 " . ($temPedidoEmLista ? "AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR LOWER(COALESCE(p.status,'')) IN ('pago','paid','aprovado','approved','produto_consolidado','consolidado','etiqueta_gerada','itens_comprados'))" : "") . "
+                 ORDER BY COALESCE(lc.data_solicitacao, lc.created_at) ASC, lc.id ASC"
             );
             $stmt->execute([':produto_id' => $produtoId]);
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
