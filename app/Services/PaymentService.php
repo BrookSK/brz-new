@@ -4417,7 +4417,8 @@ class PaymentService {
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
                 $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
 
-                // Inserir itens na lista_compras quando pagamento é aprovado
+                // Reservar estoque e inserir itens na lista de compras
+                $this->reservarEstoquePorPedidoAprovado($db, (int) $pedidoId);
                 $this->inserirItensListaCompras($db, (int) $pedidoId);
             }
 
@@ -4426,6 +4427,144 @@ class PaymentService {
                 $this->cancelarPedidoPorPagamentoRejeitado($db, (int) $pedidoId, $colsP);
             }
         } catch (\Exception $e) {
+        }
+    }
+
+    /**
+     * Reserva (debita) estoque quando pagamento de um pedido é aprovado.
+     * Se o estoque disponível for menor que a quantidade pedida, debita o que tem.
+     * A diferença (faltante) será tratada por inserirItensListaCompras.
+     */
+    private function reservarEstoquePorPedidoAprovado(\PDO $db, int $pedidoId): void {
+        try {
+            if ($pedidoId <= 0) return;
+
+            // Verificar se estoque_interno existe
+            $temEstoqueInterno = false;
+            try {
+                $stT = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT->execute(['estoque_interno']);
+                $temEstoqueInterno = ((int) $stT->fetchColumn() > 0);
+            } catch (\Exception $e) {}
+            if (!$temEstoqueInterno) return;
+
+            // Verificar se estoque_reservas existe
+            $temReservas = false;
+            try {
+                $stT2 = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT2->execute(['estoque_reservas']);
+                $temReservas = ((int) $stT2->fetchColumn() > 0);
+            } catch (\Exception $e) {}
+
+            // Verificar se estoque_movimentacao existe
+            $temMovimentacao = false;
+            try {
+                $stT3 = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT3->execute(['estoque_movimentacao']);
+                $temMovimentacao = ((int) $stT3->fetchColumn() > 0);
+            } catch (\Exception $e) {}
+
+            // Buscar tabela de itens
+            $itensTable = null;
+            try {
+                $stT4 = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT4->execute(['pedido_itens']);
+                if ((int) $stT4->fetchColumn() > 0) $itensTable = 'pedido_itens';
+                else {
+                    $stT4->execute(['pedido_items']);
+                    if ((int) $stT4->fetchColumn() > 0) $itensTable = 'pedido_items';
+                }
+            } catch (\Exception $e) {}
+            if (!$itensTable) return;
+
+            // Buscar itens do pedido
+            $stIt = $db->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+            $stIt->execute([$pedidoId]);
+            $itens = $stIt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Verificar coluna stock em produtos
+            $colsP = [];
+            try { $stC = $db->query('DESCRIBE produtos'); $colsP = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $stockCol = in_array('stock', $colsP, true) ? 'stock' : (in_array('estoque', $colsP, true) ? 'estoque' : '');
+
+            foreach ($itens as $it) {
+                $produtoId = (int) ($it['produto_id'] ?? 0);
+                $qtdPedido = (int) ($it['quantidade'] ?? 0);
+                if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                // Verificar se já tem reserva ativa para este pedido+produto (evitar duplicação)
+                if ($temReservas) {
+                    try {
+                        $stCheck = $db->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ? AND status = 'ativa'");
+                        $stCheck->execute([$pedidoId, $produtoId]);
+                        $jaReservado = (int) ($stCheck->fetchColumn() ?: 0);
+                        if ($jaReservado >= $qtdPedido) continue; // Já reservado totalmente
+                        $qtdPedido = $qtdPedido - $jaReservado; // Reservar apenas a diferença
+                    } catch (\Exception $e) {}
+                }
+
+                // Verificar estoque disponível
+                $stEstoque = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM estoque_interno WHERE produto_id = ?');
+                $stEstoque->execute([$produtoId]);
+                $estoqueDisponivel = (int) ($stEstoque->fetchColumn() ?: 0);
+
+                // Quanto debitar: o mínimo entre o pedido e o disponível
+                $aDebitar = min($qtdPedido, $estoqueDisponivel);
+
+                if ($aDebitar > 0) {
+                    // Debitar do estoque_interno (da localização mais antiga)
+                    $stLocs = $db->prepare('SELECT id, quantidade FROM estoque_interno WHERE produto_id = ? AND quantidade > 0 ORDER BY created_at ASC');
+                    $stLocs->execute([$produtoId]);
+                    $locs = $stLocs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    $restante = $aDebitar;
+                    foreach ($locs as $loc) {
+                        if ($restante <= 0) break;
+                        $locId = (int) $loc['id'];
+                        $locQtd = (int) $loc['quantidade'];
+                        $debitar = min($restante, $locQtd);
+
+                        $db->prepare('UPDATE estoque_interno SET quantidade = quantidade - ? WHERE id = ?')->execute([$debitar, $locId]);
+                        $restante -= $debitar;
+                    }
+
+                    // Registrar movimentação de saída
+                    if ($temMovimentacao) {
+                        try {
+                            $stMov = $db->prepare("INSERT INTO estoque_movimentacao (produto_id, tipo_movimentacao, quantidade, quantidade_anterior, quantidade_nova, motivo) VALUES (?, 'saida', ?, ?, ?, ?)");
+                            $stMov->execute([
+                                $produtoId,
+                                $aDebitar,
+                                $estoqueDisponivel,
+                                $estoqueDisponivel - $aDebitar,
+                                'Reserva automática - Pedido #' . $pedidoId . ' pago'
+                            ]);
+                        } catch (\Exception $e) {}
+                    }
+
+                    // Criar reserva
+                    if ($temReservas) {
+                        try {
+                            $db->prepare("INSERT INTO estoque_reservas (produto_id, pedido_id, quantidade_reservada, status, origem) VALUES (?, ?, ?, 'ativa', 'pagamento_aprovado') ON DUPLICATE KEY UPDATE quantidade_reservada = quantidade_reservada + VALUES(quantidade_reservada)")
+                                ->execute([$produtoId, $pedidoId, $aDebitar]);
+                        } catch (\Exception $e) {}
+                    }
+
+                    // Sync produtos.stock
+                    if ($stockCol !== '') {
+                        try {
+                            $stSync = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM estoque_interno WHERE produto_id = ?');
+                            $stSync->execute([$produtoId]);
+                            $novoTotal = (int) ($stSync->fetchColumn() ?: 0);
+                            $db->prepare('UPDATE produtos SET `' . $stockCol . '` = ? WHERE id = ?')->execute([$novoTotal, $produtoId]);
+                        } catch (\Exception $e) {}
+                    }
+                }
+            }
+
+            error_log('[ESTOQUE_RESERVA] Pedido #' . $pedidoId . ' - estoque reservado com sucesso');
+        } catch (\Exception $e) {
+            error_log('[ESTOQUE_RESERVA] Erro pedido #' . $pedidoId . ': ' . $e->getMessage());
         }
     }
 
@@ -7649,6 +7788,8 @@ class PaymentService {
             if ($aprovado && !$hasSplitBoth) {
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
                 $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
+                $this->reservarEstoquePorPedidoAprovado($db, (int) $pedidoId);
+                $this->inserirItensListaCompras($db, (int) $pedidoId);
             }
 
             if ($paymentStatusInterno === 'refunded') {
@@ -8016,6 +8157,8 @@ class PaymentService {
                 }
                 $this->inserirPedidoNaJanelaRemessa($db, (int) $pedidoId, $pagoEm);
                 $this->tentarGerarEtiquetaCorreiosPacketAposPagamentoAprovado($db, (int) $pedidoId, (string) $gateway);
+                $this->reservarEstoquePorPedidoAprovado($db, (int) $pedidoId);
+                $this->inserirItensListaCompras($db, (int) $pedidoId);
             }
 
             if ($paymentStatusInterno === 'refunded') {
