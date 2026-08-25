@@ -1950,6 +1950,62 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                <h6 class="mb-2 mt-4 small text-muted">Configuração de Frete (Carrier / Serviço)</h6>
+                                <p class="text-muted small">Defina o carrier e serviço padrão para geração de etiquetas em massa. Se preenchido, o sistema usará este serviço diretamente ao invés de cotar todas as opções.</p>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Carrier Account ID</label>
+                                                        <input type="text" class="form-control" name="shippo_carrier_account" value="' . $this->getConfigValue($config, 'shippo', 'carrier_account', '') . '" placeholder="Ex: 078870331023437cb917f5187429b093">
+                                                        <small class="text-muted">ID da carrier account configurada na Shippo (USPS, UPS, FedEx, etc.)</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Service Level Token</label>
+                                                        <input type="text" class="form-control" name="shippo_servicelevel_token" value="' . $this->getConfigValue($config, 'shippo', 'servicelevel_token', '') . '" placeholder="Ex: usps_priority, ups_ground, fedex_ground...">
+                                                        <small class="text-muted">Token do nível de serviço. <a href="https://docs.goshippo.com/docs/reference/serviceleveltoken/" target="_blank">Ver lista completa</a></small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Formato da Etiqueta</label>
+                                                        <select class="form-select" name="shippo_label_file_type">
+                                                            <option value="PDF_4x6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', 'PDF_4x6') === 'PDF_4x6' ? 'selected' : '') . '>PDF 4x6</option>
+                                                            <option value="PDF" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF' ? 'selected' : '') . '>PDF (Carta)</option>
+                                                            <option value="PNG" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PNG' ? 'selected' : '') . '>PNG</option>
+                                                            <option value="ZPLII" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'ZPLII' ? 'selected' : '') . '>ZPL II (Térmica)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Modo de Geração em Massa</label>
+                                                        <select class="form-select" name="shippo_massa_mode">
+                                                            <option value="single_call" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', 'single_call') === 'single_call' ? 'selected' : '') . '>Single Call (direto com carrier/serviço)</option>
+                                                            <option value="cheapest" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', '') === 'cheapest' ? 'selected' : '') . '>Mais barato (cotar e escolher menor preço)</option>
+                                                        </select>
+                                                        <small class="text-muted">Single Call requer Carrier Account e Service Level preenchidos.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Contents Type (Alfândega)</label>
+                                                        <select class="form-select" name="shippo_contents_type">
+                                                            <option value="MERCHANDISE" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', 'MERCHANDISE') === 'MERCHANDISE' ? 'selected' : '') . '>MERCHANDISE</option>
+                                                            <option value="GIFT" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', '') === 'GIFT' ? 'selected' : '') . '>GIFT</option>
+                                                            <option value="SAMPLE" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', '') === 'SAMPLE' ? 'selected' : '') . '>SAMPLE</option>
+                                                            <option value="RETURN" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', '') === 'RETURN' ? 'selected' : '') . '>RETURN</option>
+                                                            <option value="DOCUMENTS" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', '') === 'DOCUMENTS' ? 'selected' : '') . '>DOCUMENTS</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -4809,7 +4865,7 @@ HTML;
             ];
 
             // Shippo fields
-            $configMap['shippo'] = ['enabled', 'ambiente', 'api_token', 'sender_name', 'sender_company', 'sender_street1', 'sender_street2', 'sender_city', 'sender_state', 'sender_zip', 'sender_country', 'sender_phone', 'sender_email'];
+            $configMap['shippo'] = ['enabled', 'ambiente', 'api_token', 'sender_name', 'sender_company', 'sender_street1', 'sender_street2', 'sender_city', 'sender_state', 'sender_zip', 'sender_country', 'sender_phone', 'sender_email', 'carrier_account', 'servicelevel_token', 'label_file_type', 'massa_mode', 'contents_type'];
             
             $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'assessoria_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo', 'conversao_moeda_ativa', 'enabled'];
 

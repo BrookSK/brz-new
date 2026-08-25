@@ -260,7 +260,7 @@ async function gerarEtiquetasShippoSelecionadas() {
     var checks = document.querySelectorAll('.pedido-check:checked');
     if (checks.length === 0) return;
     var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
-    if (!confirm('Gerar etiquetas Shippo para ' + ids.length + ' pedido(s) selecionados?\n\nSerá selecionada automaticamente a opção de frete mais barata para cada pedido.')) return;
+    if (!confirm('Gerar etiquetas Shippo para ' + ids.length + ' pedido(s) selecionados?\n\nO frete será gerado conforme configuração em Configurações > Entrega > Shippo.')) return;
 
     var btn = document.getElementById('btnGerarShippo');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...'; }

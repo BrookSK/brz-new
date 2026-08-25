@@ -54,6 +54,13 @@ class ShippoService {
     }
 
     /**
+     * Retorna todas as configurações da Shippo (para uso no controller).
+     */
+    public function getShippoConfig(): array {
+        return $this->loadConfig();
+    }
+
+    /**
      * Verifica se a integração está configurada.
      */
     public function isConfigured(): bool {

@@ -612,22 +612,73 @@ class AdminShippoController extends Controller {
                 ? $this->svc->buildCustomsDeclaration($itens)
                 : $this->svc->buildCustomsDeclaration([['description' => 'Merchandise', 'quantity' => 1, 'net_weight' => (string) $peso, 'value_amount' => '50.00']]);
 
-            $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
-            if (!$shipResult['success']) {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? 'Falha no shipment.'];
-                continue;
-            }
+            // Verificar modo de geração configurado
+            $cfg = $this->svc->getShippoConfig();
+            $massaMode = (string) ($cfg['shippo_massa_mode'] ?? 'cheapest');
+            $carrierAccount = (string) ($cfg['shippo_carrier_account'] ?? '');
+            $servicelevelToken = (string) ($cfg['shippo_servicelevel_token'] ?? '');
+            $labelFileType = (string) ($cfg['shippo_label_file_type'] ?? 'PDF_4x6');
 
-            // Pegar a rate mais barata
-            $rates = $shipResult['rates'] ?? [];
-            if (empty($rates)) {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Nenhuma rate disponível.'];
-                continue;
-            }
+            if ($massaMode === 'single_call' && $carrierAccount !== '' && $servicelevelToken !== '') {
+                // Single Call: gera direto sem cotar
+                $labelResult = $this->svc->createLabelSingleCall($addressFrom, $addressTo, $parcel, $servicelevelToken, $carrierAccount, $customs, $labelFileType);
+                if (!$labelResult['success']) {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? 'Falha ao gerar etiqueta.'];
+                    continue;
+                }
 
-            usort($rates, function($a, $b) {
-                return ((float)($a['amount'] ?? 999)) <=> ((float)($b['amount'] ?? 999));
-            });
+                // Salvar
+                $this->ensureShippoEtiquetasTable();
+                try {
+                    $stDel = $this->connection->prepare("DELETE FROM shippo_etiquetas WHERE pedido_id = ?");
+                    $stDel->execute([$pid]);
+
+                    $rateData = $labelResult['rate'] ?? [];
+                    $stIns = $this->connection->prepare("
+                        INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, last_response_json, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, NOW())
+                    ");
+                    $stIns->execute([
+                        $pid,
+                        '',
+                        $labelResult['transaction_id'] ?? '',
+                        '',
+                        $labelResult['tracking_number'] ?? '',
+                        $labelResult['tracking_url'] ?? '',
+                        $labelResult['label_url'] ?? '',
+                        is_array($rateData) ? (string) ($rateData['provider'] ?? '') : '',
+                        is_array($rateData) ? (string) ($rateData['servicelevel_name'] ?? ($rateData['servicelevel']['name'] ?? '')) : '',
+                        is_array($rateData) ? (float) ($rateData['amount'] ?? 0) : 0,
+                        is_array($rateData) ? (string) ($rateData['currency'] ?? 'USD') : 'USD',
+                        json_encode($labelResult['data'] ?? []),
+                    ]);
+
+                    $results[] = [
+                        'pedido_id' => $pid,
+                        'success' => true,
+                        'tracking_number' => $labelResult['tracking_number'] ?? '',
+                        'label_url' => $labelResult['label_url'] ?? '',
+                    ];
+                } catch (\Exception $e) {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Falha ao salvar: ' . $e->getMessage()];
+                }
+            } else {
+                // Modo cotação: cria shipment, pega rates, escolhe o mais barato
+                $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
+                if (!$shipResult['success']) {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? 'Falha no shipment.'];
+                    continue;
+                }
+
+                $rates = $shipResult['rates'] ?? [];
+                if (empty($rates)) {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Nenhuma rate disponível.'];
+                    continue;
+                }
+
+                usort($rates, function($a, $b) {
+                    return ((float)($a['amount'] ?? 999)) <=> ((float)($b['amount'] ?? 999));
+                });
             $cheapestRate = $rates[0];
             $rateId = $cheapestRate['object_id'] ?? '';
 
@@ -637,7 +688,7 @@ class AdminShippoController extends Controller {
             }
 
             // Comprar etiqueta
-            $labelResult = $this->svc->purchaseLabel($rateId, 'PDF_4x6');
+            $labelResult = $this->svc->purchaseLabel($rateId, $labelFileType ?: 'PDF_4x6');
             if (!$labelResult['success']) {
                 $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? 'Falha ao gerar etiqueta.'];
                 continue;
@@ -677,6 +728,7 @@ class AdminShippoController extends Controller {
             } catch (\Exception $e) {
                 $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Falha ao salvar: ' . $e->getMessage()];
             }
+            } // fim else (modo cotação)
         }
 
         $this->json(['success' => true, 'results' => $results]);
