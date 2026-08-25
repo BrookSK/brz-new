@@ -206,6 +206,7 @@ class ShippoService {
             'address_to' => $addressTo,
             'parcels' => [$parcel],
             'async' => false,
+            'intent' => 'PURCHASE',
             'extra' => ['is_return' => false],
         ];
 
