@@ -54,11 +54,12 @@
     <!-- ETIQUETAS -->
     <div class="ewp-panel" id="panel-etiquetas">
         <!-- Campo de busca -->
-        <div class="mb-3">
-            <div class="input-group">
+        <div class="mb-3 d-flex gap-2 align-items-center">
+            <div class="input-group flex-grow-1">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
                 <input type="text" class="form-control" id="etiquetas-busca" placeholder="Buscar por pedido, cliente, tracking..." oninput="filtrarEtiquetas(this.value)">
             </div>
+            <button class="btn btn-success btn-sm flex-shrink-0" onclick="abrirModalNovaMala()"><i class="fas fa-suitcase me-1"></i>Nova Mala</button>
         </div>
         <div class="card ewp-card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center py-2">
@@ -91,28 +92,19 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
                 <thead class="table-light"><tr><th style="width:30px"><input type="checkbox" id="checkAllPacotes" onclick="toggleAllPacotes()"></th><th>Pedido</th><th>Cliente</th><th>Tracking</th><th class="d-none d-md-table-cell">Peso</th><th>PDF</th><th>Ações</th></tr></thead>
                 <tbody id="pacotes-body"><tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr></tbody>
             </table></div></div></div>
+        <!-- Malas -->
+        <div class="card ewp-card" id="malas-section">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <strong class="small"><i class="fas fa-suitcase me-1"></i>Malas</strong>
+            </div>
+            <div class="card-body p-0">
+                <div id="malas-lista" class="p-3"><span class="text-muted small">Nenhuma mala cadastrada.</span></div>
+            </div>
+        </div>
     </div>
 
     <!-- CONTAINERS -->
     <div class="ewp-panel" id="panel-containers" style="display:none;">
-        <!-- MALAS -->
-        <div class="card ewp-card mb-3">
-            <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                <strong class="small"><i class="fas fa-suitcase me-1"></i>Malas</strong>
-                <button class="btn btn-xs btn-success" onclick="mostrarFormMala()"><i class="fas fa-plus me-1"></i>Nova Mala</button>
-            </div>
-            <div class="card-body">
-                <div id="form-nova-mala" style="display:none;" class="mb-3 p-2 border rounded bg-light">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-4"><label class="form-label small mb-0">Nome*</label><input type="text" class="form-control form-control-sm" id="mala-nome" placeholder="Ex: Mala 1, Lote SP..."></div>
-                        <div class="col-md-5"><label class="form-label small mb-0">Descrição</label><input type="text" class="form-control form-control-sm" id="mala-descricao" placeholder="Opcional..."></div>
-                        <div class="col-md-3 d-flex gap-2"><button class="btn btn-sm btn-success" onclick="salvarMala()"><i class="fas fa-check me-1"></i>Criar</button><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('form-nova-mala').style.display='none'">Cancelar</button></div>
-                    </div>
-                </div>
-                <div id="malas-lista"><span class="text-muted small"><i class="fas fa-spinner fa-spin me-1"></i></span></div>
-            </div>
-        </div>
-
         <div class="card ewp-card mb-3">
             <div class="card-header py-2"><strong class="small">Criar Container</strong></div>
             <div class="card-body">
@@ -222,6 +214,32 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
     </div>
 </div>
 
+<!-- Modal Nova Mala -->
+<div class="modal fade" id="modalNovaMala" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:12px;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);border-radius:12px 12px 0 0;padding:16px 20px;">
+                <h6 style="color:#fff;font-weight:700;margin:0;"><i class="fas fa-suitcase me-2"></i>Nova Mala</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome da Mala *</label>
+                    <input type="text" class="form-control" id="modal-mala-nome" placeholder="Ex: Mala 1, Lote SP, Envio 15/08...">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-semibold">Descrição</label>
+                    <input type="text" class="form-control" id="modal-mala-descricao" placeholder="Opcional - descrição ou observação">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="salvarMalaModal()"><i class="fas fa-check me-1"></i>Criar Mala</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 const BASE='/admin/etiquetas-wp';
 
@@ -240,8 +258,8 @@ function filtrarEtiquetas(termo) {
     });
 }
 
-function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarMalas();carregarMalasParaContainer();carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}if(t==='documentacao'){carregarDocumentacaoTab();}}
-document.addEventListener('DOMContentLoaded',()=>{checkConnection();carregarPacotes();carregarMalasSelect();});
+function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarMalasParaContainer();carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}if(t==='documentacao'){carregarDocumentacaoTab();}}
+document.addEventListener('DOMContentLoaded',()=>{checkConnection();carregarPacotes();carregarMalasSelect();carregarMalas();});
 document.addEventListener('change',e=>{if(e.target.classList.contains('chk-pedido'))updateMassBtn();if(e.target.classList.contains('chk-cnt-pacote'))updateCntCount();});
 
 // CONNECTION
@@ -263,14 +281,15 @@ function toggleAllPacotes(){const checked=document.getElementById('checkAllPacot
 function updateBaixarMassa(){const checked=document.querySelectorAll('.chk-pacote-dl:checked').length;const btn=document.getElementById('btnBaixarMassa');const txt=document.getElementById('btnBaixarMassaText');if(btn){btn.style.display=checked>0?'':'none';}if(txt){txt.textContent=checked>1?'Baixar '+checked+' Etiquetas':'Baixar Etiqueta';}}
 async function baixarEtiquetasMassa(){const checks=[...document.querySelectorAll('.chk-pacote-dl:checked')];if(!checks.length){alert('Selecione pelo menos 1 etiqueta.');return;}const btn=document.getElementById('btnBaixarMassa');if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Baixando...';}let downloaded=0;for(const cb of checks){const url=cb.getAttribute('data-pdf-url');const pedido=cb.getAttribute('data-pedido')||'etiqueta';if(!url)continue;try{const resp=await fetch(url);if(!resp.ok)continue;const blob=await resp.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='etiqueta_'+pedido.replace('#','')+'.pdf';document.body.appendChild(link);link.click();document.body.removeChild(link);URL.revokeObjectURL(link.href);downloaded++;await new Promise(r=>setTimeout(r,300));}catch(e){console.error('Erro baixando '+url,e);}}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-download me-1"></i><span id="btnBaixarMassaText">Baixar Etiquetas</span>';updateBaixarMassa();}if(downloaded>0)alert(downloaded+' etiqueta(s) baixada(s) com sucesso!');}
 
-// MALAS SELECT (para geração em massa)
-async function carregarMalasSelect(){try{const r=await fetch(BASE+'/listar-malas');const d=await r.json();const sel=document.getElementById('mala-geracaoMassa');if(!sel)return;sel.innerHTML='<option value="">Sem mala</option>';if(d.success&&d.data){d.data.forEach(function(m){sel.innerHTML+='<option value="'+m.id+'">'+escHtmlCnt(m.nome)+' ('+m.pacotes_count+' pct)</option>';});}}catch(e){}}
-
 // MALAS
-function mostrarFormMala(){document.getElementById('form-nova-mala').style.display='block';document.getElementById('mala-nome').focus();}
-async function salvarMala(){const nome=document.getElementById('mala-nome').value.trim();const desc=document.getElementById('mala-descricao').value.trim();if(!nome){alert('Nome é obrigatório.');return;}try{const r=await fetch(BASE+'/criar-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:nome,descricao:desc})});const d=await r.json();if(d.success){document.getElementById('mala-nome').value='';document.getElementById('mala-descricao').value='';document.getElementById('form-nova-mala').style.display='none';carregarMalas();}else{alert('Erro: '+(d.error||'Falha'));}}catch(e){alert('Erro: '+e.message);}}
-async function carregarMalas(){const el=document.getElementById('malas-lista');try{const r=await fetch(BASE+'/listar-malas');const d=await r.json();if(!d.success||!d.data||!d.data.length){el.innerHTML='<span class="text-muted small">Nenhuma mala cadastrada. Crie uma para agrupar pacotes.</span>';return;}let h='<div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle"><thead class="table-light"><tr><th>Mala</th><th>Descrição</th><th>Pacotes</th><th>Peso Total</th><th>Ações</th></tr></thead><tbody>';d.data.forEach(function(m){const pesoKg=m.peso_total_gramas?(m.peso_total_gramas/1000).toFixed(2)+'kg':'0kg';h+='<tr><td><strong>'+escHtmlCnt(m.nome)+'</strong></td><td class="text-muted small">'+escHtmlCnt(m.descricao||'-')+'</td><td><span class="badge bg-primary">'+m.pacotes_count+'</span></td><td>'+pesoKg+'</td><td><button class="btn btn-xs btn-outline-danger" onclick="deletarMala('+m.id+',\''+escHtmlCnt(m.nome)+'\')"><i class="fas fa-trash"></i></button></td></tr>';});h+='</tbody></table></div>';el.innerHTML=h;}catch(e){el.innerHTML='<span class="text-danger small">'+e.message+'</span>';}}
-async function deletarMala(id,nome){if(!confirm('Deletar mala "'+nome+'"? Os pacotes serão desvinculados.'))return;try{const r=await fetch(BASE+'/deletar-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mala_id:id})});const d=await r.json();if(d.success){carregarMalas();carregarMalasParaContainer();}else{alert('Erro: '+(d.error||'Falha'));}}catch(e){alert('Erro: '+e.message);}}
+function abrirModalNovaMala(){document.getElementById('modal-mala-nome').value='';document.getElementById('modal-mala-descricao').value='';var m=new bootstrap.Modal(document.getElementById('modalNovaMala'));m.show();}
+async function carregarMalasSelect(){try{const r=await fetch(BASE+'/listar-malas');const d=await r.json();const sel=document.getElementById('mala-geracaoMassa');if(!sel)return;sel.innerHTML='<option value="">Sem mala</option>';if(d.success&&d.data){d.data.forEach(function(m){sel.innerHTML+='<option value="'+m.id+'">'+escHtmlCnt(m.nome)+' ('+m.pacotes_count+' pct)</option>';});}}catch(e){}}
+async function salvarMalaModal(){const nome=document.getElementById('modal-mala-nome').value.trim();const desc=document.getElementById('modal-mala-descricao').value.trim();if(!nome){alert('Nome é obrigatório.');return;}try{const r=await fetch(BASE+'/criar-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:nome,descricao:desc})});const d=await r.json();if(d.success){bootstrap.Modal.getInstance(document.getElementById('modalNovaMala')).hide();carregarMalas();carregarMalasSelect();}else{alert('Erro: '+(d.error||'Falha'));}}catch(e){alert('Erro: '+e.message);}}
+function mostrarFormMala(){abrirModalNovaMala();}
+async function salvarMala(){await salvarMalaModal();}
+async function carregarMalas(){const el=document.getElementById('malas-lista');try{const r=await fetch(BASE+'/listar-malas');const d=await r.json();if(!d.success||!d.data||!d.data.length){el.innerHTML='<span class="text-muted small">Nenhuma mala cadastrada. Clique em "Nova Mala" para criar.</span>';return;}let h='';d.data.forEach(function(m,idx){const pesoKg=m.peso_total_gramas?(m.peso_total_gramas/1000).toFixed(2):'0.00';const pacotes=m.pacotes||[];h+='<div class="border rounded mb-2" style="overflow:hidden;">';h+='<div class="d-flex align-items-center justify-content-between px-3 py-2" style="cursor:pointer;background:#fff;" onclick="toggleMalaDetail('+idx+')">';h+='<div class="d-flex align-items-center gap-2"><i class="fas fa-chevron-right mala-chev-'+idx+'" style="font-size:.65rem;color:#64748b;transition:transform .2s;"></i><strong>'+escHtmlCnt(m.nome)+'</strong><span class="text-muted small">'+escHtmlCnt(m.descricao||'')+'</span><span class="badge bg-primary">'+m.pacotes_count+' pacote(s)</span></div>';h+='<div class="d-flex align-items-center gap-2"><button class="btn btn-xs btn-outline-danger" onclick="event.stopPropagation();deletarMala('+m.id+',\''+escHtmlCnt(m.nome).replace(/'/g,"\\'")+'\')"><i class="fas fa-trash"></i></button></div>';h+='</div>';h+='<div id="mala-detail-'+idx+'" style="display:none;padding:10px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;">';if(pacotes.length>0){h+='<table class="table table-sm table-bordered mb-2" style="font-size:.8rem;"><thead class="table-light"><tr><th>Tracking</th><th>Pedido</th><th>Peso</th></tr></thead><tbody>';pacotes.forEach(function(p){const pesoP=p.peso_gramas?(p.peso_gramas/1000).toFixed(2)+'kg':'-';h+='<tr><td><code>'+escHtmlCnt(p.tracking_code||'-')+'</code></td><td>'+(p.pedido_id?'#'+String(p.pedido_id).padStart(6,'0'):'-')+'</td><td>'+pesoP+'</td></tr>';});h+='</tbody></table>';}else{h+='<span class="text-muted small">Nenhum pacote nesta mala.</span>';}h+='<div class="text-end small fw-bold text-primary">Peso total: '+pesoKg+'kg</div>';h+='</div></div>';});el.innerHTML=h;}catch(e){el.innerHTML='<span class="text-danger small">'+e.message+'</span>';}}
+function toggleMalaDetail(idx){var body=document.getElementById('mala-detail-'+idx);var chev=document.querySelector('.mala-chev-'+idx);if(!body)return;var isOpen=body.style.display!=='none';body.style.display=isOpen?'none':'';if(chev)chev.style.transform=isOpen?'rotate(0deg)':'rotate(90deg)';}
+async function deletarMala(id,nome){if(!confirm('Deletar mala "'+nome+'"? Os pacotes serão desvinculados.'))return;try{const r=await fetch(BASE+'/deletar-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mala_id:id})});const d=await r.json();if(d.success){carregarMalas();carregarMalasParaContainer();carregarMalasSelect();}else{alert('Erro: '+(d.error||'Falha'));}}catch(e){alert('Erro: '+e.message);}}
 async function carregarMalasParaContainer(){const sel=document.getElementById('cnt-selecionar-mala');if(!sel)return;try{const r=await fetch(BASE+'/listar-malas');const d=await r.json();sel.innerHTML='<option value="">Selecionar por Mala...</option>';if(d.success&&d.data){d.data.forEach(function(m){const pesoKg=m.peso_total_gramas?(m.peso_total_gramas/1000).toFixed(1)+'kg':'0kg';sel.innerHTML+='<option value="'+m.id+'" data-trackings="'+m.pacotes.map(function(p){return p.tracking_code;}).join(',')+'">'+escHtmlCnt(m.nome)+' ('+m.pacotes_count+' pct, '+pesoKg+')</option>';});}}catch(e){}}
 function selecionarPacotesPorMala(){const sel=document.getElementById('cnt-selecionar-mala');if(!sel||!sel.value)return;const opt=sel.options[sel.selectedIndex];const trackings=(opt.getAttribute('data-trackings')||'').split(',').filter(function(t){return t.length>0;});if(!trackings.length){alert('Nenhum pacote nessa mala.');return;}const checkboxes=document.querySelectorAll('.chk-cnt-pacote');checkboxes.forEach(function(cb){cb.checked=false;});let found=0;trackings.forEach(function(tc){checkboxes.forEach(function(cb){if(cb.value.toUpperCase()===tc.toUpperCase()){cb.checked=true;found++;}});});updateCntCount();if(found===0){alert('Nenhum pacote dessa mala está disponível (já em container ou cancelado).');}}
 
