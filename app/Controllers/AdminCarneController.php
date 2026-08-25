@@ -342,9 +342,16 @@ class AdminCarneController extends Controller {
         ");
         $stmt->execute([':id' => $id]);
 
-        $stmt = $this->db->prepare("SELECT carne_id FROM carne_compras_internas WHERE id = :id");
+        $stmt = $this->db->prepare("SELECT carne_id, pedido_id FROM carne_compras_internas WHERE id = :id");
         $stmt->execute([':id' => $id]);
-        $carneId = $stmt->fetchColumn();
+        $rowCi = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $carneId = (int) ($rowCi['carne_id'] ?? 0);
+        $pedidoId = (int) ($rowCi['pedido_id'] ?? 0);
+
+        // Espelhar a compra na lista_compras do pedido e atualizar o status do pedido.
+        // (Fluxo isolado do carnê — o fluxo normal de compras ignora pedidos de carnê de proposito.)
+        $this->marcarListaComprasCarne($pedidoId, 'comprado');
+        $this->atualizarStatusPedidoCarne($pedidoId);
 
         $this->carneModel->registrarHistorico($carneId, null, 'produto_comprado',
             'Produto marcado como comprado internamente', null, $_SESSION['usuario_id'] ?? null);
@@ -352,6 +359,274 @@ class AdminCarneController extends Controller {
         $_SESSION['message'] = 'Produto marcado como comprado.';
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$carneId}");
+    }
+
+    /**
+     * Marca (ou reverte) os itens de carnê na lista_compras de um pedido.
+     * $novoStatus: 'comprado' ou 'pendente'.
+     * Só atua sobre registros com tipo_compra = 'carne' daquele pedido.
+     */
+    private function marcarListaComprasCarne(int $pedidoId, string $novoStatus): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+        if (!in_array($novoStatus, ['comprado', 'pendente'], true)) {
+            return;
+        }
+
+        try {
+            if (!$this->carneTableExists('lista_compras')) {
+                return;
+            }
+            $temTipoCompra = $this->carneColumnExists('lista_compras', 'tipo_compra');
+            $temQtdFaltante = $this->carneColumnExists('lista_compras', 'quantidade_faltante');
+
+            // Restringe aos itens de carnê quando a coluna existe; caso contrario, ao pedido inteiro.
+            $whereTipo = $temTipoCompra ? " AND tipo_compra = 'carne'" : '';
+
+            if ($novoStatus === 'comprado') {
+                $setQtd = $temQtdFaltante ? ", quantidade_faltante = 0" : '';
+                $sql = "UPDATE lista_compras SET status = 'comprado'{$setQtd}
+                        WHERE pedido_id = :pid AND status = 'pendente'" . $whereTipo;
+                $st = $this->db->prepare($sql);
+                $st->execute([':pid' => $pedidoId]);
+
+                // Caso legado: se o pedido não tem NENHUM item de carnê na lista_compras
+                // (compra liberada antes da inserção automática), criar os itens já como comprados
+                // a partir de pedido_itens — assim o status do pedido pode ser recalculado.
+                $stCnt = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid" . $whereTipo);
+                $stCnt->execute([':pid' => $pedidoId]);
+                if ((int) $stCnt->fetchColumn() === 0) {
+                    $this->inserirItensCarneComprados($pedidoId, $temTipoCompra, $temQtdFaltante);
+                }
+            } else {
+                // Reverter para pendente: restaura quantidade_faltante = quantidade_necessaria quando possivel
+                $setQtd = $temQtdFaltante ? ", quantidade_faltante = COALESCE(NULLIF(quantidade_necessaria,0), quantidade_faltante, 1)" : '';
+                $sql = "UPDATE lista_compras SET status = 'pendente'{$setQtd}
+                        WHERE pedido_id = :pid AND status = 'comprado'" . $whereTipo;
+                $st = $this->db->prepare($sql);
+                $st->execute([':pid' => $pedidoId]);
+            }
+        } catch (\Exception $e) {
+            error_log('[CarneCompras] Erro ao sincronizar lista_compras (pedido ' . $pedidoId . '): ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Insere os itens do pedido na lista_compras já como 'comprado' (para casos legados
+     * onde a compra do carnê foi concluída sem os itens terem sido registrados na lista).
+     */
+    private function inserirItensCarneComprados(int $pedidoId, bool $temTipoCompra, bool $temQtdFaltante): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+        try {
+            $stItens = $this->db->prepare("SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? AND produto_id IS NOT NULL AND produto_id > 0");
+            $stItens->execute([$pedidoId]);
+            $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($itens)) {
+                return;
+            }
+
+            $temPedidoId = $this->carneColumnExists('lista_compras', 'pedido_id');
+            $temDataSolic = $this->carneColumnExists('lista_compras', 'data_solicitacao');
+
+            foreach ($itens as $item) {
+                $prodId = (int) ($item['produto_id'] ?? 0);
+                $qtd = (int) ($item['quantidade'] ?? 1);
+                if ($prodId <= 0 || $qtd <= 0) continue;
+
+                // Evitar duplicata: só insere se ainda não houver registro para este produto/pedido.
+                $sqlCheck = "SELECT COUNT(*) FROM lista_compras WHERE produto_id = ?";
+                $paramsCheck = [$prodId];
+                if ($temPedidoId) { $sqlCheck .= " AND pedido_id = ?"; $paramsCheck[] = $pedidoId; }
+                $stCheck = $this->db->prepare($sqlCheck);
+                $stCheck->execute($paramsCheck);
+                if ((int) $stCheck->fetchColumn() > 0) {
+                    continue;
+                }
+
+                $cols = ['produto_id', 'quantidade_necessaria', 'prioridade', 'status'];
+                $vals = ['?', '?', "'media'", "'comprado'"];
+                $params = [$prodId, $qtd];
+                if ($temQtdFaltante) { $cols[] = 'quantidade_faltante'; $vals[] = '0'; }
+                if ($temPedidoId) { $cols[] = 'pedido_id'; $vals[] = '?'; $params[] = $pedidoId; }
+                if ($temTipoCompra) { $cols[] = 'tipo_compra'; $vals[] = "'carne'"; }
+                if ($temDataSolic) { $cols[] = 'data_solicitacao'; $vals[] = 'CURDATE()'; }
+
+                $sqlIns = 'INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')';
+                $this->db->prepare($sqlIns)->execute($params);
+            }
+        } catch (\Exception $e) {
+            error_log('[CarneCompras] Erro ao inserir itens comprados (pedido ' . $pedidoId . '): ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Recalcula o status do pedido de carnê com base na lista_compras.
+     * - Nenhum item pendente  -> 'itens_comprados'
+     * - Alguns pendentes      -> 'itens_parcialmente_comprados'
+     * - Todos pendentes       -> 'pago' (reverte, sem rebaixar estagios posteriores)
+     * Nunca rebaixa pedidos que ja avancaram (em_transporte, entregue, etc.).
+     */
+    private function atualizarStatusPedidoCarne(int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        try {
+            // Status atual do pedido
+            $stCur = $this->db->prepare("SELECT status FROM pedidos WHERE id = :pid LIMIT 1");
+            $stCur->execute([':pid' => $pedidoId]);
+            $statusAtual = strtolower(trim((string) ($stCur->fetchColumn() ?: '')));
+
+            // Só mexe se o pedido estiver em um dos estados da etapa de compra.
+            // Para carnê, o pedido fica em 'carne_pagando'/'carne_aguardando' durante a compra
+            // (a compra é liberada já na 1ª parcela paga, antes de quitar). 'pago' também
+            // é aceito para o caso de carnê quitado. Nunca rebaixa estágios posteriores
+            // (produto_consolidado, em_transporte, entregue, etc.).
+            $statusEditaveis = ['carne_pagando', 'carne_aguardando', 'pago', 'itens_parcialmente_comprados', 'itens_comprados'];
+            if (!in_array($statusAtual, $statusEditaveis, true)) {
+                return;
+            }
+
+            if (!$this->carneTableExists('lista_compras')) {
+                return;
+            }
+
+            $temTipoCompra = $this->carneColumnExists('lista_compras', 'tipo_compra');
+            $whereTipo = $temTipoCompra ? " AND tipo_compra = 'carne'" : '';
+
+            // Total de itens de carnê na lista e quantos ainda estao pendentes.
+            $stTot = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid" . $whereTipo);
+            $stTot->execute([':pid' => $pedidoId]);
+            $totalItens = (int) $stTot->fetchColumn();
+
+            if ($totalItens <= 0) {
+                return;
+            }
+
+            $stPend = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid AND status = 'pendente'" . $whereTipo);
+            $stPend->execute([':pid' => $pedidoId]);
+            $pendentes = (int) $stPend->fetchColumn();
+
+            if ($pendentes <= 0) {
+                $novoStatus = 'itens_comprados';
+            } elseif ($pendentes < $totalItens) {
+                $novoStatus = 'itens_parcialmente_comprados';
+            } else {
+                // Tudo pendente novamente (ex.: após desfazer): volta ao estado anterior
+                // à compra. Para carnê, esse estado é 'carne_pagando' (ou 'pago' se quitado).
+                $novoStatus = $this->statusPreCompraDoPedido($pedidoId);
+            }
+
+            if ($novoStatus !== $statusAtual) {
+                $stUp = $this->db->prepare("UPDATE pedidos SET status = :st WHERE id = :pid LIMIT 1");
+                $stUp->execute([':st' => $novoStatus, ':pid' => $pedidoId]);
+            }
+        } catch (\Exception $e) {
+            error_log('[CarneCompras] Erro ao atualizar status do pedido ' . $pedidoId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Determina o status "pré-compra" de um pedido de carnê (usado ao desfazer a compra).
+     * Carnê quitado (todas as parcelas pagas) -> 'pago'; caso contrário -> 'carne_pagando'.
+     * Para pedidos que não são de carnê, retorna 'pago'.
+     */
+    private function statusPreCompraDoPedido(int $pedidoId): string {
+        try {
+            $st = $this->db->prepare("SELECT forma_pagamento FROM pedidos WHERE id = :pid LIMIT 1");
+            $st->execute([':pid' => $pedidoId]);
+            $formaPag = strtolower(trim((string) ($st->fetchColumn() ?: '')));
+
+            $stC = $this->db->prepare("SELECT id, quantidade_parcelas FROM carnes WHERE pedido_id = :pid LIMIT 1");
+            $stC->execute([':pid' => $pedidoId]);
+            $carne = $stC->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            $ehCarne = ($formaPag === 'carne_braziliana') || !empty($carne);
+            if (!$ehCarne) {
+                return 'pago';
+            }
+
+            $carneId = (int) ($carne['id'] ?? 0);
+            $totalParcelas = (int) ($carne['quantidade_parcelas'] ?? 0);
+            $parcelasPagas = 0;
+            if ($carneId > 0) {
+                $stP = $this->db->prepare("SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = :cid AND status = 'paga'");
+                $stP->execute([':cid' => $carneId]);
+                $parcelasPagas = (int) $stP->fetchColumn();
+            }
+
+            if ($totalParcelas > 0 && $parcelasPagas >= $totalParcelas) {
+                return 'pago';
+            }
+            return 'carne_pagando';
+        } catch (\Exception $e) {
+            return 'carne_pagando';
+        }
+    }
+
+    /**
+     * Reconcilia pedidos de carnê já marcados como comprados/recebidos em
+     * carne_compras_internas cujo pedido/lista_compras ainda não refletem a compra.
+     * Corrige casos anteriores à implementação da sincronização automática.
+     * Idempotente e seguro: só age sobre pedidos ainda em etapa de compra.
+     */
+    private function reconciliarStatusPedidosCarne(): void {
+        try {
+            if (!$this->carneTableExists('carne_compras_internas') || !$this->carneTableExists('lista_compras')) {
+                return;
+            }
+
+            // Pedidos de carnê marcados como comprados/recebidos internamente,
+            // mas com pedido ainda na etapa de compra (status não sincronizado).
+            // Inclui os status próprios do carnê (carne_pagando/carne_aguardando).
+            $sql = "SELECT DISTINCT ci.pedido_id
+                    FROM carne_compras_internas ci
+                    INNER JOIN pedidos p ON p.id = ci.pedido_id
+                    WHERE ci.status IN ('comprado', 'recebido')
+                      AND ci.pedido_id IS NOT NULL AND ci.pedido_id > 0
+                      AND p.status IN ('carne_pagando', 'carne_aguardando', 'pago', 'itens_parcialmente_comprados')";
+            $st = $this->db->query($sql);
+            $pedidoIds = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            foreach ($pedidoIds as $pid) {
+                $pid = (int) $pid;
+                if ($pid <= 0) continue;
+                // Espelha a compra na lista_compras e recalcula o status do pedido.
+                $this->marcarListaComprasCarne($pid, 'comprado');
+                $this->atualizarStatusPedidoCarne($pid);
+            }
+        } catch (\Exception $e) {
+            error_log('[CarneCompras] Erro na reconciliação de status: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Helper local: verifica existencia de tabela (sem depender de metodos privados de outros controllers).
+     */
+    private function carneTableExists(string $table): bool {
+        try {
+            $st = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $st->execute([$table]);
+            return ((int) $st->fetchColumn()) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Helper local: verifica existencia de coluna.
+     */
+    private function carneColumnExists(string $table, string $column): bool {
+        try {
+            $st = $this->db->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
+            $st->execute([$table, $column]);
+            return ((int) $st->fetchColumn()) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -375,6 +650,24 @@ class AdminCarneController extends Controller {
         $stmt->execute([':id' => $id]);
 
         $carneId = (int) ($row['carne_id'] ?? 0);
+
+        // Reverter a lista_compras e o status do pedido (fluxo isolado do carnê).
+        $pedidoIdDesfazer = 0;
+        try {
+            $stPed = $this->db->prepare("SELECT pedido_id FROM carne_compras_internas WHERE id = :id");
+            $stPed->execute([':id' => $id]);
+            $pedidoIdDesfazer = (int) ($stPed->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+        if ($pedidoIdDesfazer <= 0 && $carneId > 0) {
+            try {
+                $stPed2 = $this->db->prepare("SELECT pedido_id FROM carnes WHERE id = :cid LIMIT 1");
+                $stPed2->execute([':cid' => $carneId]);
+                $pedidoIdDesfazer = (int) ($stPed2->fetchColumn() ?: 0);
+            } catch (\Exception $e) {}
+        }
+        $this->marcarListaComprasCarne($pedidoIdDesfazer, 'pendente');
+        $this->atualizarStatusPedidoCarne($pedidoIdDesfazer);
+
         $this->carneModel->registrarHistorico($carneId, null, 'compra_desfeita',
             'Status da compra interna revertido para aguardando_compra', null, $_SESSION['usuario_id'] ?? null);
 
@@ -680,6 +973,10 @@ class AdminCarneController extends Controller {
      * Compras do Carnê — Produtos agrupados por mês
      */
     public function compras(Request $request) {
+        // Reconciliar casos legados: carnês já marcados como 'comprado'/'recebido'
+        // cujo pedido/lista_compras ainda não refletem a compra (bug anterior à correção).
+        $this->reconciliarStatusPedidosCarne();
+
         $filtroStatus = $request->getParam('status', '');
         $filtroTipo = $request->getParam('tipo', '');
         $filtroParcelas = $request->getParam('parcelas', '');
