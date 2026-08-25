@@ -337,6 +337,15 @@ class ClubeRecargaController extends Controller {
     }
 
     public function index(Request $request) {
+        // Clube desativado: bloquear novas recargas, exibir aviso com contato WhatsApp
+        if (!ClubeController::isClubeEnabled()) {
+            $this->view('clube/recarga_disabled', [
+                'clube_whatsapp' => ClubeController::CLUBE_WHATSAPP,
+                'clube_whatsapp_label' => ClubeController::CLUBE_WHATSAPP_LABEL,
+            ]);
+            return;
+        }
+
         $rate = $this->getUsdBrlRate();
 
         $capBrl = (float) self::CLUBE_CAP_BRL;
@@ -443,6 +452,12 @@ class ClubeRecargaController extends Controller {
     }
 
     public function criar(Request $request) {
+        // Clube desativado: bloquear criação de novas recargas
+        if (!ClubeController::isClubeEnabled()) {
+            $this->json(['success' => false, 'error' => 'As recargas do Clube estão temporariamente pausadas. Entre em contato pelo WhatsApp ' . ClubeController::CLUBE_WHATSAPP_LABEL . ' para mais detalhes.'], 403);
+            return;
+        }
+
         $raw = file_get_contents('php://input');
         $data = json_decode((string) $raw, true);
         if (!is_array($data)) {

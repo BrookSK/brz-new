@@ -1,4 +1,10 @@
 <?php ob_start(); ?>
+<?php
+$clubeEnabled = !isset($clube_enabled) || $clube_enabled === true;
+$clubeWhatsapp = $clube_whatsapp ?? '13053638204';
+$clubeWhatsappLabel = $clube_whatsapp_label ?? '+1 305-363-8204';
+$clubeWhatsappMsg = rawurlencode('Olá, gostaria de saber mais sobre o meu Clube Braziliana.');
+?>
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-9">
@@ -9,10 +15,30 @@
                 <h1 class="fw-bold" style="color:#0b1f3a;">Clube Braziliana</h1>
                 <p class="lead text-muted">Programa de Benefícios</p>
                 <p class="text-muted mx-auto" style="max-width:620px;">O Clube Braziliana é um programa de benefícios baseado em créditos internos da plataforma, destinado a oferecer vantagens exclusivas aos membros em compras e serviços disponíveis no sistema. Agora com duas modalidades: Normal e Turbo.</p>
+
+                <?php if ($clubeEnabled): ?>
                 <div class="d-flex gap-2 justify-content-center mt-4">
                     <a href="/clube/recarga" class="btn btn-lg" style="background:#0b1f3a;color:#fff;"><i class="fas fa-wallet me-2"></i>Ativar meu Clube</a>
                     <a href="/grupos-compras" class="btn btn-outline-secondary btn-lg"><i class="fas fa-store me-2"></i>Ver Grupos</a>
                 </div>
+                <?php else: ?>
+                <div class="alert alert-warning border-0 shadow-sm mx-auto mt-4 text-start" style="max-width:640px;border-radius:14px;">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="fas fa-pause-circle fa-2x" style="color:#b45309;"></i>
+                        <div>
+                            <h2 class="h5 mb-1" style="color:#b45309;">Novas recargas pausadas</h2>
+                            <p class="mb-2 text-muted">No momento não estamos aceitando novas recargas do Clube Braziliana. Se você já é membro e deseja utilizar seus créditos, entre em contato com a nossa equipe pelo WhatsApp para mais detalhes.</p>
+                            <a href="https://wa.me/<?= htmlspecialchars($clubeWhatsapp) ?>?text=<?= $clubeWhatsappMsg ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success">
+                                <i class="fab fa-whatsapp me-2"></i>Falar no WhatsApp
+                            </a>
+                            <div class="small text-muted mt-2"><i class="fas fa-phone-alt me-1"></i><?= htmlspecialchars($clubeWhatsappLabel) ?></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="/grupos-compras" class="btn btn-outline-secondary"><i class="fas fa-store me-2"></i>Ver Grupos</a>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Destaques rápidos -->
@@ -292,6 +318,7 @@
             </div>
 
             <!-- CTA final -->
+            <?php if ($clubeEnabled): ?>
             <div class="text-center py-4">
                 <h3 class="fw-bold mb-3" style="color:#0b1f3a;">Pronto para participar?</h3>
                 <p class="text-muted mb-4">Ative seu Clube Braziliana com um depósito mínimo de US$ 39,00. Escolha entre Normal ou Turbo e comece a aproveitar os benefícios.</p>
@@ -300,6 +327,16 @@
                     <a href="/produtos" class="btn btn-outline-primary btn-lg"><i class="fas fa-shopping-bag me-2"></i>Ver Produtos</a>
                 </div>
             </div>
+            <?php else: ?>
+            <div class="text-center py-4">
+                <h3 class="fw-bold mb-3" style="color:#0b1f3a;">Novas recargas pausadas</h3>
+                <p class="text-muted mb-4">No momento não estamos aceitando novas recargas. Já é membro? Fale com a nossa equipe pelo WhatsApp para utilizar seus créditos.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <a href="https://wa.me/<?= htmlspecialchars($clubeWhatsapp) ?>?text=<?= $clubeWhatsappMsg ?>" target="_blank" rel="noopener noreferrer" class="btn btn-lg btn-success"><i class="fab fa-whatsapp me-2"></i>Falar no WhatsApp</a>
+                    <a href="/produtos" class="btn btn-outline-primary btn-lg"><i class="fas fa-shopping-bag me-2"></i>Ver Produtos</a>
+                </div>
+            </div>
+            <?php endif; ?>
 
         </div>
     </div>

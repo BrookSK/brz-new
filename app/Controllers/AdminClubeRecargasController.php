@@ -129,6 +129,38 @@ class AdminClubeRecargasController extends Controller {
             'recargas' => $rows,
             'stats' => $stats,
             'sidebarActive' => 'clube-recargas',
+            'clube_enabled' => ClubeController::isClubeEnabled(),
         ]);
+    }
+
+    /**
+     * Ativa/desativa o Clube (novas recargas) via flag global clube_enabled.
+     * Somente admin pode alterar.
+     */
+    public function toggle(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $ativar = (string) ($request->getParam('ativar') ?? '');
+        $novoValor = in_array(strtolower(trim($ativar)), ['1', 'true', 'on', 'sim', 'yes'], true) ? '1' : '0';
+
+        $ok = false;
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('clube_enabled', ?)
+                ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
+            $ok = $stmt->execute([$novoValor]);
+        } catch (\Exception $e) {
+            $ok = false;
+        }
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['flash_' . ($ok ? 'success' : 'error')] = $ok
+            ? ($novoValor === '1' ? 'Clube ativado. Novas recargas liberadas.' : 'Clube desativado. Novas recargas bloqueadas.')
+            : 'Não foi possível atualizar o status do Clube.';
+
+        $this->redirect('/admin/clube/recargas');
     }
 }

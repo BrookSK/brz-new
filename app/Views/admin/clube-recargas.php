@@ -4,10 +4,50 @@ $recargas = isset($recargas) && is_array($recargas) ? $recargas : [];
 $turboRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal'))) === 'turbo');
 $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal'))) !== 'turbo');
 ?>
+<?php
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+$clubeEnabled = !isset($clube_enabled) || $clube_enabled === true;
+$__perfilClube = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+if ($__perfilClube === 'administrator' || $__perfilClube === 'administrador') { $__perfilClube = 'admin'; }
+$isAdmin = ($__perfilClube === 'admin');
+?>
 <div class="container-fluid">
+    <?php if (!empty($_SESSION['flash_success'])): ?>
+        <div class="alert alert-success alert-dismissible fade show mt-3"><?= htmlspecialchars($_SESSION['flash_success']) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+        <?php unset($_SESSION['flash_success']); ?>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['flash_error'])): ?>
+        <div class="alert alert-danger alert-dismissible fade show mt-3"><?= htmlspecialchars($_SESSION['flash_error']) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+        <?php unset($_SESSION['flash_error']); ?>
+    <?php endif; ?>
+
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="page-title">Recargas Clube (Checkout rápido)</h1>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge <?= $clubeEnabled ? 'bg-success' : 'bg-secondary' ?>">
+                <i class="fas <?= $clubeEnabled ? 'fa-circle-check' : 'fa-pause' ?> me-1"></i>
+                <?= $clubeEnabled ? 'Clube ativo' : 'Clube desativado' ?>
+            </span>
+            <?php if ($isAdmin): ?>
+                <form method="post" action="/admin/clube/toggle" class="m-0"
+                      onsubmit="return confirm('<?= $clubeEnabled ? 'Desativar o Clube? Novas recargas serão bloqueadas em todo o site.' : 'Reativar o Clube? Novas recargas voltarão a ser aceitas.' ?>');">
+                    <input type="hidden" name="ativar" value="<?= $clubeEnabled ? '0' : '1' ?>">
+                    <button type="submit" class="btn btn-sm <?= $clubeEnabled ? 'btn-outline-danger' : 'btn-success' ?>">
+                        <i class="fas <?= $clubeEnabled ? 'fa-pause' : 'fa-play' ?> me-1"></i>
+                        <?= $clubeEnabled ? 'Desativar Clube' : 'Ativar Clube' ?>
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
     </div>
+
+    <?php if (!$clubeEnabled): ?>
+        <div class="alert alert-warning border-0 shadow-sm">
+            <i class="fas fa-triangle-exclamation me-1"></i>
+            O Clube está <strong>desativado</strong>. Novas recargas estão bloqueadas em todo o site (página do clube, página de recarga e painel do cliente). As páginas informativas continuam acessíveis e exibem um aviso para contato via WhatsApp.
+        </div>
+    <?php endif; ?>
 
     <!-- Totais Gerais -->
     <div class="row mb-3">

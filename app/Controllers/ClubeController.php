@@ -26,7 +26,36 @@ class ClubeController extends Controller {
     }
 
     public function comoFuncionaClube(Request $request) {
-        $this->view('clube/como-funciona-clube');
+        $this->view('clube/como-funciona-clube', [
+            'clube_enabled' => self::isClubeEnabled(),
+            'clube_whatsapp' => self::CLUBE_WHATSAPP,
+            'clube_whatsapp_label' => self::CLUBE_WHATSAPP_LABEL,
+        ]);
+    }
+
+    /**
+     * WhatsApp de contato para o Clube (usado quando o clube está desativado).
+     */
+    public const CLUBE_WHATSAPP = '13053638204';
+    public const CLUBE_WHATSAPP_LABEL = '+1 305-363-8204';
+
+    /**
+     * Lê a flag global clube_enabled em configuracoes_sistema.
+     * Segue o mesmo padrão de assessoria_enabled.
+     * Retorna true (ativado) por padrão quando a chave não existe.
+     */
+    public static function isClubeEnabled(): bool {
+        $enabled = true;
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('clube_enabled', 'sistema_clube_enabled') ORDER BY chave DESC LIMIT 1");
+            $st->execute();
+            $val = $st->fetchColumn();
+            if ($val !== false) {
+                $enabled = in_array(strtolower(trim((string) $val)), ['1', 'true', 'sim', 'yes', 'on'], true);
+            }
+        } catch (\Exception $e) {}
+        return $enabled;
     }
 
     private function getUsdBrlRate(): float {
