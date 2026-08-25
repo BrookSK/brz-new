@@ -20,21 +20,44 @@ class ShippoService {
     private function loadConfig(): array {
         try {
             $pdo = Database::getConnection();
-            // Tentar buscar por categoria 'shippo'
-            $stmt = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE categoria = 'shippo'");
-            $stmt->execute();
-            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             $config = [];
-            foreach ($rows as $row) {
-                $config['shippo_' . $row['chave']] = $row['valor'];
+
+            // Detectar estrutura da tabela
+            $cols = [];
+            try {
+                $stCols = $pdo->query('DESCRIBE configuracoes_sistema');
+                $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                return [];
             }
-            // Fallback: buscar por chave direta (compatibilidade)
+
+            $temCategoria = in_array('categoria', $cols, true);
+            $keyCol = in_array('chave', $cols, true) ? 'chave' : (in_array('key', $cols, true) ? 'key' : 'chave');
+            $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : 'valor');
+
+            if ($temCategoria) {
+                $stmt = $pdo->prepare("SELECT {$keyCol}, {$valCol} FROM configuracoes_sistema WHERE categoria = 'shippo'");
+                $stmt->execute();
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $row) {
+                    $k = $row[$keyCol] ?? '';
+                    $v = $row[$valCol] ?? '';
+                    $config['shippo_' . $k] = $v;
+                }
+            }
+
+            // Fallback: buscar por chave com prefixo shippo_
             if (empty($config)) {
-                $stmt2 = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'shippo_%'");
-                $stmt2->execute();
-                $rows2 = $stmt2->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
-                $config = $rows2;
+                try {
+                    $stmt2 = $pdo->prepare("SELECT {$keyCol}, {$valCol} FROM configuracoes_sistema WHERE {$keyCol} LIKE 'shippo_%'");
+                    $stmt2->execute();
+                    $rows2 = $stmt2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rows2 as $row) {
+                        $config[$row[$keyCol]] = $row[$valCol] ?? '';
+                    }
+                } catch (\Exception $e) {}
             }
+
             return $config;
         } catch (\Exception $e) {
             return [];
