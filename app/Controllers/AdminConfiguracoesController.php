@@ -1976,8 +1976,10 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="mb-3">
                                                         <label class="form-label">Formato da Etiqueta</label>
                                                         <select class="form-select" name="shippo_label_file_type">
-                                                            <option value="PDF_4x6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', 'PDF_4x6') === 'PDF_4x6' ? 'selected' : '') . '>PDF 4x6</option>
-                                                            <option value="PDF" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF' ? 'selected' : '') . '>PDF (Carta)</option>
+                                                            <option value="PDF_4x6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', 'PDF_4x6') === 'PDF_4x6' ? 'selected' : '') . '>PDF 4x6 (uma etiqueta por página)</option>
+                                                            <option value="PDF_A4" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A4' ? 'selected' : '') . '>PDF A4 (uma etiqueta por página)</option>
+                                                            <option value="PDF" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF' ? 'selected' : '') . '>PDF 8.5x11 (duas etiquetas por página)</option>
+                                                            <option value="PDF_A6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A6' ? 'selected' : '') . '>PDF A6</option>
                                                             <option value="PNG" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PNG' ? 'selected' : '') . '>PNG</option>
                                                             <option value="ZPLII" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'ZPLII' ? 'selected' : '') . '>ZPL II (Térmica)</option>
                                                         </select>
