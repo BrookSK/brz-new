@@ -170,16 +170,16 @@ class AdminEstoqueController extends Controller {
 
         $total = 0;
 
-        // Reservas reais
+        // Reservas reais — somente de pedidos pagos/em processamento
         if ($this->tableExists('estoque_reservas')) {
             try {
                 $stmt = $this->connection->prepare(
                     "SELECT COALESCE(SUM(COALESCE(er.quantidade_reservada,0)),0) as total
                     FROM estoque_reservas er
-                    LEFT JOIN pedidos p ON p.id = er.pedido_id
+                    INNER JOIN pedidos p ON p.id = er.pedido_id
                     WHERE er.produto_id = :produto_id
                       AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
-                      AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))"
+                      AND LOWER(COALESCE(p.status,'')) IN ('pago','paid','aprovado','approved','produto_consolidado','consolidado','etiqueta_gerada','em_transporte','enviado','itens_comprados','itens_parcialmente_comprados')"
                 );
                 $stmt->execute([':produto_id' => $produtoId]);
                 $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
@@ -187,10 +187,15 @@ class AdminEstoqueController extends Controller {
             }
         }
 
-        // Demanda pendente (lista de compras)
+        // Demanda pendente (lista de compras) — somente de pedidos pagos
         if ($this->tableExists('lista_compras')) {
             try {
-                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(COALESCE(quantidade_faltante,0)),0) as total FROM lista_compras WHERE produto_id = :produto_id AND status = 'pendente'");
+                $temPedidoId = $this->columnExists('lista_compras', 'pedido_id');
+                if ($temPedidoId) {
+                    $stmt = $this->connection->prepare("SELECT COALESCE(SUM(COALESCE(lc.quantidade_faltante,0)),0) as total FROM lista_compras lc INNER JOIN pedidos p ON p.id = lc.pedido_id WHERE lc.produto_id = :produto_id AND lc.status = 'pendente' AND LOWER(COALESCE(p.status,'')) IN ('pago','paid','aprovado','approved','produto_consolidado','consolidado','etiqueta_gerada','em_transporte','enviado','itens_comprados','itens_parcialmente_comprados')");
+                } else {
+                    $stmt = $this->connection->prepare("SELECT COALESCE(SUM(COALESCE(quantidade_faltante,0)),0) as total FROM lista_compras WHERE produto_id = :produto_id AND status = 'pendente'");
+                }
                 $stmt->execute([':produto_id' => $produtoId]);
                 $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
             } catch (\Exception $e) {
@@ -209,10 +214,10 @@ class AdminEstoqueController extends Controller {
             $stmt = $this->connection->prepare(
                 "SELECT COALESCE(SUM(COALESCE(er.quantidade_reservada,0)),0) as total
                 FROM estoque_reservas er
-                LEFT JOIN pedidos p ON p.id = er.pedido_id
+                INNER JOIN pedidos p ON p.id = er.pedido_id
                 WHERE er.produto_id = :produto_id
                   AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
-                  AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))"
+                  AND LOWER(COALESCE(p.status,'')) IN ('pago','paid','aprovado','approved','produto_consolidado','consolidado','etiqueta_gerada','em_transporte','enviado','itens_comprados','itens_parcialmente_comprados')"
             );
             $stmt->execute([':produto_id' => $produtoId]);
             return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
@@ -1450,9 +1455,9 @@ class AdminEstoqueController extends Controller {
                     LEFT JOIN (
                         SELECT er.produto_id, SUM(COALESCE(er.quantidade_reservada,0)) as reservado
                         FROM estoque_reservas er
-                        LEFT JOIN pedidos p ON p.id = er.pedido_id
+                        INNER JOIN pedidos p ON p.id = er.pedido_id
                         WHERE er.status = 'ativa'
-                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluido','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
+                          AND LOWER(COALESCE(p.status,'')) IN ('pago','paid','aprovado','approved','produto_consolidado','consolidado','etiqueta_gerada','em_transporte','enviado','itens_comprados','itens_parcialmente_comprados')
                         GROUP BY er.produto_id
                     ) res_er ON res_er.produto_id = p.id
                 ";
