@@ -362,9 +362,14 @@ class AdminCarneController extends Controller {
     }
 
     /**
-     * Marca (ou reverte) os itens de carnê na lista_compras de um pedido.
+     * Marca (ou reverte) os itens do pedido de carnê na lista_compras.
      * $novoStatus: 'comprado' ou 'pendente'.
-     * Só atua sobre registros com tipo_compra = 'carne' daquele pedido.
+     *
+     * Como um pedido de carnê é integralmente de carnê (todos os itens pertencem ao
+     * mesmo carnê), quando confirmamos que o pedido é de carnê tratamos TODOS os
+     * registros da lista_compras daquele pedido — independentemente de tipo_compra —
+     * para cobrir também itens inseridos por fluxos legados sem a marca 'carne'.
+     * Se não for possível confirmar que é carnê, restringe a tipo_compra = 'carne'.
      */
     private function marcarListaComprasCarne(int $pedidoId, string $novoStatus): void {
         if ($pedidoId <= 0) {
@@ -381,20 +386,24 @@ class AdminCarneController extends Controller {
             $temTipoCompra = $this->carneColumnExists('lista_compras', 'tipo_compra');
             $temQtdFaltante = $this->carneColumnExists('lista_compras', 'quantidade_faltante');
 
-            // Restringe aos itens de carnê quando a coluna existe; caso contrario, ao pedido inteiro.
-            $whereTipo = $temTipoCompra ? " AND tipo_compra = 'carne'" : '';
+            // Pedido de carnê: abrange o pedido inteiro. Caso contrário, restringe por tipo_compra.
+            $ehCarne = $this->pedidoEhCarne($pedidoId);
+            $whereTipo = ($ehCarne || !$temTipoCompra) ? '' : " AND tipo_compra = 'carne'";
+            // Excluir itens virtuais de pacote/redirecionamento (produto_id >= 999990),
+            // que nunca são "comprados" — mesmo guard usado no fluxo normal de compras.
+            $excluiVirtuais = " AND (produto_id IS NULL OR produto_id < 999990)";
 
             if ($novoStatus === 'comprado') {
                 $setQtd = $temQtdFaltante ? ", quantidade_faltante = 0" : '';
                 $sql = "UPDATE lista_compras SET status = 'comprado'{$setQtd}
-                        WHERE pedido_id = :pid AND status = 'pendente'" . $whereTipo;
+                        WHERE pedido_id = :pid AND status = 'pendente'" . $whereTipo . $excluiVirtuais;
                 $st = $this->db->prepare($sql);
                 $st->execute([':pid' => $pedidoId]);
 
-                // Caso legado: se o pedido não tem NENHUM item de carnê na lista_compras
+                // Caso legado: se o pedido não tem NENHUM item na lista_compras
                 // (compra liberada antes da inserção automática), criar os itens já como comprados
                 // a partir de pedido_itens — assim o status do pedido pode ser recalculado.
-                $stCnt = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid" . $whereTipo);
+                $stCnt = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid" . $whereTipo . $excluiVirtuais);
                 $stCnt->execute([':pid' => $pedidoId]);
                 if ((int) $stCnt->fetchColumn() === 0) {
                     $this->inserirItensCarneComprados($pedidoId, $temTipoCompra, $temQtdFaltante);
@@ -403,12 +412,34 @@ class AdminCarneController extends Controller {
                 // Reverter para pendente: restaura quantidade_faltante = quantidade_necessaria quando possivel
                 $setQtd = $temQtdFaltante ? ", quantidade_faltante = COALESCE(NULLIF(quantidade_necessaria,0), quantidade_faltante, 1)" : '';
                 $sql = "UPDATE lista_compras SET status = 'pendente'{$setQtd}
-                        WHERE pedido_id = :pid AND status = 'comprado'" . $whereTipo;
+                        WHERE pedido_id = :pid AND status = 'comprado'" . $whereTipo . $excluiVirtuais;
                 $st = $this->db->prepare($sql);
                 $st->execute([':pid' => $pedidoId]);
             }
         } catch (\Exception $e) {
             error_log('[CarneCompras] Erro ao sincronizar lista_compras (pedido ' . $pedidoId . '): ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Confirma se um pedido é de carnê (forma_pagamento = carne_braziliana OU existe
+     * registro em carnes para o pedido). Usado para decidir o escopo da sincronização.
+     */
+    private function pedidoEhCarne(int $pedidoId): bool {
+        if ($pedidoId <= 0) {
+            return false;
+        }
+        try {
+            $st = $this->db->prepare("SELECT COUNT(*) FROM carnes WHERE pedido_id = :pid");
+            $st->execute([':pid' => $pedidoId]);
+            if ((int) $st->fetchColumn() > 0) {
+                return true;
+            }
+            $st2 = $this->db->prepare("SELECT LOWER(COALESCE(forma_pagamento,'')) FROM pedidos WHERE id = :pid LIMIT 1");
+            $st2->execute([':pid' => $pedidoId]);
+            return strtolower(trim((string) ($st2->fetchColumn() ?: ''))) === 'carne_braziliana';
+        } catch (\Exception $e) {
+            return false;
         }
     }
 
@@ -421,7 +452,7 @@ class AdminCarneController extends Controller {
             return;
         }
         try {
-            $stItens = $this->db->prepare("SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? AND produto_id IS NOT NULL AND produto_id > 0");
+            $stItens = $this->db->prepare("SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? AND produto_id IS NOT NULL AND produto_id > 0 AND produto_id < 999990");
             $stItens->execute([$pedidoId]);
             $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             if (empty($itens)) {
@@ -495,10 +526,15 @@ class AdminCarneController extends Controller {
             }
 
             $temTipoCompra = $this->carneColumnExists('lista_compras', 'tipo_compra');
-            $whereTipo = $temTipoCompra ? " AND tipo_compra = 'carne'" : '';
+            // Pedido de carnê abrange o pedido inteiro (todos os itens são do carnê);
+            // caso contrário restringe por tipo_compra = 'carne'.
+            $ehCarne = $this->pedidoEhCarne($pedidoId);
+            $whereTipo = ($ehCarne || !$temTipoCompra) ? '' : " AND tipo_compra = 'carne'";
+            // Excluir itens virtuais de pacote/redirecionamento (produto_id >= 999990) da contagem.
+            $excluiVirtuais = " AND (produto_id IS NULL OR produto_id < 999990)";
 
-            // Total de itens de carnê na lista e quantos ainda estao pendentes.
-            $stTot = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid" . $whereTipo);
+            // Total de itens na lista e quantos ainda estao pendentes.
+            $stTot = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid" . $whereTipo . $excluiVirtuais);
             $stTot->execute([':pid' => $pedidoId]);
             $totalItens = (int) $stTot->fetchColumn();
 
@@ -506,7 +542,7 @@ class AdminCarneController extends Controller {
                 return;
             }
 
-            $stPend = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid AND status = 'pendente'" . $whereTipo);
+            $stPend = $this->db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = :pid AND status = 'pendente'" . $whereTipo . $excluiVirtuais);
             $stPend->execute([':pid' => $pedidoId]);
             $pendentes = (int) $stPend->fetchColumn();
 
