@@ -206,6 +206,7 @@ class ShippoService {
             'address_to' => $addressTo,
             'parcels' => [$parcel],
             'async' => false,
+            'extra' => ['is_return' => false],
         ];
 
         if (!empty($customsDeclaration)) {
@@ -299,6 +300,7 @@ class ShippoService {
             'address_from' => $addressFrom,
             'address_to' => $addressTo,
             'parcels' => [$parcel],
+            'extra' => ['is_return' => false],
         ];
 
         if (!empty($customsDeclaration)) {
