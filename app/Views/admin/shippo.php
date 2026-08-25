@@ -22,7 +22,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Pedidos em Caixa Fechada</strong>
             <?php if (!empty($pedidos)): ?>
-                <button class="btn btn-sm btn-warning" id="btnToggleMassa" onclick="toggleModoMassa()"><i class="fas fa-bolt me-1"></i>Gerar em Massa</button>
+                <button class="btn btn-sm btn-success" id="btnGerarShippo" style="display:none;" onclick="gerarEtiquetasShippoSelecionadas()"><i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">Gerar Etiquetas</span></button>
             <?php endif; ?>
         </div>
         <div class="card-body">
@@ -71,72 +71,6 @@
                                             <span class="text-danger">--</span>
                                         <?php endif; ?>
                                     </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Desktop: Table Modo Massa (hidden by default) -->
-            <div class="table-responsive d-none" id="tabelaMassa">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div>
-                        <input type="checkbox" id="checkAllMassa" onclick="toggleAllMassaShippo(this)" class="form-check-input me-2">
-                        <label for="checkAllMassa" class="form-check-label small">Selecionar todos</label>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-success" id="btnGerarMassa" onclick="gerarEtiquetasMassaShippo()" disabled>
-                            <i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">0</span>)
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleModoMassa()">Voltar</button>
-                    </div>
-                </div>
-                <table class="table table-sm align-middle table-bordered" style="font-size:.85rem;">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width:30px;"></th>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Peso (kg)</th>
-                            <th>L×A×C (cm)</th>
-                            <th>País</th>
-                            <th>Dados OK</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($pedidos)): ?>
-                            <tr><td colspan="8" class="text-muted">Nenhum pedido.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($pedidos as $p): ?>
-                                <?php
-                                    $pid = (int) ($p['pedido_id'] ?? 0);
-                                    $peso = isset($p['peso_total']) ? (float) $p['peso_total'] : 0;
-                                    $alt = isset($p['altura']) ? (float) $p['altura'] : 0;
-                                    $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
-                                    $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
-                                    $pais = strtoupper(trim((string) ($p['pais_destino'] ?? '')));
-                                    $temPeso = $peso > 0;
-                                    $temDim = ($alt > 0 && $larg > 0 && $comp > 0);
-                                    $temNome = !empty($p['cliente_nome']);
-                                    $dadosOk = $temPeso && $temDim && $temNome;
-                                ?>
-                                <tr data-pid="<?= $pid ?>" data-ok="<?= $dadosOk ? '1' : '0' ?>">
-                                    <td><input type="checkbox" class="form-check-input massa-check" value="<?= $pid ?>" onchange="updateMassaCountShippo()" <?= !$dadosOk ? 'disabled title="Dados incompletos"' : '' ?>></td>
-                                    <td><span class="fw-bold">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
-                                    <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
-                                    <td class="<?= $temPeso ? '' : 'text-danger fw-bold' ?>"><?= $temPeso ? number_format($peso, 2, ',', '.') : '⚠ 0' ?></td>
-                                    <td class="<?= $temDim ? '' : 'text-danger' ?>"><?= ($larg > 0 ? number_format($larg, 1) : '?') ?>×<?= ($alt > 0 ? number_format($alt, 1) : '?') ?>×<?= ($comp > 0 ? number_format($comp, 1) : '?') ?></td>
-                                    <td><?= htmlspecialchars($pais ?: '?') ?></td>
-                                    <td>
-                                        <?php if ($dadosOk): ?>
-                                            <span class="badge bg-success">OK</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-danger" title="<?= implode(', ', array_filter([!$temPeso?'Peso':'', !$temDim?'Dimensões':'', !$temNome?'Nome':''])) ?>">Incompleto</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><span class="massa-status text-muted">-</span></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -306,9 +240,74 @@ function filtrarShippo() {
 // ===== Checkbox de pedidos =====
 function toggleAllPedidosShippo(el) {
     document.querySelectorAll('.pedido-check').forEach(function(cb) { cb.checked = el.checked; });
+    updateBtnGerarShippo();
 }
 
-// ===== Regerar =====
+function updateBtnGerarShippo() {
+    var checked = document.querySelectorAll('.pedido-check:checked').length;
+    var btn = document.getElementById('btnGerarShippo');
+    var txt = document.getElementById('btnGerarShippoText');
+    if (btn) btn.style.display = checked > 0 ? '' : 'none';
+    if (txt) txt.textContent = 'Gerar ' + checked + ' Etiqueta(s)';
+}
+
+// Adicionar listener nos checkboxes
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('pedido-check')) updateBtnGerarShippo();
+});
+
+async function gerarEtiquetasShippoSelecionadas() {
+    var checks = document.querySelectorAll('.pedido-check:checked');
+    if (checks.length === 0) return;
+    var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
+    if (!confirm('Gerar etiquetas Shippo para ' + ids.length + ' pedido(s) selecionados?\n\nSerá selecionada automaticamente a opção de frete mais barata para cada pedido.')) return;
+
+    var btn = document.getElementById('btnGerarShippo');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...'; }
+
+    // Overlay
+    var overlay = document.createElement('div');
+    overlay.id = 'massaOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div style="font-size:1.1rem;font-weight:600;color:#333;">Gerando etiquetas via Shippo...</div><div class="text-muted small mt-2">Não feche esta página</div></div>';
+    document.body.appendChild(overlay);
+
+    try {
+        var r = await fetch('/admin/shippo/gerar-etiquetas-massa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pedido_ids: ids })
+        });
+        var data = await r.json();
+
+        var ov = document.getElementById('massaOverlay');
+        if (ov) ov.remove();
+
+        if (data && data.results) {
+            var ok = 0, erros = [];
+            data.results.forEach(function(res) {
+                if (res.success) {
+                    ok++;
+                } else {
+                    erros.push('#' + res.pedido_id + ': ' + (res.error || 'erro'));
+                }
+            });
+
+            var msg = ok + ' etiqueta(s) gerada(s) com sucesso.';
+            if (erros.length > 0) msg += '\n\nErros (' + erros.length + '):\n' + erros.slice(0, 10).join('\n');
+            alert(msg);
+            if (ok > 0) setTimeout(function() { location.reload(); }, 1000);
+        } else {
+            alert('Erro: ' + ((data && data.error) || 'Resposta inesperada'));
+        }
+    } catch (e) {
+        var ov = document.getElementById('massaOverlay');
+        if (ov) ov.remove();
+        alert('Erro de rede: ' + e.message);
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">Gerar Etiquetas</span>'; updateBtnGerarShippo(); }
+}
 async function regerarShippo(pedidoId) {
     if (!confirm('Remover etiqueta do pedido #' + pedidoId + '? Você poderá gerar uma nova em seguida.')) return;
     try {
@@ -328,104 +327,7 @@ async function regerarShippo(pedidoId) {
     }
 }
 
-// ===== Modo Massa =====
-function toggleModoMassa() {
-    var normal = document.getElementById('tabelaNormal');
-    var massa = document.getElementById('tabelaMassa');
-    var btn = document.getElementById('btnToggleMassa');
-    if (!normal || !massa) return;
-    var isActive = !massa.classList.contains('d-none');
-    if (isActive) {
-        massa.classList.add('d-none');
-        normal.classList.remove('d-none');
-        if (btn) btn.innerHTML = '<i class="fas fa-bolt me-1"></i>Gerar em Massa';
-    } else {
-        normal.classList.add('d-none');
-        massa.classList.remove('d-none');
-        if (btn) btn.innerHTML = '<i class="fas fa-arrow-left me-1"></i>Voltar ao Normal';
-    }
-}
 
-function toggleAllMassaShippo(el) {
-    document.querySelectorAll('.massa-check:not(:disabled)').forEach(function(cb) { cb.checked = el.checked; });
-    updateMassaCountShippo();
-}
-
-function updateMassaCountShippo() {
-    var checked = document.querySelectorAll('.massa-check:checked').length;
-    var countEl = document.getElementById('massaCount');
-    var btn = document.getElementById('btnGerarMassa');
-    if (countEl) countEl.textContent = checked;
-    if (btn) btn.disabled = (checked === 0);
-}
-
-async function gerarEtiquetasMassaShippo() {
-    var checks = document.querySelectorAll('.massa-check:checked');
-    if (checks.length === 0) return;
-    var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
-    if (!confirm('Gerar etiquetas Shippo para ' + ids.length + ' pedido(s) selecionados?\n\nSerá selecionada automaticamente a opção de frete mais barata para cada pedido.')) return;
-
-    var btn = document.getElementById('btnGerarMassa');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...'; }
-
-    // Overlay
-    var overlay = document.createElement('div');
-    overlay.id = 'massaOverlay';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div id="massaOverlayText" style="font-size:1.1rem;font-weight:600;color:#333;">Gerando etiquetas via Shippo...</div><div class="text-muted small mt-2">Não feche esta página</div></div>';
-    document.body.appendChild(overlay);
-
-    // Marcar status
-    ids.forEach(function(pid) {
-        var row = document.querySelector('tr[data-pid="' + pid + '"]');
-        if (row) {
-            var st = row.querySelector('.massa-status');
-            if (st) { st.textContent = '⏳'; st.className = 'massa-status text-warning'; }
-        }
-    });
-
-    try {
-        var r = await fetch('/admin/shippo/gerar-etiquetas-massa', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pedido_ids: ids })
-        });
-        var data = await r.json();
-
-        var ov = document.getElementById('massaOverlay');
-        if (ov) ov.remove();
-
-        if (data && data.results) {
-            var ok = 0, erros = [];
-            data.results.forEach(function(res) {
-                var row = document.querySelector('tr[data-pid="' + res.pedido_id + '"]');
-                if (row) {
-                    var st = row.querySelector('.massa-status');
-                    if (res.success) {
-                        ok++;
-                        if (st) { st.innerHTML = '✅ ' + (res.tracking_number || 'OK'); st.className = 'massa-status text-success'; }
-                    } else {
-                        erros.push('#' + res.pedido_id + ': ' + (res.error || 'erro'));
-                        if (st) { st.textContent = '❌ ' + (res.error || 'erro'); st.className = 'massa-status text-danger'; }
-                    }
-                }
-            });
-
-            var msg = ok + ' etiqueta(s) gerada(s) com sucesso.';
-            if (erros.length > 0) msg += '\n\nErros (' + erros.length + '):\n' + erros.slice(0, 10).join('\n');
-            alert(msg);
-            if (ok > 0) setTimeout(function() { location.reload(); }, 1000);
-        } else {
-            alert('Erro: ' + ((data && data.error) || 'Resposta inesperada'));
-        }
-    } catch (e) {
-        var ov = document.getElementById('massaOverlay');
-        if (ov) ov.remove();
-        alert('Erro de rede: ' + e.message);
-    }
-
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">0</span>)'; }
-}
 </script>
 
 <?php
