@@ -48,11 +48,37 @@ class ClubeController extends Controller {
         $enabled = true;
         try {
             $pdo = \Config\Database::getConnection();
-            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('clube_enabled', 'sistema_clube_enabled') ORDER BY chave DESC LIMIT 1");
+
+            // Ler todas as linhas da flag (a tabela pode conter duplicatas em ambientes
+            // sem constraint UNIQUE em `chave`). Priorizar 'clube_enabled'; usar
+            // 'sistema_clube_enabled' apenas como fallback quando a primeira nao existe.
+            $st = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('clube_enabled', 'sistema_clube_enabled')");
             $st->execute();
-            $val = $st->fetchColumn();
-            if ($val !== false) {
-                $enabled = in_array(strtolower(trim((string) $val)), ['1', 'true', 'sim', 'yes', 'on'], true);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $valoresPrincipais = [];
+            $valoresFallback = [];
+            foreach ($rows as $r) {
+                $chave = (string) ($r['chave'] ?? '');
+                $valor = strtolower(trim((string) ($r['valor'] ?? '')));
+                if ($chave === 'clube_enabled') {
+                    $valoresPrincipais[] = $valor;
+                } elseif ($chave === 'sistema_clube_enabled') {
+                    $valoresFallback[] = $valor;
+                }
+            }
+
+            $valores = !empty($valoresPrincipais) ? $valoresPrincipais : $valoresFallback;
+            if (!empty($valores)) {
+                // Regra de seguranca: se QUALQUER linha indicar desativado, o clube fica desativado.
+                $ativos = ['1', 'true', 'sim', 'yes', 'on'];
+                $enabled = true;
+                foreach ($valores as $v) {
+                    if (!in_array($v, $ativos, true)) {
+                        $enabled = false;
+                        break;
+                    }
+                }
             }
         } catch (\Exception $e) {}
         return $enabled;

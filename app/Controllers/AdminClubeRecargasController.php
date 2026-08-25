@@ -147,9 +147,36 @@ class AdminClubeRecargasController extends Controller {
         $ok = false;
         try {
             $db = \Config\Database::getConnection();
-            $stmt = $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('clube_enabled', ?)
-                ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
-            $ok = $stmt->execute([$novoValor]);
+
+            // 1) Atualizar todas as linhas existentes da flag (cobre ambientes com duplicatas).
+            $upd = $db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'clube_enabled'");
+            $upd->execute([$novoValor]);
+            $afetadas = $upd->rowCount();
+
+            // 2) Se nenhuma linha existia, inserir uma nova.
+            if ($afetadas === 0) {
+                $ins = $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('clube_enabled', ?)");
+                $ins->execute([$novoValor]);
+            }
+
+            // 3) Manter tambem sincronizado o fallback, se existir, para evitar divergencia.
+            try {
+                $updFb = $db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'sistema_clube_enabled'");
+                $updFb->execute([$novoValor]);
+            } catch (\Exception $e) {}
+
+            // 4) Remover duplicatas de 'clube_enabled' (mantem apenas a de menor id),
+            //    corrigindo ambientes sem constraint UNIQUE na coluna `chave`.
+            try {
+                $dupStmt = $db->query("SELECT MIN(id) AS keep_id FROM configuracoes_sistema WHERE chave = 'clube_enabled'");
+                $keepId = $dupStmt ? (int) $dupStmt->fetchColumn() : 0;
+                if ($keepId > 0) {
+                    $del = $db->prepare("DELETE FROM configuracoes_sistema WHERE chave = 'clube_enabled' AND id <> ?");
+                    $del->execute([$keepId]);
+                }
+            } catch (\Exception $e) {}
+
+            $ok = true;
         } catch (\Exception $e) {
             $ok = false;
         }
