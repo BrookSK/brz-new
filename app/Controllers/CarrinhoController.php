@@ -1187,11 +1187,8 @@ class CarrinhoController extends Controller {
         }
         
         $produtoStock = intval($produto['estoque'] ?? 0);
-        if ($produtoStock < $quantidade) {
-            $this->debugLog('ERRO: Estoque insuficiente. Estoque: ' . $produtoStock . ', Quantidade: ' . $quantidade);
-            $this->json(['error' => 'Estoque insuficiente'], 400);
-            return;
-        }
+        // Permitir compra acima do estoque disponível (faltante vai para lista de compras)
+        // A validação de estoque não bloqueia mais a compra
         
         if ($uid > 0) {
             try {
@@ -1544,10 +1541,7 @@ class CarrinhoController extends Controller {
                 }
 
                 $produto = $this->produtoModel->find($produtoIdDb);
-                if ($produto && (int) ($produto['estoque'] ?? 0) < (int) $quantidade) {
-                    $this->json(['error' => 'Estoque insuficiente'], 400);
-                    return;
-                }
+                // Permitir atualização acima do estoque disponível (faltante vai para lista de compras)
 
                 $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
                 $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
