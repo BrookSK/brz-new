@@ -620,8 +620,50 @@ class AdminShippoController extends Controller {
             $labelFileType = (string) ($cfg['shippo_label_file_type'] ?? 'PDF_4x6');
 
             if ($massaMode === 'single_call' && $carrierAccount !== '' && $servicelevelToken !== '') {
-                // Single Call: gera direto sem cotar
-                $labelResult = $this->svc->createLabelSingleCall($addressFrom, $addressTo, $parcel, $servicelevelToken, $carrierAccount, $customs, $labelFileType);
+                // Fluxo 2 etapas com carrier/service pré-definido: cria shipment (PURCHASE) → filtra rate pelo service level → compra
+                $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
+                if (!$shipResult['success']) {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? 'Falha no shipment.'];
+                    continue;
+                }
+
+                $rates = $shipResult['rates'] ?? [];
+                // Filtrar pelo service level configurado
+                $matchedRate = null;
+                foreach ($rates as $rate) {
+                    $rateService = $rate['servicelevel']['token'] ?? ($rate['servicelevel_token'] ?? '');
+                    $rateCarrier = $rate['carrier_account'] ?? '';
+                    if (strtolower($rateService) === strtolower($servicelevelToken)) {
+                        $matchedRate = $rate;
+                        break;
+                    }
+                }
+                // Se não encontrou pelo service level exato, tentar pelo carrier account
+                if (!$matchedRate) {
+                    foreach ($rates as $rate) {
+                        if (($rate['carrier_account'] ?? '') === $carrierAccount) {
+                            $matchedRate = $rate;
+                            break;
+                        }
+                    }
+                }
+                // Fallback: pegar o primeiro disponível
+                if (!$matchedRate && !empty($rates)) {
+                    $matchedRate = $rates[0];
+                }
+
+                if (!$matchedRate) {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Nenhuma rate disponível para o carrier/serviço configurado.'];
+                    continue;
+                }
+
+                $rateId = $matchedRate['object_id'] ?? '';
+                if ($rateId === '') {
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Rate sem ID.'];
+                    continue;
+                }
+
+                $labelResult = $this->svc->purchaseLabel($rateId, $labelFileType ?: 'PDF_4x6');
                 if (!$labelResult['success']) {
                     $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? 'Falha ao gerar etiqueta.'];
                     continue;
@@ -633,23 +675,22 @@ class AdminShippoController extends Controller {
                     $stDel = $this->connection->prepare("DELETE FROM shippo_etiquetas WHERE pedido_id = ?");
                     $stDel->execute([$pid]);
 
-                    $rateData = $labelResult['rate'] ?? [];
                     $stIns = $this->connection->prepare("
                         INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, last_response_json, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, NOW())
                     ");
                     $stIns->execute([
                         $pid,
-                        '',
+                        $shipResult['shipment_id'] ?? '',
                         $labelResult['transaction_id'] ?? '',
-                        '',
+                        $rateId,
                         $labelResult['tracking_number'] ?? '',
                         $labelResult['tracking_url'] ?? '',
                         $labelResult['label_url'] ?? '',
-                        is_array($rateData) ? (string) ($rateData['provider'] ?? '') : '',
-                        is_array($rateData) ? (string) ($rateData['servicelevel_name'] ?? ($rateData['servicelevel']['name'] ?? '')) : '',
-                        is_array($rateData) ? (float) ($rateData['amount'] ?? 0) : 0,
-                        is_array($rateData) ? (string) ($rateData['currency'] ?? 'USD') : 'USD',
+                        (string) ($matchedRate['provider'] ?? ''),
+                        (string) ($matchedRate['servicelevel']['name'] ?? ($matchedRate['servicelevel_name'] ?? '')),
+                        (float) ($matchedRate['amount'] ?? 0),
+                        (string) ($matchedRate['currency'] ?? 'USD'),
                         json_encode($labelResult['data'] ?? []),
                     ]);
 
