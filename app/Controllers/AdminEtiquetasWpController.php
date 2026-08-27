@@ -1532,8 +1532,16 @@ class AdminEtiquetasWpController extends Controller
                     try {
                         $stPeso = $this->connection->prepare("SELECT peso_total FROM pedidos WHERE id = ? LIMIT 1");
                         $stPeso->execute([$pid]);
-                        $pesoKg = (float) ($stPeso->fetchColumn() ?: 0);
-                        if ($pesoKg > 0) $peso = (int) round($pesoKg * 1000);
+                        $pesoRaw = (float) ($stPeso->fetchColumn() ?: 0);
+                        if ($pesoRaw > 0) {
+                            // Se peso > 1000, provavelmente já está em gramas
+                            // Se peso < 1000, provavelmente está em kg
+                            if ($pesoRaw > 500) {
+                                $peso = (int) round($pesoRaw); // Já está em gramas
+                            } else {
+                                $peso = (int) round($pesoRaw * 1000); // Converter kg → gramas
+                            }
+                        }
                     } catch (\Exception $e) {}
                 }
 
