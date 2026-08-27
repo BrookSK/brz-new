@@ -1410,8 +1410,7 @@ class AdminEtiquetasWpController extends Controller
         try {
             $st = $this->connection->prepare("
                 SELECT m.*, 
-                       COUNT(mp.id) AS pacotes_count,
-                       COALESCE(SUM(mp.peso_gramas), 0) AS peso_total_gramas
+                       COUNT(mp.id) AS pacotes_count
                 FROM etiquetas_malas m
                 LEFT JOIN etiquetas_mala_pacotes mp ON mp.mala_id = m.id
                 GROUP BY m.id
@@ -1420,11 +1419,24 @@ class AdminEtiquetasWpController extends Controller
             $st->execute();
             $malas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            // Buscar pacotes de cada mala
+            // Buscar pacotes de cada mala e calcular peso real a partir dos pedidos
             foreach ($malas as &$mala) {
-                $stP = $this->connection->prepare("SELECT tracking_code, pedido_id, peso_gramas FROM etiquetas_mala_pacotes WHERE mala_id = ? ORDER BY created_at ASC");
+                $stP = $this->connection->prepare("SELECT mp.tracking_code, mp.pedido_id, p.peso_total FROM etiquetas_mala_pacotes mp LEFT JOIN pedidos p ON p.id = mp.pedido_id WHERE mp.mala_id = ? ORDER BY mp.created_at ASC");
                 $stP->execute([(int) $mala['id']]);
-                $mala['pacotes'] = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $pacotes = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $pesoTotalKg = 0;
+                foreach ($pacotes as &$pac) {
+                    $pesoKg = (float) ($pac['peso_total'] ?? 0);
+                    // Se peso > 500, está em gramas — converter para kg
+                    if ($pesoKg > 500) $pesoKg = $pesoKg / 1000;
+                    $pac['peso_kg'] = $pesoKg;
+                    $pesoTotalKg += $pesoKg;
+                }
+                unset($pac);
+
+                $mala['pacotes'] = $pacotes;
+                $mala['peso_total_kg'] = round($pesoTotalKg, 2);
             }
             unset($mala);
 
