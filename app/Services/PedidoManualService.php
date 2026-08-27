@@ -151,14 +151,16 @@ class PedidoManualService {
         $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ($enderecoEntrega['address_line_2'] ?? ($enderecoEntrega['complement'] ?? ($enderecoEntrega['street2'] ?? '')))));
         $pais = trim((string) ($enderecoEntrega['pais'] ?? ($enderecoEntrega['country'] ?? ($enderecoEntrega['country_code'] ?? 'BR'))));
         if ($pais === '') $pais = 'BR';
-        // Para endereços internacionais, se não tem número, usar '-'
-        if ($numero === '' && $pais !== 'BR' && $pais !== 'BRA') {
-            $numero = '-';
+        // Para endereços internacionais, se não tem número/bairro, usar valores padrão
+        if ($pais !== 'BR' && $pais !== 'BRA') {
+            if ($numero === '') $numero = '-';
+            if ($bairro === '') $bairro = '-';
         }
-        // Para endereços internacionais, se não tem bairro, usar '-'
-        if ($bairro === '' && $pais !== 'BR' && $pais !== 'BRA') {
-            $bairro = '-';
-        }
+        // Fallback geral: nunca deixar campos críticos completamente vazios
+        if ($numero === '') $numero = 'S/N';
+        if ($bairro === '') $bairro = '-';
+        if ($estado === '' && $pais !== 'BR') $estado = '-';
+        if ($cidade === '') $cidade = '-';
 
         // Precisa ter pelo menos CEP ou endereço+cidade
         if ($cep === '' && ($endereco === '' || $cidade === '')) {
