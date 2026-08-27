@@ -269,8 +269,9 @@ class PedidoManualService {
             $newId = (int) $this->db->lastInsertId();
             return $newId > 0 ? $newId : 0;
         } catch (\Exception $e) {
-            error_log('criarEnderecoEntregaParaCliente ERRO: ' . $e->getMessage());
-            return 0;
+            error_log('criarEnderecoEntregaParaCliente ERRO: ' . $e->getMessage() . ' | SQL State: ' . ($e instanceof \PDOException ? $e->getCode() : 'N/A'));
+            // Re-throw com mensagem mais útil para debug
+            throw new \Exception('Erro ao criar endereço: ' . $e->getMessage());
         }
     }
 
@@ -1299,7 +1300,8 @@ class PedidoManualService {
         // IMPORTANTE: Se o admin informou um endereço diferente no formulário, criar um novo registro
         // para não sobrescrever o endereço principal do cliente.
         $enderecoEntregaId = 0;
-        if (in_array('endereco_entrega_id', $colsPedidos, true) && $this->tableExists('enderecos')) {
+        $temColunaEndEntrega = in_array('endereco_entrega_id', $colsPedidos, true);
+        if ($this->tableExists('enderecos')) {
             $enderecoFormularioPreenchido = is_array($enderecoEntrega) && (
                 trim((string) ($enderecoEntrega['cep'] ?? '')) !== '' ||
                 (trim((string) ($enderecoEntrega['endereco'] ?? '')) !== '' && trim((string) ($enderecoEntrega['cidade'] ?? '')) !== '')
@@ -1380,7 +1382,10 @@ class PedidoManualService {
             }
 
             if ($enderecoEntregaId <= 0) {
-                throw new \Exception('Não foi possível criar o endereço de entrega. Verifique se todos os campos de endereço estão preenchidos (CEP, endereço, número, bairro, cidade e estado).');
+                if ($temColunaEndEntrega) {
+                    throw new \Exception('Não foi possível criar o endereço de entrega. Verifique se todos os campos de endereço estão preenchidos (CEP, endereço, número, bairro, cidade e estado).');
+                }
+                // Se não tem coluna endereco_entrega_id, não bloquear a criação do pedido
             }
         }
 
