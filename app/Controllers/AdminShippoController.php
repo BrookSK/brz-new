@@ -126,14 +126,23 @@ class AdminShippoController extends Controller {
 
         // Filtro para excluir Brasil
         $paisFilter = '';
+        
+        // 1. Excluir por país explícito (BR, BRA, BRAZIL, BRASIL)
         if ($colPais !== '') {
-            $paisFilter = " AND UPPER(COALESCE(p." . $colPais . ",'')) NOT IN ('BR','BRA','BRAZIL','BRASIL')";
-        } else {
-            // Fallback: excluir pedidos com moeda BRL (provavelmente são para o Brasil)
-            $colMoeda = $this->pickColumn($colsP, ['moeda', 'currency', 'moeda_pedido']);
-            if ($colMoeda !== '') {
-                $paisFilter = " AND UPPER(COALESCE(p." . $colMoeda . ",'')) != 'BRL'";
-            }
+            $paisFilter .= " AND UPPER(COALESCE(p." . $colPais . ",'')) NOT IN ('BR','BRA','BRAZIL','BRASIL')";
+        }
+        
+        // 2. Excluir por CEP brasileiro (8 dígitos numéricos)
+        $colCep = $this->pickColumn($colsP, ['cep_entrega', 'cep', 'zip', 'postal_code', 'endereco_cep']);
+        if ($colCep !== '') {
+            $paisFilter .= " AND LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) != 8";
+        }
+        
+        // 3. Excluir por estado brasileiro (se tem coluna de estado)
+        $colEstadoFilter = $this->pickColumn($colsP, ['estado_entrega', 'estado', 'state']);
+        if ($colEstadoFilter !== '') {
+            $estadosBr = "'SP','RJ','MG','BA','PR','RS','SC','GO','PE','CE','PA','MA','MT','MS','DF','AM','ES','PB','RN','AL','PI','SE','TO','RO','AC','AP','RR'";
+            $paisFilter .= " AND UPPER(COALESCE(p." . $colEstadoFilter . ",'')) NOT IN (" . $estadosBr . ")";
         }
 
         $sql = "
