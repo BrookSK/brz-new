@@ -4052,6 +4052,37 @@ HTML;
                                                 } catch (\Throwable $e) {}
                                             }
 
+                                            // Badge de origem do item (estoque, compra online, etc.)
+                                            if ($itemTipoItem === 'pacote_redirecionamento' || $itemProdId >= 999990) {
+                                                // Já tem badge de Redirecionamento
+                                            } else {
+                                                $origemBadge = '';
+                                                // Verificar se tem reserva de estoque para este pedido+produto
+                                                try {
+                                                    if (!isset($__estoqueReservaCache)) $__estoqueReservaCache = [];
+                                                    $cacheKey = $pedidoId . '_' . $itemProdId;
+                                                    if (!isset($__estoqueReservaCache[$cacheKey])) {
+                                                        $dbOrig = \Config\Database::getConnection();
+                                                        $stOrig = $dbOrig->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ? AND status = 'ativa'");
+                                                        $stOrig->execute([$pedidoId, $itemProdId]);
+                                                        $__estoqueReservaCache[$cacheKey] = (int) ($stOrig->fetchColumn() ?: 0);
+                                                    }
+                                                    $qtdReservada = $__estoqueReservaCache[$cacheKey];
+                                                    $qtdItem = (int) ($item['quantidade'] ?? 1);
+
+                                                    if ($qtdReservada >= $qtdItem) {
+                                                        $origemBadge = '<span class="badge" style="background:rgba(16,185,129,.12);color:#065f46;border:1px solid rgba(16,185,129,.3);"><i class="fas fa-warehouse me-1"></i>Estoque</span>';
+                                                    } elseif ($qtdReservada > 0) {
+                                                        $origemBadge = '<span class="badge" style="background:rgba(245,158,11,.12);color:#92400e;border:1px solid rgba(245,158,11,.3);"><i class="fas fa-warehouse me-1"></i>Estoque parcial (' . $qtdReservada . '/' . $qtdItem . ')</span>';
+                                                    } else {
+                                                        $origemBadge = '<span class="badge" style="background:rgba(59,130,246,.12);color:#1e40af;border:1px solid rgba(59,130,246,.3);"><i class="fas fa-shopping-cart me-1"></i>Compra online</span>';
+                                                    }
+                                                } catch (\Throwable $e) {
+                                                    $origemBadge = '<span class="badge" style="background:rgba(59,130,246,.12);color:#1e40af;border:1px solid rgba(59,130,246,.3);"><i class="fas fa-shopping-cart me-1"></i>Compra online</span>';
+                                                }
+                                                $nomeHtml .= ' ' . $origemBadge;
+                                            }
+
                                             $extraHtml = '';
 
                                             // Observação do cliente (assessoria)

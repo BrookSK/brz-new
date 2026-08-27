@@ -100,7 +100,7 @@ class AdminShippoController extends Controller {
         $colsU = $this->getTableColumns('usuarios');
 
         // Identificar coluna de país de destino
-        $colPais = $this->pickColumn($colsP, ['pais_destino', 'pais', 'country', 'country_code', 'dest_country']);
+        $colPais = $this->pickColumn($colsP, ['pais_destino', 'pais', 'pais_entrega', 'country', 'country_code', 'dest_country', 'endereco_pais']);
 
         // Construir SELECT com colunas que existem
         $extraSelect = '';
@@ -128,6 +128,12 @@ class AdminShippoController extends Controller {
         $paisFilter = '';
         if ($colPais !== '') {
             $paisFilter = " AND UPPER(COALESCE(p." . $colPais . ",'')) NOT IN ('BR','BRA','BRAZIL','BRASIL')";
+        } else {
+            // Fallback: excluir pedidos com moeda BRL (provavelmente são para o Brasil)
+            $colMoeda = $this->pickColumn($colsP, ['moeda', 'currency', 'moeda_pedido']);
+            if ($colMoeda !== '') {
+                $paisFilter = " AND UPPER(COALESCE(p." . $colMoeda . ",'')) != 'BRL'";
+            }
         }
 
         $sql = "
@@ -203,7 +209,7 @@ class AdminShippoController extends Controller {
         $colCidade = $this->pickColumn($colsP, ['cidade_entrega', 'cidade', 'city']);
         $colEstado = $this->pickColumn($colsP, ['estado_entrega', 'estado', 'state']);
         $colCep = $this->pickColumn($colsP, ['cep_entrega', 'cep', 'zip', 'postal_code']);
-        $colPais = $this->pickColumn($colsP, ['pais_destino', 'pais', 'country', 'country_code', 'dest_country']);
+        $colPais = $this->pickColumn($colsP, ['pais_destino', 'pais', 'pais_entrega', 'country', 'country_code', 'dest_country', 'endereco_pais']);
         $colComplemento = $this->pickColumn($colsP, ['complemento_entrega', 'complemento', 'address2', 'street2']);
 
         $selects = ['p.*', "{$colUserNome} AS cliente_nome", "{$colUserEmail} AS cliente_email", "{$colUserTel} AS cliente_telefone"];
