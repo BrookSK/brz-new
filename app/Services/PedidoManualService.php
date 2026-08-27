@@ -142,15 +142,23 @@ class PedidoManualService {
             return 0;
         }
 
-        $cep = trim((string) ($enderecoEntrega['cep'] ?? ''));
-        $endereco = trim((string) ($enderecoEntrega['endereco'] ?? ''));
-        $numero = trim((string) ($enderecoEntrega['numero'] ?? ''));
-        $bairro = trim((string) ($enderecoEntrega['bairro'] ?? ''));
-        $cidade = trim((string) ($enderecoEntrega['cidade'] ?? ''));
-        $estado = trim((string) ($enderecoEntrega['estado'] ?? ''));
-        $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ''));
-        $pais = trim((string) ($enderecoEntrega['pais'] ?? 'BR'));
+        $cep = trim((string) ($enderecoEntrega['cep'] ?? ($enderecoEntrega['zip'] ?? ($enderecoEntrega['postal_code'] ?? ''))));
+        $endereco = trim((string) ($enderecoEntrega['endereco'] ?? ($enderecoEntrega['address_line_1'] ?? ($enderecoEntrega['address'] ?? ($enderecoEntrega['street1'] ?? '')))));
+        $numero = trim((string) ($enderecoEntrega['numero'] ?? ($enderecoEntrega['number'] ?? '')));
+        $bairro = trim((string) ($enderecoEntrega['bairro'] ?? ($enderecoEntrega['neighborhood'] ?? ($enderecoEntrega['district'] ?? ''))));
+        $cidade = trim((string) ($enderecoEntrega['cidade'] ?? ($enderecoEntrega['city'] ?? '')));
+        $estado = trim((string) ($enderecoEntrega['estado'] ?? ($enderecoEntrega['state'] ?? ($enderecoEntrega['state_province'] ?? ''))));
+        $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ($enderecoEntrega['address_line_2'] ?? ($enderecoEntrega['complement'] ?? ($enderecoEntrega['street2'] ?? '')))));
+        $pais = trim((string) ($enderecoEntrega['pais'] ?? ($enderecoEntrega['country'] ?? ($enderecoEntrega['country_code'] ?? 'BR'))));
         if ($pais === '') $pais = 'BR';
+        // Para endereços internacionais, se não tem número, usar '-'
+        if ($numero === '' && $pais !== 'BR' && $pais !== 'BRA') {
+            $numero = '-';
+        }
+        // Para endereços internacionais, se não tem bairro, usar '-'
+        if ($bairro === '' && $pais !== 'BR' && $pais !== 'BRA') {
+            $bairro = '-';
+        }
 
         // Precisa ter pelo menos CEP ou endereço+cidade
         if ($cep === '' && ($endereco === '' || $cidade === '')) {
