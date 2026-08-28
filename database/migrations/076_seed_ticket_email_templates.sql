@@ -28,6 +28,24 @@ SET @sql := IF(@id_auto = 0,
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- Mesma correção para email_templates, que sofre do mesmo defeito de PK sem
+-- AUTO_INCREMENT (INSERT tentando id=0 -> erro 1062). Só corrige se a tabela
+-- existir e a coluna id ainda não for auto_increment.
+SET @et_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'email_templates'
+);
+SET @et_id_auto := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'email_templates'
+    AND COLUMN_NAME = 'id' AND EXTRA LIKE '%auto_increment%'
+);
+SET @sql := IF(@et_exists = 1 AND @et_id_auto = 0,
+  'ALTER TABLE email_templates MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Eventos: ticket_created, ticket_admin_reply
 
 INSERT INTO eventos_sistema (nome, descricao, ativo, created_at)
