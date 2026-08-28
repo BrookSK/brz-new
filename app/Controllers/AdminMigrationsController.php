@@ -8,19 +8,27 @@ use Config\Database;
 /**
  * Runner de migrations SQL.
  *
- * Roda todos os arquivos .sql de database/ e database/migrations/ de forma
- * idempotente: registra cada arquivo aplicado na tabela de controle
- * `schema_migrations` e pula os que já rodaram. Scripts destrutivos ficam numa
- * blacklist e nunca são executados por aqui.
+ * Roda todos os arquivos .sql de database/migrations/ de forma idempotente:
+ * registra cada arquivo aplicado na tabela de controle `schema_migrations` e
+ * pula os que já rodaram.
+ *
+ * Como o projeto tem SQL solto com nomes sem padrão, o runner NÃO tenta
+ * adivinhar "o que é migration" pelo nome: ele roda TUDO em migrations/,
+ * exceto:
+ *   1. Arquivos na BLACKLIST por nome (destrutivos/debug/consolidados conhecidos).
+ *   2. Arquivos que a varredura de conteúdo classificar como PERIGOSOS
+ *      (DROP DATABASE, TRUNCATE, DELETE/UPDATE sem WHERE, GRANT, etc.).
+ * Assim, um SQL novo com nome aleatório é pego automaticamente, mas um script
+ * catastrófico é barrado mesmo com nome inocente.
  */
 class AdminMigrationsController extends Controller {
 
     /**
-     * Arquivos que NUNCA devem ser rodados automaticamente:
+     * Arquivos que NUNCA devem ser rodados automaticamente (bloqueio por nome):
      * - destrutivos / debug (apagam ou injetam dados)
-     * - consolidados ALL_*: reagrupam migrations que já existem numeradas
-     *   individualmente (fonte canônica), então rodar ambos é redundante e
-     *   pode falhar em statements não idempotentes.
+     * - consolidados ALL_*: reagrupam migrations já numeradas individualmente
+     *   (fonte canônica), então rodar ambos é redundante e pode falhar em
+     *   statements não idempotentes.
      */
     private const BLACKLIST = [
         'delete_usuarios.sql',
@@ -31,45 +39,143 @@ class AdminMigrationsController extends Controller {
     ];
 
     /**
-     * Ordem de prioridade dos diretórios. Os schemas base ficam na raiz de
-     * database/ e precisam rodar antes das migrations incrementais.
+     * Allowlist: arquivos liberados manualmente para rodar MESMO que a varredura
+     * de conteúdo os marque como perigosos. Use com consciência — só para casos
+     * revisados onde o comando perigoso é intencional e seguro.
+     * (nome relativo com prefixo 'migrations/')
      */
+    private const ALLOWLIST_CONTEUDO = [
+        // ex.: 'migrations/203_cleanup_lista_compras_duplicadas.sql',
+    ];
+
+    /**
+     * Padrões de conteúdo considerados PERIGOSOS demais para rodar
+     * automaticamente. Cada item: [regex, motivo legível].
+     * As regexes rodam sobre cada statement já sem comentários.
+     */
+    private function padroesPerigosos(): array {
+        return [
+            ['/\bDROP\s+DATABASE\b/i',              'DROP DATABASE'],
+            ['/\bCREATE\s+DATABASE\b/i',            'CREATE DATABASE'],
+            ['/\bUSE\s+[`"\w]+/i',                  'USE <database> (troca de banco)'],
+            ['/\bDROP\s+SCHEMA\b/i',                'DROP SCHEMA'],
+            ['/\bTRUNCATE\b/i',                     'TRUNCATE (esvazia tabela)'],
+            ['/\bGRANT\b/i',                        'GRANT (altera permissões)'],
+            ['/\bREVOKE\b/i',                       'REVOKE (altera permissões)'],
+            ['/\bDROP\s+USER\b/i',                  'DROP USER'],
+            ['/\bCREATE\s+USER\b/i',                'CREATE USER'],
+            // DELETE sem WHERE e sem JOIN — apaga a tabela inteira
+            ['/\bDELETE\s+(?:FROM\s+)?[`"\w.]+\s*(?:;|$)/i', 'DELETE sem WHERE (apaga tudo)'],
+            // UPDATE sem WHERE — sobrescreve todas as linhas
+            ['/\bUPDATE\s+[`"\w.]+\s+SET\b(?![\s\S]*\bWHERE\b)/i', 'UPDATE sem WHERE (sobrescreve tudo)'],
+        ];
+    }
+
     private function baseDir(): string {
         return realpath(__DIR__ . '/../../database') ?: (__DIR__ . '/../../database');
     }
 
     /**
-     * Coleta todos os arquivos .sql elegíveis, já ordenados na sequência correta:
-     * primeiro os schemas base da raiz de database/ (001, 002, 003, ...),
-     * depois os incrementais de database/migrations/ em ordem natural.
+     * Remove comentários de um statement para reduzir falso-positivo/negativo
+     * na varredura de segurança.
      *
-     * @return array<int,array{name:string,path:string}>
+     * IMPORTANTE: `--` e `#` só valem como comentário no INÍCIO de uma linha
+     * (após espaços). No meio de uma string SQL eles são literais — ex.:
+     * `payload_template = '... #{{carne_id}} ...'`. Tratar `#` no meio como
+     * comentário apagaria o resto do statement (incluindo o WHERE) e geraria
+     * falso-positivo de "UPDATE sem WHERE".
+     */
+    private function limparParaAnalise(string $stmt): string {
+        $stmt = str_replace(["\r\n", "\r"], "\n", $stmt);
+        $linhas = explode("\n", $stmt);
+        $out = [];
+        foreach ($linhas as $linha) {
+            $t = ltrim($linha);
+            // Descarta a linha inteira só se ela COMEÇA com comentário
+            if (strpos($t, '--') === 0 || strpos($t, '#') === 0) {
+                continue;
+            }
+            $out[] = $linha;
+        }
+        $limpo = implode("\n", $out);
+        // Remove blocos de comentário /* ... */ (esses podem estar inline)
+        $limpo = preg_replace('#/\*.*?\*/#s', ' ', $limpo);
+        return (string) $limpo;
+    }
+
+    /**
+     * Analisa um arquivo SQL statement a statement e retorna a lista de motivos
+     * perigosos encontrados. Vazio = seguro.
+     *
+     * @return string[]
+     */
+    private function analisarSeguranca(array $statements): array {
+        $padroes = $this->padroesPerigosos();
+        $motivos = [];
+        foreach ($statements as $stmt) {
+            $limpo = $this->limparParaAnalise($stmt);
+            if (trim($limpo) === '') {
+                continue;
+            }
+            foreach ($padroes as [$regex, $motivo]) {
+                if (preg_match($regex, $limpo)) {
+                    $motivos[$motivo] = true;
+                }
+            }
+        }
+        return array_keys($motivos);
+    }
+
+    /**
+     * Coleta os arquivos .sql de database/migrations/, em ordem natural, já
+     * classificados: bloqueado por nome, bloqueado por conteúdo, ou elegível.
+     *
+     * NÃO inclui os arquivos 001/002/003 da RAIZ de database/ (esquema
+     * fundacional antigo do banco brz_logistics) nem database/scripts/
+     * (scripts de diagnóstico manual, não migrations).
+     *
+     * @return array<int,array{name:string,path:string,bloqueado:bool,motivos:string[]}>
      */
     private function coletarArquivos(): array {
         $base = $this->baseDir();
         $migrationsDir = $base . DIRECTORY_SEPARATOR . 'migrations';
 
-        $rootFiles = glob($base . DIRECTORY_SEPARATOR . '*.sql') ?: [];
-        $migFiles  = glob($migrationsDir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
-
-        // Ordenação natural garante 002 < 010 < 100
-        natcasesort($rootFiles);
+        $migFiles = glob($migrationsDir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
         natcasesort($migFiles);
 
         $arquivos = [];
-        foreach (array_merge(array_values($rootFiles), array_values($migFiles)) as $path) {
+        foreach (array_values($migFiles) as $path) {
             $name = basename($path);
+            $rel = 'migrations/' . $name;
+
+            // Bloqueio por nome (blacklist)
             if (in_array($name, self::BLACKLIST, true)) {
+                $arquivos[] = ['name' => $rel, 'path' => $path, 'bloqueado' => true, 'motivos' => ['blacklist por nome']];
                 continue;
             }
-            // Chave de controle: prefixo do diretório evita colisão de nomes iguais
-            $rel = (strpos($path, $migrationsDir) === 0 ? 'migrations/' : '') . $name;
-            $arquivos[] = ['name' => $rel, 'path' => $path];
+
+            // Varredura de conteúdo
+            $sql = @file_get_contents($path);
+            $motivos = [];
+            if ($sql !== false) {
+                $motivos = $this->analisarSeguranca($this->splitStatements($sql));
+            }
+
+            // Allowlist libera conteúdo perigoso revisado manualmente
+            if (!empty($motivos) && in_array($rel, self::ALLOWLIST_CONTEUDO, true)) {
+                $motivos = [];
+            }
+
+            $arquivos[] = [
+                'name'      => $rel,
+                'path'      => $path,
+                'bloqueado' => !empty($motivos),
+                'motivos'   => $motivos,
+            ];
         }
         return $arquivos;
     }
 
-    /** Garante a existência da tabela de controle de migrations. */
     private function garantirTabelaControle(\PDO $db): void {
         $db->exec(
             'CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -99,7 +205,6 @@ class AdminMigrationsController extends Controller {
      * @return string[]
      */
     private function splitStatements(string $sql): array {
-        // Normaliza quebras de linha
         $sql = str_replace(["\r\n", "\r"], "\n", $sql);
 
         $statements = [];
@@ -110,14 +215,11 @@ class AdminMigrationsController extends Controller {
         foreach ($lines as $line) {
             $trim = trim($line);
 
-            // Ignora comentários de linha e linhas vazias fora de um buffer
             if ($buffer === '' && ($trim === '' || strpos($trim, '--') === 0 || strpos($trim, '#') === 0)) {
                 continue;
             }
 
-            // Troca de delimitador (comando de cliente, não vai pro servidor)
             if (stripos($trim, 'DELIMITER ') === 0) {
-                // Antes de trocar, se sobrou algo no buffer, descarta espaços
                 $novo = trim(substr($trim, strlen('DELIMITER ')));
                 if ($novo !== '') {
                     $delimiter = $novo;
@@ -127,7 +229,6 @@ class AdminMigrationsController extends Controller {
 
             $buffer .= $line . "\n";
 
-            // Verifica se a linha termina o statement com o delimitador atual
             $bufTrim = rtrim(trim($buffer));
             if ($bufTrim !== '' && substr($bufTrim, -strlen($delimiter)) === $delimiter) {
                 $stmt = trim(substr($bufTrim, 0, -strlen($delimiter)));
@@ -138,7 +239,6 @@ class AdminMigrationsController extends Controller {
             }
         }
 
-        // Resto sem delimitador final
         $resto = trim($buffer);
         if ($resto !== '') {
             $statements[] = $resto;
@@ -171,7 +271,7 @@ class AdminMigrationsController extends Controller {
         return [true, null, $count];
     }
 
-    /** Tela com a lista de migrations e status (aplicada / pendente). */
+    /** Tela com a lista de migrations e status. */
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
@@ -182,8 +282,14 @@ class AdminMigrationsController extends Controller {
         $arquivos = $this->coletarArquivos();
 
         $pendentes = 0;
+        $bloqueados = 0;
         foreach ($arquivos as $a) {
+            if ($a['bloqueado']) { $bloqueados++; continue; }
             if (empty($aplicadas[$a['name']])) $pendentes++;
+        }
+        $aplicadasCount = 0;
+        foreach ($arquivos as $a) {
+            if (!$a['bloqueado'] && !empty($aplicadas[$a['name']])) $aplicadasCount++;
         }
 
         header('Content-Type: text/html; charset=utf-8');
@@ -195,13 +301,14 @@ class AdminMigrationsController extends Controller {
            . '</head><body class="bg-light"><div class="container py-4">';
 
         echo '<h1 class="h3 mb-3"><i class="fas fa-database me-2"></i>Migrations do Banco</h1>';
-        echo '<p class="text-muted">Executa os arquivos SQL pendentes em ordem. Já aplicados são ignorados (idempotente). '
-           . 'Scripts destrutivos ficam fora por segurança.</p>';
+        echo '<p class="text-muted">Roda todos os SQL de <code>database/migrations/</code> pendentes, em ordem, de forma idempotente. '
+           . 'Arquivos com comandos destrutivos (DROP DATABASE, TRUNCATE, DELETE/UPDATE sem WHERE, GRANT...) são <strong>bloqueados</strong> por segurança e precisam ser rodados manualmente.</p>';
 
-        echo '<div class="d-flex gap-3 mb-3">'
+        echo '<div class="d-flex gap-3 mb-3 flex-wrap">'
            . '<span class="badge bg-secondary fs-6">Total: ' . count($arquivos) . '</span>'
-           . '<span class="badge bg-success fs-6">Aplicadas: ' . (count($arquivos) - $pendentes) . '</span>'
+           . '<span class="badge bg-success fs-6">Aplicadas: ' . $aplicadasCount . '</span>'
            . '<span class="badge bg-warning text-dark fs-6">Pendentes: ' . $pendentes . '</span>'
+           . '<span class="badge bg-danger fs-6">Bloqueadas: ' . $bloqueados . '</span>'
            . '</div>';
 
         echo '<form method="POST" action="/admin/migrations/run" onsubmit="this.querySelector(\'button\').disabled=true;this.querySelector(\'button\').innerHTML=\'<span class=\\\'spinner-border spinner-border-sm me-2\\\'></span>Rodando...\';">'
@@ -209,14 +316,20 @@ class AdminMigrationsController extends Controller {
            . '<i class="fas fa-play me-1"></i>Rodar ' . $pendentes . ' migration(s) pendente(s)</button></form>';
 
         echo '<div class="table-responsive"><table class="table table-sm table-striped align-middle">'
-           . '<thead><tr><th>#</th><th>Arquivo</th><th>Status</th></tr></thead><tbody>';
+           . '<thead><tr><th>#</th><th>Arquivo</th><th>Status</th><th>Observação</th></tr></thead><tbody>';
         $i = 1;
         foreach ($arquivos as $a) {
-            $ok = !empty($aplicadas[$a['name']]);
-            $badge = $ok
-                ? '<span class="badge bg-success">Aplicada</span>'
-                : '<span class="badge bg-warning text-dark">Pendente</span>';
-            echo '<tr><td>' . ($i++) . '</td><td><code>' . htmlspecialchars($a['name'], ENT_QUOTES, 'UTF-8') . '</code></td><td>' . $badge . '</td></tr>';
+            if ($a['bloqueado']) {
+                $badge = '<span class="badge bg-danger">Bloqueada</span>';
+                $obs = htmlspecialchars(implode(', ', $a['motivos']), ENT_QUOTES, 'UTF-8');
+            } elseif (!empty($aplicadas[$a['name']])) {
+                $badge = '<span class="badge bg-success">Aplicada</span>';
+                $obs = '';
+            } else {
+                $badge = '<span class="badge bg-warning text-dark">Pendente</span>';
+                $obs = '';
+            }
+            echo '<tr><td>' . ($i++) . '</td><td><code>' . htmlspecialchars($a['name'], ENT_QUOTES, 'UTF-8') . '</code></td><td>' . $badge . '</td><td class="small text-danger">' . $obs . '</td></tr>';
         }
         echo '</tbody></table></div>';
 
@@ -224,7 +337,7 @@ class AdminMigrationsController extends Controller {
         exit;
     }
 
-    /** Executa todas as migrations pendentes e mostra o relatório. */
+    /** Executa todas as migrations pendentes (não bloqueadas) e mostra o relatório. */
     public function run(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
@@ -242,9 +355,17 @@ class AdminMigrationsController extends Controller {
         $resultados = [];
         $rodadas = 0;
         $puladas = 0;
+        $bloqueadas = 0;
         $falhas = 0;
 
         foreach ($arquivos as $a) {
+            // Bloqueadas por segurança: nunca executa, apenas reporta
+            if ($a['bloqueado']) {
+                $bloqueadas++;
+                $resultados[] = ['name' => $a['name'], 'status' => 'bloqueada', 'msg' => 'Não executada — ' . implode(', ', $a['motivos'])];
+                continue;
+            }
+
             if (!empty($aplicadas[$a['name']])) {
                 $puladas++;
                 continue;
@@ -255,11 +376,11 @@ class AdminMigrationsController extends Controller {
             if ($ok) {
                 $stMark->execute([$a['name']]);
                 $rodadas++;
-                $resultados[] = ['name' => $a['name'], 'ok' => true, 'msg' => $count . ' statement(s)'];
+                $resultados[] = ['name' => $a['name'], 'status' => 'ok', 'msg' => $count . ' statement(s)'];
             } else {
                 $falhas++;
-                $resultados[] = ['name' => $a['name'], 'ok' => false, 'msg' => $erro];
-                // Para na primeira falha: migrations dependem umas das outras
+                $resultados[] = ['name' => $a['name'], 'status' => 'erro', 'msg' => $erro];
+                // Para na primeira falha real: migrations dependem umas das outras
                 break;
             }
         }
@@ -272,26 +393,30 @@ class AdminMigrationsController extends Controller {
            . '</head><body class="bg-light"><div class="container py-4">';
 
         echo '<h1 class="h3 mb-3"><i class="fas fa-database me-2"></i>Resultado das Migrations</h1>';
-        echo '<div class="d-flex gap-3 mb-3">'
+        echo '<div class="d-flex gap-3 mb-3 flex-wrap">'
            . '<span class="badge bg-success fs-6">Rodadas: ' . $rodadas . '</span>'
            . '<span class="badge bg-secondary fs-6">Já aplicadas: ' . $puladas . '</span>'
-           . '<span class="badge bg-danger fs-6">Falhas: ' . $falhas . '</span>'
+           . '<span class="badge bg-danger fs-6">Bloqueadas: ' . $bloqueadas . '</span>'
+           . '<span class="badge bg-dark fs-6">Falhas: ' . $falhas . '</span>'
            . '</div>';
 
         if ($falhas > 0) {
             echo '<div class="alert alert-danger">Parei na primeira falha. Corrija o erro abaixo e rode novamente '
                . '(as que já passaram não vão repetir).</div>';
         } else {
-            echo '<div class="alert alert-success">Tudo certo. Banco atualizado.</div>';
+            echo '<div class="alert alert-success">Migrations pendentes aplicadas. '
+               . ($bloqueadas > 0 ? 'As bloqueadas por segurança precisam ser revisadas e rodadas manualmente.' : '') . '</div>';
         }
 
         if (!empty($resultados)) {
             echo '<div class="table-responsive"><table class="table table-sm align-middle">'
                . '<thead><tr><th>Arquivo</th><th>Status</th><th>Detalhe</th></tr></thead><tbody>';
             foreach ($resultados as $r) {
-                $badge = $r['ok']
-                    ? '<span class="badge bg-success">OK</span>'
-                    : '<span class="badge bg-danger">ERRO</span>';
+                switch ($r['status']) {
+                    case 'ok':        $badge = '<span class="badge bg-success">OK</span>'; break;
+                    case 'bloqueada': $badge = '<span class="badge bg-danger">BLOQUEADA</span>'; break;
+                    default:          $badge = '<span class="badge bg-dark">ERRO</span>'; break;
+                }
                 echo '<tr><td><code>' . htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8') . '</code></td>'
                    . '<td>' . $badge . '</td>'
                    . '<td class="small">' . htmlspecialchars((string) $r['msg'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
