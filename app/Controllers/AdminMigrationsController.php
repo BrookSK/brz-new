@@ -303,28 +303,49 @@ class AdminMigrationsController extends Controller {
     }
 
     /**
-     * Detecta erros benignos do padrão idempotente com PREPARE/EXECUTE:
+     * Detecta erros que são BENIGNOS num runner idempotente rodando sobre um
+     * banco parcialmente aplicado. Duas famílias:
      *
-     *   SET @sql := IF(coluna_existe, '', 'ALTER TABLE ...');
-     *   PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+     * A) Padrão PREPARE/EXECUTE com @sql vazio (coluna já existe):
+     *    - 1065 "Query was empty": PREPARE recebeu string vazia.
+     *    - 1243 "Unknown prepared statement handler": consequência — o handler
+     *      'stmt' não foi criado porque o PREPARE virou no-op.
      *
-     * Quando a coluna já existe, @sql = '' e a cadeia falha em sequência:
-     *   - 1065 "Query was empty": o PREPARE recebeu string vazia.
-     *   - 1243 "Unknown prepared statement handler": consequência — como o
-     *     PREPARE virou no-op, o EXECUTE/DEALLOCATE seguintes não encontram o
-     *     handler 'stmt'.
+     * B) Idempotência de DDL cru ("o estado desejado já existe"):
+     *    - 1050 Table already exists       (CREATE TABLE sem IF NOT EXISTS)
+     *    - 1060 Duplicate column name      (ADD COLUMN de coluna já existente)
+     *    - 1061 Duplicate key name         (ADD INDEX/KEY já existente)
+     *    - 1091 Can't DROP; doesn't exist  (DROP COLUMN/INDEX de algo ausente)
+     *    - 1826 Duplicate foreign key      (ADD CONSTRAINT FK já existente)
      *
-     * Ambos significam "nada a fazer" (migration já aplicada), então são
-     * ignorados em vez de abortar.
+     * Todos significam "essa parte da migration já está aplicada". Como o banco
+     * do estagiário já tinha mudanças aplicadas à mão, tolerar isso é o
+     * comportamento desejado: pula o que já existe e segue.
+     *
+     * NÃO cobre erros que indicam problema real: 1064 (sintaxe), 1146 (tabela
+     * ausente), 1054 (coluna ausente), etc.
      */
-    private function isErroPrepareBenigno(\PDOException $e): bool {
+    private function isErroBenigno(\PDOException $e): bool {
         $code = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
-        if ($code === 1065 || $code === 1243) {
+        $benignos = [1065, 1243, 1050, 1060, 1061, 1091, 1826];
+        if (in_array($code, $benignos, true)) {
             return true;
         }
-        $msg = $e->getMessage();
-        return stripos($msg, 'Query was empty') !== false
-            || stripos($msg, 'Unknown prepared statement handler') !== false;
+        $msg = strtolower($e->getMessage());
+        foreach ([
+            'query was empty',
+            'unknown prepared statement handler',
+            'already exists',
+            'duplicate column name',
+            'duplicate key name',
+            'duplicate foreign key',
+            "check that column/key exists",
+        ] as $needle) {
+            if (strpos($msg, $needle) !== false) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -357,10 +378,11 @@ class AdminMigrationsController extends Controller {
                 }
                 $count++;
             } catch (\PDOException $e) {
-                // No-op benigno do padrão idempotente PREPARE/EXECUTE quando
-                // @sql = '' (coluna já existe): 1065 no PREPARE e, em cascata,
-                // 1243 no EXECUTE/DEALLOCATE. Ignora e segue.
-                if ($this->isErroPrepareBenigno($e)) {
+                // Erros que representam "estado desejado já existe" (coluna/
+                // tabela/índice/FK duplicados) ou o no-op do padrão PREPARE
+                // com @sql vazio. Num runner idempotente sobre banco
+                // parcialmente aplicado, isso é esperado: ignora e segue.
+                if ($this->isErroBenigno($e)) {
                     $count++;
                     continue;
                 }
