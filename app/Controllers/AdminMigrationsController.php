@@ -206,37 +206,92 @@ class AdminMigrationsController extends Controller {
      */
     private function splitStatements(string $sql): array {
         $sql = str_replace(["\r\n", "\r"], "\n", $sql);
+        $len = strlen($sql);
 
         $statements = [];
         $buffer = '';
         $delimiter = ';';
-        $lines = explode("\n", $sql);
 
-        foreach ($lines as $line) {
-            $trim = trim($line);
+        $i = 0;
+        while ($i < $len) {
+            $ch = $sql[$i];
+            $two = substr($sql, $i, 2);
 
-            if ($buffer === '' && ($trim === '' || strpos($trim, '--') === 0 || strpos($trim, '#') === 0)) {
+            // Comentário de linha: -- (seguido de espaço/fim) ou #
+            $atLineStartCtx = ($buffer === '' || substr($buffer, -1) === "\n" || trim(substr(strrchr($buffer, "\n") ?: $buffer, 1)) === '');
+            if (($two === '--' && (($i + 2 >= $len) || $sql[$i + 2] === ' ' || $sql[$i + 2] === "\t" || $sql[$i + 2] === "\n")) || $ch === '#') {
+                // Consome até o fim da linha
+                $nl = strpos($sql, "\n", $i);
+                if ($nl === false) break;
+                $i = $nl + 1;
+                // Se o buffer só tinha espaços até aqui, não deixa lixo
                 continue;
             }
 
-            if (stripos($trim, 'DELIMITER ') === 0) {
-                $novo = trim(substr($trim, strlen('DELIMITER ')));
+            // Comentário de bloco /* ... */
+            if ($two === '/*') {
+                $end = strpos($sql, '*/', $i + 2);
+                $i = ($end === false) ? $len : $end + 2;
+                continue;
+            }
+
+            // Diretiva DELIMITER (apenas no início de uma linha)
+            if (($buffer === '' || substr(rtrim($buffer), -1) === "\n" || trim($buffer) === '')
+                && strtoupper(substr($sql, $i, 10)) === 'DELIMITER ') {
+                $nl = strpos($sql, "\n", $i);
+                $lineEnd = ($nl === false) ? $len : $nl;
+                $novo = trim(substr($sql, $i + 10, $lineEnd - ($i + 10)));
                 if ($novo !== '') {
                     $delimiter = $novo;
+                }
+                $buffer = '';
+                $i = ($nl === false) ? $len : $nl + 1;
+                continue;
+            }
+
+            // Strings: ' ou " (com escape por \ ou por duplicação)
+            if ($ch === "'" || $ch === '"') {
+                $quote = $ch;
+                $buffer .= $ch;
+                $i++;
+                while ($i < $len) {
+                    $c = $sql[$i];
+                    if ($c === '\\' && $i + 1 < $len) {
+                        $buffer .= $c . $sql[$i + 1];
+                        $i += 2;
+                        continue;
+                    }
+                    if ($c === $quote) {
+                        // Aspas duplicadas = escape literal
+                        if ($i + 1 < $len && $sql[$i + 1] === $quote) {
+                            $buffer .= $quote . $quote;
+                            $i += 2;
+                            continue;
+                        }
+                        $buffer .= $c;
+                        $i++;
+                        break;
+                    }
+                    $buffer .= $c;
+                    $i++;
                 }
                 continue;
             }
 
-            $buffer .= $line . "\n";
-
-            $bufTrim = rtrim(trim($buffer));
-            if ($bufTrim !== '' && substr($bufTrim, -strlen($delimiter)) === $delimiter) {
-                $stmt = trim(substr($bufTrim, 0, -strlen($delimiter)));
+            // Delimitador de statement (fora de string)
+            $dlen = strlen($delimiter);
+            if (substr($sql, $i, $dlen) === $delimiter) {
+                $stmt = trim($buffer);
                 if ($stmt !== '') {
                     $statements[] = $stmt;
                 }
                 $buffer = '';
+                $i += $dlen;
+                continue;
             }
+
+            $buffer .= $ch;
+            $i++;
         }
 
         $resto = trim($buffer);
@@ -245,6 +300,19 @@ class AdminMigrationsController extends Controller {
         }
 
         return $statements;
+    }
+
+    /**
+     * Detecta o erro 1065 "Query was empty" do MySQL, que ocorre quando um
+     * PREPARE recebe uma string vazia — padrão idempotente comum nas migrations
+     * (IF coluna existe -> @sql = ''). É benigno: significa "nada a fazer".
+     */
+    private function isQueryVaziaBenigna(\PDOException $e): bool {
+        $code = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+        if ($code === 1065) {
+            return true;
+        }
+        return stripos($e->getMessage(), 'Query was empty') !== false;
     }
 
     /**
@@ -277,6 +345,16 @@ class AdminMigrationsController extends Controller {
                 }
                 $count++;
             } catch (\PDOException $e) {
+                // No-op benigno: várias migrations usam o padrão
+                // SET @sql := IF(coluna_existe, '', 'ALTER TABLE ...') seguido de
+                // PREPARE/EXECUTE. Quando a coluna já existe, @sql = '' e o
+                // PREPARE dispara o erro 1065 "Query was empty". Isso significa
+                // "nada a fazer" (migration idempotente já aplicada), então
+                // ignoramos e seguimos em vez de abortar.
+                if ($this->isQueryVaziaBenigna($e)) {
+                    $count++;
+                    continue;
+                }
                 return [false, $e->getMessage() . ' | SQL: ' . substr($stmt, 0, 200), $count];
             }
         }
