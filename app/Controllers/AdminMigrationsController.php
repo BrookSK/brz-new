@@ -262,7 +262,19 @@ class AdminMigrationsController extends Controller {
         $count = 0;
         foreach ($statements as $stmt) {
             try {
-                $db->exec($stmt);
+                // Usamos query() (não exec()) porque muitas migrations do projeto
+                // usam PREPARE/EXECUTE/DEALLOCATE para idempotência via
+                // INFORMATION_SCHEMA. Quando @sql vira 'SELECT 1', o EXECUTE
+                // devolve um result set: se ele não for consumido/fechado, o
+                // statement seguinte (DEALLOCATE) falha com o erro 2014
+                // "unbuffered queries are active". closeCursor() drena isso.
+                $result = $db->query($stmt);
+                if ($result instanceof \PDOStatement) {
+                    // Fecha o cursor para liberar a conexão (evita o erro 2014
+                    // no statement seguinte, ex.: DEALLOCATE após EXECUTE).
+                    $result->closeCursor();
+                    $result = null;
+                }
                 $count++;
             } catch (\PDOException $e) {
                 return [false, $e->getMessage() . ' | SQL: ' . substr($stmt, 0, 200), $count];
@@ -346,6 +358,15 @@ class AdminMigrationsController extends Controller {
         @ini_set('max_execution_time', '600');
 
         $db = Database::getConnection();
+        // Reforço contra o erro 2014 ("unbuffered queries active"): garante que
+        // os result sets sejam totalmente bufferizados no cliente. Escopo local
+        // desta conexão de request; não altera Config\Database.
+        try {
+            $db->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+        } catch (\Throwable $e) {
+            // Se o driver não suportar, seguimos com o closeCursor() do executarArquivo.
+        }
+
         $this->garantirTabelaControle($db);
         $aplicadas = $this->jaAplicadas($db);
         $arquivos = $this->coletarArquivos();
