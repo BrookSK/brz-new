@@ -303,16 +303,28 @@ class AdminMigrationsController extends Controller {
     }
 
     /**
-     * Detecta o erro 1065 "Query was empty" do MySQL, que ocorre quando um
-     * PREPARE recebe uma string vazia — padrão idempotente comum nas migrations
-     * (IF coluna existe -> @sql = ''). É benigno: significa "nada a fazer".
+     * Detecta erros benignos do padrão idempotente com PREPARE/EXECUTE:
+     *
+     *   SET @sql := IF(coluna_existe, '', 'ALTER TABLE ...');
+     *   PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+     *
+     * Quando a coluna já existe, @sql = '' e a cadeia falha em sequência:
+     *   - 1065 "Query was empty": o PREPARE recebeu string vazia.
+     *   - 1243 "Unknown prepared statement handler": consequência — como o
+     *     PREPARE virou no-op, o EXECUTE/DEALLOCATE seguintes não encontram o
+     *     handler 'stmt'.
+     *
+     * Ambos significam "nada a fazer" (migration já aplicada), então são
+     * ignorados em vez de abortar.
      */
-    private function isQueryVaziaBenigna(\PDOException $e): bool {
+    private function isErroPrepareBenigno(\PDOException $e): bool {
         $code = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
-        if ($code === 1065) {
+        if ($code === 1065 || $code === 1243) {
             return true;
         }
-        return stripos($e->getMessage(), 'Query was empty') !== false;
+        $msg = $e->getMessage();
+        return stripos($msg, 'Query was empty') !== false
+            || stripos($msg, 'Unknown prepared statement handler') !== false;
     }
 
     /**
@@ -345,13 +357,10 @@ class AdminMigrationsController extends Controller {
                 }
                 $count++;
             } catch (\PDOException $e) {
-                // No-op benigno: várias migrations usam o padrão
-                // SET @sql := IF(coluna_existe, '', 'ALTER TABLE ...') seguido de
-                // PREPARE/EXECUTE. Quando a coluna já existe, @sql = '' e o
-                // PREPARE dispara o erro 1065 "Query was empty". Isso significa
-                // "nada a fazer" (migration idempotente já aplicada), então
-                // ignoramos e seguimos em vez de abortar.
-                if ($this->isQueryVaziaBenigna($e)) {
+                // No-op benigno do padrão idempotente PREPARE/EXECUTE quando
+                // @sql = '' (coluna já existe): 1065 no PREPARE e, em cascata,
+                // 1243 no EXECUTE/DEALLOCATE. Ignora e segue.
+                if ($this->isErroPrepareBenigno($e)) {
                     $count++;
                     continue;
                 }
