@@ -60,14 +60,27 @@ SET @sql := IF(@table_exists = 1 AND @idx_exists = 0,
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- Backfill origin for existing orders where origin is null
+-- Backfill origin for existing orders where origin is null.
+-- Este UPDATE lê codigo_pedido e numero_pedido; alguns schemas não têm essas
+-- colunas (erro 1054). Só executa se AMBAS existirem — caso contrário vira
+-- no-op e a migration 049 (schema-variant safe) faz o backfill corretamente.
 SET @col_exists := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'pedidos' AND COLUMN_NAME = 'origem_pedido'
 );
+SET @has_codigo_pedido := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'pedidos' AND COLUMN_NAME = 'codigo_pedido'
+);
+SET @has_numero_pedido := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'pedidos' AND COLUMN_NAME = 'numero_pedido'
+);
 
-SET @sql := IF(@table_exists = 1 AND @col_exists = 1,
+SET @sql := IF(@table_exists = 1 AND @col_exists = 1 AND @has_codigo_pedido = 1 AND @has_numero_pedido = 1,
   "UPDATE pedidos SET origem_pedido = CASE WHEN (codigo_pedido LIKE 'MAN-%' OR numero_pedido LIKE 'MAN-%') THEN 'manual' ELSE 'organico' END WHERE origem_pedido IS NULL OR origem_pedido = ''",
   'SELECT 1'
 );
