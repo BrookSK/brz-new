@@ -264,6 +264,16 @@ class PedidoManualService {
             }
 
             $sql = 'INSERT INTO enderecos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            
+            // Fix: corrigir AUTO_INCREMENT se necessário (prevenir Duplicate entry '0')
+            try {
+                $stMaxId = $this->db->query('SELECT MAX(id) FROM enderecos');
+                $maxId = (int) ($stMaxId ? ($stMaxId->fetchColumn() ?: 0) : 0);
+                if ($maxId >= 0) {
+                    $this->db->exec('ALTER TABLE enderecos AUTO_INCREMENT = ' . ($maxId + 1));
+                }
+            } catch (\Exception $e) {}
+            
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
             $newId = (int) $this->db->lastInsertId();
