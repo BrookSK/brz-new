@@ -1,5 +1,33 @@
 -- Seed email templates and system events for support tickets
 
+-- Garantir que eventos_sistema existe com o schema correto (mesma def. da 192).
+CREATE TABLE IF NOT EXISTS eventos_sistema (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    descricao VARCHAR(255) NULL,
+    ativo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uq_eventos_nome (nome)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Corrigir estado ruim em bancos onde a tabela foi criada à mão sem
+-- AUTO_INCREMENT: nesse caso os INSERT tentam gravar id=0 e colidem na PK
+-- (erro 1062 "Duplicate entry '0'"). Promove a coluna id a AUTO_INCREMENT
+-- quando ainda não for, sem apagar dados (a idempotência dos INSERT abaixo é
+-- garantida pelo WHERE NOT EXISTS por `nome`).
+SET @db := DATABASE();
+SET @id_auto := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'eventos_sistema'
+    AND COLUMN_NAME = 'id' AND EXTRA LIKE '%auto_increment%'
+);
+SET @sql := IF(@id_auto = 0,
+  'ALTER TABLE eventos_sistema MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Eventos: ticket_created, ticket_admin_reply
 
 INSERT INTO eventos_sistema (nome, descricao, ativo, created_at)
