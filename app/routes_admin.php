@@ -527,3 +527,7 @@ $router->post('/admin/cart-recovery/status', 'AdminCartRecoveryController', 'atu
 // Nota: todas as sub-rotas usam query param ?action= para compatibilidade com nginx
 $router->get('/admin/pacotes-wordpress', 'AdminPacotesWordpressController', 'dispatch');
 $router->post('/admin/pacotes-wordpress', 'AdminPacotesWordpressController', 'dispatchPost');
+
+// Migrations (runner de SQL — aplica migrations pendentes de forma idempotente)
+$router->get('/admin/migrations', 'AdminMigrationsController', 'index');
+$router->post('/admin/migrations/run', 'AdminMigrationsController', 'run');
