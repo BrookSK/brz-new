@@ -940,6 +940,32 @@ class CarrinhoController extends Controller {
             }
         }
 
+        // === Redirecionamento: zerar subtotal e impostos, cobrar apenas taxa de serviço ===
+        // Quando o carrinho contém SOMENTE pacotes de redirecionamento (sem produtos normais),
+        // o cliente paga apenas a taxa de serviço (+ seguro + armazenamento). Subtotal e impostos ficam zerados.
+        $isCarrinhoSomenteRedirecionamento = false;
+        $temPacoteAtivoCalc = false;
+        $temProdutoAtivoCalc = false;
+        foreach ($carrinho as $ckRedir => $cItemRedir) {
+            $ativoRedir = $this->getItemAtivoFromSession((string) $ckRedir);
+            if (!$ativoRedir) continue;
+            $tipoRedir = $cItemRedir['tipo_item'] ?? 'produto';
+            $pidRedir = (int) ($cItemRedir['produto_id'] ?? 0);
+            if ($tipoRedir === 'pacote_redirecionamento' || $pidRedir >= 999990) {
+                $temPacoteAtivoCalc = true;
+            } else {
+                $temProdutoAtivoCalc = true;
+            }
+        }
+        if ($temPacoteAtivoCalc && !$temProdutoAtivoCalc) {
+            $isCarrinhoSomenteRedirecionamento = true;
+            $subtotal = 0.0;
+            $impostos = 0.0;
+            $impostoLocal = 0.0;
+            $frete = 0.0;
+            $total = $taxaServico + $taxaSeguro + $taxaArmazenamento;
+        }
+
         $this->view('carrinho/index', [
             'carrinho' => $carrinho,
             'produtosDetalhados' => $produtosDetalhados,
@@ -967,6 +993,7 @@ class CarrinhoController extends Controller {
             'excede_peso' => $excedePeso,
             'entrega_fora_br' => $entregaForaBR,
             'free_offer_info' => $freeOfferInfo,
+            'is_somente_redirecionamento' => $isCarrinhoSomenteRedirecionamento,
         ]);
     }
 
@@ -1121,15 +1148,26 @@ class CarrinhoController extends Controller {
             if (!$ativo) {
                 continue;
             }
-            try {
-                $produto = $this->produtoModel->find((int) ($item['produto_id'] ?? 0));
-                $pesoUnit = (float) ($produto['peso'] ?? 0.5);
-                if ($pesoUnit <= 0) {
-                    $pesoUnit = 0.5;
+
+            $tipoItemCheckout = $item['tipo_item'] ?? 'produto';
+            $pidCheckout = (int) ($item['produto_id'] ?? 0);
+            $pesoUnit = 0.0;
+
+            // Pacotes de redirecionamento: usar peso_kg direto do item do carrinho
+            if ($tipoItemCheckout === 'pacote_redirecionamento' || $pidCheckout >= 999990) {
+                $pesoUnit = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? ($item['peso_unit'] ?? 0)));
+            } else {
+                try {
+                    $produto = $this->produtoModel->find($pidCheckout);
+                    $pesoUnit = (float) ($produto['peso'] ?? 0);
+                } catch (\Throwable $e) {
                 }
-                $pesoTotal += ((int) ($item['quantidade'] ?? 0)) * $pesoUnit;
-            } catch (\Throwable $e) {
             }
+
+            if ($pesoUnit <= 0) {
+                $pesoUnit = 0.5;
+            }
+            $pesoTotal += ((int) ($item['quantidade'] ?? 1)) * $pesoUnit;
         }
 
         if ($pesoTotal > 30.0 + 0.00001) {

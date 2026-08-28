@@ -427,6 +427,7 @@ $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->post('/admin/pedidos/gerar-link-diferenca', 'AdminPedidosEditController', 'gerarLinkDiferenca');
 $router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');
+$router->get('/admin/pedidos/arquivados', 'AdminPedidosController', 'arquivados');
 $router->post('/admin/pedidos/restaurar/{id}', 'AdminPedidosController', 'restaurar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
@@ -497,6 +498,9 @@ $router->get('/admin/backup/download/{id}/{tipo}', 'AdminBackupController', 'dow
 $router->post('/admin/backup/restaurar/{id}', 'AdminBackupController', 'restaurar');
 $router->post('/admin/backup/excluir/{id}', 'AdminBackupController', 'excluir');
 $router->post('/admin/backup/enviar-externo/{id}', 'AdminBackupController', 'enviarExterno');
+
+// Busca de Logs do Servidor
+$router->get('/admin/server-logs', 'AdminServerLogsController', 'index');
 
 // Log de Emails do sistema
 $router->get('/admin/emails', 'AdminEmailLogsController', 'index');

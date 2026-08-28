@@ -36,7 +36,7 @@ ob_start();
                 <hr>
                 <div class="d-flex align-items-center gap-2">
                     <i class="fab fa-whatsapp text-success fs-5"></i>
-                    <span>Precisa de ajuda? Fale com nosso suporte pelo <a href="https://wa.me/5517996203062" target="_blank" class="fw-semibold text-success text-decoration-none">WhatsApp</a> e te ajudamos com a sua compra.</span>
+                    <span>Precisa de ajuda? Fale com nosso suporte pelo <a href="https://wa.me/13053638204" target="_blank" class="fw-semibold text-success text-decoration-none">WhatsApp</a> e te ajudamos com a sua compra.</span>
                 </div>
             </div>
         </div>

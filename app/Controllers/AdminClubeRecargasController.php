@@ -129,6 +129,65 @@ class AdminClubeRecargasController extends Controller {
             'recargas' => $rows,
             'stats' => $stats,
             'sidebarActive' => 'clube-recargas',
+            'clube_enabled' => ClubeController::isClubeEnabled(),
         ]);
+    }
+
+    /**
+     * Ativa/desativa o Clube (novas recargas) via flag global clube_enabled.
+     * Somente admin pode alterar.
+     */
+    public function toggle(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $ativar = (string) ($request->getParam('ativar') ?? '');
+        $novoValor = in_array(strtolower(trim($ativar)), ['1', 'true', 'on', 'sim', 'yes'], true) ? '1' : '0';
+
+        $ok = false;
+        try {
+            $db = \Config\Database::getConnection();
+
+            // 1) Atualizar todas as linhas existentes da flag (cobre ambientes com duplicatas).
+            $upd = $db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'clube_enabled'");
+            $upd->execute([$novoValor]);
+            $afetadas = $upd->rowCount();
+
+            // 2) Se nenhuma linha existia, inserir uma nova.
+            if ($afetadas === 0) {
+                $ins = $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('clube_enabled', ?)");
+                $ins->execute([$novoValor]);
+            }
+
+            // 3) Manter tambem sincronizado o fallback, se existir, para evitar divergencia.
+            try {
+                $updFb = $db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'sistema_clube_enabled'");
+                $updFb->execute([$novoValor]);
+            } catch (\Exception $e) {}
+
+            // 4) Remover duplicatas de 'clube_enabled' (mantem apenas a de menor id),
+            //    corrigindo ambientes sem constraint UNIQUE na coluna `chave`.
+            try {
+                $dupStmt = $db->query("SELECT MIN(id) AS keep_id FROM configuracoes_sistema WHERE chave = 'clube_enabled'");
+                $keepId = $dupStmt ? (int) $dupStmt->fetchColumn() : 0;
+                if ($keepId > 0) {
+                    $del = $db->prepare("DELETE FROM configuracoes_sistema WHERE chave = 'clube_enabled' AND id <> ?");
+                    $del->execute([$keepId]);
+                }
+            } catch (\Exception $e) {}
+
+            $ok = true;
+        } catch (\Exception $e) {
+            $ok = false;
+        }
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['flash_' . ($ok ? 'success' : 'error')] = $ok
+            ? ($novoValor === '1' ? 'Clube ativado. Novas recargas liberadas.' : 'Clube desativado. Novas recargas bloqueadas.')
+            : 'Não foi possível atualizar o status do Clube.';
+
+        $this->redirect('/admin/clube/recargas');
     }
 }

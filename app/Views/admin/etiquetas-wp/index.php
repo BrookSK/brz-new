@@ -91,7 +91,9 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
                 <thead class="table-light"><tr><th style="width:30px"><input type="checkbox" id="checkAllPacotes" onclick="toggleAllPacotes()"></th><th>Pedido</th><th>Cliente</th><th>Tracking</th><th class="d-none d-md-table-cell">Peso</th><th>PDF</th><th>Ações</th></tr></thead>
                 <tbody id="pacotes-body"><tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr></tbody>
-            </table></div></div></div>
+            </table></div>
+            <div id="pacotes-pagination" class="d-flex align-items-center justify-content-center py-2" style="display:none;"></div>
+            </div></div>
         <!-- Malas -->
         <div class="card ewp-card" id="malas-section">
             <div class="card-header d-flex justify-content-between align-items-center py-2">
@@ -244,18 +246,140 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
 const BASE='/admin/etiquetas-wp';
 
 // Filtro de busca client-side
+let filtroDebounce = null;
 function filtrarEtiquetas(termo) {
-    termo = termo.toLowerCase().trim();
-    // Filtrar tabela Caixa Fechada
+    termo = termo.trim();
+    // Filtrar tabela Caixa Fechada (sempre client-side)
+    const termoLower = termo.toLowerCase();
     document.querySelectorAll('#pedidos-body tr').forEach(tr => {
         const text = tr.textContent.toLowerCase();
-        tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
+        tr.style.display = (!termoLower || text.includes(termoLower)) ? '' : 'none';
     });
-    // Filtrar tabela Pacotes gerados
-    document.querySelectorAll('#pacotes-body tr').forEach(tr => {
-        const text = tr.textContent.toLowerCase();
-        tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
-    });
+
+    // Para pacotes: se tem 3+ chars, buscar direto no WP com debounce
+    clearTimeout(filtroDebounce);
+    if (termo.length >= 3) {
+        document.getElementById('pacotes-pagination').style.display = 'none';
+        filtroDebounce = setTimeout(() => buscarNoWordPress(termo), 400);
+    } else if (termo.length === 0) {
+        // Sem filtro: voltar pra listagem paginada normal
+        carregarPacotes(1);
+    } else {
+        // 1-2 chars: filtrar client-side na página atual
+        document.querySelectorAll('#pacotes-body tr').forEach(tr => {
+            const text = tr.textContent.toLowerCase();
+            tr.style.display = (!termoLower || text.includes(termoLower)) ? '' : 'none';
+        });
+    }
+}
+
+// Busca direta no WordPress
+async function buscarNoWordPress(termo) {
+    const tbody = document.getElementById('pacotes-body');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i> Buscando...</td></tr>';
+    try {
+        const r = await fetch(BASE + '/listar-pacotes?search=' + encodeURIComponent(termo) + '&per_page=50');
+        const d = await r.json();
+        tbody.innerHTML = '';
+        if (d.success && d.data && d.data.length > 0) {
+            d.data.forEach(p => renderPacoteRow(tbody, p));
+            document.getElementById('pacotes-pagination').innerHTML = '<small class="text-muted"><i class="fas fa-cloud me-1"></i>' + d.data.length + ' resultado(s) para "' + termo + '"</small>';
+            document.getElementById('pacotes-pagination').style.display = 'flex';
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="ewp-empty"><i class="fas fa-search"></i> Nenhum pacote encontrado para "' + termo + '"</td></tr>';
+            document.getElementById('pacotes-pagination').style.display = 'none';
+        }
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-danger">' + e.message + '</td></tr>';
+    }
+}
+
+// Render de uma linha de pacote (7 colunas: checkbox download em massa + badge de mala)
+// tbody opcional: se informado, faz append; sempre retorna a string HTML da linha.
+function renderPacoteRow(tbody, p) {
+    // Compatibilidade: permite chamada renderPacoteRow(p) sem tbody
+    if (tbody && p === undefined) { p = tbody; tbody = null; }
+    let pedidoLabel = p.order_id || '-';
+    let pedidoIdLocal = p.pedido_id_local || 0;
+    if (p.pedido_id_local && !String(p.order_id || '').toUpperCase().startsWith('REDIR')) {
+        pedidoLabel = '#' + String(p.pedido_id_local).padStart(6, '0');
+    }
+    const clienteNome = p.recipient_name || '-';
+    const isCancelado = p.package_status === 'cancelado';
+    const rowClass = isCancelado ? ' class="text-muted" style="opacity:0.5;text-decoration:line-through;"' : '';
+    const badge = isCancelado ? ' <span class="badge bg-secondary" style="font-size:0.65rem;">Cancelado</span>' : '';
+    const malaBadge = (p.mala_nome && !isCancelado) ? ' <span class="badge bg-info text-dark" style="font-size:0.6rem;">' + escHtmlCnt(p.mala_nome) + '</span>' : '';
+    const pdfUrl = (p.wp_post_id && !isCancelado) ? BASE + '/pdf/pacote/' + p.wp_post_id : '';
+    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" onchange="updateBaixarMassa()">' : '';
+    const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
+    if (tbody) tbody.innerHTML += row;
+    return row;
+}
+
+// Paginação
+let pacotesPage = 1;
+const pacotesPerPage = 50;
+let pacotesTotal = 0;
+let pacotesPages = 1;
+
+async function carregarPacotes(page) {
+    if (page) pacotesPage = page;
+    const tbody = document.getElementById('pacotes-body');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr>';
+    try {
+        const r = await fetch(BASE + '/listar-pacotes?without_container=1&per_page=' + pacotesPerPage + '&page=' + pacotesPage);
+        const d = await r.json();
+        tbody.innerHTML = '';
+        if (d.success && d.data && d.data.length > 0) {
+            pacotesTotal = d.total || d.data.length;
+            pacotesPages = d.pages || Math.ceil(pacotesTotal / pacotesPerPage);
+            // Agrupar os pacotes da página atual por mala (mantendo a paginação server-side)
+            const byMala = {};
+            const semMala = [];
+            d.data.forEach(p => {
+                if (p.mala_nome) {
+                    if (!byMala[p.mala_nome]) byMala[p.mala_nome] = { pacotes: [], pesoTotal: 0 };
+                    byMala[p.mala_nome].pacotes.push(p);
+                    const tw = parseInt(p.total_weight) || 0;
+                    if (tw > 0 && tw < 100000) byMala[p.mala_nome].pesoTotal += tw;
+                } else {
+                    semMala.push(p);
+                }
+            });
+            let html = '';
+            Object.keys(byMala).forEach(function(malaNome) {
+                const grupo = byMala[malaNome];
+                const pesoKg = (grupo.pesoTotal / 1000).toFixed(1);
+                html += '<tr><td colspan="7" style="background:#eef2ff;padding:6px 12px;border-left:3px solid #3b82f6;"><strong class="small"><i class="fas fa-suitcase me-1 text-primary"></i>' + escHtmlCnt(malaNome) + '</strong> <span class="badge bg-primary ms-1">' + grupo.pacotes.length + ' pct</span> <span class="text-muted small ms-2">' + pesoKg + 'kg</span></td></tr>';
+                grupo.pacotes.forEach(function(p) { html += renderPacoteRow(p); });
+            });
+            if (semMala.length > 0) {
+                if (Object.keys(byMala).length > 0) {
+                    html += '<tr><td colspan="7" style="background:#f8fafc;padding:6px 12px;border-left:3px solid #94a3b8;"><strong class="small text-muted"><i class="fas fa-inbox me-1"></i>Sem mala</strong> <span class="badge bg-secondary ms-1">' + semMala.length + '</span></td></tr>';
+                }
+                semMala.forEach(function(p) { html += renderPacoteRow(p); });
+            }
+            tbody.innerHTML = html;
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum pacote sem container</td></tr>';
+            pacotesTotal = 0;
+            pacotesPages = 1;
+        }
+        renderPacotesPagination();
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-danger">' + e.message + '</td></tr>';
+    }
+}
+
+function renderPacotesPagination() {
+    const el = document.getElementById('pacotes-pagination');
+    if (pacotesPages <= 1) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    let h = '<small class="text-muted me-2">' + pacotesTotal + ' pacote(s)</small>';
+    if (pacotesPage > 1) h += '<button class="btn btn-xs btn-outline-secondary me-1" onclick="carregarPacotes(' + (pacotesPage - 1) + ')"><i class="fas fa-chevron-left"></i></button>';
+    h += '<span class="small mx-1">' + pacotesPage + ' / ' + pacotesPages + '</span>';
+    if (pacotesPage < pacotesPages) h += '<button class="btn btn-xs btn-outline-secondary ms-1" onclick="carregarPacotes(' + (pacotesPage + 1) + ')"><i class="fas fa-chevron-right"></i></button>';
+    el.innerHTML = h;
 }
 
 function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarMalasParaContainer();carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}if(t==='documentacao'){carregarDocumentacaoTab();}}
@@ -271,10 +395,6 @@ async function testarConexaoDetalhado(){const p=document.getElementById('ewp-dia
 function toggleAllPedidos(){const c=document.getElementById('checkAllPedidos').checked;document.querySelectorAll('.chk-pedido').forEach(el=>el.checked=c);updateMassBtn();}
 function updateMassBtn(){const n=document.querySelectorAll('.chk-pedido:checked').length;const btn=document.getElementById('btnGerarMassa');const malaSelect=document.getElementById('mala-geracaoMassa');if(n>0){btn.style.display='';if(malaSelect)malaSelect.style.display='';document.getElementById('btnGerarMassaText').textContent='Gerar '+n+' etiqueta(s)';}else{btn.style.display='none';if(malaSelect)malaSelect.style.display='none';}}
 async function gerarEtiquetasMassa(){const ids=[...document.querySelectorAll('.chk-pedido:checked')].map(e=>parseInt(e.value));if(!ids.length)return;const malaId=document.getElementById('mala-geracaoMassa').value;const malaMsg=malaId?' (atribuir à mala selecionada)':'';if(!confirm('Gerar '+ids.length+' etiqueta(s) via WordPress?'+malaMsg))return;const btn=document.getElementById('btnGerarMassa');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';try{const r=await fetch(BASE+'/gerar-etiquetas-massa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});const d=await r.json();const el=document.getElementById('pedidos-resultado');el.style.display='block';if(d.success){let h='<div class="alert alert-'+(d.failed>0?'warning':'success')+' py-2 small"><strong>'+d.generated+' gerada(s)</strong>'+(d.failed>0?', '+d.failed+' falha(s)':'');if(d.results)d.results.forEach(r=>{if(r.tracking_number)h+='<br><code>'+r.tracking_number+'</code>';if(r.error)h+='<br><span class="text-danger">#'+r.pedido_id+': '+r.error+'</span>';});h+='</div>';el.innerHTML=h;if(d.generated>0&&malaId){const trackings=d.results.filter(r=>r.success&&r.tracking_number).map(r=>r.tracking_number);const pedidoIds=d.results.filter(r=>r.success).map(r=>r.pedido_id);if(trackings.length>0){try{await fetch(BASE+'/atribuir-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mala_id:parseInt(malaId),tracking_codes:trackings,pedido_ids:pedidoIds})});}catch(e){}}}if(d.generated>0)setTimeout(()=>location.reload(),2000);}else{el.innerHTML='<div class="alert alert-danger py-2 small">'+(d.error||'Erro')+'</div>';}}catch(e){alert('Erro: '+e.message);}btn.disabled=false;updateMassBtn();}
-
-// PACOTES
-async function carregarPacotes(){const tbody=document.getElementById('pacotes-body');try{const r=await fetch(BASE+'/listar-pacotes?without_container=1');const d=await r.json();tbody.innerHTML='';if(d.success&&d.data&&d.data.length>0){const byMala={};const semMala=[];d.data.forEach(p=>{if(p.mala_nome){if(!byMala[p.mala_nome])byMala[p.mala_nome]={pacotes:[],pesoTotal:0};byMala[p.mala_nome].pacotes.push(p);var tw=parseInt(p.total_weight)||0;if(tw>0&&tw<100000)byMala[p.mala_nome].pesoTotal+=tw;}else{semMala.push(p);}});let html='';Object.keys(byMala).forEach(function(malaNome){const grupo=byMala[malaNome];const pesoKg=(grupo.pesoTotal/1000).toFixed(1);html+='<tr><td colspan="7" style="background:#eef2ff;padding:6px 12px;border-left:3px solid #3b82f6;"><strong class="small"><i class="fas fa-suitcase me-1 text-primary"></i>'+escHtmlCnt(malaNome)+'</strong> <span class="badge bg-primary ms-1">'+grupo.pacotes.length+' pct</span> <span class="text-muted small ms-2">'+pesoKg+'kg</span></td></tr>';grupo.pacotes.forEach(function(p){html+=renderPacoteRow(p);});});if(semMala.length>0){if(Object.keys(byMala).length>0){html+='<tr><td colspan="7" style="background:#f8fafc;padding:6px 12px;border-left:3px solid #94a3b8;"><strong class="small text-muted"><i class="fas fa-inbox me-1"></i>Sem mala</strong> <span class="badge bg-secondary ms-1">'+semMala.length+'</span></td></tr>';}semMala.forEach(function(p){html+=renderPacoteRow(p);});}tbody.innerHTML=html;}else{tbody.innerHTML='<tr><td colspan="7" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum pacote sem container</td></tr>';}}catch(e){tbody.innerHTML='<tr><td colspan="7" class="text-danger">'+e.message+'</td></tr>';}}
-function renderPacoteRow(p){let pedidoLabel=p.order_id||'-';let pedidoIdLocal=p.pedido_id_local||0;if(p.pedido_id_local&&!String(p.order_id||'').toUpperCase().startsWith('REDIR')){pedidoLabel='#'+String(p.pedido_id_local).padStart(6,'0');}const clienteNome=p.recipient_name||'-';const isCancelado=p.package_status==='cancelado';const rowClass=isCancelado?' class="text-muted" style="opacity:0.5;text-decoration:line-through;"':'';const badge=isCancelado?' <span class="badge bg-secondary" style="font-size:0.65rem;">Cancelado</span>':'';const malaBadge=p.mala_nome&&!isCancelado?' <span class="badge bg-info text-dark" style="font-size:0.6rem;">'+escHtmlCnt(p.mala_nome)+'</span>':'';const pdfUrl=(p.wp_post_id&&!isCancelado)?BASE+'/pdf/pacote/'+p.wp_post_id:'';const checkboxHtml=(!isCancelado&&pdfUrl)?'<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="'+pdfUrl+'" data-pedido="'+pedidoLabel+'" onchange="updateBaixarMassa()">':'';return '<tr'+rowClass+'><td>'+checkboxHtml+'</td><td>'+pedidoLabel+badge+malaBadge+'</td><td>'+clienteNome+'</td><td><code class="small">'+(p.tracking_code||'-')+'</code></td><td class="d-none d-md-table-cell">'+(p.total_weight?(p.total_weight/1000).toFixed(1)+'kg':'-')+'</td><td>'+(p.wp_post_id&&!isCancelado?'<a href="'+BASE+'/pdf/pacote/'+p.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td>'+(pedidoIdLocal&&!isCancelado?'<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp('+pedidoIdLocal+')" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>':'')+'</td></tr>';}
 
 // TOGGLE ALL PACOTES (download em massa)
 function toggleAllPacotes(){const checked=document.getElementById('checkAllPacotes').checked;document.querySelectorAll('.chk-pacote-dl').forEach(cb=>{cb.checked=checked;});updateBaixarMassa();}

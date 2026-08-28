@@ -228,12 +228,20 @@ function brz_api_create_package(WP_REST_Request $request) {
 
     // Montar items
     $items = [];
+    $items_for_json = []; // Items completos com weight (para salvar no _items_json e usar no PDF)
     foreach ($body['items'] as $item) {
         $items[] = [
             'hsCode' => sanitize_text_field($item['hsCode'] ?? ''),
             'description' => sanitize_text_field($item['description'] ?? ''),
             'quantity' => intval($item['quantity'] ?? 1),
             'value' => floatval($item['value'] ?? 0),
+        ];
+        $items_for_json[] = [
+            'hsCode' => sanitize_text_field($item['hsCode'] ?? ''),
+            'description' => sanitize_text_field($item['description'] ?? ''),
+            'quantity' => intval($item['quantity'] ?? 1),
+            'value' => floatval($item['value'] ?? 0),
+            'weight' => floatval($item['weight'] ?? 0),
         ];
     }
 
@@ -320,7 +328,7 @@ function brz_api_create_package(WP_REST_Request $request) {
         update_post_meta($post_id, '_recipient_zip_code', $recipient_data['recipientZipCode']);
         update_post_meta($post_id, '_recipient_email', $recipient_data['recipientEmail']);
         update_post_meta($post_id, '_recipient_phone_number', $recipient_data['recipientPhoneNumber']);
-        update_post_meta($post_id, '_items_json', wp_slash(wp_json_encode($items)));
+        update_post_meta($post_id, '_items_json', wp_slash(wp_json_encode($items_for_json)));
 
         return new WP_REST_Response([
             'success' => true,
@@ -343,7 +351,7 @@ function brz_api_list_packages(WP_REST_Request $request) {
 
     $args = [
         'post_type' => 'package',
-        'posts_per_page' => min($per_page, 200),
+        'posts_per_page' => min($per_page, 500),
         'paged' => $page,
         'post_status' => 'publish',
         'orderby' => 'date',
@@ -356,6 +364,19 @@ function brz_api_list_packages(WP_REST_Request $request) {
             'key' => '_correios_tracking_code',
             'value' => sanitize_text_field($request->get_param('tracking_code')),
         ]];
+    }
+
+    // Filtro de busca genérica (order_id, tracking, recipient_name)
+    $search = $request->get_param('search');
+    if ($search && strlen(trim($search)) >= 2) {
+        $search = sanitize_text_field(trim($search));
+        $args['meta_query'] = [
+            'relation' => 'OR',
+            ['key' => '_package_order_id', 'value' => $search, 'compare' => 'LIKE'],
+            ['key' => '_correios_tracking_code', 'value' => $search, 'compare' => 'LIKE'],
+            ['key' => '_recipient_name', 'value' => $search, 'compare' => 'LIKE'],
+            ['key' => '_pedido_id_local', 'value' => $search, 'compare' => 'LIKE'],
+        ];
     }
 
     // Filtro por sem container

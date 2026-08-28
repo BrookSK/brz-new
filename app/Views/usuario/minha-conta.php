@@ -132,7 +132,9 @@
                                         echo 'US$ ' . number_format($cu, 2, ',', '.');
                                         ?>
                                     </h6>
+                                    <?php if (!isset($clube_enabled) || $clube_enabled === true): ?>
                                     <a href="/clube/recarga" class="btn btn-sm btn-outline-primary mt-2">Adicionar saldo</a>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.18); color: rgba(49, 46, 129, 1);">
                                     <i class="fas fa-wallet"></i>

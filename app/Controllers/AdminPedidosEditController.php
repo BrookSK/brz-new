@@ -434,6 +434,10 @@ class AdminPedidosEditController extends Controller {
 
     public function editar($request) {
         try {
+            // Pedidos grandes podem exceder o limite padrão de memória
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(120);
+
             $id = (int) $request->getParam('id');
             if ($id <= 0) {
                 echo '<div class="alert alert-danger">Pedido inválido</div>';
@@ -442,17 +446,87 @@ class AdminPedidosEditController extends Controller {
             }
 
             $pedidoModel = new \App\Models\PedidoEcommerce();
-            $pedido = $pedidoModel->getComDetalhes($id);
+
+            // Carregar pedido de forma leve (sem sub-queries pesadas de getComDetalhes)
+            $pedido = null;
+            try {
+                $stPed = $this->connection->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+                $stPed->execute([$id]);
+                $pedido = $stPed->fetch(\PDO::FETCH_ASSOC) ?: null;
+            } catch (\Exception $e) {
+                $pedido = null;
+            }
             if (!$pedido) {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
                 echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
 
-            $itens = $pedido['items'] ?? [];
-            if (!is_array($itens)) {
-                $itens = [];
+            // Normalizar campos do pedido
+            if (empty($pedido['codigo_pedido']) && !empty($pedido['numero_pedido'])) {
+                $pedido['codigo_pedido'] = $pedido['numero_pedido'];
             }
+
+            // Carregar itens de forma leve (query simples, sem subqueries correlacionadas)
+            $itensTable = $this->getItensTableForPedido($id);
+            $colsItens = $this->getColsFromTable($itensTable);
+
+            $selectCols = ['id', 'pedido_id', 'produto_id', 'quantidade'];
+            // Detectar colunas de preço
+            foreach (['preco_unitario', 'valor_unitario', 'price'] as $c) {
+                if (in_array($c, $colsItens, true)) { $selectCols[] = $c; break; }
+            }
+            if (in_array('subtotal', $colsItens, true)) $selectCols[] = 'subtotal';
+            // Detectar colunas de nome
+            foreach (['nome_produto', 'produto_nome', 'nome', 'nome_item'] as $c) {
+                if (in_array($c, $colsItens, true)) $selectCols[] = $c;
+            }
+            if (in_array('nome_produto_sku', $colsItens, true)) $selectCols[] = 'nome_produto_sku';
+            if (in_array('sku', $colsItens, true) && !in_array('nome_produto_sku', $colsItens, true)) $selectCols[] = 'sku';
+            if (in_array('loja', $colsItens, true)) $selectCols[] = 'loja';
+            if (in_array('tipo_item', $colsItens, true)) $selectCols[] = 'tipo_item';
+            if (in_array('pacote_id', $colsItens, true)) $selectCols[] = 'pacote_id';
+
+            $stItens = $this->connection->prepare('SELECT ' . implode(',', $selectCols) . ' FROM ' . $itensTable . ' WHERE pedido_id = ? ORDER BY id');
+            $stItens->execute([$id]);
+            $itensRaw = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Normalizar campos dos itens para o formato esperado pela view
+            $itens = [];
+            foreach ($itensRaw as $it) {
+                $nome = '';
+                foreach (['nome_produto', 'produto_nome', 'nome', 'nome_item'] as $nc) {
+                    if (!empty($it[$nc])) { $nome = (string) $it[$nc]; break; }
+                }
+                // Fallback: buscar nome do produto na tabela produtos
+                if ($nome === '' && (int) ($it['produto_id'] ?? 0) > 0 && (int) ($it['produto_id'] ?? 0) < 999990) {
+                    try {
+                        $stN = $this->connection->prepare('SELECT COALESCE(name, nome, "") FROM produtos WHERE id = ? LIMIT 1');
+                        $stN->execute([(int) $it['produto_id']]);
+                        $nome = (string) ($stN->fetchColumn() ?: '');
+                    } catch (\Throwable $e) {}
+                }
+                if ($nome === '') $nome = 'Produto #' . ($it['produto_id'] ?? 0);
+
+                $preco = (float) ($it['preco_unitario'] ?? ($it['valor_unitario'] ?? ($it['price'] ?? 0)));
+                $qtd = (int) ($it['quantidade'] ?? 1);
+
+                $itens[] = [
+                    'id' => (int) ($it['id'] ?? 0),
+                    'produto_id' => (int) ($it['produto_id'] ?? 0),
+                    'nome_produto' => $nome,
+                    'nome_produto_sku' => (string) ($it['nome_produto_sku'] ?? ($it['sku'] ?? '')),
+                    'quantidade' => $qtd,
+                    'preco_unitario' => $preco,
+                    'subtotal' => (float) ($it['subtotal'] ?? ($preco * $qtd)),
+                    'loja' => (string) ($it['loja'] ?? 'outro'),
+                    'tipo_item' => (string) ($it['tipo_item'] ?? 'produto'),
+                    'pacote_id' => (int) ($it['pacote_id'] ?? 0),
+                ];
+            }
+            unset($itensRaw); // liberar memória
+
+            $pedido['items'] = $itens;
 
             $stmt = $this->connection->prepare("SELECT id, name, price, sku, loja FROM produtos WHERE active = 1 ORDER BY name");
             $stmt->execute();
@@ -461,6 +535,46 @@ class AdminPedidosEditController extends Controller {
             $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $pedido['numero_pedido'] ?? $pedido['codigo'] ?? $pedido['numero'] ?? $id);
             if ($codigoPedido === '') {
                 $codigoPedido = (string) $id;
+            }
+
+            // Buscar dados do cliente (nome, suite) a partir do usuario_id do pedido
+            $clienteId = (int) ($pedido['usuario_id'] ?? ($pedido['cliente_id'] ?? 0));
+            if ($clienteId > 0) {
+                try {
+                    $stUser = $this->connection->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                    $stUser->execute([$clienteId]);
+                    $userData = $stUser->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    
+                    if (!empty($userData)) {
+                        // Nome: tentar várias colunas
+                        $nomeCliente = '';
+                        foreach (['name', 'nome', 'nome_completo', 'full_name'] as $nc) {
+                            if (!empty($userData[$nc])) { $nomeCliente = (string) $userData[$nc]; break; }
+                        }
+                        if ($nomeCliente !== '') {
+                            $pedido['cliente_nome'] = $nomeCliente;
+                        }
+                        
+                        // Suíte
+                        $suiteCliente = '';
+                        foreach (['numero_suite', 'suite', 'suite_number'] as $sc) {
+                            if (!empty($userData[$sc])) { $suiteCliente = (string) $userData[$sc]; break; }
+                        }
+                        if ($suiteCliente !== '') {
+                            $pedido['cliente_suite'] = $suiteCliente;
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // Suíte: fallback do próprio pedido se existir coluna
+            if (empty($pedido['cliente_suite'])) {
+                foreach (['suite_cliente', 'numero_suite', 'suite'] as $sc) {
+                    if (!empty($pedido[$sc])) {
+                        $pedido['cliente_suite'] = $pedido[$sc];
+                        break;
+                    }
+                }
             }
 
             $statusLower = strtolower((string) ($pedido['status'] ?? ''));
@@ -492,7 +606,7 @@ class AdminPedidosEditController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</title>
+    <title>Editar Pedido #' . (int) $id . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
@@ -509,7 +623,7 @@ class AdminPedidosEditController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title">Editar Pedido #' . htmlspecialchars($codigoPedido) . '</h1>
+                    <h1 class="page-title">Editar Pedido #' . (int) $id . '</h1>
                     <div class="d-flex gap-2">
                         <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
@@ -525,7 +639,7 @@ class AdminPedidosEditController extends Controller {
                 <div class="card mb-4 border-info">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex flex-wrap gap-4 align-items-center">
-                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>Pedido:</strong> ' . htmlspecialchars($codigoPedido) . ' <span class="text-secondary">(ID: ' . (int)$id . ')</span></span>
+                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>Pedido:</strong> #' . (int)$id . ' <span class="text-secondary">(' . htmlspecialchars($codigoPedido) . ')</span></span>
                             <span class="text-muted small"><i class="fas fa-user me-1"></i><strong>Cliente:</strong> ' . htmlspecialchars((string)($pedido['cliente_nome'] ?? '—')) . '</span>
                             ' . (!empty($pedido['cliente_cpf_cnpj']) ? '<span class="text-muted small"><i class="fas fa-id-card me-1"></i><strong>CPF/CNPJ:</strong> ' . htmlspecialchars((string)$pedido['cliente_cpf_cnpj']) . '</span>' : '') . '
                             ' . (!empty($pedido['cliente_suite']) ? '<span class="text-muted small"><i class="fas fa-box me-1"></i><strong>Suíte:</strong> ' . htmlspecialchars((string)$pedido['cliente_suite']) . '</span>' : '') . '
@@ -1300,6 +1414,10 @@ class AdminPedidosEditController extends Controller {
 
     public function salvar($request) {
         try {
+            // Pedidos grandes podem exceder o limite padrão de memória/tempo
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(120);
+
             error_log('[EDIT_SAVE_V2] AdminPedidosEditController::salvar() chamado - versao sem lista_compras');
             $dados = json_decode(file_get_contents('php://input'), true);
 
@@ -1478,26 +1596,70 @@ class AdminPedidosEditController extends Controller {
             if ($this->tableExists('pedido_items')) $itensTables[] = 'pedido_items';
             if (empty($itensTables)) $itensTables[] = $this->getItensTable();
 
+            // Tabela principal para INSERT (a mesma usada na leitura do pedido)
+            $itensTablePrincipal = $this->getItensTableForPedido($pedidoId);
+
             $subtotal = 0;
 
             if (!$isPago) {
+            // Preservar dados extras dos itens existentes (foto_url, tipo_item, declaration_value, etc.)
+            // que o frontend não envia mas que devem ser mantidos após o re-insert
+            $dadosExtrasItens = []; // produto_id => [foto_url, tipo_item, ...]
+            try {
+                $colsPreserve = $this->getColsFromTable($itensTablePrincipal);
+                $extraCols = [];
+                foreach (['foto_url', 'tipo_item', 'pacote_id', 'declaration_value', 'comprovante_url', 'ncm', 'nome_item'] as $ec) {
+                    if (in_array($ec, $colsPreserve, true)) $extraCols[] = $ec;
+                }
+                if (!empty($extraCols)) {
+                    $stExtra = $this->connection->prepare('SELECT produto_id, ' . implode(',', $extraCols) . ' FROM ' . $itensTablePrincipal . ' WHERE pedido_id = ?');
+                    $stExtra->execute([$pedidoId]);
+                    $extraRows = $stExtra->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($extraRows as $er) {
+                        $epid = (int) ($er['produto_id'] ?? 0);
+                        if ($epid > 0) {
+                            $dadosExtrasItens[$epid] = $er;
+                        }
+                    }
+                    unset($extraRows);
+                }
+            } catch (\Throwable $e) {}
+
+            // DELETE de TODAS as tabelas (limpar fantasmas de ambas)
             foreach ($itensTables as $t) {
-                // Preservar itens de pacote/redirecionamento (não deletar, não recriar)
-                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id AND (produto_id IS NULL OR produto_id < 999990)");
+                // Deletar TODOS os itens do pedido (o frontend reenvia a lista completa)
+                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             }
 
-            // Calcular subtotal e inserir novos itens
-            foreach (($dados['itens'] ?? []) as $item) {
+            // Cache de colunas por tabela (evitar DESCRIBE repetido a cada item)
+            $colsCache = [];
+            $colsCache[$itensTablePrincipal] = $this->getColsFromTable($itensTablePrincipal);
+
+            // Calcular subtotal e inserir novos itens (APENAS na tabela principal)
+            // De-duplicar itens (evitar que itens repetidos do frontend sejam inseridos múltiplas vezes)
+            $itensParaSalvar = $dados['itens'] ?? [];
+            $itensDedup = [];
+            foreach ($itensParaSalvar as $item) {
+                $dedupKey = (string) ($item['produto_id'] ?? '0') . '|' . (string) ($item['nome_produto'] ?? '') . '|' . (string) ($item['preco_unitario'] ?? '0');
+                if (isset($itensDedup[$dedupKey])) {
+                    // Somar quantidade em vez de duplicar
+                    $itensDedup[$dedupKey]['quantidade'] = (int) ($itensDedup[$dedupKey]['quantidade'] ?? 0) + (int) ($item['quantidade'] ?? 0);
+                } else {
+                    $itensDedup[$dedupKey] = $item;
+                }
+            }
+            $itensParaSalvar = array_values($itensDedup);
+            unset($itensDedup);
+
+            foreach ($itensParaSalvar as $itemIdx => $item) {
                 $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
                 $subtotal += $subtotalItem;
 
-                // Inserir novo item em todas as tabelas existentes (com colunas dinâmicas)
-                foreach ($itensTables as $t) {
-                    $cols = $this->getColsFromTable($t);
-                    if (empty($cols)) {
-                        continue;
-                    }
+                // Inserir novo item apenas na tabela principal
+                $t = $itensTablePrincipal;
+                $cols = $colsCache[$t] ?? [];
+                if (!empty($cols)) {
 
                     $insertCols = [];
                     $insertVals = [];
@@ -1510,9 +1672,49 @@ class AdminPedidosEditController extends Controller {
                         'preco_unitario' => (float) ($item['preco_unitario'] ?? 0),
                         'subtotal' => (float) $subtotalItem,
                         'nome_produto' => (string) ($item['nome_produto'] ?? ''),
+                        'produto_nome' => (string) ($item['nome_produto'] ?? ''),
+                        'nome' => (string) ($item['nome_produto'] ?? ''),
+                        'nome_item' => (string) ($item['nome_produto'] ?? ''),
                         'nome_produto_sku' => (string) ($item['nome_produto_sku'] ?? ''),
                         'loja' => (string) ($item['loja'] ?? ''),
                     ];
+
+                    // Complementar com dados extras preservados (foto_url, tipo_item, etc.)
+                    $pid = (int) ($item['produto_id'] ?? 0);
+                    if ($pid > 0 && isset($dadosExtrasItens[$pid])) {
+                        $extras = $dadosExtrasItens[$pid];
+                        foreach (['foto_url', 'tipo_item', 'pacote_id', 'declaration_value', 'comprovante_url', 'ncm'] as $extraField) {
+                            if (isset($extras[$extraField]) && $extras[$extraField] !== '' && $extras[$extraField] !== null) {
+                                $map[$extraField] = $extras[$extraField];
+                            }
+                        }
+                        // nome_item: só preencher se estiver vazio no map
+                        if (empty($map['nome_item']) && !empty($extras['nome_item'])) {
+                            $map['nome_item'] = $extras['nome_item'];
+                        }
+                    }
+
+                    // Fallback: buscar declaration_value do pacotes_recebidos se não veio dos extras
+                    if (empty($map['declaration_value']) && $pid >= 999990) {
+                        $pacIdFallback = $pid - 999990;
+                        if ($pacIdFallback > 0) {
+                            try {
+                                $stDeclFb = $this->connection->prepare('SELECT declaration_value FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                $stDeclFb->execute([$pacIdFallback]);
+                                $declFb = (float) ($stDeclFb->fetchColumn() ?: 0);
+                                if ($declFb > 0) {
+                                    $map['declaration_value'] = $declFb;
+                                }
+                            } catch (\Throwable $e) {}
+                        }
+                    }
+
+                    // Se preco_unitario é 0 mas declaration_value existe, usar como preço
+                    if ((float) ($map['preco_unitario'] ?? 0) <= 0 && !empty($map['declaration_value']) && (float) $map['declaration_value'] > 0) {
+                        $map['preco_unitario'] = (float) $map['declaration_value'];
+                        $map['subtotal'] = (float) $map['declaration_value'] * (int) ($item['quantidade'] ?? 1);
+                        $subtotalItem = $map['subtotal'];
+                    }
 
                     foreach ($map as $c => $v) {
                         if (in_array($c, $cols, true)) {

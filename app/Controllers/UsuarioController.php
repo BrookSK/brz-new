@@ -521,6 +521,7 @@ class UsuarioController extends Controller {
             'desapego_comissao_pendente' => $desapegoComissaoPendente,
             'desapego_comissao_paga' => $desapegoComissaoPaga,
             'desapego_total_produtos' => $desapegoTotalProdutos,
+            'clube_enabled' => \App\Controllers\ClubeController::isClubeEnabled(),
         ]);
     }
 
@@ -549,6 +550,12 @@ class UsuarioController extends Controller {
 
     public function carteiraRecargaCriar(Request $request) {
         $this->authService->requerAutenticacao();
+
+        // Clube desativado: bloquear novas recargas de carteira
+        if (!\App\Controllers\ClubeController::isClubeEnabled()) {
+            $this->json(['success' => false, 'error' => 'As recargas do Clube estão temporariamente pausadas. Entre em contato pelo WhatsApp ' . \App\Controllers\ClubeController::CLUBE_WHATSAPP_LABEL . ' para mais detalhes.'], 403);
+            return;
+        }
 
         $usuarioSessao = $this->authService->getUsuarioLogado();
         $usuarioId = (int) ($usuarioSessao['id'] ?? 0);

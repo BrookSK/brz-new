@@ -957,6 +957,11 @@ class WPR_Envios
                         'weight' => $it['weight'] ?? 0,
                     ];
                 }
+                // Fallback: se nenhum item tem peso individual, dividir peso total igualmente
+                $has_individual_weight = false;
+                foreach ($items as $it) {
+                    if ((float) $it['weight'] > 0) { $has_individual_weight = true; break; }
+                }
                 $item_weight = count($items) > 0 ? $total_weight / count($items) : 0;
                 $items_suplementary = array_slice($items, 3);
                 $items = array_slice($items, 0, 3);
@@ -1008,19 +1013,45 @@ class WPR_Envios
 
         $items = [];
         $total_weight = get_post_meta($package_id, '_total_weight', true) / 1000;
-        foreach ($order->get_items() as $item_id => $item) {
-            $product = $item->get_product();
-            $weight = $product->get_weight();
-            $quantity = $item->get_quantity();
-            $items[] = [
-                'hsCode' => $item->get_meta('_ncm'),
-                'description' => $item->get_meta('_product_name'),
-                'quantity' => $quantity,
-                'value' => $item->get_meta('_declaration_value') ?: $item->get_total(),
-                'weight' => $weight,
-            ];
+
+        // Para pacotes de redirecionamento (criados via API do sistema principal),
+        // preferir _items_json pois contém descrições e pesos corretos.
+        // Para orders normais do WooCommerce, usar dados do WC order (que já funcionam).
+        $pedido_id_local_check = get_post_meta($package_id, '_pedido_id_local', true);
+        $items_json_wc = get_post_meta($package_id, '_items_json', true);
+        $items_from_json = $items_json_wc ? json_decode($items_json_wc, true) : [];
+
+        if (!empty($items_from_json) && !empty($pedido_id_local_check)) {
+            // Pacote criado via API externa — usar dados do _items_json
+            foreach ($items_from_json as $it) {
+                $items[] = [
+                    'hsCode' => $it['hsCode'] ?? '',
+                    'description' => $it['description'] ?? '',
+                    'quantity' => $it['quantity'] ?? 1,
+                    'value' => $it['value'] ?? 0,
+                    'weight' => $it['weight'] ?? 0,
+                ];
+            }
+        } else {
+            // Order normal do WooCommerce — usar itens do WC
+            foreach ($order->get_items() as $item_id => $item) {
+                $product = $item->get_product();
+                $weight = $product ? $product->get_weight() : 0;
+                $quantity = $item->get_quantity();
+                $desc_wc = $item->get_meta('_product_name');
+                if (empty($desc_wc)) {
+                    $desc_wc = $item->get_name();
+                }
+                $items[] = [
+                    'hsCode' => $item->get_meta('_ncm'),
+                    'description' => $desc_wc,
+                    'quantity' => $quantity,
+                    'value' => $item->get_meta('_declaration_value') ?: $item->get_total(),
+                    'weight' => $weight,
+                ];
+            }
         }
-        $item_weight = $total_weight / count($items);
+        $item_weight = count($items) > 0 ? $total_weight / count($items) : 0;
         $items_suplementary = array_slice($items, 3);
         $items = array_slice($items, 0, 3);
 
@@ -1462,7 +1493,13 @@ class WPR_Envios
                                 <td><?php echo $item['hsCode']; ?></td>
                                 <td><?php echo $item['quantity']; ?></td>
                                 <td><?php echo $item['description']; ?></td>
-                                <td><?php echo number_format($item_weight / $item['quantity'], 2, ',', '.'); ?></td>
+                                <td><?php
+                                    // Usar peso individual do item se disponível, senão fallback para peso dividido
+                                    $peso_display = ((float) ($item['weight'] ?? 0) > 0)
+                                        ? (float) $item['weight']
+                                        : $item_weight / max($item['quantity'], 1);
+                                    echo number_format($peso_display, 2, ',', '.');
+                                ?></td>
                                 <td><?php echo number_format($item['value'], 2, ',', '.'); ?></td>
                                 <td><?php echo number_format($item_total, 2, ',', '.'); ?></td>
                             </tr>
@@ -1580,7 +1617,10 @@ class WPR_Envios
                                         $description = $item['description'];
                                         $quantity = $item['quantity'];
                                         $value = $item['value'];
-                                        $weight = $item_weight / $quantity;
+                                        // Usar peso individual do item se disponível
+                                        $weight = ((float) ($item['weight'] ?? 0) > 0)
+                                            ? (float) $item['weight']
+                                            : $item_weight / max($quantity, 1);
                                         $item_total = $value * $quantity;
                                         $weight_total = $weight * $quantity;
 

@@ -25,7 +25,9 @@ class AdminPedidosController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$', [
+                \PDO::MYSQL_ATTR_FOUND_ROWS => true,
+            ]);
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
 
             $usuarioLogado = $auth->getUsuarioLogado();
@@ -143,9 +145,73 @@ class AdminPedidosController extends Controller {
             ];
             error_log('[ATUALIZAR_CLIENTE_DEBUG] ' . json_encode($debugInfo, JSON_UNESCAPED_UNICODE));
 
-            // NÃO atualizar tabela usuarios — edição no pedido é exclusiva deste pedido
+            // Propagar dados editados para a tabela usuarios (cadastro do cliente)
+            // O sistema lê telefone, email, nome e CPF de lá via fallback no getComDetalhes()
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
             $usuarioIdPedido = ($colUsuarioId !== '') ? (int) ($oldRow[$colUsuarioId] ?? 0) : 0;
+
+            if ($usuarioIdPedido > 0) {
+                try {
+                    $colsUsuarios = $this->getTableColumnsPdo($pdo, 'usuarios');
+                    $pickColU = function(array $candidates) use ($colsUsuarios): string {
+                        foreach ($candidates as $c) {
+                            if (is_array($colsUsuarios) && in_array($c, $colsUsuarios, true)) return $c;
+                        }
+                        return '';
+                    };
+
+                    $setU = [];
+                    $paramsU = [];
+
+                    // Telefone
+                    $telefoneVal = trim((string) $request->getParam('telefone'));
+                    if ($telefoneVal !== '') {
+                        $colTelU = $pickColU(['telefone', 'phone', 'celular', 'mobile', 'whatsapp']);
+                        if ($colTelU !== '') {
+                            $setU[] = $colTelU . ' = ?';
+                            $paramsU[] = $telefoneVal;
+                        }
+                    }
+
+                    // Email
+                    $emailVal = trim((string) $request->getParam('email'));
+                    if ($emailVal !== '') {
+                        $colEmailU = $pickColU(['email']);
+                        if ($colEmailU !== '') {
+                            $setU[] = $colEmailU . ' = ?';
+                            $paramsU[] = $emailVal;
+                        }
+                    }
+
+                    // Nome
+                    $nomeVal = trim((string) $request->getParam('nome'));
+                    if ($nomeVal !== '') {
+                        $colNomeU = $pickColU(['nome', 'name', 'full_name']);
+                        if ($colNomeU !== '') {
+                            $setU[] = $colNomeU . ' = ?';
+                            $paramsU[] = $nomeVal;
+                        }
+                    }
+
+                    // CPF/Documento
+                    $docVal = trim((string) $request->getParam('documento'));
+                    if ($docVal !== '') {
+                        $colDocU = $pickColU(['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf']);
+                        if ($colDocU !== '') {
+                            $setU[] = $colDocU . ' = ?';
+                            $paramsU[] = $docVal;
+                        }
+                    }
+
+                    if (!empty($setU)) {
+                        $paramsU[] = $usuarioIdPedido;
+                        $sqlU = 'UPDATE usuarios SET ' . implode(', ', $setU) . ' WHERE id = ?';
+                        $pdo->prepare($sqlU)->execute($paramsU);
+                    }
+                } catch (\Throwable $e) {
+                    // Silenciar — não bloquear o fluxo principal por falha na propagação
+                }
+            }
 
             // ENDEREÇO: SEMPRE criar registro NOVO exclusivo para este pedido
             // Isso garante que editar endereço de um pedido NÃO afeta outros pedidos da mesma cliente.
@@ -259,7 +325,7 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            $this->json(['success' => true, 'debug' => $debugInfo]);
+            $this->json(['success' => true, 'rows_affected' => $rowsAffected, 'endereco_id' => $enderecoIdAtualizado]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
@@ -905,6 +971,29 @@ class AdminPedidosController extends Controller {
                     $pdo->prepare("UPDATE pedidos SET arquivado = 0 WHERE id = ?")->execute([(int) $id]);
                 } catch (\Exception $e) {}
 
+                // Restaurar status do pedido para carne_pagando (se era carnê cancelado)
+                try {
+                    $stCheckCarne = $pdo->prepare("SELECT id, quantidade_parcelas FROM carnes WHERE pedido_id = ? LIMIT 1");
+                    $stCheckCarne->execute([(int) $id]);
+                    $carneRow = $stCheckCarne->fetch(\PDO::FETCH_ASSOC);
+                    if (!empty($carneRow)) {
+                        // Verificar quantas parcelas já foram pagas
+                        $stPagas = $pdo->prepare("SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = ? AND status = 'paga'");
+                        $stPagas->execute([(int) $carneRow['id']]);
+                        $parcelasPagas = (int) ($stPagas->fetchColumn() ?: 0);
+                        $totalParcelas = (int) ($carneRow['quantidade_parcelas'] ?? 0);
+
+                        // Se todas parcelas pagas = pago, senão = carne_pagando
+                        $novoStatusPedido = ($parcelasPagas >= $totalParcelas && $totalParcelas > 0) ? 'pago' : 'carne_pagando';
+                        $pdo->prepare("UPDATE pedidos SET status = ? WHERE id = ? AND status = 'cancelado'")
+                            ->execute([$novoStatusPedido, (int) $id]);
+                    } else {
+                        // Não é carnê, restaurar para pendente
+                        $pdo->prepare("UPDATE pedidos SET status = 'pendente' WHERE id = ? AND status = 'cancelado'")
+                            ->execute([(int) $id]);
+                    }
+                } catch (\Exception $e) {}
+
                 // Restaurar parcelas canceladas que não foram pagas (cancelada -> pendente)
                 $pdo->prepare("UPDATE carne_parcelas cp
                     JOIN carnes c ON cp.carne_id = c.id
@@ -948,7 +1037,98 @@ class AdminPedidosController extends Controller {
         } catch (\Exception $e) {
         }
 
-        header('Location: /admin/pedidos/lixeira');
+        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/pedidos/lixeira'));
+        exit;
+    }
+
+    public function arquivados(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) { $colsPedidos = []; }
+
+            if (!in_array('arquivado', $colsPedidos, true)) {
+                echo '<div class="alert alert-warning">Coluna "arquivado" não encontrada na tabela pedidos.</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
+
+            $colsUsuarios = [];
+            try { $st = $pdo->query('DESCRIBE usuarios'); $colsUsuarios = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+            $colUserName = in_array('name', $colsUsuarios, true) ? 'name' : (in_array('nome', $colsUsuarios, true) ? 'nome' : 'name');
+            $colUserEmail = in_array('email', $colsUsuarios, true) ? 'email' : 'email';
+
+            $colUsuarioId = in_array('usuario_id', $colsPedidos, true) ? 'usuario_id' : 'cliente_id';
+            $colNumero = in_array('numero_pedido', $colsPedidos, true) ? 'numero_pedido' : (in_array('numero', $colsPedidos, true) ? 'numero' : null);
+
+            $sql = "SELECT p.*, u.{$colUserName} AS cliente_nome, u.{$colUserEmail} AS cliente_email
+                    FROM pedidos p LEFT JOIN usuarios u ON p.{$colUsuarioId} = u.id
+                    WHERE p.arquivado = 1";
+            if (in_array('deleted_at', $colsPedidos, true)) {
+                $sql .= " AND p.deleted_at IS NULL";
+            }
+            $sql .= " ORDER BY p.id DESC LIMIT 100";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute();
+            $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            header('Content-Type: text/html; charset=UTF-8');
+            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pedidos Arquivados</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+            </head><body>';
+
+            $sidebarActive = 'pedidos';
+            include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+            echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h4><i class="fas fa-archive me-2"></i>Pedidos Arquivados</h4>
+                <a href="/admin/pedidos" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+            </div>
+            <p class="text-muted small">Pedidos cancelados automaticamente (carnê expirado, inadimplência). Para restaurar, clique em "Restaurar".</p>';
+
+            if (empty($pedidos)) {
+                echo '<div class="alert alert-info">Nenhum pedido arquivado.</div>';
+            } else {
+                echo '<div class="table-responsive"><table class="table table-sm table-hover">
+                <thead><tr>
+                    <th>#</th><th>Cliente</th><th>Status</th><th>Total</th><th>Data</th><th>Ações</th>
+                </tr></thead><tbody>';
+
+                foreach ($pedidos as $p) {
+                    $total = (float) ($p['total'] ?? 0);
+                    $data = !empty($p['created_at']) ? date('d/m/Y', strtotime($p['created_at'])) : '-';
+                    $nome = htmlspecialchars((string) ($p['cliente_nome'] ?? ''));
+                    echo '<tr>
+                        <td>' . (int) $p['id'] . '</td>
+                        <td>' . $nome . '</td>
+                        <td><span class="badge bg-secondary">' . htmlspecialchars((string) ($p['status'] ?? '')) . '</span></td>
+                        <td>R$ ' . number_format($total, 2, ',', '.') . '</td>
+                        <td class="small">' . $data . '</td>
+                        <td>
+                            <a href="/admin/pedidos/detalhes/' . (int) $p['id'] . '" class="btn btn-sm btn-outline-primary" title="Ver"><i class="fas fa-eye"></i></a>
+                            <form method="POST" action="/admin/pedidos/restaurar/' . (int) $p['id'] . '" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Restaurar"><i class="fas fa-undo"></i></button>
+                            </form>
+                        </td>
+                    </tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+            echo '</main></body></html>';
+
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+        }
         exit;
     }
 
@@ -2611,6 +2791,9 @@ JS;
                         <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger">
                             <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
+                        <a href="/admin/pedidos/arquivados" class="btn btn-outline-secondary">
+                            <i class="fas fa-archive me-1"></i>Arquivados
+                        </a>
                         <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
                             <i class="fas fa-download me-1"></i>Exportar XLSX
                         </a>
@@ -2629,6 +2812,7 @@ JS;
                         <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Novo Pedido</a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
                         <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Lixeira</a>
+                        <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>Arquivados</a>
                         <a class="btn btn-sm btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download me-1"></i>XLSX</a>
                         <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                     </div>
@@ -4189,7 +4373,7 @@ HTML;
                                                     ? '<span class="badge bg-success">GRÁTIS</span>'
                                                     : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
-                                                <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
+                                                <td>' . ((!empty($item['created_at'])) ? date('d/m/Y H:i', strtotime($item['created_at'])) : '-') . '</td>
                                                 <td>' . $acoesHtml . '</td>
                                             </tr>';
                                         }
@@ -4456,6 +4640,32 @@ CUSTOSCRIPT;
                     $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
                     $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
                     $pais = (string) ($pedido['pais_entrega'] ?? ($pedido['country_entrega'] ?? ($pedido['pais'] ?? '')));
+                    // Normalizar país para código ISO (ex: "Brasil" → "BR", "Brazil" → "BR")
+                    $paisNormMap = [
+                        'BRASIL' => 'BR', 'BRAZIL' => 'BR', 'BRA' => 'BR',
+                        'ESTADOS UNIDOS' => 'US', 'UNITED STATES' => 'US', 'USA' => 'US',
+                        'PORTUGAL' => 'PT', 'PRT' => 'PT',
+                        'JAPAO' => 'JP', 'JAPAN' => 'JP', 'JPN' => 'JP',
+                        'REINO UNIDO' => 'GB', 'UNITED KINGDOM' => 'GB', 'GBR' => 'GB',
+                        'ALEMANHA' => 'DE', 'GERMANY' => 'DE', 'DEU' => 'DE',
+                        'FRANCA' => 'FR', 'FRANCE' => 'FR', 'FRA' => 'FR',
+                        'ESPANHA' => 'ES', 'SPAIN' => 'ES', 'ESP' => 'ES',
+                        'ITALIA' => 'IT', 'ITALY' => 'IT', 'ITA' => 'IT',
+                        'CANADA' => 'CA', 'CAN' => 'CA',
+                        'AUSTRALIA' => 'AU', 'AUS' => 'AU',
+                        'ARGENTINA' => 'AR', 'ARG' => 'AR',
+                        'CHILE' => 'CL', 'CHL' => 'CL',
+                        'COLOMBIA' => 'CO', 'COL' => 'CO',
+                        'MEXICO' => 'MX', 'MEX' => 'MX',
+                    ];
+                    $paisUp = strtoupper(trim($pais));
+                    // Remover acentos para normalização
+                    $paisUpNorm = strtoupper(trim((string) @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $pais)));
+                    if (isset($paisNormMap[$paisUp])) {
+                        $pais = $paisNormMap[$paisUp];
+                    } elseif ($paisUpNorm !== '' && isset($paisNormMap[$paisUpNorm])) {
+                        $pais = $paisNormMap[$paisUpNorm];
+                    }
                     $cep = (string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''));
                     $endereco = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
                     $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
@@ -5492,7 +5702,128 @@ LINKSCRIPT;
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>';
+
+        // === SEÇÃO AUDITORIA / HISTÓRICO (colapsável) ===
+        $auditoriaHtml = '';
+        try {
+            $dbAudit = \Config\Database::getConnection();
+            $pidAudit = (int) $pedido['id'];
+
+            // 1. Histórico de status (pedido_status_history)
+            $statusHistRows = [];
+            try {
+                $stHist = $dbAudit->prepare("
+                    SELECT h.status_anterior, h.novo_status, h.observacao, h.created_at, u.nome AS usuario_nome
+                    FROM pedido_status_history h
+                    LEFT JOIN usuarios u ON u.id = h.alterado_por
+                    WHERE h.pedido_id = ?
+                    ORDER BY h.created_at DESC
+                ");
+                $stHist->execute([$pidAudit]);
+                $statusHistRows = $stHist->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            // 2. Etiquetas geradas (correios_packet_etiquetas)
+            $etiquetaRows = [];
+            try {
+                $stEtiq = $dbAudit->prepare("SELECT tracking_number, status, customer_control_code, wp_post_id, created_at FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY created_at DESC");
+                $stEtiq->execute([$pidAudit]);
+                $etiquetaRows = $stEtiq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            // 3. Auditoria de edições (auditoria_logs)
+            $auditRows = [];
+            try {
+                $stAudit = $dbAudit->prepare("
+                    SELECT a.acao, a.valores_antigos, a.valores_novos, a.ip, a.created_at, u.nome AS usuario_nome
+                    FROM auditoria_logs a
+                    LEFT JOIN usuarios u ON u.id = a.usuario_id
+                    WHERE a.registro_id = ? AND a.tabela = 'pedidos'
+                    ORDER BY a.created_at DESC
+                    LIMIT 30
+                ");
+                $stAudit->execute([$pidAudit]);
+                $auditRows = $stAudit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            $temDados = (!empty($statusHistRows) || !empty($etiquetaRows) || !empty($auditRows));
+
+            if ($temDados) {
+                $auditoriaHtml .= '<div class="row mt-4"><div class="col-12">';
+                $auditoriaHtml .= '<div class="card mb-4 border-secondary">';
+                $auditoriaHtml .= '<div class="card-header bg-light d-flex justify-content-between align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#collapseAuditoria" aria-expanded="false">';
+                $auditoriaHtml .= '<h6 class="mb-0"><i class="fas fa-clock-rotate-left me-2"></i>Auditoria / Histórico</h6>';
+                $auditoriaHtml .= '<i class="fas fa-chevron-down small"></i>';
+                $auditoriaHtml .= '</div>';
+                $auditoriaHtml .= '<div class="collapse" id="collapseAuditoria"><div class="card-body">';
+
+                // Histórico de status
+                if (!empty($statusHistRows)) {
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-exchange-alt me-1"></i> Histórico de Status</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Data</th><th>De</th><th>Para</th><th>Observação</th><th>Usuário</th></tr></thead><tbody>';
+                    foreach ($statusHistRows as $sh) {
+                        $auditoriaHtml .= '<tr><td class="small">' . ($sh['created_at'] ? date('d/m/Y H:i', strtotime($sh['created_at'])) : '-') . '</td>';
+                        $auditoriaHtml .= '<td><span class="badge bg-secondary">' . htmlspecialchars($sh['status_anterior'] ?? '-') . '</span></td>';
+                        $auditoriaHtml .= '<td><span class="badge bg-primary">' . htmlspecialchars($sh['novo_status'] ?? '-') . '</span></td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['observacao'] ?? '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['usuario_nome'] ?? 'Sistema') . '</td></tr>';
+                    }
+                    $auditoriaHtml .= '</tbody></table></div>';
+                }
+
+                // Etiquetas
+                if (!empty($etiquetaRows)) {
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-barcode me-1"></i> Etiquetas</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Data</th><th>Tracking</th><th>Status</th><th>WP Post ID</th></tr></thead><tbody>';
+                    foreach ($etiquetaRows as $et) {
+                        $auditoriaHtml .= '<tr><td class="small">' . ($et['created_at'] ? date('d/m/Y H:i', strtotime($et['created_at'])) : '-') . '</td>';
+                        $auditoriaHtml .= '<td><code>' . htmlspecialchars($et['tracking_number'] ?? '-') . '</code></td>';
+                        $auditoriaHtml .= '<td>' . htmlspecialchars($et['status'] ?? '-') . '</td>';
+                        $auditoriaHtml .= '<td>' . ($et['wp_post_id'] ? $et['wp_post_id'] : '<span class="text-muted">-</span>') . '</td></tr>';
+                    }
+                    $auditoriaHtml .= '</tbody></table></div>';
+                }
+
+                // Log de auditoria (edições)
+                if (!empty($auditRows)) {
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-pen me-1"></i> Log de Edições</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead class="table-light"><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Mudanças</th><th>IP</th></tr></thead><tbody>';
+                    foreach ($auditRows as $ar) {
+                        $antigos = json_decode($ar['valores_antigos'] ?? '', true);
+                        $novos = json_decode($ar['valores_novos'] ?? '', true);
+                        $mudancas = '';
+                        if (is_array($antigos) && is_array($novos)) {
+                            $diffs = [];
+                            foreach ($novos as $k => $v) {
+                                $oldVal = $antigos[$k] ?? null;
+                                $oldStr = is_array($oldVal) ? json_encode($oldVal) : (string) ($oldVal ?? 'null');
+                                $newStr = is_array($v) ? json_encode($v) : (string) ($v ?? 'null');
+                                if ($oldStr !== $newStr) {
+                                    $diffs[] = '<strong>' . htmlspecialchars($k) . '</strong>: ' . htmlspecialchars(mb_substr($oldStr, 0, 80)) . ' → ' . htmlspecialchars(mb_substr($newStr, 0, 80));
+                                }
+                            }
+                            $mudancas = implode('<br>', array_slice($diffs, 0, 5));
+                            if (count($diffs) > 5) $mudancas .= '<br><span class="text-muted">...+' . (count($diffs) - 5) . ' campos</span>';
+                        }
+                        $auditoriaHtml .= '<tr><td class="small text-nowrap">' . ($ar['created_at'] ? date('d/m/Y H:i', strtotime($ar['created_at'])) : '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['usuario_nome'] ?? 'Sistema') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['acao'] ?? '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . ($mudancas ?: '-') . '</td>';
+                        $auditoriaHtml .= '<td class="small text-muted">' . htmlspecialchars($ar['ip'] ?? '-') . '</td></tr>';
+                    }
+                    $auditoriaHtml .= '</tbody></table></div>';
+                }
+
+                $auditoriaHtml .= '</div></div></div></div></div>';
+            }
+        } catch (\Exception $e) {}
+
+        if ($auditoriaHtml !== '') {
+            echo $auditoriaHtml;
+        }
+
+        echo '
             </main>
         </div>
     </div>

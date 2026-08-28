@@ -1606,10 +1606,44 @@ class PedidoEcommerce {
                 }
             }
 
-            $sqlItens = 'SELECT ' . implode(', ', $selectParts) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
-            $stmtItens = $this->connection->prepare($sqlItens);
-            $stmtItens->execute([':id' => $pedidoId]);
-            $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            // Verificar quantidade de itens antes de fazer query pesada
+            $stmtCount = $this->connection->prepare('SELECT COUNT(*) FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id');
+            $stmtCount->execute([':id' => $pedidoId]);
+            $totalItensCount = (int) ($stmtCount->fetchColumn() ?: 0);
+
+            // Para pedidos com muitos itens (>200), usar query simplificada sem sub-queries correlacionadas
+            if ($totalItensCount > 200) {
+                $simpleCols = ['pi.id'];
+                if ($colProdutoId) $simpleCols[] = 'pi.' . $colProdutoId . ' AS produto_id';
+                if ($colProdutoVariacaoId) $simpleCols[] = 'pi.' . $colProdutoVariacaoId . ' AS produto_variacao_id';
+                if ($colQtd) $simpleCols[] = 'pi.' . $colQtd . ' AS quantidade';
+                if ($colPrecoUnit) $simpleCols[] = 'pi.' . $colPrecoUnit . ' AS preco_unitario';
+                if ($colSubtotal) $simpleCols[] = 'pi.' . $colSubtotal . ' AS subtotal';
+                if ($colNomeProduto) $simpleCols[] = 'pi.' . $colNomeProduto . ' AS nome_produto';
+                if ($colSku) $simpleCols[] = 'pi.' . $colSku . ' AS nome_produto_sku';
+                if ($colUrlOriginalItem) $simpleCols[] = 'pi.' . $colUrlOriginalItem . ' AS url_original';
+                if ($pick(['tipo_item']) !== null) $simpleCols[] = 'pi.tipo_item';
+                if ($pick(['pacote_id']) !== null) $simpleCols[] = 'pi.pacote_id';
+                if ($pick(['foto_url']) !== null) $simpleCols[] = 'pi.foto_url';
+                if ($pick(['nome_item']) !== null) $simpleCols[] = 'pi.nome_item';
+                if ($pick(['declaration_value']) !== null) $simpleCols[] = 'pi.declaration_value';
+                if ($pick(['loja']) !== null) $simpleCols[] = 'pi.loja';
+                if ($pick(['created_at']) !== null) $simpleCols[] = 'pi.created_at';
+                $simpleCols[] = "'' AS ncm";
+                $simpleCols[] = "NULL AS peso_kg";
+                $simpleCols[] = "NULL AS imagem_principal";
+                $simpleCols[] = "NULL AS nome_produto_fallback";
+
+                $sqlItens = 'SELECT ' . implode(', ', $simpleCols) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
+                $stmtItens = $this->connection->prepare($sqlItens);
+                $stmtItens->execute([':id' => $pedidoId]);
+                $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } else {
+                $sqlItens = 'SELECT ' . implode(', ', $selectParts) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
+                $stmtItens = $this->connection->prepare($sqlItens);
+                $stmtItens->execute([':id' => $pedidoId]);
+                $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
 
             // Fallback de imagem via tabela produtos (quando não há produto_fotos)
             $stmtProdImg = null;

@@ -2247,7 +2247,7 @@ class CheckoutController extends Controller {
         foreach ($carrinho as $item) {
             $qtd = (int) ($item['quantidade'] ?? 0);
             if ($qtd <= 0) continue;
-            $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+            $pesoUnit = (float) ($item['peso'] ?? ($item['peso_kg'] ?? ($item['weight'] ?? 0)));
             if ($pesoUnit <= 0) {
                 $pesoUnit = 0.5;
             }
@@ -2858,6 +2858,27 @@ class CheckoutController extends Controller {
                 }
             }
         } catch (\Throwable $e) {}
+
+        // === Redirecionamento: zerar subtotal e impostos no checkout ===
+        // Quando o carrinho contém SOMENTE pacotes de redirecionamento (sem produtos normais),
+        // o cliente paga apenas a taxa de serviço. Subtotal e impostos ficam zerados.
+        $isSomenteRedirecionamentoCheckout = true;
+        foreach ($carrinho as $cItemRedirCk) {
+            $tipoRedirCk = $cItemRedirCk['tipo_item'] ?? 'produto';
+            $pidRedirCk = (int) ($cItemRedirCk['produto_id'] ?? 0);
+            if ($tipoRedirCk !== 'pacote_redirecionamento' && $pidRedirCk < 999990 && $tipoRedirCk !== 'fatura_adicional') {
+                $isSomenteRedirecionamentoCheckout = false;
+                break;
+            }
+        }
+        if ($isSomenteRedirecionamentoCheckout) {
+            $subtotal = 0.0;
+            $impostos = 0.0;
+            $impostosCalculado = 0.0;
+            $impostoLocal = 0.0;
+            $frete = 0.0;
+            $total = $taxaServico;
+        }
 
         $rateBRL = 5.5;
         try {
@@ -5795,9 +5816,9 @@ class CheckoutController extends Controller {
 
                 if (in_array('nome', $colsItens, true)) { $colsInsP[] = 'nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
                 elseif (in_array('produto_nome', $colsItens, true)) { $colsInsP[] = 'produto_nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
-                if (in_array('preco_unitario', $colsItens, true)) { $colsInsP[] = 'preco_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
-                elseif (in_array('valor_unitario', $colsItens, true)) { $colsInsP[] = 'valor_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
-                if (in_array('subtotal', $colsItens, true)) { $colsInsP[] = 'subtotal'; $valsInsP[] = $precoPacote * $qtdPacote; $phP[] = '?'; }
+                if (in_array('preco_unitario', $colsItens, true)) { $colsInsP[] = 'preco_unitario'; $valsInsP[] = ($declarationVal > 0 ? $declarationVal : $precoPacote); $phP[] = '?'; }
+                elseif (in_array('valor_unitario', $colsItens, true)) { $colsInsP[] = 'valor_unitario'; $valsInsP[] = ($declarationVal > 0 ? $declarationVal : $precoPacote); $phP[] = '?'; }
+                if (in_array('subtotal', $colsItens, true)) { $colsInsP[] = 'subtotal'; $valsInsP[] = ($declarationVal > 0 ? $declarationVal : $precoPacote) * $qtdPacote; $phP[] = '?'; }
                 if (in_array('peso_kg', $colsItens, true)) { $colsInsP[] = 'peso_kg'; $valsInsP[] = $pesoPacote; $phP[] = '?'; }
                 elseif (in_array('peso', $colsItens, true)) { $colsInsP[] = 'peso'; $valsInsP[] = $pesoPacote; $phP[] = '?'; }
                 if (in_array('declaration_value', $colsItens, true)) { $colsInsP[] = 'declaration_value'; $valsInsP[] = $declarationVal; $phP[] = '?'; }
@@ -5807,16 +5828,29 @@ class CheckoutController extends Controller {
                 if (in_array('comprovante_url', $colsItens, true)) { $colsInsP[] = 'comprovante_url'; $valsInsP[] = $comprovanteUrl; $phP[] = '?'; }
                 if (in_array('ncm', $colsItens, true)) { $colsInsP[] = 'ncm'; $valsInsP[] = $ncmPacote; $phP[] = '?'; }
                 if (in_array('nome_item', $colsItens, true)) { $colsInsP[] = 'nome_item'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
+                if (in_array('nome_produto', $colsItens, true)) { $colsInsP[] = 'nome_produto'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
 
                 $sqlInsP = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $colsInsP) . ') VALUES (' . implode(', ', $phP) . ')';
                 $stInsP = $db->prepare($sqlInsP);
                 $stInsP->execute($valsInsP);
 
-                // Atualizar status do pacote
+                // Atualizar status do pacote E salvar declaration_value como backup no pacotes_recebidos
                 if ($pacoteIdItem > 0) {
                     try {
-                        $db->prepare('UPDATE pacotes_recebidos SET status = ?, pedido_id = ? WHERE id = ?')
-                           ->execute(['pedido_criado', (int) $pedidoId, $pacoteIdItem]);
+                        // Garantir coluna declaration_value no pacotes_recebidos
+                        try {
+                            $db->exec("ALTER TABLE pacotes_recebidos ADD COLUMN declaration_value DECIMAL(10,2) NULL");
+                        } catch (\Throwable $e) {} // ignora se já existe
+
+                        $updateFields = ['status = ?', 'pedido_id = ?'];
+                        $updateParams = ['pedido_criado', (int) $pedidoId];
+                        if ($declarationVal > 0) {
+                            $updateFields[] = 'declaration_value = ?';
+                            $updateParams[] = $declarationVal;
+                        }
+                        $updateParams[] = $pacoteIdItem;
+                        $db->prepare('UPDATE pacotes_recebidos SET ' . implode(', ', $updateFields) . ' WHERE id = ?')
+                           ->execute($updateParams);
                     } catch (\Throwable $e) {}
                 }
 
@@ -7271,6 +7305,27 @@ class CheckoutController extends Controller {
             } catch (\Throwable $e) {}
 
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd + $impostoLocalUsd;
+
+            // === Redirecionamento: zerar subtotal e impostos, cobrar apenas taxa de serviço ===
+            // Quando o carrinho contém SOMENTE pacotes de redirecionamento (sem produtos normais),
+            // o cliente paga apenas a taxa de serviço (inclui seguro + armazenamento). Subtotal e impostos ficam zerados.
+            $isSomenteRedirecionamentoCheckout = true;
+            foreach ($carrinho as $cItemRedirCheck) {
+                $tipoRedirCheck = $cItemRedirCheck['tipo_item'] ?? 'produto';
+                $pidRedirCheck = (int) ($cItemRedirCheck['produto_id'] ?? 0);
+                if ($tipoRedirCheck !== 'pacote_redirecionamento' && $pidRedirCheck < 999990 && $tipoRedirCheck !== 'fatura_adicional') {
+                    $isSomenteRedirecionamentoCheckout = false;
+                    break;
+                }
+            }
+            if ($isSomenteRedirecionamentoCheckout) {
+                $this->debugLog('[CRIAR_PEDIDO] Carrinho somente redirecionamento: zerando subtotal/impostos, cobrando só taxa de serviço');
+                $subtotal = 0.0;
+                $impostosUsd = 0.0;
+                $freteUsd = 0.0;
+                $impostoLocalUsd = 0.0;
+                $totalUsd = $taxaServicoUsd;
+            }
 
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
                 $taxaServico = $taxaServicoUsd * $taxaConversao;

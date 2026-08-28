@@ -792,6 +792,9 @@ class AdminEtiquetasWpController extends Controller
                         if ($hasProdutoNcmCol) $selectCols .= ", i.produto_ncm";
                         if ($hasTipoItem) $selectCols .= ", i.tipo_item";
                         if ($hasDeclarationValue) $selectCols .= ", i.declaration_value";
+                        if (in_array('peso_kg', $cols)) $selectCols .= ", i.peso_kg";
+                        if (in_array('peso_manual', $cols)) $selectCols .= ", i.peso_manual";
+                        if (in_array('pacote_id', $cols)) $selectCols .= ", i.pacote_id";
 
                         if ($hasProdutoId) {
                             $sql = "SELECT {$selectCols}, p.ncm AS produto_ncm_join
@@ -856,14 +859,58 @@ class AdminEtiquetasWpController extends Controller
                                 }
 
                                 if ($val < 0.01) $val = 0.01;
+
+                                // Descrição: usar nome_produto, com fallback para pacotes_recebidos
+                                $descFix = trim((string) ($it[$nomeCol] ?? ''));
+                                if ($descFix === '' || $descFix === 'Item' || strpos($descFix, 'Produto #') === 0) {
+                                    // Tentar buscar nome do pacote_recebido via pacote_id
+                                    $pacoteIdFix = (int) ($it['pacote_id'] ?? 0);
+                                    if ($isPacoteItem && $pacoteIdFix > 0) {
+                                        try {
+                                            $stPacNome = $this->connection->prepare(
+                                                "SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1"
+                                            );
+                                            $stPacNome->execute([$pacoteIdFix]);
+                                            $nomePacFix = trim((string) ($stPacNome->fetchColumn() ?: ''));
+                                            if ($nomePacFix !== '') $descFix = $nomePacFix;
+                                        } catch (\Throwable $e) {}
+                                    }
+                                    if ($descFix === '' || $descFix === 'Item' || strpos($descFix, 'Produto #') === 0) {
+                                        $descFix = 'Item';
+                                    }
+                                }
+
+                                // Peso individual do item
+                                $pesoFixItem = 0;
+                                if (in_array('peso_kg', $cols)) {
+                                    $pesoFixItem = (float) ($it['peso_kg'] ?? 0);
+                                }
+                                if ($pesoFixItem <= 0 && in_array('peso_manual', $cols)) {
+                                    $pesoFixItem = (float) ($it['peso_manual'] ?? 0);
+                                }
+                                // Fallback: buscar peso do pacote_recebido
+                                if ($pesoFixItem <= 0 && $isPacoteItem) {
+                                    $pacoteIdPeso = (int) ($it['pacote_id'] ?? 0);
+                                    if ($pacoteIdPeso > 0) {
+                                        try {
+                                            $stPeso = $this->connection->prepare('SELECT peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                            $stPeso->execute([$pacoteIdPeso]);
+                                            $pesoPac = (float) ($stPeso->fetchColumn() ?: 0);
+                                            if ($pesoPac > 0) $pesoFixItem = $pesoPac;
+                                        } catch (\Throwable $e) {}
+                                    }
+                                }
+
                                 $items[] = [
                                     'hsCode' => $hs,
-                                    'description' => $it[$nomeCol] ?? 'Item',
+                                    'description' => $descFix,
                                     'quantity' => (int) ($it[$qtdCol] ?? 1),
                                     'value' => (float) number_format($val, 2, '.', ''),
+                                    'weight' => (float) $pesoFixItem,
                                 ];
                             }
                             $fixData['items'] = $items;
+                            error_log('[BRZ-PDF-FIX] items_to_send=' . json_encode($items));
                         }
                     }
                 } catch (\Exception $e) {
@@ -955,6 +1002,8 @@ class AdminEtiquetasWpController extends Controller
         $params = [];
         if ($request->getParam('without_container')) $params['without_container'] = '1';
         if ($request->getParam('per_page')) $params['per_page'] = (int) $request->getParam('per_page');
+        if ($request->getParam('page')) $params['page'] = (int) $request->getParam('page');
+        if ($request->getParam('search')) $params['search'] = trim((string) $request->getParam('search'));
 
         $resp = $this->wp->listPackages($params);
 
@@ -1177,16 +1226,38 @@ class AdminEtiquetasWpController extends Controller
                 if (!empty($itensDireto)) {
                     $itemsIn = [];
                     foreach ($itensDireto as $itD) {
+                        $nomeProd = trim((string) ($itD['nome_produto'] ?? ($itD['nome_item'] ?? '')));
+                        // Fallback: buscar nome do pacote_recebido quando nome está vazio ou genérico
+                        $pidItem = (int) ($itD['produto_id'] ?? 0);
+                        $pacoteIdItem = (int) ($itD['pacote_id'] ?? 0);
+                        if (($nomeProd === '' || $nomeProd === 'Item' || strpos($nomeProd, 'Produto #') === 0) && $pacoteIdItem > 0) {
+                            try {
+                                $stNomePac = $dbDireto->prepare('SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                $stNomePac->execute([$pacoteIdItem]);
+                                $nomePac = trim((string) ($stNomePac->fetchColumn() ?: ''));
+                                if ($nomePac !== '') $nomeProd = $nomePac;
+                            } catch (\Throwable $e) {}
+                        }
+                        // Peso: fallback para pacotes_recebidos.peso_kg
+                        $pesoKgItem = (float) ($itD['peso_manual'] ?? ($itD['peso_kg'] ?? 0));
+                        if ($pesoKgItem <= 0 && $pacoteIdItem > 0) {
+                            try {
+                                $stPesoDir = $dbDireto->prepare('SELECT peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                $stPesoDir->execute([$pacoteIdItem]);
+                                $pesoDirFb = (float) ($stPesoDir->fetchColumn() ?: 0);
+                                if ($pesoDirFb > 0) $pesoKgItem = $pesoDirFb;
+                            } catch (\Throwable $e) {}
+                        }
                         $itemsIn[] = [
-                            'produto_id' => (int) ($itD['produto_id'] ?? 0),
-                            'nome_produto' => $itD['nome_produto'] ?? ($itD['nome_item'] ?? ''),
-                            'nome' => $itD['nome_produto'] ?? ($itD['nome_item'] ?? ''),
+                            'produto_id' => $pidItem,
+                            'nome_produto' => $nomeProd,
+                            'nome' => $nomeProd,
                             'ncm' => $itD['ncm'] ?? ($itD['produto_ncm'] ?? ''),
                             'produto_ncm' => $itD['produto_ncm'] ?? ($itD['ncm'] ?? ''),
                             'preco_unitario' => (float) ($itD['preco_unitario'] ?? 0),
                             'declaration_value' => (float) ($itD['declaration_value'] ?? 0),
                             'quantidade' => (int) ($itD['quantidade'] ?? 1),
-                            'peso_kg' => (float) ($itD['peso_manual'] ?? ($itD['peso_kg'] ?? 0)),
+                            'peso_kg' => $pesoKgItem,
                             'tipo_item' => $itD['tipo_item'] ?? 'produto',
                             'pacote_id' => $itD['pacote_id'] ?? null,
                             '_valor_ja_usd' => (($itD['tipo_item'] ?? '') === 'pacote_redirecionamento'),
@@ -1253,7 +1324,22 @@ class AdminEtiquetasWpController extends Controller
             $qtd = (int) ($it['quantidade'] ?? 0);
             if ($qtd <= 0) return ['_error' => 'Item #' . ($idx+1) . ' qtd inválida'];
             $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
-            if ($desc === '') $desc = 'Item ' . ($idx+1);
+            if ($desc === '' || $desc === 'Item' || strpos($desc, 'Produto #') === 0) {
+                // Fallback: buscar nome do pacote_recebido
+                $pacIdFallback = (int) ($it['pacote_id'] ?? 0);
+                if ($pacIdFallback > 0) {
+                    try {
+                        $dbFb = \Config\Database::getConnection();
+                        $stFb = $dbFb->prepare('SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stFb->execute([$pacIdFallback]);
+                        $nomeFb = trim((string) ($stFb->fetchColumn() ?: ''));
+                        if ($nomeFb !== '') $desc = $nomeFb;
+                    } catch (\Throwable $e) {}
+                }
+                if ($desc === '' || $desc === 'Item' || strpos($desc, 'Produto #') === 0) {
+                    $desc = 'Item ' . ($idx+1);
+                }
+            }
 
             // NCM: tentar múltiplas fontes (ncm, produto_ncm, ncm_code)
             $ncmRaw = (string) ($it['ncm'] ?? ($it['produto_ncm'] ?? ($it['ncm_code'] ?? '')));
@@ -1278,7 +1364,21 @@ class AdminEtiquetasWpController extends Controller
             }
 
             if ($val < 0.01) $val = 0.01;
-            $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', '')];
+            $pesoItem = (float) ($it['peso_kg'] ?? 0);
+            // Fallback: buscar peso do pacote_recebido quando peso_kg está zero
+            if ($pesoItem <= 0 && $isPacote) {
+                $pacIdPeso = (int) ($it['pacote_id'] ?? 0);
+                if ($pacIdPeso > 0) {
+                    try {
+                        $dbPeso = \Config\Database::getConnection();
+                        $stPesoFb = $dbPeso->prepare('SELECT peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stPesoFb->execute([$pacIdPeso]);
+                        $pesoFb = (float) ($stPesoFb->fetchColumn() ?: 0);
+                        if ($pesoFb > 0) $pesoItem = $pesoFb;
+                    } catch (\Throwable $e) {}
+                }
+            }
+            $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', ''), 'weight' => (float) number_format($pesoItem, 4, '.', '')];
         }
         if (empty($items)) return ['_error' => 'Sem itens válidos'];
 

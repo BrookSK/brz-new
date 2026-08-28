@@ -99,8 +99,13 @@ $busca = $busca ?? '';
                 </div>
             <?php else: ?>
                 <p class="small text-muted mb-2">Seu saldo atual: <strong>US$ <?= number_format($clubeSaldoUsd, 2, ',', '.') ?></strong></p>
+                <?php $__clubeEnabledGrupo = \App\Controllers\ClubeController::isClubeEnabled(); ?>
                 <div class="d-flex gap-2 justify-content-center flex-wrap">
-                    <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i>Recarregar carteira</a>
+                    <?php if ($__clubeEnabledGrupo): ?>
+                        <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i>Recarregar carteira</a>
+                    <?php else: ?>
+                        <a href="https://wa.me/<?= htmlspecialchars(\App\Controllers\ClubeController::CLUBE_WHATSAPP) ?>?text=<?= rawurlencode('Olá, gostaria de saber mais sobre o meu Clube Braziliana.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success"><i class="fab fa-whatsapp me-1"></i>Falar no WhatsApp</a>
+                    <?php endif; ?>
                     <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i>Saiba mais</a>
                 </div>
             <?php endif; ?>

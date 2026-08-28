@@ -26,7 +26,62 @@ class ClubeController extends Controller {
     }
 
     public function comoFuncionaClube(Request $request) {
-        $this->view('clube/como-funciona-clube');
+        $this->view('clube/como-funciona-clube', [
+            'clube_enabled' => self::isClubeEnabled(),
+            'clube_whatsapp' => self::CLUBE_WHATSAPP,
+            'clube_whatsapp_label' => self::CLUBE_WHATSAPP_LABEL,
+        ]);
+    }
+
+    /**
+     * WhatsApp de contato para o Clube (usado quando o clube está desativado).
+     */
+    public const CLUBE_WHATSAPP = '13053638204';
+    public const CLUBE_WHATSAPP_LABEL = '+1 305-363-8204';
+
+    /**
+     * Lê a flag global clube_enabled em configuracoes_sistema.
+     * Segue o mesmo padrão de assessoria_enabled.
+     * Retorna true (ativado) por padrão quando a chave não existe.
+     */
+    public static function isClubeEnabled(): bool {
+        $enabled = true;
+        try {
+            $pdo = \Config\Database::getConnection();
+
+            // Ler todas as linhas da flag (a tabela pode conter duplicatas em ambientes
+            // sem constraint UNIQUE em `chave`). Priorizar 'clube_enabled'; usar
+            // 'sistema_clube_enabled' apenas como fallback quando a primeira nao existe.
+            $st = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('clube_enabled', 'sistema_clube_enabled')");
+            $st->execute();
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $valoresPrincipais = [];
+            $valoresFallback = [];
+            foreach ($rows as $r) {
+                $chave = (string) ($r['chave'] ?? '');
+                $valor = strtolower(trim((string) ($r['valor'] ?? '')));
+                if ($chave === 'clube_enabled') {
+                    $valoresPrincipais[] = $valor;
+                } elseif ($chave === 'sistema_clube_enabled') {
+                    $valoresFallback[] = $valor;
+                }
+            }
+
+            $valores = !empty($valoresPrincipais) ? $valoresPrincipais : $valoresFallback;
+            if (!empty($valores)) {
+                // Regra de seguranca: se QUALQUER linha indicar desativado, o clube fica desativado.
+                $ativos = ['1', 'true', 'sim', 'yes', 'on'];
+                $enabled = true;
+                foreach ($valores as $v) {
+                    if (!in_array($v, $ativos, true)) {
+                        $enabled = false;
+                        break;
+                    }
+                }
+            }
+        } catch (\Exception $e) {}
+        return $enabled;
     }
 
     private function getUsdBrlRate(): float {
