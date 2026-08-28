@@ -44,6 +44,27 @@ CREATE TABLE IF NOT EXISTS webhook_disparos (
     INDEX idx_webhook_disparos_disparado_em (disparado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Corrigir bancos onde estas tabelas foram criadas à mão sem AUTO_INCREMENT na
+-- PK: sem isso, os INSERT abaixo tentam gravar id=0 e colidem (erro 1062
+-- "Duplicate entry '0'"). Promove id a AUTO_INCREMENT quando ainda não for,
+-- sem apagar dados (os INSERT são idempotentes por `nome`).
+SET @db := DATABASE();
+
+SET @auto := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA=@db AND TABLE_NAME='eventos_sistema' AND COLUMN_NAME='id' AND EXTRA LIKE '%auto_increment%');
+SET @sql := IF(@auto=0, 'ALTER TABLE eventos_sistema MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @auto := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA=@db AND TABLE_NAME='webhooks' AND COLUMN_NAME='id' AND EXTRA LIKE '%auto_increment%');
+SET @sql := IF(@auto=0, 'ALTER TABLE webhooks MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @auto := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA=@db AND TABLE_NAME='webhook_disparos' AND COLUMN_NAME='id' AND EXTRA LIKE '%auto_increment%');
+SET @sql := IF(@auto=0, 'ALTER TABLE webhook_disparos MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- ========== EVENTOS DE CARNÊ ==========
 
 INSERT INTO eventos_sistema (nome, descricao, ativo, created_at) 
