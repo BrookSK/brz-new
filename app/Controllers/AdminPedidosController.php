@@ -2223,7 +2223,9 @@ JS;
             };
 
             // Campos opcionais para enriquecer a listagem (sem depender de schema fixo)
-            $colPais = $pickCol($colsPedidos, ['pais', 'country', 'pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'pais_entrega_nome']);
+            // IMPORTANTE: priorizar a coluna de país de ENTREGA (pais_entrega) sobre a coluna
+            // legada "pais", pois é ela que é atualizada ao editar o endereço do pedido.
+            $colPais = $pickCol($colsPedidos, ['pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'pais', 'country', 'pais_entrega_nome']);
             $colOrigem = $pickCol($colsPedidos, ['origem', 'canal', 'channel', 'source', 'utm_source', 'pedido_origem']);
             $colManual = $pickCol($colsPedidos, ['pedido_manual', 'manual', 'is_manual', 'criado_manual', 'admin_criou', 'criado_por_admin']);
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
@@ -2698,8 +2700,17 @@ JS;
         $resolverPaisPedido = function($pedido) use ($colPais, $pdo, &$__paisEndCache, $paisNomes) {
             $paisTxt = '';
 
-            // Prioridade 1: país do endereço vinculado ao pedido (fonte de verdade após edição)
-            if (!empty($pedido['endereco_entrega_id'])) {
+            // Prioridade 1: coluna de país de ENTREGA do próprio pedido (mesma fonte usada
+            // na tela de detalhes/edição, que é atualizada ao salvar o endereço).
+            foreach (['pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino'] as $c) {
+                if (array_key_exists($c, $pedido) && trim((string) ($pedido[$c] ?? '')) !== '') {
+                    $paisTxt = trim((string) $pedido[$c]);
+                    break;
+                }
+            }
+
+            // Prioridade 2: país do endereço vinculado ao pedido
+            if ($paisTxt === '' && !empty($pedido['endereco_entrega_id'])) {
                 $endId = (int) $pedido['endereco_entrega_id'];
                 if ($endId > 0) {
                     if (!isset($__paisEndCache[$endId])) {
@@ -2715,7 +2726,7 @@ JS;
                 }
             }
 
-            // Prioridade 2: coluna de país de entrega do próprio pedido
+            // Prioridade 3: coluna resolvida dinamicamente e coluna legada "pais"
             if ($paisTxt === '' && !empty($colPais) && array_key_exists($colPais, $pedido)) {
                 $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
             }
