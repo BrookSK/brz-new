@@ -218,7 +218,7 @@ class AdminPedidosController extends Controller {
             $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
             $enderecoIdAtualizado = 0;
 
-            if ($endEntregaIdCol !== '' && $this->tableExistsPdo($pdo, 'enderecos')) {
+            if ($this->tableExistsPdo($pdo, 'enderecos')) {
                 try {
                     $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
                     $pickEnd = function(array $candidates) use ($colsEnd): string {
@@ -277,7 +277,8 @@ class AdminPedidosController extends Controller {
 
                         foreach ($endFields as $col => $val) {
                             $insertCols[] = $col;
-                            $insertVals[] = ($val !== '') ? $val : ($col === 'pais' ? 'BR' : '');
+                            $isPaisCol = in_array($col, ['pais', 'country', 'country_code'], true);
+                            $insertVals[] = ($val !== '') ? $val : ($isPaisCol ? 'BR' : '');
                             $insertPlaceholders[] = '?';
                         }
 
@@ -293,8 +294,10 @@ class AdminPedidosController extends Controller {
                         $newEndId = (int) $pdo->lastInsertId();
 
                         // Atualizar o pedido para apontar para o novo endereço exclusivo
-                        if ($newEndId > 0) {
+                        if ($newEndId > 0 && $endEntregaIdCol !== '') {
                             $pdo->prepare('UPDATE pedidos SET ' . $endEntregaIdCol . ' = ? WHERE id = ?')->execute([$newEndId, $pedidoId]);
+                            $enderecoIdAtualizado = $newEndId;
+                        } elseif ($newEndId > 0) {
                             $enderecoIdAtualizado = $newEndId;
                         }
                     }
@@ -4640,6 +4643,44 @@ CUSTOSCRIPT;
                     $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
                     $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
                     $pais = (string) ($pedido['pais_entrega'] ?? ($pedido['country_entrega'] ?? ($pedido['pais'] ?? '')));
+
+                    // Se país ainda estiver vazio, tentar buscar do endereço vinculado ao pedido
+                    if (trim($pais) === '') {
+                        $endIdForPais = (int) ($pedido['endereco_entrega_id'] ?? 0);
+                        if ($endIdForPais > 0) {
+                            try {
+                                $dbPais = \Config\Database::getConnection();
+                                $stPais = $dbPais->prepare('SELECT * FROM enderecos WHERE id = ? LIMIT 1');
+                                $stPais->execute([$endIdForPais]);
+                                $rowPais = $stPais->fetch(\PDO::FETCH_ASSOC);
+                                if (is_array($rowPais)) {
+                                    $paisEnd = $rowPais['pais'] ?? ($rowPais['country'] ?? ($rowPais['country_code'] ?? ''));
+                                    if (trim((string) $paisEnd) !== '') {
+                                        $pais = trim((string) $paisEnd);
+                                    }
+                                }
+                            } catch (\Throwable $e) {
+                                // Silenciar — manter $pais vazio
+                            }
+                        }
+                        // Fallback: buscar endereço mais recente do usuário
+                        if (trim($pais) === '') {
+                            $uidPais = (int) ($pedido['usuario_id'] ?? 0);
+                            if ($uidPais > 0) {
+                                try {
+                                    $dbPais2 = \Config\Database::getConnection();
+                                    $stPais2 = $dbPais2->prepare('SELECT pais FROM enderecos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1');
+                                    $stPais2->execute([$uidPais]);
+                                    $paisU = $stPais2->fetchColumn();
+                                    if ($paisU !== false && trim((string) $paisU) !== '') {
+                                        $pais = trim((string) $paisU);
+                                    }
+                                } catch (\Throwable $e) {
+                                    // Silenciar
+                                }
+                            }
+                        }
+                    }
                     // Normalizar país para código ISO (ex: "Brasil" → "BR", "Brazil" → "BR")
                     $paisNormMap = [
                         'BRASIL' => 'BR', 'BRAZIL' => 'BR', 'BRA' => 'BR',

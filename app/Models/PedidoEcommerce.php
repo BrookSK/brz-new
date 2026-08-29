@@ -1092,6 +1092,13 @@ class PedidoEcommerce {
                                 $pedido['estado_entrega'] = $rowE['estado'] ?? ($pedido['estado_entrega'] ?? null);
                                 $pedido['cep_entrega'] = $rowE['cep'] ?? ($pedido['cep_entrega'] ?? null);
 
+                                // País do endereço (fallback do usuário)
+                                $paisEnd = $rowE['pais'] ?? ($rowE['country'] ?? ($rowE['country_code'] ?? ($rowE['pais_code'] ?? null)));
+                                if ($paisEnd !== null && trim((string) $paisEnd) !== '') {
+                                    $pedido['pais_entrega'] = trim((string) $paisEnd);
+                                    $pedido['pais'] = trim((string) $paisEnd);
+                                }
+
                                 $pedido['endereco'] = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? null);
                                 $pedido['numero'] = $pedido['numero_entrega'] ?? ($pedido['numero'] ?? null);
                                 $pedido['complemento'] = $pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? null);

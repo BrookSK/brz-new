@@ -113,6 +113,7 @@ class Endereco extends Model {
                 bairro = :bairro, 
                 cidade = :cidade, 
                 estado = :estado, 
+                pais = :pais, 
                 updated_at = NOW() 
                 WHERE id = :id";
         
@@ -126,6 +127,8 @@ class Endereco extends Model {
         $stmt->bindParam(':bairro', $data['bairro']);
         $stmt->bindParam(':cidade', $data['cidade']);
         $stmt->bindParam(':estado', $data['estado']);
+        $paisValue = $data['pais'] ?? 'BR';
+        $stmt->bindParam(':pais', $paisValue);
         $stmt->bindParam(':id', $id);
         
         return $stmt->execute();
