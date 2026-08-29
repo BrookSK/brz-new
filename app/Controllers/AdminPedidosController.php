@@ -2697,7 +2697,8 @@ JS;
         // Helper para resolver país do pedido (com fallback para tabela enderecos)
         $__paisEndCache = [];
         $paisNomes = ['BR'=>'Brazil','US'=>'United States','PT'=>'Portugal','JP'=>'Japan','GB'=>'United Kingdom','DE'=>'Germany','FR'=>'France','ES'=>'Spain','IT'=>'Italy','CA'=>'Canada','AU'=>'Australia','AR'=>'Argentina','CL'=>'Chile','CO'=>'Colombia','MX'=>'Mexico'];
-        $resolverPaisPedido = function($pedido) use ($colPais, $pdo, &$__paisEndCache, $paisNomes) {
+        $__paisUserCache = [];
+        $resolverPaisPedido = function($pedido) use ($colPais, $pdo, &$__paisEndCache, &$__paisUserCache, $paisNomes) {
             $paisTxt = '';
 
             // Prioridade 1: coluna de país de ENTREGA do próprio pedido (mesma fonte usada
@@ -2709,7 +2710,7 @@ JS;
                 }
             }
 
-            // Prioridade 2: país do endereço vinculado ao pedido
+            // Prioridade 2: país do endereço vinculado ao pedido (endereco_entrega_id)
             if ($paisTxt === '' && !empty($pedido['endereco_entrega_id'])) {
                 $endId = (int) $pedido['endereco_entrega_id'];
                 if ($endId > 0) {
@@ -2732,6 +2733,26 @@ JS;
             }
             if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
                 $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+            }
+
+            // Prioridade 4: endereço PRINCIPAL do usuário (mesmo fallback usado na tela de
+            // detalhes via getComDetalhes). Cobre pedidos sem endereco_entrega_id e sem país
+            // nas colunas do pedido — que é o caso de pedidos com endereço internacional
+            // editado quando o endereço foi salvo apenas na tabela enderecos.
+            if ($paisTxt === '' && !empty($pedido['usuario_id'])) {
+                $uid = (int) $pedido['usuario_id'];
+                if ($uid > 0) {
+                    if (!isset($__paisUserCache[$uid])) {
+                        try {
+                            $stPU = $pdo->prepare("SELECT pais FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
+                            $stPU->execute([$uid]);
+                            $__paisUserCache[$uid] = trim((string) ($stPU->fetchColumn() ?: ''));
+                        } catch (\Exception $e) { $__paisUserCache[$uid] = ''; }
+                    }
+                    if ($__paisUserCache[$uid] !== '') {
+                        $paisTxt = $__paisUserCache[$uid];
+                    }
+                }
             }
 
             if ($paisTxt === '') {
@@ -2933,16 +2954,6 @@ JS;
                     
                     $paisTxt = $resolverPaisPedido($pedido);
 
-                    // DIAGNÓSTICO TEMPORÁRIO: emite os valores brutos do país no HTML.
-                    // Inspecione o código-fonte da página (Ctrl+U) e procure por PAIS_DEBUG.
-                    echo '<!-- PAIS_DEBUG pedido=' . (int) ($pedido['id'] ?? 0)
-                        . ' resolvido="' . htmlspecialchars($paisTxt) . '"'
-                        . ' pais_entrega="' . htmlspecialchars((string) ($pedido['pais_entrega'] ?? '(sem chave)')) . '"'
-                        . ' pais="' . htmlspecialchars((string) ($pedido['pais'] ?? '(sem chave)')) . '"'
-                        . ' colPais="' . htmlspecialchars((string) $colPais) . '"'
-                        . ' end_id="' . htmlspecialchars((string) ($pedido['endereco_entrega_id'] ?? '(sem chave)')) . '"'
-                        . ' -->';
-
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
                     $paisStyle = $paisIsBrazil
@@ -3064,16 +3075,6 @@ JS;
 
                     $paisTxt = $resolverPaisPedido($pedido);
 
-                    // DIAGNÓSTICO TEMPORÁRIO: emite os valores brutos do país no HTML.
-                    // Inspecione o código-fonte da página (Ctrl+U) e procure por PAIS_DEBUG.
-                    echo '<!-- PAIS_DEBUG pedido=' . (int) ($pedido['id'] ?? 0)
-                        . ' resolvido="' . htmlspecialchars($paisTxt) . '"'
-                        . ' pais_entrega="' . htmlspecialchars((string) ($pedido['pais_entrega'] ?? '(sem chave)')) . '"'
-                        . ' pais="' . htmlspecialchars((string) ($pedido['pais'] ?? '(sem chave)')) . '"'
-                        . ' colPais="' . htmlspecialchars((string) $colPais) . '"'
-                        . ' end_id="' . htmlspecialchars((string) ($pedido['endereco_entrega_id'] ?? '(sem chave)')) . '"'
-                        . ' -->';
-
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
                     $paisStyle = $paisIsBrazil
@@ -3193,16 +3194,6 @@ JS;
                     }
 
                     $paisTxt = $resolverPaisPedido($pedido);
-
-                    // DIAGNÓSTICO TEMPORÁRIO: emite os valores brutos do país no HTML.
-                    // Inspecione o código-fonte da página (Ctrl+U) e procure por PAIS_DEBUG.
-                    echo '<!-- PAIS_DEBUG pedido=' . (int) ($pedido['id'] ?? 0)
-                        . ' resolvido="' . htmlspecialchars($paisTxt) . '"'
-                        . ' pais_entrega="' . htmlspecialchars((string) ($pedido['pais_entrega'] ?? '(sem chave)')) . '"'
-                        . ' pais="' . htmlspecialchars((string) ($pedido['pais'] ?? '(sem chave)')) . '"'
-                        . ' colPais="' . htmlspecialchars((string) $colPais) . '"'
-                        . ' end_id="' . htmlspecialchars((string) ($pedido['endereco_entrega_id'] ?? '(sem chave)')) . '"'
-                        . ' -->';
 
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
