@@ -2933,6 +2933,16 @@ JS;
                     
                     $paisTxt = $resolverPaisPedido($pedido);
 
+                    // DIAGNÓSTICO TEMPORÁRIO: emite os valores brutos do país no HTML.
+                    // Inspecione o código-fonte da página (Ctrl+U) e procure por PAIS_DEBUG.
+                    echo '<!-- PAIS_DEBUG pedido=' . (int) ($pedido['id'] ?? 0)
+                        . ' resolvido="' . htmlspecialchars($paisTxt) . '"'
+                        . ' pais_entrega="' . htmlspecialchars((string) ($pedido['pais_entrega'] ?? '(sem chave)')) . '"'
+                        . ' pais="' . htmlspecialchars((string) ($pedido['pais'] ?? '(sem chave)')) . '"'
+                        . ' colPais="' . htmlspecialchars((string) $colPais) . '"'
+                        . ' end_id="' . htmlspecialchars((string) ($pedido['endereco_entrega_id'] ?? '(sem chave)')) . '"'
+                        . ' -->';
+
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
                     $paisStyle = $paisIsBrazil
@@ -3054,6 +3064,16 @@ JS;
 
                     $paisTxt = $resolverPaisPedido($pedido);
 
+                    // DIAGNÓSTICO TEMPORÁRIO: emite os valores brutos do país no HTML.
+                    // Inspecione o código-fonte da página (Ctrl+U) e procure por PAIS_DEBUG.
+                    echo '<!-- PAIS_DEBUG pedido=' . (int) ($pedido['id'] ?? 0)
+                        . ' resolvido="' . htmlspecialchars($paisTxt) . '"'
+                        . ' pais_entrega="' . htmlspecialchars((string) ($pedido['pais_entrega'] ?? '(sem chave)')) . '"'
+                        . ' pais="' . htmlspecialchars((string) ($pedido['pais'] ?? '(sem chave)')) . '"'
+                        . ' colPais="' . htmlspecialchars((string) $colPais) . '"'
+                        . ' end_id="' . htmlspecialchars((string) ($pedido['endereco_entrega_id'] ?? '(sem chave)')) . '"'
+                        . ' -->';
+
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
                     $paisStyle = $paisIsBrazil
@@ -3173,6 +3193,16 @@ JS;
                     }
 
                     $paisTxt = $resolverPaisPedido($pedido);
+
+                    // DIAGNÓSTICO TEMPORÁRIO: emite os valores brutos do país no HTML.
+                    // Inspecione o código-fonte da página (Ctrl+U) e procure por PAIS_DEBUG.
+                    echo '<!-- PAIS_DEBUG pedido=' . (int) ($pedido['id'] ?? 0)
+                        . ' resolvido="' . htmlspecialchars($paisTxt) . '"'
+                        . ' pais_entrega="' . htmlspecialchars((string) ($pedido['pais_entrega'] ?? '(sem chave)')) . '"'
+                        . ' pais="' . htmlspecialchars((string) ($pedido['pais'] ?? '(sem chave)')) . '"'
+                        . ' colPais="' . htmlspecialchars((string) $colPais) . '"'
+                        . ' end_id="' . htmlspecialchars((string) ($pedido['endereco_entrega_id'] ?? '(sem chave)')) . '"'
+                        . ' -->';
 
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
