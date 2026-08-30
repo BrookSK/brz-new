@@ -30,6 +30,18 @@ class AdminPedidosController extends Controller {
             ]);
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
 
+            // Garantir que exista uma coluna dedicada para o país de entrega no pedido.
+            // Sem ela, o país de pedidos com endereço internacional editado não persiste
+            // de forma confiável (dependeria do endereço vinculado / endereço do usuário).
+            if (is_array($cols) && !in_array('pais_entrega', $cols, true)) {
+                try {
+                    $pdo->exec("ALTER TABLE pedidos ADD COLUMN pais_entrega VARCHAR(50) NULL");
+                    $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
+                } catch (\Throwable $e) {
+                    // Se falhar (ex.: permissão), seguir com o schema atual.
+                }
+            }
+
             $usuarioLogado = $auth->getUsuarioLogado();
             $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
             $oldRow = [];
