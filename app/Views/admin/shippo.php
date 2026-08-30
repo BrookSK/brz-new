@@ -17,10 +17,10 @@
 
     <div class="alert alert-danger" id="shippo_error" style="display:none;"></div>
 
-    <!-- Pedidos em Caixa Fechada (prontos para etiqueta) -->
+    <!-- Pedidos internacionais (todos exceto Brasil) -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Pedidos em Caixa Fechada</strong>
+            <strong>Pedidos internacionais (todos, exceto Brasil)</strong>
             <?php if (!empty($pedidos)): ?>
                 <button class="btn btn-sm btn-success" id="btnGerarShippo" style="display:none;" onclick="gerarEtiquetasShippoSelecionadas()"><i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">Gerar Etiquetas</span></button>
             <?php endif; ?>

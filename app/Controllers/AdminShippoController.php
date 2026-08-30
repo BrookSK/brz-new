@@ -164,29 +164,41 @@ class AdminShippoController extends Controller {
             }
         }
 
+        // Excluir pedidos removidos (soft-delete) e arquivados, quando essas colunas existirem.
+        $statusExtraFilter = '';
+        if (in_array('deleted_at', $colsP, true)) {
+            $statusExtraFilter .= " AND p.deleted_at IS NULL";
+        }
+        if (in_array('arquivado', $colsP, true)) {
+            $statusExtraFilter .= " AND COALESCE(p.arquivado, 0) = 0";
+        }
+
         $colCep = $this->pickColumn($colsP, ['cep_entrega', 'cep', 'zip', 'postal_code', 'endereco_cep']);
         $colEstadoFilter = $this->pickColumn($colsP, ['estado_entrega', 'estado', 'state']);
 
         if (!empty($paisExprParts)) {
             $paisResolvidoExpr = 'COALESCE(' . implode(', ', $paisExprParts) . ", '')";
 
-            // Excluir explicitamente quando o país resolvido for Brasil.
+            // A fonte de verdade é o PAÍS RESOLVIDO. Regra:
+            //  - País resolvido é Brasil          -> NÃO aparece.
+            //  - País resolvido é internacional    -> aparece (independente de CEP/estado).
+            //  - País resolvido vazio/desconhecido  -> tratar como nacional (Brasil é o
+            //    padrão do sistema) e cair no reforço por CEP/estado brasileiro.
             $paisFilter .= " AND UPPER(" . $paisResolvidoExpr . ") NOT IN " . $BR_VALUES;
 
-            // País desconhecido (vazio): o Brasil é o padrão do sistema, então quando não
-            // há NENHUMA indicação de país internacional o pedido é tratado como nacional
-            // e NÃO deve aparecer na tela internacional. Exceção: se houver CEP/estado que
-            // comprovem destino internacional, mantém. Aqui, para segurança, exigimos que
-            // o país resolvido esteja preenchido com um valor internacional.
-            $paisFilter .= " AND TRIM(" . $paisResolvidoExpr . ") <> ''";
-
-            // Reforço: mesmo com país preenchido, excluir se CEP/estado forem claramente do Brasil.
+            // Reforço aplicado SOMENTE quando o país está vazio/desconhecido — assim não
+            // escondemos pedidos internacionais legítimos que tenham CEP de 8 dígitos.
+            $reforcoBr = [];
             if ($colCep !== '') {
-                $paisFilter .= " AND LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) != 8";
+                $reforcoBr[] = "LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) = 8";
             }
             if ($colEstadoFilter !== '') {
                 $estadosBr = "'SP','RJ','MG','BA','PR','RS','SC','GO','PE','CE','PA','MA','MT','MS','DF','AM','ES','PB','RN','AL','PI','SE','TO','RO','AC','AP','RR'";
-                $paisFilter .= " AND UPPER(COALESCE(p." . $colEstadoFilter . ",'')) NOT IN (" . $estadosBr . ")";
+                $reforcoBr[] = "UPPER(COALESCE(p." . $colEstadoFilter . ",'')) IN (" . $estadosBr . ")";
+            }
+            if (!empty($reforcoBr)) {
+                // Exclui quando: país vazio E (CEP OU estado brasileiro).
+                $paisFilter .= " AND NOT ( TRIM(" . $paisResolvidoExpr . ") = '' AND (" . implode(' OR ', $reforcoBr) . ") )";
             }
         } else {
             // Sem nenhuma coluna de país disponível: usar apenas o reforço por CEP/estado.
@@ -206,10 +218,11 @@ class AdminShippoController extends Controller {
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             LEFT JOIN shippo_etiquetas se ON se.pedido_id = p.id
-            WHERE LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado')
+            WHERE LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','pendente','rascunho','carrinho')
               AND se.id IS NULL
+              {$statusExtraFilter}
               {$paisFilter}
-            ORDER BY p.created_at ASC
+            ORDER BY p.created_at DESC
             LIMIT 200
         ";
         try {
