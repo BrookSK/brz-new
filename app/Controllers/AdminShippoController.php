@@ -124,25 +124,79 @@ class AdminShippoController extends Controller {
         $colUserEmail = in_array('email', $colsU, true) ? 'u.email' : 'NULL';
         $colUserTel = in_array('telefone', $colsU, true) ? 'u.telefone' : (in_array('phone', $colsU, true) ? 'u.phone' : 'NULL');
 
-        // Filtro para excluir Brasil
+        // ─── Filtro para EXCLUIR pedidos com destino Brasil ──────────────────────
+        // Regra do negócio: a tela Shippo é só para envios INTERNACIONAIS. Portanto,
+        // pedidos cujo país de destino seja Brasil (ou endereço brasileiro) NÃO aparecem.
+        //
+        // O país de destino é resolvido pela MESMA prioridade usada nas telas de
+        // pedidos (detalhe/listagem), montada como uma expressão SQL "paisResolvido":
+        //   1) colunas de país do próprio pedido (pais_entrega, pais, country, ...)
+        //   2) país do endereço vinculado (endereco_entrega_id -> enderecos.pais)
+        //   3) país do endereço principal do usuário (enderecos por usuario_id)
+        // Se o país resolvido for Brasil, o pedido é excluído.
         $paisFilter = '';
-        
-        // 1. Excluir por país explícito (BR, BRA, BRAZIL, BRASIL)
-        if ($colPais !== '') {
-            $paisFilter .= " AND UPPER(COALESCE(p." . $colPais . ",'')) NOT IN ('BR','BRA','BRAZIL','BRASIL')";
+        $BR_VALUES = "('BR','BRA','BRAZIL','BRASIL')";
+
+        // Montar a expressão do "país resolvido" via COALESCE das fontes, em ordem de prioridade.
+        // NULLIF(...,'') faz strings vazias serem ignoradas pelo COALESCE.
+        $paisExprParts = [];
+
+        // 1) Colunas de país do próprio pedido (prioridade: entrega antes de legada).
+        foreach (['pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'dest_country', 'endereco_pais', 'pais', 'country', 'country_code'] as $cp) {
+            if (in_array($cp, $colsP, true)) {
+                $paisExprParts[] = "NULLIF(TRIM(p." . $cp . "),'')";
+            }
         }
-        
-        // 2. Excluir por CEP brasileiro (8 dígitos numéricos)
+
+        // 2/3) País do endereço vinculado e do endereço principal do usuário (subqueries).
+        $colEndPais = '';
+        if ($this->tableExists('enderecos')) {
+            $colsEnd = $this->getTableColumns('enderecos');
+            $colEndPais = $this->pickColumn($colsEnd, ['pais', 'country', 'country_code', 'pais_code']);
+            if ($colEndPais !== '') {
+                if (in_array('endereco_entrega_id', $colsP, true) && in_array('id', $colsEnd, true)) {
+                    $paisExprParts[] = "NULLIF(TRIM((SELECT e_vinc." . $colEndPais . " FROM enderecos e_vinc WHERE e_vinc.id = p.endereco_entrega_id LIMIT 1)),'')";
+                }
+                if (in_array('usuario_id', $colsEnd, true)) {
+                    $orderByUser = in_array('principal', $colsEnd, true) ? 'e_user.principal DESC, e_user.id DESC' : 'e_user.id DESC';
+                    $paisExprParts[] = "NULLIF(TRIM((SELECT e_user." . $colEndPais . " FROM enderecos e_user WHERE e_user.usuario_id = p.usuario_id ORDER BY " . $orderByUser . " LIMIT 1)),'')";
+                }
+            }
+        }
+
         $colCep = $this->pickColumn($colsP, ['cep_entrega', 'cep', 'zip', 'postal_code', 'endereco_cep']);
-        if ($colCep !== '') {
-            $paisFilter .= " AND LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) != 8";
-        }
-        
-        // 3. Excluir por estado brasileiro (se tem coluna de estado)
         $colEstadoFilter = $this->pickColumn($colsP, ['estado_entrega', 'estado', 'state']);
-        if ($colEstadoFilter !== '') {
-            $estadosBr = "'SP','RJ','MG','BA','PR','RS','SC','GO','PE','CE','PA','MA','MT','MS','DF','AM','ES','PB','RN','AL','PI','SE','TO','RO','AC','AP','RR'";
-            $paisFilter .= " AND UPPER(COALESCE(p." . $colEstadoFilter . ",'')) NOT IN (" . $estadosBr . ")";
+
+        if (!empty($paisExprParts)) {
+            $paisResolvidoExpr = 'COALESCE(' . implode(', ', $paisExprParts) . ", '')";
+
+            // Excluir explicitamente quando o país resolvido for Brasil.
+            $paisFilter .= " AND UPPER(" . $paisResolvidoExpr . ") NOT IN " . $BR_VALUES;
+
+            // País desconhecido (vazio): o Brasil é o padrão do sistema, então quando não
+            // há NENHUMA indicação de país internacional o pedido é tratado como nacional
+            // e NÃO deve aparecer na tela internacional. Exceção: se houver CEP/estado que
+            // comprovem destino internacional, mantém. Aqui, para segurança, exigimos que
+            // o país resolvido esteja preenchido com um valor internacional.
+            $paisFilter .= " AND TRIM(" . $paisResolvidoExpr . ") <> ''";
+
+            // Reforço: mesmo com país preenchido, excluir se CEP/estado forem claramente do Brasil.
+            if ($colCep !== '') {
+                $paisFilter .= " AND LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) != 8";
+            }
+            if ($colEstadoFilter !== '') {
+                $estadosBr = "'SP','RJ','MG','BA','PR','RS','SC','GO','PE','CE','PA','MA','MT','MS','DF','AM','ES','PB','RN','AL','PI','SE','TO','RO','AC','AP','RR'";
+                $paisFilter .= " AND UPPER(COALESCE(p." . $colEstadoFilter . ",'')) NOT IN (" . $estadosBr . ")";
+            }
+        } else {
+            // Sem nenhuma coluna de país disponível: usar apenas o reforço por CEP/estado.
+            if ($colCep !== '') {
+                $paisFilter .= " AND LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) != 8";
+            }
+            if ($colEstadoFilter !== '') {
+                $estadosBr = "'SP','RJ','MG','BA','PR','RS','SC','GO','PE','CE','PA','MA','MT','MS','DF','AM','ES','PB','RN','AL','PI','SE','TO','RO','AC','AP','RR'";
+                $paisFilter .= " AND UPPER(COALESCE(p." . $colEstadoFilter . ",'')) NOT IN (" . $estadosBr . ")";
+            }
         }
 
         $sql = "
