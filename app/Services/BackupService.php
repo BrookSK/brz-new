@@ -141,8 +141,26 @@ class BackupService {
     }
 
     /**
+     * Marca como 'erro' os backups presos em 'processando' há mais de N minutos.
+     * Protege contra jobs que morreram sem finalizar o registro.
+     */
+    public function destravarBackupsPresos(int $minutos = 15): void {
+        $pdo = Database::getConnection();
+        if (!$this->tableHasColumn('backup_runs', 'status')) {
+            return;
+        }
+        $minutos = max(0, (int) $minutos);
+        try {
+            $sql = "UPDATE backup_runs SET status = 'erro', erro = COALESCE(NULLIF(erro,''), 'Backup expirou (processo não finalizou a tempo). Verifique se o PHP tem permissão/tempo para gerar o dump.') WHERE status = 'processando' AND created_at < (NOW() - INTERVAL " . $minutos . " MINUTE)";
+            $pdo->exec($sql);
+        } catch (\Throwable $e) {
+            // silencioso
+        }
+    }
+
+    /**
      * Retorna o backup em andamento (status 'processando'), se houver.
-     * Considera apenas os últimos 30 minutos para evitar registros "presos".
+     * Antes de consultar, destrava jobs presos há muito tempo.
      */
     public function getRunningBackup(): ?array {
         $pdo = Database::getConnection();
@@ -159,8 +177,11 @@ class BackupService {
             return null;
         }
 
+        // Auto-destravar jobs presos (ex.: worker morreu)
+        $this->destravarBackupsPresos(15);
+
         try {
-            $stmt = $pdo->query("SELECT * FROM backup_runs WHERE status = 'processando' AND created_at >= (NOW() - INTERVAL 30 MINUTE) ORDER BY id DESC LIMIT 1");
+            $stmt = $pdo->query("SELECT * FROM backup_runs WHERE status = 'processando' ORDER BY id DESC LIMIT 1");
             $row = $stmt ? ($stmt->fetch(\PDO::FETCH_ASSOC) ?: null) : null;
             return $row ?: null;
         } catch (\Throwable $e) {
@@ -377,11 +398,12 @@ class BackupService {
     }
 
     /**
-     * Cria o registro do backup com status 'processando' e dispara o worker em
-     * segundo plano. Retorna o ID do registro imediatamente (não bloqueia).
+     * Cria o registro do backup com status 'processando' e retorna o ID
+     * imediatamente (não executa o dump aqui).
      *
-     * Se não for possível disparar processo em background (exec desabilitado),
-     * executa o backup de forma síncrona como fallback.
+     * A execução do dump é feita por quem chama, após liberar a resposta HTTP
+     * (ver AdminBackupController::agora() usando fastcgi_finish_request), ou
+     * pelo worker CLI (scripts/backup_worker.php) chamando runBackupJob().
      */
     public function startBackupAsync(string $trigger = 'manual', int $usuarioId = 0): int {
         $this->ensureRunsTable();
@@ -417,59 +439,7 @@ class BackupService {
         $stmt->execute($insertVals);
         $runId = (int) $pdo->lastInsertId();
 
-        // Tentar disparar o worker em segundo plano
-        $spawned = $this->spawnWorker($runId);
-
-        if (!$spawned) {
-            // Fallback: executa síncrono (mesma request). Ainda notifica no fim.
-            $this->runBackupJob($runId);
-        }
-
         return $runId;
-    }
-
-    /**
-     * Dispara o worker CLI desacoplado. Retorna true se conseguiu disparar.
-     */
-    private function spawnWorker(int $runId): bool {
-        $disabled = \array_map('trim', \explode(',', (string) \ini_get('disable_functions')));
-        $worker = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup_worker.php';
-        if (!is_file($worker)) {
-            return false;
-        }
-
-        // Localizar binário do PHP CLI
-        $phpBin = PHP_BINARY;
-        if (stripos($phpBin, 'php-fpm') !== false || stripos($phpBin, 'php-cgi') !== false) {
-            // PHP_BINARY aponta para FPM/CGI; tentar caminhos comuns do CLI
-            foreach (['php', '/usr/bin/php', '/usr/local/bin/php'] as $cand) {
-                $phpBin = $cand;
-                break;
-            }
-        }
-
-        $isWindows = (stripos(PHP_OS, 'WIN') === 0);
-
-        if ($isWindows) {
-            if (!\function_exists('popen') || \in_array('popen', $disabled, true)) {
-                return false;
-            }
-            $cmd = 'start /B "" "' . $phpBin . '" "' . $worker . '" ' . (int) $runId;
-            $h = @popen($cmd, 'r');
-            if ($h === false) {
-                return false;
-            }
-            @pclose($h);
-            return true;
-        }
-
-        // Unix: precisa de exec para desacoplar com nohup + &
-        if (\in_array('exec', $disabled, true)) {
-            return false;
-        }
-        $cmd = 'nohup ' . \escapeshellarg($phpBin) . ' ' . \escapeshellarg($worker) . ' ' . (int) $runId . ' > /dev/null 2>&1 &';
-        @\exec($cmd, $o, $ret);
-        return true;
     }
 
     /**

@@ -231,10 +231,13 @@ class AdminBackupController extends Controller {
                         <div id="backupProgressCard" class="' . ($isRunning ? '' : 'd-none') . '">
                             <div class="d-flex align-items-center gap-3 p-3 rounded" style="background:#eff6ff;border:1px solid #bfdbfe;">
                                 <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">...</span></div>
-                                <div>
+                                <div class="flex-grow-1">
                                     <div class="fw-semibold" style="color:#1e40af;">Backup em andamento</div>
                                     <div class="text-muted small">Rodando em segundo plano. Você pode sair desta tela; o sino avisará quando terminar.</div>
                                 </div>
+                                <form method="POST" action="/admin/backup/destravar" onsubmit="return confirm(\'Cancelar/destravar o backup em andamento? Use apenas se ele parecer travado.\')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Destravar se estiver preso"><i class="fas fa-xmark me-1"></i>Destravar</button>
+                                </form>
                             </div>
                         </div>
 
@@ -478,6 +481,7 @@ class AdminBackupController extends Controller {
         $usuarioId = (int) ($_SESSION['usuario_id'] ?? 0);
 
         $service = new BackupService();
+        $runId = 0;
         try {
             // Não permitir dois backups simultâneos
             $emAndamento = $service->getRunningBackup();
@@ -488,14 +492,76 @@ class AdminBackupController extends Controller {
                 exit;
             }
 
-            // Dispara em segundo plano e retorna imediatamente.
-            // Se o servidor não permitir background, o próprio serviço executa
-            // de forma síncrona como fallback.
-            $service->startBackupAsync('manual', $usuarioId);
+            // Cria o registro 'processando' e retorna o ID imediatamente.
+            $runId = $service->startBackupAsync('manual', $usuarioId);
             $_SESSION['message'] = 'Backup iniciado em segundo plano. Você será notificado no sino quando terminar.';
             $_SESSION['message_type'] = 'info';
         } catch (\Throwable $e) {
             $_SESSION['message'] = 'Erro ao iniciar backup: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/backup');
+            exit;
+        }
+
+        // Redireciona o navegador de volta para a tela (mostra o card "processando").
+        header('Location: /admin/backup');
+
+        // Envia a resposta ao navegador AGORA e continua executando o backup
+        // neste mesmo worker PHP-FPM, de forma desacoplada da tela.
+        // Isso evita depender de processos externos (nohup/php CLI) que falhavam
+        // silenciosamente e deixavam o backup preso em "processando".
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        if (function_exists('fastcgi_finish_request')) {
+            @fastcgi_finish_request();
+        } else {
+            // Sem FastCGI: garante que o cliente receba a resposta antes de continuar
+            @ignore_user_abort(true);
+            $size = ob_get_length();
+            if ($size !== false && $size > 0) {
+                header('Content-Length: ' . $size);
+            }
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            @flush();
+        }
+
+        // A partir daqui o usuário já está livre. Executa o dump.
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ignore_user_abort(true);
+
+        try {
+            if ($runId > 0) {
+                $service->runBackupJob($runId);
+            }
+        } catch (\Throwable $e) {
+            error_log('[BACKUP] Falha ao executar job em segundo plano: ' . $e->getMessage());
+        }
+        exit;
+    }
+
+    /**
+     * Destrava manualmente backups presos em "processando" (marca como erro).
+     */
+    public function destravar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $service = new BackupService();
+        try {
+            // 0 minutos = destrava qualquer job 'processando' imediatamente
+            $service->destravarBackupsPresos(0);
+            $_SESSION['message'] = 'Backups presos foram destravados.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Throwable $e) {
+            $_SESSION['message'] = 'Erro ao destravar: ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
