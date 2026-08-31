@@ -140,6 +140,34 @@ class BackupService {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Retorna o backup em andamento (status 'processando'), se houver.
+     * Considera apenas os últimos 30 minutos para evitar registros "presos".
+     */
+    public function getRunningBackup(): ?array {
+        $pdo = Database::getConnection();
+        try {
+            $st = $pdo->query("SHOW TABLES LIKE 'backup_runs'");
+            if (!($st && $st->fetchColumn())) {
+                return null;
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (!$this->tableHasColumn('backup_runs', 'status')) {
+            return null;
+        }
+
+        try {
+            $stmt = $pdo->query("SELECT * FROM backup_runs WHERE status = 'processando' AND created_at >= (NOW() - INTERVAL 30 MINUTE) ORDER BY id DESC LIMIT 1");
+            $row = $stmt ? ($stmt->fetch(\PDO::FETCH_ASSOC) ?: null) : null;
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function getBackupDir(): string {
         $cfg = $this->getConfig();
         return $this->normalizeBackupDir((string) ($cfg['pasta_backup'] ?? ''));
@@ -171,7 +199,16 @@ class BackupService {
             return $p->getValue();
         };
 
-        $host = (string) ($getProp('host') ?? 'localhost');
+        // Database usa $hosts (array). Mantemos compatibilidade com $host (string) caso exista.
+        $host = $getProp('host');
+        if ($host === null) {
+            $hosts = $getProp('hosts');
+            if (is_array($hosts) && !empty($hosts)) {
+                $host = (string) $hosts[0];
+            }
+        }
+        $host = (string) ($host ?: '127.0.0.1');
+
         $db = (string) ($getProp('db_name') ?? '');
         $user = (string) ($getProp('username') ?? '');
         $pass = (string) ($getProp('password') ?? '');
@@ -291,11 +328,18 @@ class BackupService {
         $zip->close();
     }
 
-    public function createBackupNow(string $trigger = 'manual'): int {
-        $cfg = $this->getConfig();
-        $dir = $this->normalizeBackupDir((string) ($cfg['pasta_backup'] ?? ''));
-        $this->ensureDir($dir);
+    private function tableHasColumn(string $table, string $column): bool {
+        $pdo = Database::getConnection();
+        try {
+            $st = $pdo->prepare('SHOW COLUMNS FROM `' . str_replace('`', '', $table) . '` LIKE ?');
+            $st->execute([$column]);
+            return (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
 
+    private function ensureRunsTable(): void {
         $pdo = Database::getConnection();
         $hasRuns = false;
         try {
@@ -307,13 +351,150 @@ class BackupService {
         if (!$hasRuns) {
             throw new \RuntimeException('Tabela backup_runs não existe. Rode as migrations.');
         }
+    }
+
+    /**
+     * Cria uma notificação no sino do admin (tabela admin_notificacoes).
+     * Silencioso em caso de falha — não deve quebrar o fluxo de backup.
+     */
+    private function criarNotificacao(int $usuarioId, string $tipo, string $titulo, string $mensagem, string $link): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+        try {
+            $pdo = Database::getConnection();
+            // Garantir tabela (mesmo padrão do módulo de demandas)
+            try {
+                $pdo->query('SELECT 1 FROM admin_notificacoes LIMIT 1');
+            } catch (\Throwable $e) {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS admin_notificacoes (id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, tipo VARCHAR(50) NOT NULL DEFAULT 'demanda', titulo VARCHAR(500) NOT NULL, mensagem TEXT NULL, link VARCHAR(1000) NULL, lida TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_usuario_lida (usuario_id, lida))");
+            }
+            $pdo->prepare('INSERT INTO admin_notificacoes (usuario_id, tipo, titulo, mensagem, link) VALUES (?,?,?,?,?)')
+                ->execute([$usuarioId, $tipo, $titulo, $mensagem, $link]);
+        } catch (\Throwable $e) {
+            error_log('[BACKUP] Falha ao criar notificação: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Cria o registro do backup com status 'processando' e dispara o worker em
+     * segundo plano. Retorna o ID do registro imediatamente (não bloqueia).
+     *
+     * Se não for possível disparar processo em background (exec desabilitado),
+     * executa o backup de forma síncrona como fallback.
+     */
+    public function startBackupAsync(string $trigger = 'manual', int $usuarioId = 0): int {
+        $this->ensureRunsTable();
+        $pdo = Database::getConnection();
+
+        // Inserir registro placeholder em 'processando'
+        $hasTrigger = $this->tableHasColumn('backup_runs', 'trigger_tipo');
+        $hasUsuario = $this->tableHasColumn('backup_runs', 'usuario_id');
+
+        $cols = ['db_sql_path', 'files_zip_path', 'db_size_bytes', 'files_size_bytes', 'status', 'created_at'];
+        $vals = ['', '', 0, 0, 'processando'];
+        $place = ['?', '?', '?', '?', '?', 'NOW()'];
+
+        if ($hasTrigger) { $cols[] = 'trigger_tipo'; $vals[] = $trigger; }
+        if ($hasUsuario) { $cols[] = 'usuario_id'; $vals[] = ($usuarioId > 0 ? $usuarioId : null); }
+
+        // Reordenar placeholders: created_at usa NOW() e não recebe valor.
+        $insertCols = [];
+        $insertPlace = [];
+        $insertVals = [];
+        foreach ($cols as $c) {
+            $insertCols[] = $c;
+            if ($c === 'created_at') {
+                $insertPlace[] = 'NOW()';
+            } else {
+                $insertPlace[] = '?';
+                $insertVals[] = array_shift($vals);
+            }
+        }
+
+        $sql = 'INSERT INTO backup_runs (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertPlace) . ')';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($insertVals);
+        $runId = (int) $pdo->lastInsertId();
+
+        // Tentar disparar o worker em segundo plano
+        $spawned = $this->spawnWorker($runId);
+
+        if (!$spawned) {
+            // Fallback: executa síncrono (mesma request). Ainda notifica no fim.
+            $this->runBackupJob($runId);
+        }
+
+        return $runId;
+    }
+
+    /**
+     * Dispara o worker CLI desacoplado. Retorna true se conseguiu disparar.
+     */
+    private function spawnWorker(int $runId): bool {
+        $disabled = \array_map('trim', \explode(',', (string) \ini_get('disable_functions')));
+        $worker = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup_worker.php';
+        if (!is_file($worker)) {
+            return false;
+        }
+
+        // Localizar binário do PHP CLI
+        $phpBin = PHP_BINARY;
+        if (stripos($phpBin, 'php-fpm') !== false || stripos($phpBin, 'php-cgi') !== false) {
+            // PHP_BINARY aponta para FPM/CGI; tentar caminhos comuns do CLI
+            foreach (['php', '/usr/bin/php', '/usr/local/bin/php'] as $cand) {
+                $phpBin = $cand;
+                break;
+            }
+        }
+
+        $isWindows = (stripos(PHP_OS, 'WIN') === 0);
+
+        if ($isWindows) {
+            if (!\function_exists('popen') || \in_array('popen', $disabled, true)) {
+                return false;
+            }
+            $cmd = 'start /B "" "' . $phpBin . '" "' . $worker . '" ' . (int) $runId;
+            $h = @popen($cmd, 'r');
+            if ($h === false) {
+                return false;
+            }
+            @pclose($h);
+            return true;
+        }
+
+        // Unix: precisa de exec para desacoplar com nohup + &
+        if (\in_array('exec', $disabled, true)) {
+            return false;
+        }
+        $cmd = 'nohup ' . \escapeshellarg($phpBin) . ' ' . \escapeshellarg($worker) . ' ' . (int) $runId . ' > /dev/null 2>&1 &';
+        @\exec($cmd, $o, $ret);
+        return true;
+    }
+
+    /**
+     * Executa o backup para um registro já existente (status 'processando'),
+     * gera o dump, finaliza o registro e notifica o usuário que disparou.
+     */
+    public function runBackupJob(int $runId): void {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+
+        $this->ensureRunsTable();
+        $pdo = Database::getConnection();
+
+        $run = $this->getBackupRun($runId);
+        $trigger = (string) ($run['trigger_tipo'] ?? 'manual');
+        $usuarioId = (int) ($run['usuario_id'] ?? 0);
+
+        $cfg = $this->getConfig();
+        $dir = $this->normalizeBackupDir((string) ($cfg['pasta_backup'] ?? ''));
+        $this->ensureDir($dir);
 
         $ts = date('Ymd_His');
         $dbSqlPath = $dir . DIRECTORY_SEPARATOR . 'db_' . $ts . '.sql';
-        $filesZipPath = $dir . DIRECTORY_SEPARATOR . 'files_' . $ts . '.zip';
 
         $dbSize = 0;
-        $filesSize = 0;
         $status = 'ok';
         $err = null;
 
@@ -323,29 +504,129 @@ class BackupService {
                 throw new \RuntimeException('Credenciais do banco inválidas');
             }
 
-            // Verificar se exec/shell estão disponíveis
-            $canExec = true;
+            $this->gerarDumpBanco($host, $db, $user, $pass, $dbSqlPath);
+
+            if (!file_exists($dbSqlPath) || (int) (@filesize($dbSqlPath) ?: 0) === 0) {
+                throw new \RuntimeException('Arquivo .sql não foi gerado ou ficou vazio');
+            }
+            $dbSize = (int) (@filesize($dbSqlPath) ?: 0);
+        } catch (\Throwable $e) {
+            $status = 'erro';
+            $err = $e->getMessage();
+        }
+
+        // Atualizar o registro existente
+        $hasFinished = $this->tableHasColumn('backup_runs', 'finished_at');
+        $setFinished = $hasFinished ? ', finished_at = NOW()' : '';
+        $upd = $pdo->prepare(
+            'UPDATE backup_runs SET db_sql_path = ?, files_zip_path = ?, db_size_bytes = ?, files_size_bytes = ?, status = ?, erro = ?' . $setFinished . ' WHERE id = ?'
+        );
+        $upd->execute([$dbSqlPath, '', $dbSize, 0, $status, $err, $runId]);
+
+        try {
+            $pdo->prepare('UPDATE backup_config SET last_run_at = NOW() WHERE id = 1')->execute();
+        } catch (\Throwable $e) {
+        }
+
+        $this->applyRetention((int) ($cfg['reter_quantidade'] ?? 10));
+
+        // Notificar quem disparou
+        if ($status === 'ok') {
+            $this->criarNotificacao(
+                $usuarioId,
+                'backup',
+                '✅ Backup concluído',
+                'Seu backup do banco foi finalizado com sucesso (' . $this->fmtBytesPublic($dbSize) . ').',
+                '/admin/backup'
+            );
+        } else {
+            $this->criarNotificacao(
+                $usuarioId,
+                'backup',
+                '⚠️ Falha no backup',
+                'O backup não pôde ser concluído: ' . (string) $err,
+                '/admin/backup'
+            );
+        }
+
+        // Enviar cópia para servidor externo (apenas cron)
+        if ($status === 'ok' && $trigger === 'cron') {
+            try {
+                $this->enviarBackupServidorExterno($dbSqlPath);
+            } catch (\Throwable $e) {
+                error_log('[BACKUP] Falha ao enviar para servidor externo: ' . $e->getMessage());
+            }
+        }
+    }
+
+    public function fmtBytesPublic(int $bytes): string {
+        if ($bytes < 1024) return $bytes . ' B';
+        $kb = $bytes / 1024;
+        if ($kb < 1024) return number_format($kb, 1, ',', '.') . ' KB';
+        $mb = $kb / 1024;
+        if ($mb < 1024) return number_format($mb, 1, ',', '.') . ' MB';
+        $gb = $mb / 1024;
+        return number_format($gb, 2, ',', '.') . ' GB';
+    }
+
+    /**
+     * Gera o dump do banco no caminho informado. Lança exceção em caso de falha.
+     */
+    private function gerarDumpBanco(string $host, string $db, string $user, string $pass, string $dbSqlPath): void {
+        if ($db === '' || $user === '') {
+            throw new \RuntimeException('Credenciais do banco inválidas');
+        }
+
+        // Verificar se exec/shell estão disponíveis
+        $canExec = true;
             $disabled = \array_map('trim', \explode(',', (string) \ini_get('disable_functions')));
             if (\in_array('exec', $disabled, true) || \in_array('escapeshellarg', $disabled, true)) {
                 $canExec = false;
             }
 
             $usedPhpDump = false;
+            $dumpErrors = [];
 
             if ($canExec) {
-                $mysqldump = 'mysqldump';
-                $cmd = '"' . $mysqldump . '"' .
-                    ' --host=' . \escapeshellarg($host) .
-                    ' --user=' . \escapeshellarg($user) .
-                    ' --password=' . \escapeshellarg($pass) .
-                    ' --single-transaction --routines --triggers --events --default-character-set=utf8mb4 ' .
-                    \escapeshellarg($db) .
-                    ' > ' . \escapeshellarg($dbSqlPath);
+                // Tentar mysqldump em caminhos comuns (nem sempre está no PATH do PHP-FPM)
+                $candidates = [
+                    'mysqldump',
+                    '/usr/bin/mysqldump',
+                    '/usr/local/bin/mysqldump',
+                    '/usr/local/mysql/bin/mysqldump',
+                    '/opt/cpanel/ea-mysql57/root/usr/bin/mysqldump',
+                    '/opt/cpanel/ea-mysql80/root/usr/bin/mysqldump',
+                ];
 
-                [$ret, $out] = $this->runCmd($cmd);
-                if ($ret !== 0) {
-                    $this->dumpDatabasePHP($host, $db, $user, $pass, $dbSqlPath);
-                    $usedPhpDump = true;
+                $ok = false;
+                foreach ($candidates as $mysqldump) {
+                    $cmd = '"' . $mysqldump . '"' .
+                        ' --host=' . \escapeshellarg($host) .
+                        ' --user=' . \escapeshellarg($user) .
+                        ' --password=' . \escapeshellarg($pass) .
+                        ' --single-transaction --routines --triggers --events --default-character-set=utf8mb4 ' .
+                        \escapeshellarg($db) .
+                        ' > ' . \escapeshellarg($dbSqlPath);
+
+                    [$ret, $out] = $this->runCmd($cmd);
+                    if ($ret === 0 && file_exists($dbSqlPath) && (int) (@filesize($dbSqlPath) ?: 0) > 0) {
+                        $ok = true;
+                        break;
+                    }
+                    $dumpErrors[] = $mysqldump . ' (ret=' . $ret . '): ' . trim((string) $out);
+                }
+
+                if (!$ok) {
+                    // Fallback: dump em PHP puro
+                    try {
+                        $this->dumpDatabasePHP($host, $db, $user, $pass, $dbSqlPath);
+                        $usedPhpDump = true;
+                    } catch (\Throwable $e) {
+                        throw new \RuntimeException(
+                            'mysqldump falhou e o dump PHP também falhou. mysqldump: [' .
+                            implode(' | ', $dumpErrors) . ']. PHP: ' . $e->getMessage()
+                        );
+                    }
                 }
             } else {
                 // exec/escapeshellarg desabilitados — usar dump PHP puro
@@ -353,38 +634,76 @@ class BackupService {
                 $usedPhpDump = true;
             }
 
-            if (!file_exists($dbSqlPath)) {
-                throw new \RuntimeException('Arquivo .sql não foi gerado');
-            }
+        if (!file_exists($dbSqlPath) || (int) (@filesize($dbSqlPath) ?: 0) === 0) {
+            throw new \RuntimeException('Arquivo .sql não foi gerado ou ficou vazio');
+        }
+    }
+
+    /**
+     * Backup SÍNCRONO (bloqueante). Mantido para o cron, que não tem limite de
+     * tempo e prefere aguardar o término para reportar o resultado.
+     * Cria o registro já finalizado (ok/erro) e retorna o ID.
+     *
+     * NOTA: o zip dos arquivos do projeto foi desativado de propósito — os
+     * arquivos são versionados via Git e zipar a raiz inteira estourava o
+     * timeout do PHP-FPM. Este método gera apenas o dump do banco (.sql).
+     */
+    public function createBackupNow(string $trigger = 'manual', int $usuarioId = 0): int {
+        $this->ensureRunsTable();
+        $pdo = Database::getConnection();
+        $cfg = $this->getConfig();
+        $dir = $this->normalizeBackupDir((string) ($cfg['pasta_backup'] ?? ''));
+        $this->ensureDir($dir);
+
+        $ts = date('Ymd_His');
+        $dbSqlPath = $dir . DIRECTORY_SEPARATOR . 'db_' . $ts . '.sql';
+
+        $dbSize = 0;
+        $status = 'ok';
+        $err = null;
+
+        try {
+            [$host, $db, $user, $pass] = $this->getDbCredentials();
+            $this->gerarDumpBanco($host, $db, $user, $pass, $dbSqlPath);
             $dbSize = (int) (@filesize($dbSqlPath) ?: 0);
-
-            $root = dirname(__DIR__, 2);
-            $this->zipDirectory($root, $filesZipPath);
-            $filesSize = (int) (@filesize($filesZipPath) ?: 0);
-
         } catch (\Throwable $e) {
             $status = 'erro';
             $err = $e->getMessage();
         }
 
-        $stmt = $pdo->prepare('INSERT INTO backup_runs (db_sql_path, files_zip_path, db_size_bytes, files_size_bytes, status, erro, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())');
-        $stmt->execute([$dbSqlPath, $filesZipPath, $dbSize, $filesSize, $status, $err]);
+        $hasTrigger = $this->tableHasColumn('backup_runs', 'trigger_tipo');
+        $hasUsuario = $this->tableHasColumn('backup_runs', 'usuario_id');
+        $hasFinished = $this->tableHasColumn('backup_runs', 'finished_at');
+
+        $cols = ['db_sql_path', 'files_zip_path', 'db_size_bytes', 'files_size_bytes', 'status', 'erro', 'created_at'];
+        $place = ['?', '?', '?', '?', '?', '?', 'NOW()'];
+        $vals = [$dbSqlPath, '', $dbSize, 0, $status, $err];
+
+        if ($hasTrigger) { $cols[] = 'trigger_tipo'; $place[] = '?'; $vals[] = $trigger; }
+        if ($hasUsuario) { $cols[] = 'usuario_id'; $place[] = '?'; $vals[] = ($usuarioId > 0 ? $usuarioId : null); }
+        if ($hasFinished) { $cols[] = 'finished_at'; $place[] = 'NOW()'; }
+
+        $stmt = $pdo->prepare('INSERT INTO backup_runs (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $place) . ')');
+        $stmt->execute($vals);
         $id = (int) $pdo->lastInsertId();
 
         try {
-            $stmt2 = $pdo->prepare('UPDATE backup_config SET last_run_at = NOW() WHERE id = 1');
-            $stmt2->execute();
+            $pdo->prepare('UPDATE backup_config SET last_run_at = NOW() WHERE id = 1')->execute();
         } catch (\Throwable $e) {
         }
 
         $this->applyRetention((int) ($cfg['reter_quantidade'] ?? 10));
 
+        if ($status === 'ok') {
+            $this->criarNotificacao($usuarioId, 'backup', '✅ Backup concluído', 'Seu backup do banco foi finalizado com sucesso (' . $this->fmtBytesPublic($dbSize) . ').', '/admin/backup');
+        } else {
+            $this->criarNotificacao($usuarioId, 'backup', '⚠️ Falha no backup', 'O backup não pôde ser concluído: ' . (string) $err, '/admin/backup');
+        }
+
         if ($status !== 'ok') {
             throw new \RuntimeException($err ?: 'Falha ao gerar backup');
         }
 
-        // Enviar cópia do backup do banco para servidor externo (apenas via cron, não no manual)
-        // No manual, o envio é feito pelo botão "Enviar" separadamente para evitar timeout
         if ($trigger === 'cron') {
             try {
                 $this->enviarBackupServidorExterno($dbSqlPath);

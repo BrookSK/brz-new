@@ -115,6 +115,13 @@ class AdminBackupController extends Controller {
             $runs = [];
         }
 
+        $running = null;
+        try {
+            $running = $service->getRunningBackup();
+        } catch (\Throwable $e) {
+            $running = null;
+        }
+
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
@@ -151,6 +158,9 @@ class AdminBackupController extends Controller {
             <div class="fw-semibold mb-1">Restauração de arquivos do sistema</div>
             <div>Os arquivos do sistema são versionados via GitHub/Git. Para restaurar arquivos, utilize o fluxo de revert/rollback no repositório. Este módulo restaura apenas o banco de dados.</div>
         </div>';
+
+        $isRunning = !empty($running);
+        $runningId = $isRunning ? (int) ($running['id'] ?? 0) : 0;
 
         echo '<div class="row g-4">
             <div class="col-lg-6">
@@ -212,12 +222,23 @@ class AdminBackupController extends Controller {
                     </div>
                     <div class="card-body">
                         <form method="POST" action="/admin/backup/agora" class="mb-3" id="backupNowForm">
-                            <button type="submit" class="btn btn-success" id="backupNowBtn">
+                            <button type="submit" class="btn btn-success" id="backupNowBtn"' . ($isRunning ? ' disabled' : '') . '>
                                 <span class="backup-now-idle"><i class="fas fa-play me-1"></i>Fazer backup agora</span>
-                                <span class="backup-now-loading" style="display:none;"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Fazendo backup...</span>
+                                <span class="backup-now-loading" style="display:none;"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Iniciando...</span>
                             </button>
                         </form>
-                        <div class="text-muted small">O backup cria um dump do banco (.sql) e um .zip dos arquivos (somente referência). A restauração atua apenas no banco.</div>
+
+                        <div id="backupProgressCard" class="' . ($isRunning ? '' : 'd-none') . '">
+                            <div class="d-flex align-items-center gap-3 p-3 rounded" style="background:#eff6ff;border:1px solid #bfdbfe;">
+                                <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">...</span></div>
+                                <div>
+                                    <div class="fw-semibold" style="color:#1e40af;">Backup em andamento</div>
+                                    <div class="text-muted small">Rodando em segundo plano. Você pode sair desta tela; o sino avisará quando terminar.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-muted small mt-2">O backup gera um dump do banco (.sql) em segundo plano. Os arquivos do sistema são versionados via Git. A restauração atua apenas no banco.</div>
                     </div>
                 </div>
             </div>
@@ -250,6 +271,7 @@ class AdminBackupController extends Controller {
                 $id = (int) ($r['id'] ?? 0);
                 $created = (string) ($r['created_at'] ?? '');
                 $status = (string) ($r['status'] ?? 'ok');
+                $erroMsg = (string) ($r['erro'] ?? '');
                 $dbPath = (string) ($r['db_sql_path'] ?? '');
                 $zipPath = (string) ($r['files_zip_path'] ?? '');
                 $dbSize = (int) ($r['db_size_bytes'] ?? 0);
@@ -259,9 +281,18 @@ class AdminBackupController extends Controller {
                 $zipName = htmlspecialchars(basename($zipPath), ENT_QUOTES, 'UTF-8');
 
                 $createdFmt = $created !== '' ? date('d/m/Y H:i', strtotime($created)) : '-';
-                $statusBadge = $status === 'ok'
-                    ? '<span class="badge bg-success">OK</span>'
-                    : '<span class="badge bg-danger">Erro</span>';
+                if ($status === 'ok') {
+                    $statusBadge = '<span class="badge bg-success">OK</span>';
+                } elseif ($status === 'processando') {
+                    $statusBadge = '<span class="badge bg-info text-dark"><span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>Processando</span>';
+                } else {
+                    $statusBadge = '<span class="badge bg-danger">Erro</span>';
+                }
+                if ($status === 'erro' && $erroMsg !== '') {
+                    $statusBadge .= '<div class="text-danger small mt-1" style="max-width:320px;word-break:break-word;">'
+                        . htmlspecialchars($erroMsg, ENT_QUOTES, 'UTF-8')
+                        . '</div>';
+                }
 
                 $dbDownload = '';
                 if ($dbPath !== '' && file_exists($dbPath) && is_file($dbPath)) {
@@ -331,6 +362,51 @@ class AdminBackupController extends Controller {
                 });
             }
 
+            // Polling do status do backup em segundo plano
+            var backupRunning = ' . ($isRunning ? 'true' : 'false') . ';
+            var progressCard = document.getElementById("backupProgressCard");
+            var pollTimer = null;
+
+            function setRunningUI(running){
+                if (progressCard) progressCard.classList.toggle("d-none", !running);
+                if (btn) {
+                    btn.disabled = running;
+                    var idle = btn.querySelector(".backup-now-idle");
+                    var loading = btn.querySelector(".backup-now-loading");
+                    if (idle) idle.style.display = running ? "none" : "inline";
+                    if (loading) loading.style.display = running ? "inline" : "none";
+                }
+            }
+
+            function pollBackupStatus(){
+                fetch("/admin/backup/status", {headers:{"X-Requested-With":"XMLHttpRequest"}})
+                    .then(function(r){ return r.json(); })
+                    .then(function(d){
+                        if (d && d.running) {
+                            backupRunning = true;
+                            setRunningUI(true);
+                        } else {
+                            if (backupRunning) {
+                                // Acabou de concluir: recarregar para mostrar o resultado na lista
+                                backupRunning = false;
+                                setRunningUI(false);
+                                if (pollTimer) clearInterval(pollTimer);
+                                setTimeout(function(){ window.location.reload(); }, 800);
+                            } else {
+                                setRunningUI(false);
+                            }
+                        }
+                    })
+                    .catch(function(){});
+            }
+
+            // Inicia o polling apenas se houver (ou tiver havido) um backup em andamento
+            if (backupRunning) {
+                setRunningUI(true);
+                pollTimer = setInterval(pollBackupStatus, 5000);
+                setTimeout(pollBackupStatus, 2000);
+            }
+
             var restoreForms = document.querySelectorAll("form.restoreForm");
             restoreForms.forEach(function(f){
                 f.addEventListener("submit", function(e){
@@ -396,23 +472,73 @@ class AdminBackupController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
 
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $usuarioId = (int) ($_SESSION['usuario_id'] ?? 0);
+
         $service = new BackupService();
         try {
-            $id = $service->createBackupNow('manual');
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
+            // Não permitir dois backups simultâneos
+            $emAndamento = $service->getRunningBackup();
+            if ($emAndamento) {
+                $_SESSION['message'] = 'Já existe um backup em andamento. Aguarde a conclusão.';
+                $_SESSION['message_type'] = 'info';
+                header('Location: /admin/backup');
+                exit;
             }
-            $_SESSION['message'] = 'Backup criado com sucesso (#' . $id . ').';
-            $_SESSION['message_type'] = 'success';
+
+            // Dispara em segundo plano e retorna imediatamente.
+            // Se o servidor não permitir background, o próprio serviço executa
+            // de forma síncrona como fallback.
+            $service->startBackupAsync('manual', $usuarioId);
+            $_SESSION['message'] = 'Backup iniciado em segundo plano. Você será notificado no sino quando terminar.';
+            $_SESSION['message_type'] = 'info';
         } catch (\Throwable $e) {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $_SESSION['message'] = 'Erro ao criar backup: ' . $e->getMessage();
+            $_SESSION['message'] = 'Erro ao iniciar backup: ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
         header('Location: /admin/backup');
+        exit;
+    }
+
+    /**
+     * Endpoint JSON de status do backup em andamento (para polling da tela).
+     */
+    public function status(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        $service = new BackupService();
+        $running = $service->getRunningBackup();
+
+        if ($running) {
+            echo json_encode([
+                'running' => true,
+                'id' => (int) ($running['id'] ?? 0),
+                'created_at' => (string) ($running['created_at'] ?? ''),
+            ]);
+            exit;
+        }
+
+        // Sem job em andamento: devolver o último backup concluído para a tela
+        // saber se deve recarregar a lista.
+        $ultimo = null;
+        try {
+            $runs = $service->listBackups(1);
+            $ultimo = $runs[0] ?? null;
+        } catch (\Throwable $e) {
+            $ultimo = null;
+        }
+
+        echo json_encode([
+            'running' => false,
+            'last_id' => $ultimo ? (int) ($ultimo['id'] ?? 0) : 0,
+            'last_status' => $ultimo ? (string) ($ultimo['status'] ?? '') : '',
+        ]);
         exit;
     }
 
