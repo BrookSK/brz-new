@@ -258,13 +258,14 @@ class AdminShippoController extends Controller {
         $colUserEmail = in_array('email', $colsU, true) ? 'u.email' : 'NULL';
         $colUserTel = in_array('telefone', $colsU, true) ? 'u.telefone' : (in_array('phone', $colsU, true) ? 'u.phone' : 'NULL');
 
-        // Endereço de destino
+        // Colunas de endereço/país que possam existir DIRETAMENTE no pedido (schemas variados).
         $colEndereco = $this->pickColumn($colsP, ['endereco_entrega', 'endereco', 'address', 'street1']);
         $colCidade = $this->pickColumn($colsP, ['cidade_entrega', 'cidade', 'city']);
         $colEstado = $this->pickColumn($colsP, ['estado_entrega', 'estado', 'state']);
         $colCep = $this->pickColumn($colsP, ['cep_entrega', 'cep', 'zip', 'postal_code']);
-        $colPais = $this->pickColumn($colsP, ['pais_destino', 'pais', 'pais_entrega', 'country', 'country_code', 'dest_country', 'endereco_pais']);
+        $colPais = $this->pickColumn($colsP, ['pais_entrega', 'pais_destino', 'pais', 'country', 'country_code', 'dest_country', 'endereco_pais']);
         $colComplemento = $this->pickColumn($colsP, ['complemento_entrega', 'complemento', 'address2', 'street2']);
+        $colNumero = $this->pickColumn($colsP, ['numero_entrega', 'numero', 'number']);
 
         $selects = ['p.*', "{$colUserNome} AS cliente_nome", "{$colUserEmail} AS cliente_email", "{$colUserTel} AS cliente_telefone"];
 
@@ -279,13 +280,65 @@ class AdminShippoController extends Controller {
             $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
             if (!$row) return null;
 
-            // Normalizar campos de endereço
-            $row['_endereco'] = $row[$colEndereco] ?? '';
-            $row['_cidade'] = $row[$colCidade] ?? '';
-            $row['_estado'] = $row[$colEstado] ?? '';
-            $row['_cep'] = $row[$colCep] ?? '';
-            $row['_pais'] = $row[$colPais] ?? 'US';
-            $row['_complemento'] = $colComplemento !== '' ? ($row[$colComplemento] ?? '') : '';
+            // 1) Tentar endereço direto no pedido (quando o schema tiver essas colunas).
+            $endereco = $colEndereco !== '' ? (string) ($row[$colEndereco] ?? '') : '';
+            $cidade   = $colCidade   !== '' ? (string) ($row[$colCidade] ?? '')   : '';
+            $estado   = $colEstado   !== '' ? (string) ($row[$colEstado] ?? '')   : '';
+            $cep      = $colCep      !== '' ? (string) ($row[$colCep] ?? '')      : '';
+            $pais     = $colPais     !== '' ? (string) ($row[$colPais] ?? '')     : '';
+            $complemento = $colComplemento !== '' ? (string) ($row[$colComplemento] ?? '') : '';
+            $numero   = $colNumero   !== '' ? (string) ($row[$colNumero] ?? '')   : '';
+
+            // 2) Se faltarem dados de endereço, buscar na tabela enderecos.
+            //    Prioridade: endereço vinculado ao pedido (endereco_entrega_id);
+            //    senão, endereço internacional do usuário; senão, endereço mais recente.
+            $precisaCompletar = ($endereco === '' || $cidade === '' || $cep === '' || $pais === '');
+            if ($precisaCompletar && $this->tableExists('enderecos')) {
+                $rowEnd = null;
+
+                $endId = (int) ($row['endereco_entrega_id'] ?? 0);
+                if ($endId > 0) {
+                    $stE = $this->connection->prepare('SELECT * FROM enderecos WHERE id = ? LIMIT 1');
+                    $stE->execute([$endId]);
+                    $rowEnd = $stE->fetch(\PDO::FETCH_ASSOC) ?: null;
+                }
+
+                // Fallback: endereço INTERNACIONAL do usuário (não Brasil), o mais recente.
+                if (!$rowEnd) {
+                    $uid = (int) ($row['usuario_id'] ?? 0);
+                    if ($uid > 0) {
+                        $stE = $this->connection->prepare(
+                            "SELECT * FROM enderecos
+                             WHERE usuario_id = ?
+                               AND TRIM(COALESCE(pais,'')) <> ''
+                               AND UPPER(TRIM(pais)) NOT IN ('BR','BRA','BRAZIL','BRASIL')
+                             ORDER BY principal DESC, id DESC LIMIT 1"
+                        );
+                        $stE->execute([$uid]);
+                        $rowEnd = $stE->fetch(\PDO::FETCH_ASSOC) ?: null;
+                    }
+                }
+
+                if (is_array($rowEnd) && !empty($rowEnd)) {
+                    if ($endereco === '') $endereco = (string) ($rowEnd['endereco'] ?? ($rowEnd['logradouro'] ?? ''));
+                    if ($cidade === '')   $cidade   = (string) ($rowEnd['cidade'] ?? '');
+                    if ($estado === '')   $estado   = (string) ($rowEnd['estado'] ?? '');
+                    if ($cep === '')      $cep      = (string) ($rowEnd['cep'] ?? '');
+                    if ($pais === '')     $pais     = (string) ($rowEnd['pais'] ?? '');
+                    if ($complemento === '') $complemento = (string) ($rowEnd['complemento'] ?? '');
+                    if ($numero === '')   $numero   = (string) ($rowEnd['numero'] ?? '');
+                }
+            }
+
+            // Normalizar campos de endereço para uso no addressTo do Shippo.
+            // Concatena número ao logradouro quando existir (Shippo espera street1 completo).
+            $street1 = trim($endereco . ($numero !== '' ? (', ' . $numero) : ''));
+            $row['_endereco'] = $street1;
+            $row['_cidade'] = $cidade;
+            $row['_estado'] = $estado;
+            $row['_cep'] = $cep;
+            $row['_pais'] = $pais !== '' ? $pais : 'US';
+            $row['_complemento'] = $complemento;
 
             return $row;
         } catch (\Exception $e) {
@@ -430,6 +483,20 @@ class AdminShippoController extends Controller {
         $pais = strtoupper(trim((string) ($pedido['_pais'] ?? '')));
         if (in_array($pais, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
             $this->json(['success' => false, 'error' => 'Shippo não atende envios para o Brasil. Use Correio Internacional.'], 400);
+            return;
+        }
+
+        // Validar endereço mínimo exigido pela Shippo (evita erro genérico "incomplete address").
+        $faltando = [];
+        if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = 'endereço/rua';
+        if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = 'cidade';
+        if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = 'CEP/ZIP';
+        if ($pais === '')                                        $faltando[] = 'país';
+        if (!empty($faltando)) {
+            $this->json([
+                'success' => false,
+                'error' => 'Endereço incompleto para envio internacional. Preencha: ' . implode(', ', $faltando) . '. Edite o endereço do pedido e tente novamente.',
+            ], 400);
             return;
         }
 
@@ -633,6 +700,21 @@ class AdminShippoController extends Controller {
             $pais = strtoupper(trim((string) ($pedido['_pais'] ?? '')));
             if (in_array($pais, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
                 $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Destino Brasil não permitido na Shippo.'];
+                continue;
+            }
+
+            // Validar endereço mínimo exigido pela Shippo (evita erro genérico "incomplete address").
+            $faltando = [];
+            if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = 'endereço/rua';
+            if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = 'cidade';
+            if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = 'CEP/ZIP';
+            if ($pais === '')                                        $faltando[] = 'país';
+            if (!empty($faltando)) {
+                $results[] = [
+                    'pedido_id' => $pid,
+                    'success' => false,
+                    'error' => 'Endereço incompleto para envio internacional. Preencha: ' . implode(', ', $faltando) . '. Edite o endereço do pedido e tente novamente.',
+                ];
                 continue;
             }
 
