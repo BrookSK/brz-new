@@ -1630,7 +1630,9 @@ class AdminEtiquetasWpController extends Controller
         }
 
         try {
-            $stIns = $this->connection->prepare("INSERT IGNORE INTO etiquetas_mala_pacotes (mala_id, tracking_code, pedido_id, peso_gramas) VALUES (?, ?, ?, ?)");
+            // ON DUPLICATE KEY UPDATE permite MOVER uma etiqueta que já esteja em outra mala
+            // (o UNIQUE em tracking_code garante que cada etiqueta fique em apenas uma mala).
+            $stIns = $this->connection->prepare("INSERT INTO etiquetas_mala_pacotes (mala_id, tracking_code, pedido_id, peso_gramas) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE mala_id = VALUES(mala_id), pedido_id = VALUES(pedido_id), peso_gramas = VALUES(peso_gramas)");
 
             $added = 0;
             foreach ($trackingCodes as $idx => $tc) {
