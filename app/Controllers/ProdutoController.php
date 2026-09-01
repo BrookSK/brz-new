@@ -18,6 +18,77 @@ class ProdutoController extends Controller {
         return $pdo;
     }
 
+    /**
+     * Estoque REAL disponível de um produto, usando a mesma fonte da tela de Estoque Interno:
+     * soma de estoque_interno menos as reservas ativas de pedidos válidos.
+     * Fallback para produtos.stock quando não houver estoque_interno.
+     * Retorna null quando não é possível determinar (deixa o chamador usar o valor padrão).
+     */
+    private function getEstoqueRealProduto(int $produtoId): ?int {
+        if ($produtoId <= 0) {
+            return null;
+        }
+        try {
+            $pdo = $this->getDirectPdo();
+
+            // Tabela estoque_interno existe?
+            $temInterno = false;
+            try {
+                $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'estoque_interno'");
+                $stT->execute();
+                $temInterno = ((int) $stT->fetchColumn() > 0);
+            } catch (\Throwable $e) {}
+
+            if (!$temInterno) {
+                return null; // Sem estoque_interno: usar fonte padrão (produtos.stock)
+            }
+
+            // Total físico em estoque_interno
+            $stQ = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM estoque_interno WHERE produto_id = ?');
+            $stQ->execute([$produtoId]);
+            $totalInterno = (int) ($stQ->fetchColumn() ?: 0);
+
+            // Reservas ativas (pedidos válidos), se a tabela existir
+            $reservado = 0;
+            try {
+                $stTR = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas'");
+                $stTR->execute();
+                if ((int) $stTR->fetchColumn() > 0) {
+                    $stR = $pdo->prepare("
+                        SELECT COALESCE(SUM(er.quantidade_reservada),0)
+                        FROM estoque_reservas er
+                        INNER JOIN pedidos p ON p.id = er.pedido_id
+                        WHERE er.produto_id = ?
+                          AND er.status = 'ativa'
+                          AND LOWER(COALESCE(p.status,'')) IN ('pago','paid','aprovado','approved','produto_consolidado','consolidado','etiqueta_gerada','em_transporte','enviado','itens_comprados','itens_parcialmente_comprados')
+                    ");
+                    $stR->execute([$produtoId]);
+                    $reservado = (int) ($stR->fetchColumn() ?: 0);
+                }
+            } catch (\Throwable $e) {}
+
+            $disponivel = $totalInterno - $reservado;
+            return $disponivel > 0 ? $disponivel : 0;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Sincroniza produtos.stock com um valor calculado, para manter a exibição pública
+     * e as validações do carrinho alinhadas ao estoque real (estoque_interno - reservas).
+     */
+    private function syncProdutoStock(int $produtoId, int $valor): void {
+        if ($produtoId <= 0 || $valor < 0) {
+            return;
+        }
+        try {
+            $pdo = $this->getDirectPdo();
+            $pdo->prepare('UPDATE produtos SET stock = ? WHERE id = ? LIMIT 1')->execute([$valor, $produtoId]);
+        } catch (\Throwable $e) {
+        }
+    }
+
     public function __construct() {
         $this->produtoModel = new Produto();
         $this->produtoFotoModel = new ProdutoFoto();
@@ -499,6 +570,14 @@ class ProdutoController extends Controller {
             }
         }
         
+        // Estoque exibido na página: usar o estoque REAL (estoque_interno - reservas),
+        // alinhando o badge/botão de "disponível" com a validação de adicionar ao carrinho.
+        $estoqueRealDetalhe = $this->getEstoqueRealProduto((int) $produtoId);
+        if ($estoqueRealDetalhe !== null) {
+            $produto['estoque'] = $estoqueRealDetalhe;
+            $this->syncProdutoStock((int) $produtoId, $estoqueRealDetalhe);
+        }
+
         $this->view('produto/detalhes', [
             'produto' => $produto,
             'fotos' => $fotos,
@@ -645,7 +724,15 @@ class ProdutoController extends Controller {
         $precoPromo = (float) ($produto['preco_promocao'] ?? 0);
         if ($precoPromo < 0) $precoPromo = 0.0;
         $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
-        $itemStock = (int) ($produto['estoque'] ?? 0);
+        // Estoque: preferir o estoque REAL (estoque_interno - reservas), com fallback para produtos.stock.
+        $estoqueReal = $this->getEstoqueRealProduto((int) $produtoId);
+        if ($estoqueReal !== null) {
+            // Sincronizar produtos.stock com o estoque real para que o model (Carrinho::adicionarItem),
+            // que revalida por produtos.stock, enxergue o mesmo valor e não bloqueie a adição.
+            $this->syncProdutoStock((int) $produtoId, $estoqueReal);
+            $produto['estoque'] = $estoqueReal;
+        }
+        $itemStock = ($estoqueReal !== null) ? $estoqueReal : (int) ($produto['estoque'] ?? 0);
         $variacaoDescricao = null;
         $pvId = null;
 
