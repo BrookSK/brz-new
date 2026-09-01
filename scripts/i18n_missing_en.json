@@ -1,0 +1,4982 @@
+﻿[
+    {
+        "key":  "admin.additional_invoices.cancelled_success",
+        "fallback":  "Fatura cancelada com sucesso."
+    },
+    {
+        "key":  "admin.additional_invoices.cannot_cancel",
+        "fallback":  "Fatura nÃ£o pode ser cancelada."
+    },
+    {
+        "key":  "admin.additional_invoices.cart_item_label",
+        "fallback":  "Fatura Adicional:"
+    },
+    {
+        "key":  "admin.additional_invoices.created_success",
+        "fallback":  "Fatura adicional criada. Item adicionado ao carrinho do cliente."
+    },
+    {
+        "key":  "admin.additional_invoices.fill_required_fields",
+        "fallback":  "Preencha todos os campos obrigatÃ³rios."
+    },
+    {
+        "key":  "admin.additional_invoices.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.commissions_global.all_currencies",
+        "fallback":  "Todas"
+    },
+    {
+        "key":  "admin.commissions_global.by_seller_header",
+        "fallback":  "ComissÃµes por Vendedor (Pedidos Manuais + Processamento) â€” valores em R$"
+    },
+    {
+        "key":  "admin.commissions_global.card_product_cost_usd",
+        "fallback":  "Custo Produtos (USD)"
+    },
+    {
+        "key":  "admin.commissions_global.card_service_fee",
+        "fallback":  "Taxa de ServiÃ§o"
+    },
+    {
+        "key":  "admin.commissions_global.card_shipping",
+        "fallback":  "Frete"
+    },
+    {
+        "key":  "admin.commissions_global.card_subtotal_products",
+        "fallback":  "Subtotal Produtos"
+    },
+    {
+        "key":  "admin.commissions_global.card_taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.commissions_global.card_total_collected",
+        "fallback":  "Total Arrecadado"
+    },
+    {
+        "key":  "admin.commissions_global.commission_period",
+        "fallback":  "PerÃ­odo de comissÃ£o"
+    },
+    {
+        "key":  "admin.commissions_global.cost",
+        "fallback":  "Custo:"
+    },
+    {
+        "key":  "admin.commissions_global.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.commissions_global.detail_by_order",
+        "fallback":  "Detalhamento por Pedido"
+    },
+    {
+        "key":  "admin.commissions_global.end_date",
+        "fallback":  "Data fim"
+    },
+    {
+        "key":  "admin.commissions_global.exchange_label",
+        "fallback":  "CÃ¢mbio:"
+    },
+    {
+        "key":  "admin.commissions_global.formula_label",
+        "fallback":  "FÃ³rmula:"
+    },
+    {
+        "key":  "admin.commissions_global.formula_text",
+        "fallback":  "Bruto = total vendido (convertido para R$) | LÃ­quido = Bruto âˆ’ Custo âˆ’ Impostos | ComissÃ£o = LÃ­quido Ã— % da faixa"
+    },
+    {
+        "key":  "admin.commissions_global.from",
+        "fallback":  "De"
+    },
+    {
+        "key":  "admin.commissions_global.grand_total",
+        "fallback":  "Total Geral"
+    },
+    {
+        "key":  "admin.commissions_global.gross",
+        "fallback":  "Bruto:"
+    },
+    {
+        "key":  "admin.commissions_global.net",
+        "fallback":  "LÃ­quido:"
+    },
+    {
+        "key":  "admin.commissions_global.no_orders_filters",
+        "fallback":  "Nenhum pedido encontrado com os filtros selecionados."
+    },
+    {
+        "key":  "admin.commissions_global.orders_word",
+        "fallback":  "pedidos"
+    },
+    {
+        "key":  "admin.commissions_global.organic_sales",
+        "fallback":  "Vendas OrgÃ¢nicas (sem vendedor atribuÃ­do)"
+    },
+    {
+        "key":  "admin.commissions_global.page_title",
+        "fallback":  "ComissÃµes Global - Admin"
+    },
+    {
+        "key":  "admin.commissions_global.seller_label",
+        "fallback":  "Vendedor #"
+    },
+    {
+        "key":  "admin.commissions_global.start_date",
+        "fallback":  "Data inÃ­cio"
+    },
+    {
+        "key":  "admin.commissions_global.status_placeholder",
+        "fallback":  "ex: pago"
+    },
+    {
+        "key":  "admin.commissions_global.summary_page_title",
+        "fallback":  "Resumo Financeiro - Admin"
+    },
+    {
+        "key":  "admin.commissions_global.summary_title",
+        "fallback":  "Resumo Financeiro Global"
+    },
+    {
+        "key":  "admin.commissions_global.taxes",
+        "fallback":  "Impostos:"
+    },
+    {
+        "key":  "admin.commissions_global.th_code",
+        "fallback":  "CÃ³digo"
+    },
+    {
+        "key":  "admin.commissions_global.th_commission_pct",
+        "fallback":  "% ComissÃ£o"
+    },
+    {
+        "key":  "admin.commissions_global.th_cost_prod",
+        "fallback":  "Custo Prod."
+    },
+    {
+        "key":  "admin.commissions_global.th_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.commissions_global.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.commissions_global.th_gross",
+        "fallback":  "Bruto (R$)"
+    },
+    {
+        "key":  "admin.commissions_global.th_manual_commission",
+        "fallback":  "ComissÃ£o Manual"
+    },
+    {
+        "key":  "admin.commissions_global.th_net",
+        "fallback":  "LÃ­quido"
+    },
+    {
+        "key":  "admin.commissions_global.th_orders",
+        "fallback":  "Pedidos"
+    },
+    {
+        "key":  "admin.commissions_global.th_proc_commission",
+        "fallback":  "ComissÃ£o Proc."
+    },
+    {
+        "key":  "admin.commissions_global.th_product_cost",
+        "fallback":  "Custo Produto"
+    },
+    {
+        "key":  "admin.commissions_global.th_seller",
+        "fallback":  "Vendedor"
+    },
+    {
+        "key":  "admin.commissions_global.th_service_fee_short",
+        "fallback":  "Taxa ServiÃ§o"
+    },
+    {
+        "key":  "admin.commissions_global.th_subtotal_prod",
+        "fallback":  "Subtotal Prod."
+    },
+    {
+        "key":  "admin.commissions_global.th_taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.commissions_global.th_total_commission",
+        "fallback":  "Total ComissÃ£o"
+    },
+    {
+        "key":  "admin.commissions_global.title",
+        "fallback":  "ComissÃµes - VisÃ£o Global"
+    },
+    {
+        "key":  "admin.commissions_global.to",
+        "fallback":  "atÃ©"
+    },
+    {
+        "key":  "admin.consolidate_orders.title",
+        "fallback":  "Consolidar Pedidos"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_cnpj_invalid",
+        "fallback":  "CNPJ invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_cpf_invalid",
+        "fallback":  "CPF invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_dims_sum",
+        "fallback":  "Soma dimensÃµes \u003e 200cm"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_email_invalid",
+        "fallback":  "E-mail destinatÃ¡rio invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_has_label",
+        "fallback":  "JÃ¡ possui etiqueta"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_height_invalid",
+        "fallback":  "Altura invÃ¡lida (2-100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_length_invalid",
+        "fallback":  "Comprimento invÃ¡lido (16-100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_no_items",
+        "fallback":  "Sem itens"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_no_tracking",
+        "fallback":  "API nÃ£o retornou tracking"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_no_valid_items",
+        "fallback":  "Sem itens vÃ¡lidos"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_not_closed_box",
+        "fallback":  "NÃ£o estÃ¡ em Caixa Fechada"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_over_20_items",
+        "fallback":  "Mais de 20 itens"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_phone_invalid",
+        "fallback":  "Telefone destinatÃ¡rio invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_total_over_3000",
+        "fallback":  "Valor total \u003e USD 3000"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_weight_exceeds",
+        "fallback":  "Peso excede 30kg"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_weight_missing",
+        "fallback":  "Peso nÃ£o informado"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_width_invalid",
+        "fallback":  "Largura invÃ¡lida (11-100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.bill_not_found",
+        "fallback":  "Fatura nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.bills_table_missing",
+        "fallback":  "Tabela correios_packet_bills nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.cn38_not_found",
+        "fallback":  "cn38Code nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.correios_mundial.container_not_found",
+        "fallback":  "Container nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.correios_mundial.container_not_found_dot",
+        "fallback":  "Container nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.correios_mundial.containers_invalid",
+        "fallback":  "Containers invÃ¡lidos."
+    },
+    {
+        "key":  "admin.correios_mundial.containers_not_found",
+        "fallback":  "Containers nÃ£o encontrados."
+    },
+    {
+        "key":  "admin.correios_mundial.containers_table_missing",
+        "fallback":  "Tabela correios_packet_containers nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.err_already_used",
+        "fallback":  "JÃ¡ usado em outro container:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_balance",
+        "fallback":  "Falha ao consultar saldo."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cancel_before_delete",
+        "fallback":  "Para deletar, primeiro cancele o despacho deste container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cancel_dispatch",
+        "fallback":  "Falha ao cancelar despacho."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cnpj_invalid",
+        "fallback":  "CNPJ do destinatÃ¡rio invÃ¡lido. Confira o nÃºmero informado."
+    },
+    {
+        "key":  "admin.correios_mundial.err_container_linked",
+        "fallback":  "Container jÃ¡ estÃ¡ vinculado a uma fatura."
+    },
+    {
+        "key":  "admin.correios_mundial.err_container_no_tn",
+        "fallback":  "Container sem trackingNumbers."
+    },
+    {
+        "key":  "admin.correios_mundial.err_container_no_unitcode",
+        "fallback":  "Container invÃ¡lido/sem unitCode."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cpf_invalid",
+        "fallback":  "CPF do destinatÃ¡rio invÃ¡lido. Confira o nÃºmero informado."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cpf_invalid_rf",
+        "fallback":  "CPF do destinatÃ¡rio invÃ¡lido. Confira se o CPF estÃ¡ correto e regular na Receita Federal."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cpf_not_regular",
+        "fallback":  "CPF do destinatÃ¡rio nÃ£o estÃ¡ regular na Receita Federal. O pedido nÃ£o pode gerar etiqueta atÃ© regularizar."
+    },
+    {
+        "key":  "admin.correios_mundial.err_customs_sum",
+        "fallback":  "Soma de valores (frete+seguro+itens) nÃ£o pode ultrapassar 3000.00 USD"
+    },
+    {
+        "key":  "admin.correios_mundial.err_delete_container",
+        "fallback":  "Falha ao deletar container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_delete_previous",
+        "fallback":  "Erro ao deletar etiqueta anterior:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_dest_operator",
+        "fallback":  "destinationOperatorName deve ter 4 letras."
+    },
+    {
+        "key":  "admin.correios_mundial.err_dimensions_required",
+        "fallback":  "Informe Peso total (g), Comprimento, Largura e Altura para gerar a etiqueta."
+    },
+    {
+        "key":  "admin.correios_mundial.err_dims_sum",
+        "fallback":  "Soma das dimensÃµes (C+L+A) nÃ£o pode ultrapassar 200cm"
+    },
+    {
+        "key":  "admin.correios_mundial.err_dispatch_invalid",
+        "fallback":  "dispatchNumber invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.err_fetch_container",
+        "fallback":  "Erro ao buscar container"
+    },
+    {
+        "key":  "admin.correios_mundial.err_freight_min",
+        "fallback":  "Frete deve ser no mÃ­nimo 0.01"
+    },
+    {
+        "key":  "admin.correios_mundial.err_generate_generic",
+        "fallback":  "NÃ£o foi possÃ­vel gerar a etiqueta. Verifique os dados do destinatÃ¡rio e dos produtos e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.err_generate_prefix",
+        "fallback":  "NÃ£o foi possÃ­vel gerar a etiqueta:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_height_range",
+        "fallback":  "Altura invÃ¡lida (mÃ­n 2cm, mÃ¡x 100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_hs_not_allowed",
+        "fallback":  "NÃ£o foi possÃ­vel gerar o rastreio porque o NCM (HS Code) de algum item nÃ£o Ã© permitido no Brasil. Revise o NCM do produto."
+    },
+    {
+        "key":  "admin.correios_mundial.err_insufficient_balance",
+        "fallback":  "Saldo insuficiente para faturamento."
+    },
+    {
+        "key":  "admin.correios_mundial.err_insurance_min",
+        "fallback":  "Seguro deve ser no mÃ­nimo 0.01 (ou deixe vazio)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_ncm_prefix",
+        "fallback":  "Item #"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_ncm_suffix",
+        "fallback":  " sem NCM"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_qty_prefix",
+        "fallback":  "Item #"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_qty_suffix",
+        "fallback":  " com quantidade invÃ¡lida"
+    },
+    {
+        "key":  "admin.correios_mundial.err_label_cancelled",
+        "fallback":  "Etiqueta cancelada (nÃ£o pode ser usada):"
+    },
+    {
+        "key":  "admin.correios_mundial.err_length_range",
+        "fallback":  "Comprimento invÃ¡lido (mÃ­n 16cm, mÃ¡x 100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_limit_1000",
+        "fallback":  "Limite de 1000 pacotes por mala/unitCode."
+    },
+    {
+        "key":  "admin.correios_mundial.err_limit_500",
+        "fallback":  "Limite de 500 pacotes por container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_limit_5000",
+        "fallback":  "Limite de 5000 cÃ³digos de rastreio por fatura excedido."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_dispatch_number",
+        "fallback":  "dispatchNumber nÃ£o encontrado no container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_items",
+        "fallback":  "Pedido sem itens"
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_request_id",
+        "fallback":  "Correios nÃ£o retornou requestId."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_tracking",
+        "fallback":  "Resposta da API sem trackingNumber"
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_unitcode",
+        "fallback":  "Correios nÃ£o retornou unitCode."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_valid_items",
+        "fallback":  "Pedido sem itens vÃ¡lidos"
+    },
+    {
+        "key":  "admin.correios_mundial.err_only_created",
+        "fallback":  "Apenas containers com status created podem ser faturados."
+    },
+    {
+        "key":  "admin.correios_mundial.err_origin_operator",
+        "fallback":  "originOperatorName deve ter 4 letras."
+    },
+    {
+        "key":  "admin.correios_mundial.err_origin_us",
+        "fallback":  "originCountry deve ser US."
+    },
+    {
+        "key":  "admin.correios_mundial.err_phone_invalid",
+        "fallback":  "Telefone do destinatÃ¡rio invÃ¡lido. Informe DDD + nÃºmero (10 ou 11 dÃ­gitos), sem +55."
+    },
+    {
+        "key":  "admin.correios_mundial.err_postal_category",
+        "fallback":  "postalCategoryCode invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.err_process_bill",
+        "fallback":  "Erro ao processar fatura."
+    },
+    {
+        "key":  "admin.correios_mundial.err_save_bill",
+        "fallback":  "Falha ao salvar fatura no banco."
+    },
+    {
+        "key":  "admin.correios_mundial.err_save_container",
+        "fallback":  "Falha ao salvar container no banco."
+    },
+    {
+        "key":  "admin.correios_mundial.err_save_label",
+        "fallback":  "Falha ao salvar etiqueta:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_select_container",
+        "fallback":  "Selecione pelo menos 1 container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_select_package",
+        "fallback":  "Selecione pelo menos 1 pacote."
+    },
+    {
+        "key":  "admin.correios_mundial.err_service_subclass",
+        "fallback":  "serviceSubclassCode deve ser NX ou IX."
+    },
+    {
+        "key":  "admin.correios_mundial.err_start_billing",
+        "fallback":  "Falha ao iniciar faturamento."
+    },
+    {
+        "key":  "admin.correios_mundial.err_too_many_items",
+        "fallback":  "Pedido possui mais de 20 itens (limite da API PACKET)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_tracking_not_found",
+        "fallback":  "Tracking nÃ£o encontrado:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_unit_type",
+        "fallback":  "unitType invÃ¡lido (1 ou 2)."
+    },
+    {
+        "key":  "admin.correios_mundial.err_weight_range",
+        "fallback":  "Peso total invÃ¡lido (1 a 30000g)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_width_range",
+        "fallback":  "Largura invÃ¡lida (mÃ­n 11cm, mÃ¡x 100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_zip_invalid",
+        "fallback":  "CEP do destinatÃ¡rio invÃ¡lido. Informe um CEP vÃ¡lido com 8 dÃ­gitos."
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_id",
+        "fallback":  "ID invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_ids",
+        "fallback":  "IDs invÃ¡lidos"
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_tracking",
+        "fallback":  "Tracking invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta PACKET para este pedido"
+    },
+    {
+        "key":  "admin.correios_mundial.label_not_found_dot",
+        "fallback":  "Etiqueta nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.no_label_selected",
+        "fallback":  "Nenhuma etiqueta selecionada"
+    },
+    {
+        "key":  "admin.correios_mundial.no_labels_for_orders",
+        "fallback":  "Nenhuma etiqueta encontrada para os pedidos selecionados"
+    },
+    {
+        "key":  "admin.correios_mundial.no_order_selected",
+        "fallback":  "Nenhum pedido selecionado"
+    },
+    {
+        "key":  "admin.correios_mundial.not_closed_box",
+        "fallback":  "Pedido nÃ£o estÃ¡ em Caixa Fechada"
+    },
+    {
+        "key":  "admin.correios_mundial.not_forwarding",
+        "fallback":  "Pedido nÃ£o Ã© do redirecionamento"
+    },
+    {
+        "key":  "admin.correios_mundial.not_usd",
+        "fallback":  "Pedido nÃ£o estÃ¡ em USD"
+    },
+    {
+        "key":  "admin.correios_mundial.ok_bill_generated",
+        "fallback":  "Fatura gerada:"
+    },
+    {
+        "key":  "admin.correios_mundial.ok_container_created",
+        "fallback":  "Container criado:"
+    },
+    {
+        "key":  "admin.correios_mundial.ok_dispatch_cancelled",
+        "fallback":  "Despacho cancelado. Agora vocÃª pode deletar o container para liberar os pacotes."
+    },
+    {
+        "key":  "admin.correios_mundial.ok_request_created",
+        "fallback":  "SolicitaÃ§Ã£o criada. Aguarde e atualize o status."
+    },
+    {
+        "key":  "admin.correios_mundial.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.correios_mundial.order_not_found_dot",
+        "fallback":  "Pedido nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_cnpj",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: CNPJ invÃ¡lido (deve conter 14 dÃ­gitos). Atualize o CNPJ do cliente e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_cpf",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: CPF invÃ¡lido (deve conter 11 dÃ­gitos). Atualize o CPF do cliente e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_doctype",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: tipo de documento invÃ¡lido (CPF/CNPJ/PASSPORT)."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_email_invalid",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: e-mail invÃ¡lido. Atualize o cadastro e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_email_required",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: e-mail Ã© obrigatÃ³rio. Atualize o cadastro e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_not_forwarding",
+        "fallback":  "Este pedido nÃ£o Ã© do redirecionamento."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_not_usd",
+        "fallback":  "Este pedido nÃ£o estÃ¡ em USD."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_phone_invalid",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: telefone invÃ¡lido (deve conter 10 ou 11 dÃ­gitos, sem +55). Atualize o cadastro e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_phone_required",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: telefone Ã© obrigatÃ³rio (10 ou 11 dÃ­gitos, sem +55). Atualize o cadastro e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_zip",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: CEP invÃ¡lido (deve conter 8 dÃ­gitos). Atualize o endereÃ§o do cliente/pedido e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.table_missing",
+        "fallback":  "Tabela correios_packet_etiquetas nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.table_not_found",
+        "fallback":  "Tabela nÃ£o encontrada"
+    },
+    {
+        "key":  "admin.correios_mundial.unitcode_not_found",
+        "fallback":  "unitCode nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.dre.csv_col_category",
+        "fallback":  "Categoria"
+    },
+    {
+        "key":  "admin.dre.csv_col_competence",
+        "fallback":  "CompetÃªncia"
+    },
+    {
+        "key":  "admin.dre.csv_col_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.dre.csv_col_customer",
+        "fallback":  "Cliente"
+    },
+    {
+        "key":  "admin.dre.csv_col_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.dre.csv_col_description",
+        "fallback":  "DescriÃ§Ã£o"
+    },
+    {
+        "key":  "admin.dre.csv_col_due",
+        "fallback":  "Vencimento"
+    },
+    {
+        "key":  "admin.dre.csv_col_exclusion_reason",
+        "fallback":  "Motivo da exclusÃ£o"
+    },
+    {
+        "key":  "admin.dre.csv_col_gateway",
+        "fallback":  "Gateway"
+    },
+    {
+        "key":  "admin.dre.csv_col_number",
+        "fallback":  "Numero"
+    },
+    {
+        "key":  "admin.dre.csv_col_origin",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.dre.csv_col_pay_method",
+        "fallback":  "Forma Pgto"
+    },
+    {
+        "key":  "admin.dre.csv_col_pay_status",
+        "fallback":  "Status Pgto"
+    },
+    {
+        "key":  "admin.dre.csv_col_payee",
+        "fallback":  "Favorecido"
+    },
+    {
+        "key":  "admin.dre.csv_col_payment",
+        "fallback":  "Pagamento"
+    },
+    {
+        "key":  "admin.dre.csv_col_quantity",
+        "fallback":  "Quantidade"
+    },
+    {
+        "key":  "admin.dre.csv_col_services",
+        "fallback":  "Servicos"
+    },
+    {
+        "key":  "admin.dre.csv_col_shipping",
+        "fallback":  "Frete"
+    },
+    {
+        "key":  "admin.dre.csv_col_status",
+        "fallback":  "Status"
+    },
+    {
+        "key":  "admin.dre.csv_col_subtotal",
+        "fallback":  "Subtotal"
+    },
+    {
+        "key":  "admin.dre.csv_col_taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.dre.csv_col_total",
+        "fallback":  "Total"
+    },
+    {
+        "key":  "admin.dre.csv_col_total_brl",
+        "fallback":  "Total BRL"
+    },
+    {
+        "key":  "admin.dre.csv_col_type",
+        "fallback":  "Tipo"
+    },
+    {
+        "key":  "admin.dre.csv_col_value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.dre.csv_col_value_brl",
+        "fallback":  "Valor BRL"
+    },
+    {
+        "key":  "admin.dre.csv_expenses_not_realized",
+        "fallback":  "Despesas ainda nÃ£o realizadas"
+    },
+    {
+        "key":  "admin.dre.csv_generated_at",
+        "fallback":  "Gerado em"
+    },
+    {
+        "key":  "admin.dre.csv_header",
+        "fallback":  "DEMONSTRATIVO DE RESULTADO GERENCIAL - BRAZILIANA SHOP"
+    },
+    {
+        "key":  "admin.dre.csv_orders_not_realized",
+        "fallback":  "Pedidos ainda nÃ£o realizados"
+    },
+    {
+        "key":  "admin.dre.csv_period",
+        "fallback":  "PerÃ­odo"
+    },
+    {
+        "key":  "admin.dre.csv_period_balance",
+        "fallback":  "Saldo realizado do perÃ­odo"
+    },
+    {
+        "key":  "admin.dre.csv_products",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.dre.csv_qty_expenses_out",
+        "fallback":  "Quantidade de despesas fora da DRE"
+    },
+    {
+        "key":  "admin.dre.csv_qty_orders_out",
+        "fallback":  "Quantidade de pedidos fora da DRE"
+    },
+    {
+        "key":  "admin.dre.csv_qty_paid_expenses",
+        "fallback":  "Quantidade de despesas pagas"
+    },
+    {
+        "key":  "admin.dre.csv_qty_paid_orders",
+        "fallback":  "Quantidade de pedidos pagos"
+    },
+    {
+        "key":  "admin.dre.csv_rate_usd_brl",
+        "fallback":  "Taxa USDâ†’BRL"
+    },
+    {
+        "key":  "admin.dre.csv_realized_expenses",
+        "fallback":  "(-) Despesas realizadas"
+    },
+    {
+        "key":  "admin.dre.csv_realized_inflows",
+        "fallback":  "Entradas realizadas"
+    },
+    {
+        "key":  "admin.dre.csv_realized_margin",
+        "fallback":  "Margem realizada"
+    },
+    {
+        "key":  "admin.dre.csv_realized_outflows",
+        "fallback":  "SaÃ­das realizadas"
+    },
+    {
+        "key":  "admin.dre.csv_realized_result",
+        "fallback":  "(=) Resultado realizado"
+    },
+    {
+        "key":  "admin.dre.csv_realized_revenue",
+        "fallback":  "Receita realizada"
+    },
+    {
+        "key":  "admin.dre.csv_report_currency",
+        "fallback":  "Moeda do relatÃ³rio"
+    },
+    {
+        "key":  "admin.dre.csv_s1",
+        "fallback":  "=== 1. RESUMO DA DRE REALIZADA ==="
+    },
+    {
+        "key":  "admin.dre.csv_s10",
+        "fallback":  "=== 10. CONCILIAÃ‡ÃƒO DO PERÃODO ==="
+    },
+    {
+        "key":  "admin.dre.csv_s2",
+        "fallback":  "=== 2. COMPOSIÃ‡ÃƒO DA RECEITA REALIZADA ==="
+    },
+    {
+        "key":  "admin.dre.csv_s3",
+        "fallback":  "=== 3. COMPOSIÃ‡ÃƒO DAS DESPESAS REALIZADAS ==="
+    },
+    {
+        "key":  "admin.dre.csv_s4",
+        "fallback":  "=== 4. PEDIDOS CONSIDERADOS NA RECEITA REALIZADA ==="
+    },
+    {
+        "key":  "admin.dre.csv_s5",
+        "fallback":  "=== 5. DESPESAS CONSIDERADAS NO RESULTADO REALIZADO ==="
+    },
+    {
+        "key":  "admin.dre.csv_s6",
+        "fallback":  "=== 6. PEDIDOS FORA DA RECEITA REALIZADA ==="
+    },
+    {
+        "key":  "admin.dre.csv_s7",
+        "fallback":  "=== 7. DESPESAS FORA DO RESULTADO REALIZADO ==="
+    },
+    {
+        "key":  "admin.dre.csv_s8",
+        "fallback":  "=== 8. DETALHAMENTO DOS PEDIDOS EXCLUÃDOS DA DRE ==="
+    },
+    {
+        "key":  "admin.dre.csv_s9",
+        "fallback":  "=== 9. DETALHAMENTO DAS DESPESAS EXCLUÃDAS DA DRE ==="
+    },
+    {
+        "key":  "admin.dre.csv_services",
+        "fallback":  "ServiÃ§os"
+    },
+    {
+        "key":  "admin.dre.csv_shipping_charged",
+        "fallback":  "Frete cobrado"
+    },
+    {
+        "key":  "admin.dre.csv_taxes_charged",
+        "fallback":  "Impostos cobrados"
+    },
+    {
+        "key":  "admin.dre.csv_total_expenses_considered",
+        "fallback":  "TOTAL DESPESAS CONSIDERADAS"
+    },
+    {
+        "key":  "admin.dre.csv_total_orders_considered",
+        "fallback":  "TOTAL PEDIDOS CONSIDERADOS"
+    },
+    {
+        "key":  "admin.dre.csv_total_out_result",
+        "fallback":  "TOTAL FORA DO RESULTADO REALIZADO"
+    },
+    {
+        "key":  "admin.dre.csv_total_out_revenue",
+        "fallback":  "TOTAL FORA DA RECEITA REALIZADA"
+    },
+    {
+        "key":  "admin.dre.csv_total_realized_expenses",
+        "fallback":  "TOTAL DESPESAS REALIZADAS"
+    },
+    {
+        "key":  "admin.dre.csv_total_realized_revenue",
+        "fallback":  "Total da receita realizada"
+    },
+    {
+        "key":  "admin.dre.expense_word",
+        "fallback":  "Despesa"
+    },
+    {
+        "key":  "admin.dre.fees_paren",
+        "fallback":  "Taxas"
+    },
+    {
+        "key":  "admin.dre.gw_cr_fees",
+        "fallback":  "CR Taxas"
+    },
+    {
+        "key":  "admin.dre.gw_cr_products",
+        "fallback":  "CR Produtos"
+    },
+    {
+        "key":  "admin.dre.installment_order",
+        "fallback":  "CarnÃª Ped #"
+    },
+    {
+        "key":  "admin.dre.installment_short",
+        "fallback":  "Parc"
+    },
+    {
+        "key":  "admin.dre.installment_word",
+        "fallback":  "Parcela"
+    },
+    {
+        "key":  "admin.dre.invalid_secret",
+        "fallback":  "Secret invÃ¡lido"
+    },
+    {
+        "key":  "admin.dre.no_category",
+        "fallback":  "Sem categoria"
+    },
+    {
+        "key":  "admin.dre.no_payee",
+        "fallback":  "Sem favorecido"
+    },
+    {
+        "key":  "admin.dre.not_authenticated",
+        "fallback":  "NÃ£o autenticado"
+    },
+    {
+        "key":  "admin.dre.order_word",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.dre.outflow",
+        "fallback":  "SaÃ­da"
+    },
+    {
+        "key":  "admin.dre.products_paren",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.dre.reason_expense_due",
+        "fallback":  "Despesa a vencer"
+    },
+    {
+        "key":  "admin.dre.reason_expense_forecast",
+        "fallback":  "Despesa prevista, ainda nao paga"
+    },
+    {
+        "key":  "admin.dre.reason_expense_overdue",
+        "fallback":  "Despesa vencida, nao paga"
+    },
+    {
+        "key":  "admin.dre.reason_installment_ongoing",
+        "fallback":  "Carne em andamento"
+    },
+    {
+        "key":  "admin.dre.reason_no_payment",
+        "fallback":  "Sem pagamento realizado"
+    },
+    {
+        "key":  "admin.dre.reason_order_cancelled",
+        "fallback":  "Pedido cancelado"
+    },
+    {
+        "key":  "admin.dre.reason_order_pending",
+        "fallback":  "Pedido pendente"
+    },
+    {
+        "key":  "admin.dre.reason_payment_pending",
+        "fallback":  "Pagamento pendente"
+    },
+    {
+        "key":  "admin.dre.reason_payment_unconfirmed",
+        "fallback":  "Pagamento ainda nao confirmado"
+    },
+    {
+        "key":  "admin.dre.reason_processing",
+        "fallback":  "Em processamento"
+    },
+    {
+        "key":  "admin.dre.reason_status",
+        "fallback":  "Status: "
+    },
+    {
+        "key":  "admin.dre.reason_status_unconfirmed",
+        "fallback":  "Status nao confirmado ("
+    },
+    {
+        "key":  "admin.expenses.cancelled",
+        "fallback":  "Despesa cancelada."
+    },
+    {
+        "key":  "admin.expenses.created_success",
+        "fallback":  "Despesa criada com sucesso."
+    },
+    {
+        "key":  "admin.expenses.csv_amount",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.expenses.csv_category",
+        "fallback":  "Categoria"
+    },
+    {
+        "key":  "admin.expenses.csv_competence",
+        "fallback":  "CompetÃªncia"
+    },
+    {
+        "key":  "admin.expenses.csv_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.expenses.csv_description",
+        "fallback":  "DescriÃ§Ã£o"
+    },
+    {
+        "key":  "admin.expenses.csv_due_date",
+        "fallback":  "Vencimento"
+    },
+    {
+        "key":  "admin.expenses.csv_hourly_rate",
+        "fallback":  "Valor/Hora"
+    },
+    {
+        "key":  "admin.expenses.csv_hours",
+        "fallback":  "Horas"
+    },
+    {
+        "key":  "admin.expenses.csv_origin",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.expenses.csv_payee",
+        "fallback":  "Favorecido"
+    },
+    {
+        "key":  "admin.expenses.csv_payment",
+        "fallback":  "Pagamento"
+    },
+    {
+        "key":  "admin.expenses.csv_payment_method",
+        "fallback":  "Forma Pagamento"
+    },
+    {
+        "key":  "admin.expenses.csv_person_hour",
+        "fallback":  "Pessoa (hora)"
+    },
+    {
+        "key":  "admin.expenses.csv_type",
+        "fallback":  "Tipo"
+    },
+    {
+        "key":  "admin.expenses.deleted",
+        "fallback":  "Despesa excluÃ­da."
+    },
+    {
+        "key":  "admin.expenses.description_empty",
+        "fallback":  "DescriÃ§Ã£o nÃ£o pode ser vazia."
+    },
+    {
+        "key":  "admin.expenses.fill_hourly_fields",
+        "fallback":  "Preencha o nome da pessoa, horas trabalhadas e valor por hora."
+    },
+    {
+        "key":  "admin.expenses.hourly_created",
+        "fallback":  "Despesa por hora criada: "
+    },
+    {
+        "key":  "admin.expenses.id_not_found",
+        "fallback":  "ID da despesa nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.expenses.installment_created",
+        "fallback":  "Parcelamento criado com {count} parcelas."
+    },
+    {
+        "key":  "admin.expenses.marked_paid",
+        "fallback":  "Despesa marcada como paga."
+    },
+    {
+        "key":  "admin.expenses.recurrence_cancelled_period",
+        "fallback":  "Despesa cancelada para este perÃ­odo."
+    },
+    {
+        "key":  "admin.expenses.recurrence_created",
+        "fallback":  "RecorrÃªncia criada com sucesso."
+    },
+    {
+        "key":  "admin.expenses.recurrence_id_not_found",
+        "fallback":  "ID da recorrÃªncia nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.expenses.recurrence_not_found",
+        "fallback":  "RecorrÃªncia nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.expenses.recurrence_paid_advanced",
+        "fallback":  "Despesa marcada como paga e prÃ³xima geraÃ§Ã£o avanÃ§ada."
+    },
+    {
+        "key":  "admin.expenses.recurrence_updated",
+        "fallback":  "RecorrÃªncia atualizada com sucesso."
+    },
+    {
+        "key":  "admin.expenses.seller_label",
+        "fallback":  "Vendedor #"
+    },
+    {
+        "key":  "admin.expenses.title",
+        "fallback":  "Despesas"
+    },
+    {
+        "key":  "admin.expenses.updated_success",
+        "fallback":  "Despesa atualizada com sucesso."
+    },
+    {
+        "key":  "admin.installment.already_exists_for_order",
+        "fallback":  "JÃ¡ existe um carnÃª para o pedido #{id}."
+    },
+    {
+        "key":  "admin.installment.archived_title",
+        "fallback":  "CarnÃªs Arquivados"
+    },
+    {
+        "key":  "admin.installment.billing_email_error",
+        "fallback":  "Erro ao enviar email de cobranÃ§a: "
+    },
+    {
+        "key":  "admin.installment.billing_email_sent",
+        "fallback":  "Email de cobranÃ§a enviado com sucesso para "
+    },
+    {
+        "key":  "admin.installment.boleto_reissued",
+        "fallback":  "Boleto reemitido com sucesso."
+    },
+    {
+        "key":  "admin.installment.create_error",
+        "fallback":  "Erro ao criar carnÃª: "
+    },
+    {
+        "key":  "admin.installment.create_link_failed",
+        "fallback":  "Falha ao criar link"
+    },
+    {
+        "key":  "admin.installment.created_success",
+        "fallback":  "CarnÃª criado com sucesso para o pedido #{oid} (ID: {cid}, {qty} parcelas, Produtos: R$ {prod}, Taxas: R$ {fees})"
+    },
+    {
+        "key":  "admin.installment.email_attention",
+        "fallback":  "AtenÃ§Ã£o:"
+    },
+    {
+        "key":  "admin.installment.email_cta",
+        "fallback":  "Ver meu carnÃª e pagar"
+    },
+    {
+        "key":  "admin.installment.email_detail_due",
+        "fallback":  "Vencimento"
+    },
+    {
+        "key":  "admin.installment.email_detail_fees",
+        "fallback":  "Taxas"
+    },
+    {
+        "key":  "admin.installment.email_detail_installment",
+        "fallback":  "Parcela"
+    },
+    {
+        "key":  "admin.installment.email_detail_installment_book",
+        "fallback":  "CarnÃª"
+    },
+    {
+        "key":  "admin.installment.email_detail_products",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.installment.email_detail_total",
+        "fallback":  "Total da parcela"
+    },
+    {
+        "key":  "admin.installment.email_installment_of",
+        "fallback":  "{n} de {total}"
+    },
+    {
+        "key":  "admin.installment.email_message",
+        "fallback":  "Estamos entrando em contato para lembrar sobre o pagamento da parcela do seu carnÃª."
+    },
+    {
+        "key":  "admin.installment.email_overdue_notice",
+        "fallback":  "Esta parcela estÃ¡ \u003cstrong\u003e{status}\u003c/strong\u003e. Regularize o pagamento para evitar o cancelamento do seu carnÃª."
+    },
+    {
+        "key":  "admin.installment.email_pay_notice",
+        "fallback":  "Realize o pagamento da sua parcela."
+    },
+    {
+        "key":  "admin.installment.email_reminder",
+        "fallback":  "Lembrete:"
+    },
+    {
+        "key":  "admin.installment.email_subject",
+        "fallback":  "CobranÃ§a - Parcela {n}/{total} do CarnÃª #{id}"
+    },
+    {
+        "key":  "admin.installment.email_subject_overdue",
+        "fallback":  "âš ï¸ Parcela em atraso - {n}/{total} do CarnÃª #{id}"
+    },
+    {
+        "key":  "admin.installment.installment_not_found",
+        "fallback":  "Parcela nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.installment.invalid_action",
+        "fallback":  "AÃ§Ã£o invÃ¡lida."
+    },
+    {
+        "key":  "admin.installment.invalid_order_id",
+        "fallback":  "ID do pedido invÃ¡lido."
+    },
+    {
+        "key":  "admin.installment.must_be_paid_to_ship",
+        "fallback":  "CarnÃª precisa estar quitado para liberar envio."
+    },
+    {
+        "key":  "admin.installment.not_found",
+        "fallback":  "CarnÃª nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.installment.not_found_short",
+        "fallback":  "CarnÃª nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.installment.notification_resent",
+        "fallback":  "NotificaÃ§Ã£o reenviada."
+    },
+    {
+        "key":  "admin.installment.order_no_customer",
+        "fallback":  "Pedido #{id} nÃ£o tem cliente vinculado."
+    },
+    {
+        "key":  "admin.installment.order_not_found",
+        "fallback":  "Pedido #{id} nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.installment.order_word_short",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.installment.order_zero_values",
+        "fallback":  "Pedido #{id} tem valores zerados. NÃ£o Ã© possÃ­vel criar carnÃª."
+    },
+    {
+        "key":  "admin.installment.product_marked_bought",
+        "fallback":  "Produto marcado como comprado."
+    },
+    {
+        "key":  "admin.installment.product_marked_received",
+        "fallback":  "Produto marcado como recebido."
+    },
+    {
+        "key":  "admin.installment.purchases_monthly_title",
+        "fallback":  "Compras CarnÃª â€” Mensal"
+    },
+    {
+        "key":  "admin.installment.purchases_title",
+        "fallback":  "Compras do CarnÃª"
+    },
+    {
+        "key":  "admin.installment.record_not_found",
+        "fallback":  "Registro nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.installment.settings_saved",
+        "fallback":  "ConfiguraÃ§Ãµes salvas."
+    },
+    {
+        "key":  "admin.installment.shipping_released",
+        "fallback":  "Envio liberado com sucesso."
+    },
+    {
+        "key":  "admin.installment.status_expired",
+        "fallback":  "vencida"
+    },
+    {
+        "key":  "admin.installment.status_late",
+        "fallback":  "em atraso"
+    },
+    {
+        "key":  "admin.installment.status_reverted",
+        "fallback":  "Status revertido para aguardando compra."
+    },
+    {
+        "key":  "admin.installment.title",
+        "fallback":  "GestÃ£o de CarnÃªs"
+    },
+    {
+        "key":  "admin.installment.unknown_error",
+        "fallback":  "erro desconhecido"
+    },
+    {
+        "key":  "admin.installment.value_gt_zero",
+        "fallback":  "Valor deve ser maior que zero"
+    },
+    {
+        "key":  "admin.installment.wallet_credit_generated",
+        "fallback":  "CrÃ©dito em carteira gerado com sucesso."
+    },
+    {
+        "key":  "admin.intl_shipment.badge_finalized",
+        "fallback":  "Finalizada"
+    },
+    {
+        "key":  "admin.intl_shipment.badge_generated",
+        "fallback":  "Remessa Gerada"
+    },
+    {
+        "key":  "admin.intl_shipment.badge_late",
+        "fallback":  "Atraso"
+    },
+    {
+        "key":  "admin.intl_shipment.cannot_close",
+        "fallback":  "â€” nÃ£o pode ser fechada"
+    },
+    {
+        "key":  "admin.intl_shipment.days",
+        "fallback":  "dias"
+    },
+    {
+        "key":  "admin.intl_shipment.enter_order_number",
+        "fallback":  "Digite o nÃºmero do pedido"
+    },
+    {
+        "key":  "admin.intl_shipment.err_load",
+        "fallback":  "Erro ao carregar Remessa Internacional:"
+    },
+    {
+        "key":  "admin.intl_shipment.err_load_hint",
+        "fallback":  "Verifique se vocÃª rodou as migrations de remessa (ex: database/migrations/016_create_remessa_janelas.sql) e se a tabela/colunas existem."
+    },
+    {
+        "key":  "admin.intl_shipment.err_search_order",
+        "fallback":  "Erro ao buscar pedido"
+    },
+    {
+        "key":  "admin.intl_shipment.generate_shipment",
+        "fallback":  "Gerar Remessa"
+    },
+    {
+        "key":  "admin.intl_shipment.generate_to_close",
+        "fallback":  "â€” gere as etiquetas para fechar"
+    },
+    {
+        "key":  "admin.intl_shipment.heading",
+        "fallback":  "Remessa Internacional"
+    },
+    {
+        "key":  "admin.intl_shipment.labels_pending",
+        "fallback":  "etiqueta(s) pendente(s)"
+    },
+    {
+        "key":  "admin.intl_shipment.no_finalized_windows",
+        "fallback":  "Nenhuma janela finalizada"
+    },
+    {
+        "key":  "admin.intl_shipment.no_generated_shipments",
+        "fallback":  "Nenhuma remessa gerada"
+    },
+    {
+        "key":  "admin.intl_shipment.no_late_windows",
+        "fallback":  "Nenhuma janela em atraso"
+    },
+    {
+        "key":  "admin.intl_shipment.no_pending_orders",
+        "fallback":  "Nenhum pedido pendente encontrado"
+    },
+    {
+        "key":  "admin.intl_shipment.no_windows",
+        "fallback":  "Nenhuma janela de remessa encontrada"
+    },
+    {
+        "key":  "admin.intl_shipment.order_not_found_window",
+        "fallback":  "Pedido nÃ£o encontrado em nenhuma janela"
+    },
+    {
+        "key":  "admin.intl_shipment.orders_count",
+        "fallback":  "pedido(s)"
+    },
+    {
+        "key":  "admin.intl_shipment.page_title",
+        "fallback":  "Remessa Internacional"
+    },
+    {
+        "key":  "admin.intl_shipment.search_order_placeholder",
+        "fallback":  "NÂº pedido..."
+    },
+    {
+        "key":  "admin.intl_shipment.section_finalized_windows",
+        "fallback":  "Janelas Finalizadas"
+    },
+    {
+        "key":  "admin.intl_shipment.section_generated_shipments",
+        "fallback":  "Remessas Geradas"
+    },
+    {
+        "key":  "admin.intl_shipment.section_late_orders",
+        "fallback":  "Pedidos em Atraso (15+ dias)"
+    },
+    {
+        "key":  "admin.intl_shipment.section_late_windows",
+        "fallback":  "Janelas em Atraso (15+ dias)"
+    },
+    {
+        "key":  "admin.intl_shipment.section_open_windows",
+        "fallback":  "Janelas Abertas (13 dias)"
+    },
+    {
+        "key":  "admin.intl_shipment.section_pending_orders",
+        "fallback":  "Pedidos Pendentes de Envio"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_active_windows",
+        "fallback":  "Janelas ativas"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_closed_windows",
+        "fallback":  "Janelas fechadas"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_finalized",
+        "fallback":  "Finalizadas"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_generated",
+        "fallback":  "Remessa Gerada"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_late",
+        "fallback":  "Atraso"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_late_windows",
+        "fallback":  "Janelas em atraso"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_open",
+        "fallback":  "Abertas"
+    },
+    {
+        "key":  "admin.intl_shipment.stat_waiting_labels",
+        "fallback":  "Esperando etiquetas"
+    },
+    {
+        "key":  "admin.intl_shipment.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.intl_shipment.th_days",
+        "fallback":  "Dias"
+    },
+    {
+        "key":  "admin.intl_shipment.th_order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.intl_shipment.view_orders",
+        "fallback":  "Ver Pedidos"
+    },
+    {
+        "key":  "admin.intl_shipment.window",
+        "fallback":  "Janela"
+    },
+    {
+        "key":  "admin.invoice.already_released",
+        "fallback":  "Este pedido jÃ¡ tem um invoice liberado."
+    },
+    {
+        "key":  "admin.invoice.email_before_ship",
+        "fallback":  "Antes de enviarmos seu pacote, precisamos que vocÃª confira e confirme os dados que irÃ£o na etiqueta de envio (declaraÃ§Ã£o aduaneira)."
+    },
+    {
+        "key":  "admin.invoice.email_button",
+        "fallback":  "Conferir Invoice Agora"
+    },
+    {
+        "key":  "admin.invoice.email_customer",
+        "fallback":  "Cliente"
+    },
+    {
+        "key":  "admin.invoice.email_footer",
+        "fallback":  "Braziliana - Seu parceiro em compras internacionais"
+    },
+    {
+        "key":  "admin.invoice.email_greeting",
+        "fallback":  "OlÃ¡, "
+    },
+    {
+        "key":  "admin.invoice.email_important",
+        "fallback":  "Importante:"
+    },
+    {
+        "key":  "admin.invoice.email_important_text",
+        "fallback":  " Seu pacote sÃ³ serÃ¡ enviado apÃ³s a confirmaÃ§Ã£o dos dados. Se houver algo incorreto, vocÃª pode contestar e nossa equipe ajustarÃ¡."
+    },
+    {
+        "key":  "admin.invoice.email_intro",
+        "fallback":  "O invoice do seu pedido \u003cstrong\u003e#{id}\u003c/strong\u003e foi liberado para conferÃªncia."
+    },
+    {
+        "key":  "admin.invoice.email_item_address",
+        "fallback":  "Confirmar o endereÃ§o de entrega"
+    },
+    {
+        "key":  "admin.invoice.email_item_battery",
+        "fallback":  "Informar se contÃ©m bateria ou perfume/lÃ­quido"
+    },
+    {
+        "key":  "admin.invoice.email_item_name",
+        "fallback":  "Conferir o nome de cada produto (serÃ¡ usado na etiqueta)"
+    },
+    {
+        "key":  "admin.invoice.email_item_values",
+        "fallback":  "Verificar os valores declarados"
+    },
+    {
+        "key":  "admin.invoice.email_subject",
+        "fallback":  "Confira os dados do seu envio - Pedido #{id}"
+    },
+    {
+        "key":  "admin.invoice.email_title",
+        "fallback":  "Confira os dados do seu envio"
+    },
+    {
+        "key":  "admin.invoice.email_what_to_do",
+        "fallback":  "O que vocÃª precisa fazer:"
+    },
+    {
+        "key":  "admin.invoice.invalid_order",
+        "fallback":  "Pedido invÃ¡lido."
+    },
+    {
+        "key":  "admin.invoice.order_no_items",
+        "fallback":  "Pedido nÃ£o possui itens."
+    },
+    {
+        "key":  "admin.invoice.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.invoice.product_default",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.invoice.released_success",
+        "fallback":  "Invoice liberado com sucesso. O cliente pode agora conferir os dados."
+    },
+    {
+        "key":  "admin.menu.redirecionamento.ajuda",
+        "fallback":  "Como Funciona"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.clientes",
+        "fallback":  "Clientes"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.coletas",
+        "fallback":  "Coletas"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.comprovantes",
+        "fallback":  "Comprovantes"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.dashboard",
+        "fallback":  "Dashboard de Redirecionamento"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.divergencias",
+        "fallback":  "DivergÃªncias e Ajustes"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.envios",
+        "fallback":  "Envios"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.pagamentos",
+        "fallback":  "Pagamentos"
+    },
+    {
+        "key":  "admin.menu.redirecionamento.tabela_pesos",
+        "fallback":  "Tabela de Pesos e PreÃ§os"
+    },
+    {
+        "key":  "admin.menu.wp_orders_stats",
+        "fallback":  "EstatÃ­sticas (WP)"
+    },
+    {
+        "key":  "admin.orders_check.cancel_confirm",
+        "fallback":  "Cancelar este pedido? O cliente serÃ¡ notificado."
+    },
+    {
+        "key":  "admin.orders_check.cancel_error",
+        "fallback":  "Erro ao cancelar pedido."
+    },
+    {
+        "key":  "admin.orders_check.cancelled",
+        "fallback":  "Pedido cancelado."
+    },
+    {
+        "key":  "admin.orders_check.confirm_error",
+        "fallback":  "Erro ao confirmar pedido."
+    },
+    {
+        "key":  "admin.orders_check.confirm_order",
+        "fallback":  "Confirmar pedido"
+    },
+    {
+        "key":  "admin.orders_check.confirmed_no_measures",
+        "fallback":  "Pedido confirmado (online), comprovante anexado e comissÃ£o registrada. ATENÃ‡ÃƒO: O status NÃƒO foi alterado para Caixa Fechada porque as medidas (peso, altura, largura, comprimento) nÃ£o estÃ£o preenchidas. Preencha as medidas e altere o status manualmente."
+    },
+    {
+        "key":  "admin.orders_check.confirmed_online",
+        "fallback":  "Pedido confirmado (online), comprovante anexado e comissÃ£o registrada."
+    },
+    {
+        "key":  "admin.orders_check.confirmed_sent_to_list",
+        "fallback":  "Pedido confirmado e enviado para a lista de compras."
+    },
+    {
+        "key":  "admin.orders_check.customer_value_badge",
+        "fallback":  "Valor informado pelo cliente"
+    },
+    {
+        "key":  "admin.orders_check.full_order",
+        "fallback":  "Pedido completo"
+    },
+    {
+        "key":  "admin.orders_check.invalid_order",
+        "fallback":  "Pedido invÃ¡lido."
+    },
+    {
+        "key":  "admin.orders_check.missing_column",
+        "fallback":  "Sua base ainda nÃ£o possui o campo status_conferencia. Rode a migration 085_add_tipo_compra_e_conferencia.sql."
+    },
+    {
+        "key":  "admin.orders_check.no_items",
+        "fallback":  "Nenhum item encontrado."
+    },
+    {
+        "key":  "admin.orders_check.no_pending",
+        "fallback":  "Nenhum pedido pendente de conferÃªncia"
+    },
+    {
+        "key":  "admin.orders_check.open_on_site",
+        "fallback":  "Abrir no site"
+    },
+    {
+        "key":  "admin.orders_check.pending_count_suffix",
+        "fallback":  "pedido(s) pendente(s)"
+    },
+    {
+        "key":  "admin.orders_check.price_by_customer",
+        "fallback":  "PreÃ§o informado pelo cliente"
+    },
+    {
+        "key":  "admin.orders_check.purchase_receipt_optional",
+        "fallback":  "Comprovante de compra (opcional)"
+    },
+    {
+        "key":  "admin.orders_check.status_check",
+        "fallback":  "Conferir"
+    },
+    {
+        "key":  "admin.orders_check.th_link",
+        "fallback":  "Link"
+    },
+    {
+        "key":  "admin.orders_check.th_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.orders_check.th_pulled_price",
+        "fallback":  "PreÃ§o Puxado"
+    },
+    {
+        "key":  "admin.orders_check.th_qty",
+        "fallback":  "Qtd"
+    },
+    {
+        "key":  "admin.orders_check.th_real_value",
+        "fallback":  "Valor Real"
+    },
+    {
+        "key":  "admin.orders_check.title",
+        "fallback":  "Pedidos para ConferÃªncia"
+    },
+    {
+        "key":  "admin.orders_check.weight_changed",
+        "fallback":  "Peso alterado:"
+    },
+    {
+        "key":  "admin.orders_edit.add",
+        "fallback":  "Adicionar"
+    },
+    {
+        "key":  "admin.orders_edit.add_product",
+        "fallback":  "Adicionar Produto"
+    },
+    {
+        "key":  "admin.orders_edit.calculated_difference",
+        "fallback":  "DiferenÃ§a calculada"
+    },
+    {
+        "key":  "admin.orders_edit.charge_difference",
+        "fallback":  "Cobrar diferenÃ§a (Payment Link)"
+    },
+    {
+        "key":  "admin.orders_edit.charge_difference_hint",
+        "fallback":  "Salve o pedido primeiro com os novos itens. O valor da diferenÃ§a Ã© calculado automaticamente."
+    },
+    {
+        "key":  "admin.orders_edit.code",
+        "fallback":  "CÃ³digo"
+    },
+    {
+        "key":  "admin.orders_edit.customer_label",
+        "fallback":  "Cliente:"
+    },
+    {
+        "key":  "admin.orders_edit.discount_pct",
+        "fallback":  "Desconto (%)"
+    },
+    {
+        "key":  "admin.orders_edit.discount_value",
+        "fallback":  "Valor Desconto"
+    },
+    {
+        "key":  "admin.orders_edit.doc_label",
+        "fallback":  "CPF/CNPJ:"
+    },
+    {
+        "key":  "admin.orders_edit.edit_product_name",
+        "fallback":  "Editar nome do produto"
+    },
+    {
+        "key":  "admin.orders_edit.financial",
+        "fallback":  "Financeiro"
+    },
+    {
+        "key":  "admin.orders_edit.generate_payment_link",
+        "fallback":  "Gerar link de pagamento"
+    },
+    {
+        "key":  "admin.orders_edit.height_cm",
+        "fallback":  "Altura (cm)"
+    },
+    {
+        "key":  "admin.orders_edit.information",
+        "fallback":  "InformaÃ§Ãµes"
+    },
+    {
+        "key":  "admin.orders_edit.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.orders_edit.invoice_check",
+        "fallback":  "Invoice (ConferÃªncia)"
+    },
+    {
+        "key":  "admin.orders_edit.items",
+        "fallback":  "Itens"
+    },
+    {
+        "key":  "admin.orders_edit.js_confirm_remove_item",
+        "fallback":  "Tem certeza que deseja remover este item?"
+    },
+    {
+        "key":  "admin.orders_edit.js_modal_not_found",
+        "fallback":  "Modal de produto nÃ£o encontrado na pÃ¡gina. Atualize a pÃ¡gina com Ctrl+F5 e tente novamente."
+    },
+    {
+        "key":  "admin.orders_edit.js_name_empty",
+        "fallback":  "O nome nÃ£o pode ficar vazio."
+    },
+    {
+        "key":  "admin.orders_edit.js_save_error",
+        "fallback":  "Erro ao salvar pedido"
+    },
+    {
+        "key":  "admin.orders_edit.js_save_failed",
+        "fallback":  "Falha ao salvar"
+    },
+    {
+        "key":  "admin.orders_edit.js_status_error",
+        "fallback":  "Erro ao atualizar status"
+    },
+    {
+        "key":  "admin.orders_edit.js_status_failed",
+        "fallback":  "Falha ao atualizar status"
+    },
+    {
+        "key":  "admin.orders_edit.leave_empty_auto",
+        "fallback":  "Deixe vazio p/ automÃ¡tico"
+    },
+    {
+        "key":  "admin.orders_edit.length_cm",
+        "fallback":  "Comprimento (cm)"
+    },
+    {
+        "key":  "admin.orders_edit.link_creation_failed",
+        "fallback":  "Falha ao criar link"
+    },
+    {
+        "key":  "admin.orders_edit.manual_value_optional",
+        "fallback":  "Valor manual (opcional)"
+    },
+    {
+        "key":  "admin.orders_edit.measures_required",
+        "fallback":  "Para marcar como Caixa Fechada (ou status seguintes), preencha Peso real (gramas), Altura, Largura e Comprimento."
+    },
+    {
+        "key":  "admin.orders_edit.measures_weight",
+        "fallback":  "Medidas e peso (obrigatÃ³rio para gerar etiqueta)"
+    },
+    {
+        "key":  "admin.orders_edit.no_difference",
+        "fallback":  "Sem diferenÃ§a a cobrar. Adicione itens e salve o pedido primeiro."
+    },
+    {
+        "key":  "admin.orders_edit.order_label",
+        "fallback":  "Pedido:"
+    },
+    {
+        "key":  "admin.orders_edit.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.orders_edit.paid_warning",
+        "fallback":  "Este pedido estÃ¡ com status \u003cstrong\u003ePago\u003c/strong\u003e. VocÃª pode \u003cstrong\u003ealterar o status\u003c/strong\u003e abaixo, mas nÃ£o pode editar/adicionar itens atÃ© voltar para \u003cstrong\u003ePendente\u003c/strong\u003e."
+    },
+    {
+        "key":  "admin.orders_edit.real_weight_grams",
+        "fallback":  "Peso real (gramas)"
+    },
+    {
+        "key":  "admin.orders_edit.release_invoice",
+        "fallback":  "Liberar Invoice"
+    },
+    {
+        "key":  "admin.orders_edit.release_invoice_confirm",
+        "fallback":  "Liberar invoice para conferÃªncia do cliente?"
+    },
+    {
+        "key":  "admin.orders_edit.release_invoice_hint",
+        "fallback":  "Libera os dados para o cliente conferir antes do envio."
+    },
+    {
+        "key":  "admin.orders_edit.search_product",
+        "fallback":  "Buscar produto..."
+    },
+    {
+        "key":  "admin.orders_edit.seller_note",
+        "fallback":  "ObservaÃ§Ã£o do vendedor"
+    },
+    {
+        "key":  "admin.orders_edit.seller_note_hint",
+        "fallback":  "Essa observaÃ§Ã£o Ã© interna e aparece no PDF do relatÃ³rio de compras."
+    },
+    {
+        "key":  "admin.orders_edit.seller_note_placeholder",
+        "fallback":  "ObservaÃ§Ã£o interna para compras/PDF..."
+    },
+    {
+        "key":  "admin.orders_edit.shipping",
+        "fallback":  "Frete"
+    },
+    {
+        "key":  "admin.orders_edit.store_label",
+        "fallback":  "Loja:"
+    },
+    {
+        "key":  "admin.orders_edit.subtotal",
+        "fallback":  "Subtotal"
+    },
+    {
+        "key":  "admin.orders_edit.suite_label",
+        "fallback":  "SuÃ­te:"
+    },
+    {
+        "key":  "admin.orders_edit.th_price",
+        "fallback":  "PreÃ§o"
+    },
+    {
+        "key":  "admin.orders_edit.th_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.orders_edit.th_qty",
+        "fallback":  "Qtd"
+    },
+    {
+        "key":  "admin.orders_edit.th_store",
+        "fallback":  "Loja"
+    },
+    {
+        "key":  "admin.orders_edit.th_subtotal",
+        "fallback":  "Subtotal"
+    },
+    {
+        "key":  "admin.orders_edit.title",
+        "fallback":  "Editar Pedido"
+    },
+    {
+        "key":  "admin.orders_edit.tracking_code",
+        "fallback":  "CÃ³digo de Rastreio"
+    },
+    {
+        "key":  "admin.orders_edit.tracking_hint",
+        "fallback":  "CÃ³digo de rastreio exibido para o cliente. Deixe vazio se nÃ£o houver."
+    },
+    {
+        "key":  "admin.orders_edit.tracking_placeholder",
+        "fallback":  "Ex: AB123456789BR"
+    },
+    {
+        "key":  "admin.orders_edit.update_status",
+        "fallback":  "Atualizar Status"
+    },
+    {
+        "key":  "admin.orders_edit.updated_success",
+        "fallback":  "Pedido atualizado com sucesso"
+    },
+    {
+        "key":  "admin.orders_edit.width_cm",
+        "fallback":  "Largura (cm)"
+    },
+    {
+        "key":  "admin.orders_manual.add_product",
+        "fallback":  "Adicionar Produto"
+    },
+    {
+        "key":  "admin.orders_manual.address_hint",
+        "fallback":  "Se o cliente nÃ£o tiver endereÃ§o cadastrado, preencha aqui para criar e vincular ao pedido manual."
+    },
+    {
+        "key":  "admin.orders_manual.already_launched",
+        "fallback":  "JÃ¡ lanÃ§ado no vendas.braziliana"
+    },
+    {
+        "key":  "admin.orders_manual.complement",
+        "fallback":  "Complemento"
+    },
+    {
+        "key":  "admin.orders_manual.country",
+        "fallback":  "PaÃ­s"
+    },
+    {
+        "key":  "admin.orders_manual.country_ar",
+        "fallback":  "Argentina"
+    },
+    {
+        "key":  "admin.orders_manual.country_au",
+        "fallback":  "AustrÃ¡lia"
+    },
+    {
+        "key":  "admin.orders_manual.country_br",
+        "fallback":  "Brasil"
+    },
+    {
+        "key":  "admin.orders_manual.country_ca",
+        "fallback":  "CanadÃ¡"
+    },
+    {
+        "key":  "admin.orders_manual.country_cl",
+        "fallback":  "Chile"
+    },
+    {
+        "key":  "admin.orders_manual.country_co",
+        "fallback":  "ColÃ´mbia"
+    },
+    {
+        "key":  "admin.orders_manual.country_de",
+        "fallback":  "Alemanha"
+    },
+    {
+        "key":  "admin.orders_manual.country_es",
+        "fallback":  "Espanha"
+    },
+    {
+        "key":  "admin.orders_manual.country_fr",
+        "fallback":  "FranÃ§a"
+    },
+    {
+        "key":  "admin.orders_manual.country_gb",
+        "fallback":  "Reino Unido"
+    },
+    {
+        "key":  "admin.orders_manual.country_it",
+        "fallback":  "ItÃ¡lia"
+    },
+    {
+        "key":  "admin.orders_manual.country_jp",
+        "fallback":  "JapÃ£o"
+    },
+    {
+        "key":  "admin.orders_manual.country_mx",
+        "fallback":  "MÃ©xico"
+    },
+    {
+        "key":  "admin.orders_manual.country_other",
+        "fallback":  "Outro"
+    },
+    {
+        "key":  "admin.orders_manual.country_pt",
+        "fallback":  "Portugal"
+    },
+    {
+        "key":  "admin.orders_manual.country_us",
+        "fallback":  "Estados Unidos"
+    },
+    {
+        "key":  "admin.orders_manual.create_order",
+        "fallback":  "Criar Pedido Manual"
+    },
+    {
+        "key":  "admin.orders_manual.created_success",
+        "fallback":  "Pedido manual criado com sucesso:"
+    },
+    {
+        "key":  "admin.orders_manual.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.orders_manual.currency_brl",
+        "fallback":  "Real (BRL)"
+    },
+    {
+        "key":  "admin.orders_manual.currency_usd",
+        "fallback":  "DÃ³lar (USD)"
+    },
+    {
+        "key":  "admin.orders_manual.customer",
+        "fallback":  "Cliente"
+    },
+    {
+        "key":  "admin.orders_manual.customer_search_failed",
+        "fallback":  "Falha ao buscar clientes"
+    },
+    {
+        "key":  "admin.orders_manual.customer_search_placeholder",
+        "fallback":  "Digite nome, e-mail ou switch..."
+    },
+    {
+        "key":  "admin.orders_manual.delivery_address",
+        "fallback":  "EndereÃ§o de Entrega"
+    },
+    {
+        "key":  "admin.orders_manual.discount_applied",
+        "fallback":  "Desconto aplicado"
+    },
+    {
+        "key":  "admin.orders_manual.foreign_tax_notice",
+        "fallback":  "Entrega fora do Brasil: impostos de importaÃ§Ã£o brasileiros \u003cstrong\u003enÃ£o serÃ£o cobrados\u003c/strong\u003e. A tributaÃ§Ã£o local Ã© responsabilidade do destinatÃ¡rio."
+    },
+    {
+        "key":  "admin.orders_manual.generate_payment_link",
+        "fallback":  "Gerar Link de Pagamento"
+    },
+    {
+        "key":  "admin.orders_manual.generate_quote_message",
+        "fallback":  "Gerar mensagem de orÃ§amento"
+    },
+    {
+        "key":  "admin.orders_manual.gift_tooltip",
+        "fallback":  "Marcar como brinde (preÃ§o zero, impostos devolvidos na carteira)"
+    },
+    {
+        "key":  "admin.orders_manual.installment_availability",
+        "fallback":  "DisponÃ­vel apenas para pedidos em Reais (BRL) com entrega no Brasil. ApÃ³s criar o pedido, clique em \u003cstrong\u003eGerar Link de Pagamento\u003c/strong\u003e para gerar os links das parcelas e enviar ao cliente."
+    },
+    {
+        "key":  "admin.orders_manual.installment_braziliana",
+        "fallback":  "CarnÃª Braziliana"
+    },
+    {
+        "key":  "admin.orders_manual.installment_count",
+        "fallback":  "Quantidade de Parcelas"
+    },
+    {
+        "key":  "admin.orders_manual.installment_desc",
+        "fallback":  "Parcele a compra do cliente em atÃ© 12x. Cada parcela gera dois links de pagamento: um para produtos (CÃ¢mbio Real) e outro para taxas (CÃ¢mbio Real Taxas)."
+    },
+    {
+        "key":  "admin.orders_manual.installment_link_products",
+        "fallback":  "Link Produtos (CÃ¢mbio Real)"
+    },
+    {
+        "key":  "admin.orders_manual.installment_link_taxes",
+        "fallback":  "Link Taxas (CÃ¢mbio Real Taxas)"
+    },
+    {
+        "key":  "admin.orders_manual.installment_ship_after_paid",
+        "fallback":  "O envio ocorre somente apÃ³s a quitaÃ§Ã£o total."
+    },
+    {
+        "key":  "admin.orders_manual.installment_total_per",
+        "fallback":  "Total por parcela:"
+    },
+    {
+        "key":  "admin.orders_manual.instructions",
+        "fallback":  "InstruÃ§Ãµes"
+    },
+    {
+        "key":  "admin.orders_manual.invalid_customer",
+        "fallback":  "Cliente invÃ¡lido"
+    },
+    {
+        "key":  "admin.orders_manual.items_count",
+        "fallback":  "Quantidade de Itens"
+    },
+    {
+        "key":  "admin.orders_manual.local_tax",
+        "fallback":  "Imposto local"
+    },
+    {
+        "key":  "admin.orders_manual.neighborhood",
+        "fallback":  "Bairro"
+    },
+    {
+        "key":  "admin.orders_manual.no_commission_hint",
+        "fallback":  "Se marcado, este pedido nÃ£o serÃ¡ contabilizado nas comissÃµes."
+    },
+    {
+        "key":  "admin.orders_manual.number",
+        "fallback":  "NÃºmero"
+    },
+    {
+        "key":  "admin.orders_manual.order_items",
+        "fallback":  "Itens do Pedido"
+    },
+    {
+        "key":  "admin.orders_manual.pagdev_request_approval",
+        "fallback":  "Solicite aprovaÃ§Ã£o para usar este mÃ©todo de pagamento."
+    },
+    {
+        "key":  "admin.orders_manual.pagdev_requires_auth",
+        "fallback":  "PagDev requer autorizaÃ§Ã£o."
+    },
+    {
+        "key":  "admin.orders_manual.payment",
+        "fallback":  "Pagamento"
+    },
+    {
+        "key":  "admin.orders_manual.payment_credit_card",
+        "fallback":  "CartÃ£o de CrÃ©dito"
+    },
+    {
+        "key":  "admin.orders_manual.payment_debit_card",
+        "fallback":  "CartÃ£o de DÃ©bito"
+    },
+    {
+        "key":  "admin.orders_manual.payment_hint",
+        "fallback":  "BRL: valor dos produtos via CÃ¢mbio Real, taxas/impostos via AppMax. Para pagamentos offline, serÃ¡ necessÃ¡rio anexar o comprovante no pedido."
+    },
+    {
+        "key":  "admin.orders_manual.payment_installment",
+        "fallback":  "CarnÃª Braziliana (parcelado)"
+    },
+    {
+        "key":  "admin.orders_manual.payment_link_info",
+        "fallback":  "ApÃ³s criar o pedido manual, clique em \u003cstrong\u003eGerar Link de Pagamento\u003c/strong\u003e para gerar os links de cobranÃ§a."
+    },
+    {
+        "key":  "admin.orders_manual.payment_link_info_brl",
+        "fallback":  "BRL: link de checkout CÃ¢mbio Real (produtos) + link de pagamento CÃ¢mbio Real Taxas (taxas/impostos). Copie e envie para o cliente."
+    },
+    {
+        "key":  "admin.orders_manual.payment_method",
+        "fallback":  "MÃ©todo de Pagamento"
+    },
+    {
+        "key":  "admin.orders_manual.payment_pagdev",
+        "fallback":  "PagDev (offline)"
+    },
+    {
+        "key":  "admin.orders_manual.payment_pix",
+        "fallback":  "PIX (CÃ¢mbio Real + CÃ¢mbio Real Taxas)"
+    },
+    {
+        "key":  "admin.orders_manual.payment_wallet",
+        "fallback":  "Carteira"
+    },
+    {
+        "key":  "admin.orders_manual.purchase_marketing",
+        "fallback":  "Marketing"
+    },
+    {
+        "key":  "admin.orders_manual.purchase_offline",
+        "fallback":  "Offline"
+    },
+    {
+        "key":  "admin.orders_manual.purchase_online",
+        "fallback":  "Online"
+    },
+    {
+        "key":  "admin.orders_manual.purchase_type",
+        "fallback":  "Tipo de compra"
+    },
+    {
+        "key":  "admin.orders_manual.purchase_type_required",
+        "fallback":  "ObrigatÃ³rio para pedidos manuais."
+    },
+    {
+        "key":  "admin.orders_manual.request",
+        "fallback":  "Solicitar"
+    },
+    {
+        "key":  "admin.orders_manual.service_fee",
+        "fallback":  "Taxa de ServiÃ§o"
+    },
+    {
+        "key":  "admin.orders_manual.service_fee_discount",
+        "fallback":  "Desconto na Taxa de ServiÃ§o"
+    },
+    {
+        "key":  "admin.orders_manual.shipping",
+        "fallback":  "Frete"
+    },
+    {
+        "key":  "admin.orders_manual.subtotal",
+        "fallback":  "Subtotal"
+    },
+    {
+        "key":  "admin.orders_manual.summary",
+        "fallback":  "Resumo"
+    },
+    {
+        "key":  "admin.orders_manual.taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.orders_manual.th_already_bought",
+        "fallback":  "JÃ¡ comprado"
+    },
+    {
+        "key":  "admin.orders_manual.th_discount",
+        "fallback":  "Desconto"
+    },
+    {
+        "key":  "admin.orders_manual.th_gift",
+        "fallback":  "Brinde"
+    },
+    {
+        "key":  "admin.orders_manual.th_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.orders_manual.th_qty",
+        "fallback":  "Qtd"
+    },
+    {
+        "key":  "admin.orders_manual.th_value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.orders_manual.title",
+        "fallback":  "Novo Pedido Manual"
+    },
+    {
+        "key":  "admin.orders_manual.total_weight",
+        "fallback":  "Peso Total"
+    },
+    {
+        "key":  "admin.orders_manual.weight_limit_active",
+        "fallback":  "Limite de 30kg ativo"
+    },
+    {
+        "key":  "admin.orders_manual.weight_limit_hint",
+        "fallback":  "(desative para permitir pedidos acima de 30kg)"
+    },
+    {
+        "key":  "admin.orders_manual.zip",
+        "fallback":  "CEP"
+    },
+    {
+        "key":  "admin.orders_split.cannot_split_all",
+        "fallback":  "VocÃª nÃ£o pode separar todos os itens com quantidade total. Pelo menos um item (ou parte) deve permanecer no pedido original."
+    },
+    {
+        "key":  "admin.orders_split.error_fetch_items",
+        "fallback":  "Erro ao buscar itens:"
+    },
+    {
+        "key":  "admin.orders_split.error_fetch_order",
+        "fallback":  "Erro ao buscar pedido:"
+    },
+    {
+        "key":  "admin.orders_split.error_processing",
+        "fallback":  "Erro ao processar split:"
+    },
+    {
+        "key":  "admin.orders_split.instructions",
+        "fallback":  "Selecione os itens que deseja \u003cstrong\u003eseparar\u003c/strong\u003e para um novo pedido. Os itens selecionados serÃ£o removidos deste pedido e um novo pedido serÃ¡ criado com eles."
+    },
+    {
+        "key":  "admin.orders_split.invalid_or_no_items",
+        "fallback":  "ID do pedido invÃ¡lido ou nenhum item selecionado."
+    },
+    {
+        "key":  "admin.orders_split.js_cannot_split_all",
+        "fallback":  "VocÃª nÃ£o pode separar TODOS os itens com quantidade total. Pelo menos um item (ou parte dele) deve permanecer no pedido original."
+    },
+    {
+        "key":  "admin.orders_split.js_confirm_split",
+        "fallback":  "Tem certeza que deseja separar os itens selecionados em um novo pedido? Esta aÃ§Ã£o nÃ£o pode ser desfeita."
+    },
+    {
+        "key":  "admin.orders_split.no_items_suffix",
+        "fallback":  "nÃ£o possui itens."
+    },
+    {
+        "key":  "admin.orders_split.no_valid_items",
+        "fallback":  "Nenhum item vÃ¡lido selecionado para separar."
+    },
+    {
+        "key":  "admin.orders_split.not_found_suffix",
+        "fallback":  "nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.orders_split.order_id",
+        "fallback":  "ID do Pedido"
+    },
+    {
+        "key":  "admin.orders_split.order_id_placeholder",
+        "fallback":  "Ex: 1234"
+    },
+    {
+        "key":  "admin.orders_split.order_label",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.orders_split.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.orders_split.selected_value",
+        "fallback":  "Valor selecionado:"
+    },
+    {
+        "key":  "admin.orders_split.split_selected_items",
+        "fallback":  "Separar Itens Selecionados"
+    },
+    {
+        "key":  "admin.orders_split.split_success",
+        "fallback":  "Split realizado com sucesso! Novo pedido criado:"
+    },
+    {
+        "key":  "admin.orders_split.th_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.orders_split.th_qty_to_split",
+        "fallback":  "Qtd a Separar"
+    },
+    {
+        "key":  "admin.orders_split.th_sku",
+        "fallback":  "SKU"
+    },
+    {
+        "key":  "admin.orders_split.th_subtotal",
+        "fallback":  "Subtotal"
+    },
+    {
+        "key":  "admin.orders_split.th_total_qty",
+        "fallback":  "Qtd Total"
+    },
+    {
+        "key":  "admin.orders_split.th_total_weight",
+        "fallback":  "Peso Total"
+    },
+    {
+        "key":  "admin.orders_split.th_unit_price",
+        "fallback":  "PreÃ§o Unit."
+    },
+    {
+        "key":  "admin.orders_split.title",
+        "fallback":  "Split Order"
+    },
+    {
+        "key":  "admin.orders_split.total_selected_weight",
+        "fallback":  "Peso total selecionado:"
+    },
+    {
+        "key":  "admin.orders_wp.configure_wp_db",
+        "fallback":  "Configure o banco WordPress em Admin \u003e ConfiguraÃ§Ãµes \u003e WordPress"
+    },
+    {
+        "key":  "admin.orders_wp.details.download_wexpress_label",
+        "fallback":  "Baixar etiqueta W-Express"
+    },
+    {
+        "key":  "admin.orders_wp.details.generating_wexpress_label",
+        "fallback":  "Gerando..."
+    },
+    {
+        "key":  "admin.orders_wp.details_title",
+        "fallback":  "Pedido WP - Detalhes - Braziliana Admin"
+    },
+    {
+        "key":  "admin.orders_wp.document_not_found",
+        "fallback":  "Documento (CPF/CNPJ) nÃ£o encontrado no pedido. Preencha o campo de CPF/CNPJ no WooCommerce antes de gerar a etiqueta."
+    },
+    {
+        "key":  "admin.orders_wp.export_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.orders_wp.export_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.orders_wp.export_doc_title",
+        "fallback":  "Pedidos WP - ExportaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.orders_wp.export_items_count",
+        "fallback":  "Qtd Itens"
+    },
+    {
+        "key":  "admin.orders_wp.export_lastname",
+        "fallback":  "Sobrenome"
+    },
+    {
+        "key":  "admin.orders_wp.export_origin",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.orders_wp.export_sheet_all",
+        "fallback":  "Todos"
+    },
+    {
+        "key":  "admin.orders_wp.export_time",
+        "fallback":  "Hora"
+    },
+    {
+        "key":  "admin.orders_wp.export_total_declaration",
+        "fallback":  "Total DeclaraÃ§Ã£o"
+    },
+    {
+        "key":  "admin.orders_wp.export_total_products",
+        "fallback":  "Total Produtos"
+    },
+    {
+        "key":  "admin.orders_wp.export_total_sale",
+        "fallback":  "Total Venda"
+    },
+    {
+        "key":  "admin.orders_wp.export_total_service_fee",
+        "fallback":  "Total Taxa ServiÃ§o"
+    },
+    {
+        "key":  "admin.orders_wp.export_total_weight",
+        "fallback":  "Peso Total (kg)"
+    },
+    {
+        "key":  "admin.orders_wp.export_wp_order_id",
+        "fallback":  "WP Order ID"
+    },
+    {
+        "key":  "admin.orders_wp.incomplete_address",
+        "fallback":  "EndereÃ§o de entrega incompleto no pedido (shipping). Corrija no WooCommerce antes de gerar a etiqueta."
+    },
+    {
+        "key":  "admin.orders_wp.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.orders_wp.invalid_params",
+        "fallback":  "ParÃ¢metros invÃ¡lidos. Use start/end no formato YYYY-MM-DD."
+    },
+    {
+        "key":  "admin.orders_wp.label_already_generated",
+        "fallback":  "Etiqueta jÃ¡ gerada para este pedido"
+    },
+    {
+        "key":  "admin.orders_wp.list_title",
+        "fallback":  "Pedidos (WordPress) - Braziliana Admin"
+    },
+    {
+        "key":  "admin.orders_wp.ncm_not_found",
+        "fallback":  "NCM nÃ£o encontrado para um ou mais itens do pedido. Cadastre o NCM nos produtos (ou no Invoice) antes de gerar a etiqueta."
+    },
+    {
+        "key":  "admin.orders_wp.no_items",
+        "fallback":  "Sem itens no pedido"
+    },
+    {
+        "key":  "admin.orders_wp.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado no WordPress"
+    },
+    {
+        "key":  "admin.orders_wp.stats_title",
+        "fallback":  "EstatÃ­sticas (WP) - Braziliana Admin"
+    },
+    {
+        "key":  "admin.orders_wp.table.source",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.orders_wp.wexpress_sender_config",
+        "fallback":  "W-Express: configure o Sender (JSON) em Admin \u003e ConfiguraÃ§Ãµes \u003e Entrega"
+    },
+    {
+        "key":  "admin.orders_wp.xlsx_error",
+        "fallback":  "Erro ao gerar XLSX:"
+    },
+    {
+        "key":  "admin.payment_links.add_product",
+        "fallback":  "Adicionar produto"
+    },
+    {
+        "key":  "admin.payment_links.address",
+        "fallback":  "EndereÃ§o: "
+    },
+    {
+        "key":  "admin.payment_links.birth",
+        "fallback":  "Nascimento: "
+    },
+    {
+        "key":  "admin.payment_links.create_failed",
+        "fallback":  "Falha ao criar link"
+    },
+    {
+        "key":  "admin.payment_links.create_link",
+        "fallback":  "Criar link"
+    },
+    {
+        "key":  "admin.payment_links.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.payment_links.description",
+        "fallback":  "DescriÃ§Ã£o"
+    },
+    {
+        "key":  "admin.payment_links.description_placeholder",
+        "fallback":  "Ex: Pagamento avulso"
+    },
+    {
+        "key":  "admin.payment_links.detail_page_title",
+        "fallback":  "HistÃ³rico - Payment Link"
+    },
+    {
+        "key":  "admin.payment_links.duplicate",
+        "fallback":  "Duplicar"
+    },
+    {
+        "key":  "admin.payment_links.duplicate_failed",
+        "fallback":  "Falha ao duplicar link"
+    },
+    {
+        "key":  "admin.payment_links.expires",
+        "fallback":  "Expira"
+    },
+    {
+        "key":  "admin.payment_links.expires_note",
+        "fallback":  "O link expira automaticamente em 30 dias."
+    },
+    {
+        "key":  "admin.payment_links.generate_link",
+        "fallback":  "Gerar link"
+    },
+    {
+        "key":  "admin.payment_links.generated_links",
+        "fallback":  "Links gerados"
+    },
+    {
+        "key":  "admin.payment_links.history",
+        "fallback":  "HistÃ³rico"
+    },
+    {
+        "key":  "admin.payment_links.invalid_link",
+        "fallback":  "Link invÃ¡lido."
+    },
+    {
+        "key":  "admin.payment_links.link_created",
+        "fallback":  "Link criado: "
+    },
+    {
+        "key":  "admin.payment_links.link_duplicated",
+        "fallback":  "Link duplicado: "
+    },
+    {
+        "key":  "admin.payment_links.link_not_found",
+        "fallback":  "Link nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.payment_links.no_links",
+        "fallback":  "Nenhum link criado."
+    },
+    {
+        "key":  "admin.payment_links.no_payments",
+        "fallback":  "Nenhum pagamento registrado."
+    },
+    {
+        "key":  "admin.payment_links.open",
+        "fallback":  "Abrir"
+    },
+    {
+        "key":  "admin.payment_links.open_link",
+        "fallback":  "abrir link"
+    },
+    {
+        "key":  "admin.payment_links.page_title",
+        "fallback":  "Payment Links - Admin"
+    },
+    {
+        "key":  "admin.payment_links.payments",
+        "fallback":  "Pagamentos"
+    },
+    {
+        "key":  "admin.payment_links.product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.payment_links.products",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.payment_links.products_subtotal",
+        "fallback":  "Subtotal produtos"
+    },
+    {
+        "key":  "admin.payment_links.receipt_pdf",
+        "fallback":  "Comprovante (PDF)"
+    },
+    {
+        "key":  "admin.payment_links.recipient",
+        "fallback":  "DestinatÃ¡rio: "
+    },
+    {
+        "key":  "admin.payment_links.service_fee",
+        "fallback":  "Taxa de serviÃ§o"
+    },
+    {
+        "key":  "admin.payment_links.service_fee_value",
+        "fallback":  "Taxa de serviÃ§o (valor)"
+    },
+    {
+        "key":  "admin.payment_links.taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.payment_links.taxes_value",
+        "fallback":  "Impostos (valor)"
+    },
+    {
+        "key":  "admin.payment_links.th_component",
+        "fallback":  "Componente"
+    },
+    {
+        "key":  "admin.payment_links.th_created",
+        "fallback":  "Criado"
+    },
+    {
+        "key":  "admin.payment_links.th_customer",
+        "fallback":  "Cliente"
+    },
+    {
+        "key":  "admin.payment_links.th_data",
+        "fallback":  "Dados"
+    },
+    {
+        "key":  "admin.payment_links.th_fee",
+        "fallback":  "Taxa"
+    },
+    {
+        "key":  "admin.payment_links.th_gateway",
+        "fallback":  "Gateway"
+    },
+    {
+        "key":  "admin.payment_links.th_method",
+        "fallback":  "MÃ©todo"
+    },
+    {
+        "key":  "admin.payment_links.title",
+        "fallback":  "Payment Links"
+    },
+    {
+        "key":  "admin.payment_links.url_label",
+        "fallback":  "URL:"
+    },
+    {
+        "key":  "admin.payments.adjustment",
+        "fallback":  "Ajuste"
+    },
+    {
+        "key":  "admin.payments.all_gateways",
+        "fallback":  "Todos gateways"
+    },
+    {
+        "key":  "admin.payments.all_methods",
+        "fallback":  "Todos mÃ©todos"
+    },
+    {
+        "key":  "admin.payments.all_status",
+        "fallback":  "Todos status"
+    },
+    {
+        "key":  "admin.payments.approve",
+        "fallback":  "Aprovar"
+    },
+    {
+        "key":  "admin.payments.cambioreal_fees_note",
+        "fallback":  "(taxa de serviÃ§o e impostos)"
+    },
+    {
+        "key":  "admin.payments.cancel_not_implemented",
+        "fallback":  "Cancelamento ainda nÃ£o implementado para este gateway"
+    },
+    {
+        "key":  "admin.payments.cancel_order",
+        "fallback":  "Cancelar pedido"
+    },
+    {
+        "key":  "admin.payments.cancel_payment",
+        "fallback":  "Cancelar pag."
+    },
+    {
+        "key":  "admin.payments.card_approved",
+        "fallback":  "Aprovados"
+    },
+    {
+        "key":  "admin.payments.card_pending",
+        "fallback":  "Pendentes"
+    },
+    {
+        "key":  "admin.payments.card_rejected",
+        "fallback":  "Recusados"
+    },
+    {
+        "key":  "admin.payments.card_transactions_30d",
+        "fallback":  "TransaÃ§Ãµes (30 dias)"
+    },
+    {
+        "key":  "admin.payments.carne_advanced_settings",
+        "fallback":  "ConfiguraÃ§Ãµes avanÃ§adas do CarnÃª"
+    },
+    {
+        "key":  "admin.payments.carne_note",
+        "fallback":  "Controla se o mÃ©todo de pagamento CarnÃª Braziliana aparece no checkout para novas compras. Desativar nÃ£o afeta carnÃªs jÃ¡ existentes."
+    },
+    {
+        "key":  "admin.payments.carne_show_checkout",
+        "fallback":  "Exibir CarnÃª Braziliana no Checkout"
+    },
+    {
+        "key":  "admin.payments.commissions_page_title",
+        "fallback":  "ComissÃµes gerais - Admin"
+    },
+    {
+        "key":  "admin.payments.commissions_schema_missing",
+        "fallback":  "Schema de ComissÃµes gerais nÃ£o encontrado. Rode as migrations 052, 053 e 057."
+    },
+    {
+        "key":  "admin.payments.commissions_title",
+        "fallback":  "ComissÃµes gerais"
+    },
+    {
+        "key":  "admin.payments.config_page_title",
+        "fallback":  "ConfiguraÃ§Ãµes de Pagamento - Braziliana Admin"
+    },
+    {
+        "key":  "admin.payments.config_table_not_found",
+        "fallback":  "Tabela de configuraÃ§Ãµes nÃ£o encontrada"
+    },
+    {
+        "key":  "admin.payments.config_title",
+        "fallback":  "ConfiguraÃ§Ãµes de Pagamento"
+    },
+    {
+        "key":  "admin.payments.create_adjustment",
+        "fallback":  "Criar ajuste"
+    },
+    {
+        "key":  "admin.payments.credit",
+        "fallback":  "CrÃ©dito"
+    },
+    {
+        "key":  "admin.payments.credit_card",
+        "fallback":  "CartÃ£o de CrÃ©dito"
+    },
+    {
+        "key":  "admin.payments.currency_brl",
+        "fallback":  "Real (BRL)"
+    },
+    {
+        "key":  "admin.payments.currency_usd",
+        "fallback":  "DÃ³lar (USD)"
+    },
+    {
+        "key":  "admin.payments.debit",
+        "fallback":  "DÃ©bito"
+    },
+    {
+        "key":  "admin.payments.default_currency",
+        "fallback":  "Moeda PadrÃ£o"
+    },
+    {
+        "key":  "admin.payments.default_method",
+        "fallback":  "MÃ©todo PadrÃ£o"
+    },
+    {
+        "key":  "admin.payments.delete",
+        "fallback":  "Deletar"
+    },
+    {
+        "key":  "admin.payments.enable_cambioreal",
+        "fallback":  "Habilitar CÃ¢mbio Real"
+    },
+    {
+        "key":  "admin.payments.enable_mercadopago",
+        "fallback":  "Habilitar Mercado Pago"
+    },
+    {
+        "key":  "admin.payments.enable_pix",
+        "fallback":  "Habilitar PIX"
+    },
+    {
+        "key":  "admin.payments.enable_stripe",
+        "fallback":  "Habilitar Stripe"
+    },
+    {
+        "key":  "admin.payments.export_report",
+        "fallback":  "Exportar RelatÃ³rio"
+    },
+    {
+        "key":  "admin.payments.feature_in_development",
+        "fallback":  "Funcionalidade em desenvolvimento"
+    },
+    {
+        "key":  "admin.payments.gateway_label",
+        "fallback":  "Gateway:"
+    },
+    {
+        "key":  "admin.payments.gateway_wallet",
+        "fallback":  "Carteira"
+    },
+    {
+        "key":  "admin.payments.general_settings",
+        "fallback":  "ConfiguraÃ§Ãµes Gerais"
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_confirm",
+        "fallback":  "Cancelar o pedido no sistema?"
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_error",
+        "fallback":  "Erro ao cancelar pedido: "
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_error_generic",
+        "fallback":  "Erro ao cancelar pedido"
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_refund_too",
+        "fallback":  "Deseja estornar/cancelar o pagamento tambÃ©m?"
+    },
+    {
+        "key":  "admin.payments.js_cancel_payment_confirm",
+        "fallback":  "Cancelar pagamento no gateway?"
+    },
+    {
+        "key":  "admin.payments.js_cancel_payment_error",
+        "fallback":  "Erro ao cancelar pagamento: "
+    },
+    {
+        "key":  "admin.payments.js_cancel_payment_error_generic",
+        "fallback":  "Erro ao cancelar pagamento"
+    },
+    {
+        "key":  "admin.payments.js_confirm_error",
+        "fallback":  "Erro ao confirmar pagamento: "
+    },
+    {
+        "key":  "admin.payments.js_confirm_error_generic",
+        "fallback":  "Erro ao confirmar pagamento"
+    },
+    {
+        "key":  "admin.payments.js_confirm_payment",
+        "fallback":  "Tem certeza que deseja confirmar este pagamento?"
+    },
+    {
+        "key":  "admin.payments.js_refresh_error",
+        "fallback":  "Erro ao atualizar status: "
+    },
+    {
+        "key":  "admin.payments.js_refresh_error_generic",
+        "fallback":  "Erro ao atualizar status"
+    },
+    {
+        "key":  "admin.payments.js_refund_confirm",
+        "fallback":  "Confirmar estorno?"
+    },
+    {
+        "key":  "admin.payments.js_refund_error",
+        "fallback":  "Erro ao estornar: "
+    },
+    {
+        "key":  "admin.payments.js_refund_error_generic",
+        "fallback":  "Erro ao estornar"
+    },
+    {
+        "key":  "admin.payments.js_refund_reason",
+        "fallback":  "Motivo do estorno (opcional):"
+    },
+    {
+        "key":  "admin.payments.key_type",
+        "fallback":  "Tipo da Chave"
+    },
+    {
+        "key":  "admin.payments.load_error",
+        "fallback":  "Erro ao carregar pagamentos: "
+    },
+    {
+        "key":  "admin.payments.method",
+        "fallback":  "MÃ©todo"
+    },
+    {
+        "key":  "admin.payments.method_boleto",
+        "fallback":  "Boleto"
+    },
+    {
+        "key":  "admin.payments.method_card",
+        "fallback":  "CartÃ£o"
+    },
+    {
+        "key":  "admin.payments.method_label",
+        "fallback":  "MÃ©todo:"
+    },
+    {
+        "key":  "admin.payments.nav_dashboard",
+        "fallback":  "Dashboard"
+    },
+    {
+        "key":  "admin.payments.nav_orders",
+        "fallback":  "Pedidos"
+    },
+    {
+        "key":  "admin.payments.nav_products",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.payments.nav_users",
+        "fallback":  "UsuÃ¡rios"
+    },
+    {
+        "key":  "admin.payments.no_payments_window",
+        "fallback":  "Sem pagamentos nesta janela."
+    },
+    {
+        "key":  "admin.payments.none_found",
+        "fallback":  "Nenhum pagamento encontrado"
+    },
+    {
+        "key":  "admin.payments.observation",
+        "fallback":  "ObservaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.payments.order_label",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.payments.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.payments.page_title",
+        "fallback":  "Pagamentos - Braziliana Admin"
+    },
+    {
+        "key":  "admin.payments.payment",
+        "fallback":  "Pagamento"
+    },
+    {
+        "key":  "admin.payments.pix_key",
+        "fallback":  "Chave PIX"
+    },
+    {
+        "key":  "admin.payments.pix_random",
+        "fallback":  "AleatÃ³ria"
+    },
+    {
+        "key":  "admin.payments.public_key",
+        "fallback":  "Chave PÃºblica"
+    },
+    {
+        "key":  "admin.payments.reason",
+        "fallback":  "Motivo"
+    },
+    {
+        "key":  "admin.payments.refresh_not_implemented",
+        "fallback":  "Refresh automÃ¡tico ainda nÃ£o implementado para este gateway"
+    },
+    {
+        "key":  "admin.payments.refresh_status",
+        "fallback":  "Atualizar status"
+    },
+    {
+        "key":  "admin.payments.refund",
+        "fallback":  "Estornar"
+    },
+    {
+        "key":  "admin.payments.refund_not_implemented",
+        "fallback":  "Estorno ainda nÃ£o implementado para este gateway"
+    },
+    {
+        "key":  "admin.payments.register_payment",
+        "fallback":  "Registrar pagamento"
+    },
+    {
+        "key":  "admin.payments.remove_payment_confirm",
+        "fallback":  "Remover este pagamento?"
+    },
+    {
+        "key":  "admin.payments.save_adjustment",
+        "fallback":  "Salvar ajuste"
+    },
+    {
+        "key":  "admin.payments.save_payment",
+        "fallback":  "Salvar pagamento"
+    },
+    {
+        "key":  "admin.payments.save_settings",
+        "fallback":  "Salvar ConfiguraÃ§Ãµes"
+    },
+    {
+        "key":  "admin.payments.search_placeholder",
+        "fallback":  "Buscar pedido, cliente ou transaÃ§Ã£o..."
+    },
+    {
+        "key":  "admin.payments.secret_key",
+        "fallback":  "Chave Secreta"
+    },
+    {
+        "key":  "admin.payments.seller_label",
+        "fallback":  "Vendedor #"
+    },
+    {
+        "key":  "admin.payments.settings",
+        "fallback":  "ConfiguraÃ§Ãµes"
+    },
+    {
+        "key":  "admin.payments.status_approved",
+        "fallback":  "Aprovado"
+    },
+    {
+        "key":  "admin.payments.status_pending",
+        "fallback":  "Pendente"
+    },
+    {
+        "key":  "admin.payments.status_refunded",
+        "fallback":  "Estornado"
+    },
+    {
+        "key":  "admin.payments.status_rejected",
+        "fallback":  "Recusado"
+    },
+    {
+        "key":  "admin.payments.summary_by_seller",
+        "fallback":  "Resumo por vendedor"
+    },
+    {
+        "key":  "admin.payments.th_adjustments",
+        "fallback":  "Ajustes"
+    },
+    {
+        "key":  "admin.payments.th_calculated_commission",
+        "fallback":  "ComissÃ£o calculada"
+    },
+    {
+        "key":  "admin.payments.th_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.payments.th_paid",
+        "fallback":  "Pago"
+    },
+    {
+        "key":  "admin.payments.th_seller",
+        "fallback":  "Vendedor"
+    },
+    {
+        "key":  "admin.payments.title",
+        "fallback":  "Pagamentos"
+    },
+    {
+        "key":  "admin.payments.to",
+        "fallback":  "atÃ©"
+    },
+    {
+        "key":  "admin.payments.transaction_label",
+        "fallback":  "TransaÃ§Ã£o:"
+    },
+    {
+        "key":  "admin.payments.transactions_word",
+        "fallback":  "transaÃ§Ãµes"
+    },
+    {
+        "key":  "admin.payments.type",
+        "fallback":  "Tipo"
+    },
+    {
+        "key":  "admin.payments.value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.payments.value_label",
+        "fallback":  "Valor:"
+    },
+    {
+        "key":  "admin.payments.value_paid",
+        "fallback":  "Valor pago"
+    },
+    {
+        "key":  "admin.payments.view_order",
+        "fallback":  "Ver Pedido"
+    },
+    {
+        "key":  "admin.payments.visitor",
+        "fallback":  "Visitante"
+    },
+    {
+        "key":  "admin.payments.wallet_status_local",
+        "fallback":  "Status da carteira Ã© local (sem refresh externo)"
+    },
+    {
+        "key":  "admin.payments.window",
+        "fallback":  "Janela"
+    },
+    {
+        "key":  "admin.received_packages.cannot_delete",
+        "fallback":  "Pacote nÃ£o pode ser excluÃ­do."
+    },
+    {
+        "key":  "admin.received_packages.cannot_edit",
+        "fallback":  "Este pacote nÃ£o pode mais ser editado."
+    },
+    {
+        "key":  "admin.received_packages.created_success",
+        "fallback":  "Pacote cadastrado com sucesso. E-mail enviado ao cliente."
+    },
+    {
+        "key":  "admin.received_packages.deleted_success",
+        "fallback":  "Pacote excluÃ­do com sucesso."
+    },
+    {
+        "key":  "admin.received_packages.email_attention",
+        "fallback":  "AtenÃ§Ã£o:"
+    },
+    {
+        "key":  "admin.received_packages.email_deadline",
+        "fallback":  "VocÃª tem atÃ© \u003cstrong\u003e30 dias\u003c/strong\u003e para concluir suas compras e solicitar o envio."
+    },
+    {
+        "key":  "admin.received_packages.email_discard",
+        "fallback":  "ApÃ³s 42 dias, o produto serÃ¡ descartado."
+    },
+    {
+        "key":  "admin.received_packages.email_fee",
+        "fallback":  "ApÃ³s 15 dias, serÃ¡ cobrada uma taxa de armazenamento de US$ 2,00/dia."
+    },
+    {
+        "key":  "admin.received_packages.email_footer",
+        "fallback":  "Braziliana - Seu parceiro em compras internacionais"
+    },
+    {
+        "key":  "admin.received_packages.email_hello",
+        "fallback":  "OlÃ¡"
+    },
+    {
+        "key":  "admin.received_packages.email_intro",
+        "fallback":  "Informamos que recebemos um novo produto em nosso armazÃ©m vinculado Ã  sua suite:"
+    },
+    {
+        "key":  "admin.received_packages.email_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.received_packages.email_quantity",
+        "fallback":  "Quantidade"
+    },
+    {
+        "key":  "admin.received_packages.email_receipt_date",
+        "fallback":  "Data de Recebimento"
+    },
+    {
+        "key":  "admin.received_packages.email_subject",
+        "fallback":  "Seu produto foi cadastrado!"
+    },
+    {
+        "key":  "admin.received_packages.email_supplier",
+        "fallback":  "Fornecedor"
+    },
+    {
+        "key":  "admin.received_packages.email_view_cart",
+        "fallback":  "Ver meu Carrinho"
+    },
+    {
+        "key":  "admin.received_packages.email_weight",
+        "fallback":  "Peso"
+    },
+    {
+        "key":  "admin.received_packages.fill_required_fields",
+        "fallback":  "Preencha todos os campos obrigatÃ³rios."
+    },
+    {
+        "key":  "admin.received_packages.no_client_for_suite",
+        "fallback":  "Nenhum cliente encontrado com a suite"
+    },
+    {
+        "key":  "admin.received_packages.no_client_found",
+        "fallback":  "Nenhum cliente encontrado com"
+    },
+    {
+        "key":  "admin.received_packages.not_found",
+        "fallback":  "Pacote nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.received_packages.settings_saved",
+        "fallback":  "ConfiguraÃ§Ãµes salvas com sucesso."
+    },
+    {
+        "key":  "admin.received_packages.status_discarded",
+        "fallback":  "Descartado"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_confirmed",
+        "fallback":  "Invoice Confirmado"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_disputed",
+        "fallback":  "Invoice Contestado"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_paid",
+        "fallback":  "Fatura Paga"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_pending",
+        "fallback":  "Fatura Pendente"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_released",
+        "fallback":  "Invoice Liberado"
+    },
+    {
+        "key":  "admin.received_packages.status_order_created",
+        "fallback":  "Pedido Criado"
+    },
+    {
+        "key":  "admin.received_packages.status_pending",
+        "fallback":  "Pendente"
+    },
+    {
+        "key":  "admin.received_packages.status_shipped",
+        "fallback":  "Enviado"
+    },
+    {
+        "key":  "admin.received_packages.updated_success",
+        "fallback":  "Pacote atualizado com sucesso."
+    },
+    {
+        "key":  "admin.report_general.discount_prefix",
+        "fallback":  "Desconto - "
+    },
+    {
+        "key":  "admin.report_general.no_category",
+        "fallback":  "Sem categoria"
+    },
+    {
+        "key":  "admin.report_general.order_word",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.report_general.seller_paren",
+        "fallback":  "(vendedor: "
+    },
+    {
+        "key":  "admin.report_general.title",
+        "fallback":  "RelatÃ³rio Geral"
+    },
+    {
+        "key":  "admin.report_orders.desapego_mix_suffix",
+        "fallback":  " ContÃ©m {count} item(ns) de Desapego Braziliana."
+    },
+    {
+        "key":  "admin.report_orders.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.report_orders.title",
+        "fallback":  "RelatÃ³rio de Pedidos"
+    },
+    {
+        "key":  "admin.report_orders.type_advisory_desc",
+        "fallback":  "Pedido criado via orÃ§amento de assessoria personalizada."
+    },
+    {
+        "key":  "admin.report_orders.type_advisory_label",
+        "fallback":  "Assessoria de Compra"
+    },
+    {
+        "key":  "admin.report_orders.type_desapego_desc",
+        "fallback":  "Pedido de produto(s) do Desapego Braziliana (entrega somente EUA)."
+    },
+    {
+        "key":  "admin.report_orders.type_desapego_label",
+        "fallback":  "Desapego Braziliana"
+    },
+    {
+        "key":  "admin.report_orders.type_forwarding_desc",
+        "fallback":  "Pedido originado do serviÃ§o de redirecionamento de pacotes (compras prÃ³prias do cliente)."
+    },
+    {
+        "key":  "admin.report_orders.type_forwarding_label",
+        "fallback":  "Redirecionamento de Pacote"
+    },
+    {
+        "key":  "admin.report_orders.type_manual_desc",
+        "fallback":  "Pedido criado manualmente pela equipe administrativa."
+    },
+    {
+        "key":  "admin.report_orders.type_manual_label",
+        "fallback":  "Pedido Manual"
+    },
+    {
+        "key":  "admin.report_orders.type_mixed_desc",
+        "fallback":  "Este pedido contÃ©m {fwd} item(ns) de redirecionamento e {site} item(ns) do catÃ¡logo do site."
+    },
+    {
+        "key":  "admin.report_orders.type_mixed_label",
+        "fallback":  "Pedido Misto"
+    },
+    {
+        "key":  "admin.report_orders.type_site_desc",
+        "fallback":  "Pedido de produtos disponÃ­veis no catÃ¡logo da loja."
+    },
+    {
+        "key":  "admin.report_orders.type_site_label",
+        "fallback":  "Produtos do Site"
+    },
+    {
+        "key":  "admin.reports.action_created_manual_order",
+        "fallback":  "Criou pedido manual"
+    },
+    {
+        "key":  "admin.reports.action_generated_payment_link",
+        "fallback":  "Gerou link de pagamento"
+    },
+    {
+        "key":  "admin.reports.action_updated_profile",
+        "fallback":  "Atualizou perfil"
+    },
+    {
+        "key":  "admin.reports.all_currencies",
+        "fallback":  "Todas"
+    },
+    {
+        "key":  "admin.reports.audit_page_title",
+        "fallback":  "Auditoria de AÃ§Ãµes - Admin"
+    },
+    {
+        "key":  "admin.reports.audit_search_placeholder",
+        "fallback":  "aÃ§Ã£o, rota, tabela..."
+    },
+    {
+        "key":  "admin.reports.audit_title",
+        "fallback":  "Auditoria / Logs de Uso"
+    },
+    {
+        "key":  "admin.reports.btn_complete_report",
+        "fallback":  "RelatÃ³rio Completo"
+    },
+    {
+        "key":  "admin.reports.btn_financial_complete",
+        "fallback":  "Financeiro (Completo)"
+    },
+    {
+        "key":  "admin.reports.btn_movement",
+        "fallback":  "MovimentaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.reports.btn_purchases",
+        "fallback":  "Compras"
+    },
+    {
+        "key":  "admin.reports.btn_stock",
+        "fallback":  "Estoque"
+    },
+    {
+        "key":  "admin.reports.card_expiring",
+        "fallback":  "Vencendo"
+    },
+    {
+        "key":  "admin.reports.card_in_shopping_list",
+        "fallback":  "Na lista de compras"
+    },
+    {
+        "key":  "admin.reports.card_needs_buy",
+        "fallback":  "Precisa Comprar"
+    },
+    {
+        "key":  "admin.reports.card_next_30_days",
+        "fallback":  "PrÃ³ximos 30 dias"
+    },
+    {
+        "key":  "admin.reports.card_registered",
+        "fallback":  "Cadastrados no sistema"
+    },
+    {
+        "key":  "admin.reports.card_total_products",
+        "fallback":  "Total Produtos"
+    },
+    {
+        "key":  "admin.reports.card_with_stock",
+        "fallback":  "Com Estoque"
+    },
+    {
+        "key":  "admin.reports.card_with_stock_items",
+        "fallback":  "Com itens em estoque"
+    },
+    {
+        "key":  "admin.reports.clear_filters",
+        "fallback":  "Limpar Filtros"
+    },
+    {
+        "key":  "admin.reports.commission",
+        "fallback":  "ComissÃ£o:"
+    },
+    {
+        "key":  "admin.reports.consolidated_brl",
+        "fallback":  "Consolidado (BRL)"
+    },
+    {
+        "key":  "admin.reports.consolidated_usd",
+        "fallback":  "Consolidado (USD)"
+    },
+    {
+        "key":  "admin.reports.creation_from",
+        "fallback":  "CriaÃ§Ã£o (de)"
+    },
+    {
+        "key":  "admin.reports.creation_to",
+        "fallback":  "CriaÃ§Ã£o (atÃ©)"
+    },
+    {
+        "key":  "admin.reports.critical_products",
+        "fallback":  "Produtos CrÃ­ticos"
+    },
+    {
+        "key":  "admin.reports.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.reports.days",
+        "fallback":  "dias"
+    },
+    {
+        "key":  "admin.reports.end_date",
+        "fallback":  "Data Final"
+    },
+    {
+        "key":  "admin.reports.export_csv",
+        "fallback":  "Exportar CSV"
+    },
+    {
+        "key":  "admin.reports.export_pdf",
+        "fallback":  "Exportar PDF"
+    },
+    {
+        "key":  "admin.reports.fields_label",
+        "fallback":  "Campos: "
+    },
+    {
+        "key":  "admin.reports.filters_for_reports",
+        "fallback":  "Filtros para RelatÃ³rios"
+    },
+    {
+        "key":  "admin.reports.financial_page_title",
+        "fallback":  "RelatÃ³rio Financeiro - Admin"
+    },
+    {
+        "key":  "admin.reports.financial_title",
+        "fallback":  "RelatÃ³rio Financeiro (Completo)"
+    },
+    {
+        "key":  "admin.reports.fixed_shipping_cost",
+        "fallback":  "Custo envio fixo:"
+    },
+    {
+        "key":  "admin.reports.flow_page_title",
+        "fallback":  "MovimentaÃ§Ã£o do Fluxo - Admin"
+    },
+    {
+        "key":  "admin.reports.flow_title",
+        "fallback":  "MovimentaÃ§Ã£o do Fluxo"
+    },
+    {
+        "key":  "admin.reports.from",
+        "fallback":  "De"
+    },
+    {
+        "key":  "admin.reports.generate_custom_report",
+        "fallback":  "Gerar RelatÃ³rio Personalizado"
+    },
+    {
+        "key":  "admin.reports.no_records",
+        "fallback":  "Nenhum registro encontrado."
+    },
+    {
+        "key":  "admin.reports.of",
+        "fallback":  "de"
+    },
+    {
+        "key":  "admin.reports.only_movement",
+        "fallback":  "Apenas MovimentaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.reports.only_purchases",
+        "fallback":  "Apenas Compras"
+    },
+    {
+        "key":  "admin.reports.only_stock",
+        "fallback":  "Apenas Estoque"
+    },
+    {
+        "key":  "admin.reports.page",
+        "fallback":  "PÃ¡gina"
+    },
+    {
+        "key":  "admin.reports.page_title",
+        "fallback":  "RelatÃ³rios - Braziliana Admin"
+    },
+    {
+        "key":  "admin.reports.payment_from",
+        "fallback":  "Pagamento (de)"
+    },
+    {
+        "key":  "admin.reports.payment_to",
+        "fallback":  "Pagamento (atÃ©)"
+    },
+    {
+        "key":  "admin.reports.pdf_error",
+        "fallback":  "Erro ao gerar PDF: "
+    },
+    {
+        "key":  "admin.reports.pdf_footer",
+        "fallback":  "RelatÃ³rio gerado pelo Sistema Braziliana Estoque - PÃ¡gina "
+    },
+    {
+        "key":  "admin.reports.pdf_generated_at",
+        "fallback":  "Gerado em: "
+    },
+    {
+        "key":  "admin.reports.pdf_report_of",
+        "fallback":  "RelatÃ³rio de "
+    },
+    {
+        "key":  "admin.reports.product_cost",
+        "fallback":  "Custo produtos:"
+    },
+    {
+        "key":  "admin.reports.products_by_expiry",
+        "fallback":  "Produtos por Validade"
+    },
+    {
+        "key":  "admin.reports.profit",
+        "fallback":  "Lucro:"
+    },
+    {
+        "key":  "admin.reports.profit_consolidated",
+        "fallback":  "Lucro (consolidado)"
+    },
+    {
+        "key":  "admin.reports.recent_movements",
+        "fallback":  "MovimentaÃ§Ãµes Recentes"
+    },
+    {
+        "key":  "admin.reports.records",
+        "fallback":  "registros"
+    },
+    {
+        "key":  "admin.reports.report_type",
+        "fallback":  "Tipo de RelatÃ³rio"
+    },
+    {
+        "key":  "admin.reports.sales_quantity",
+        "fallback":  "Quantidade de vendas"
+    },
+    {
+        "key":  "admin.reports.search_placeholder",
+        "fallback":  "pedido, produto, sku..."
+    },
+    {
+        "key":  "admin.reports.service_fee",
+        "fallback":  "Taxa de serviÃ§o:"
+    },
+    {
+        "key":  "admin.reports.start_date",
+        "fallback":  "Data Inicial"
+    },
+    {
+        "key":  "admin.reports.status_critical",
+        "fallback":  "CrÃ­tico"
+    },
+    {
+        "key":  "admin.reports.status_out_of_stock",
+        "fallback":  "Esgotado"
+    },
+    {
+        "key":  "admin.reports.status_placeholder",
+        "fallback":  "ex: pago"
+    },
+    {
+        "key":  "admin.reports.store",
+        "fallback":  "Loja"
+    },
+    {
+        "key":  "admin.reports.store_other",
+        "fallback":  "Outro"
+    },
+    {
+        "key":  "admin.reports.subtotal_products",
+        "fallback":  "Subtotal produtos:"
+    },
+    {
+        "key":  "admin.reports.system",
+        "fallback":  "Sistema"
+    },
+    {
+        "key":  "admin.reports.table_auditoria_missing",
+        "fallback":  "A tabela \u003cstrong\u003eauditoria_logs\u003c/strong\u003e nÃ£o existe no banco. Rode as migrations 068 e 069."
+    },
+    {
+        "key":  "admin.reports.table_auditoria_missing2",
+        "fallback":  "A tabela \u003cstrong\u003eauditoria_logs\u003c/strong\u003e nÃ£o existe no banco. Rode a migration \u003ccode\u003e068_create_auditoria_logs.sql\u003c/code\u003e."
+    },
+    {
+        "key":  "admin.reports.table_estoque_movimentacao_missing",
+        "fallback":  "A tabela \u003cstrong\u003eestoque_movimentacao\u003c/strong\u003e nÃ£o existe no banco."
+    },
+    {
+        "key":  "admin.reports.taxes_collected_origin",
+        "fallback":  "Impostos arrecadados (origem)"
+    },
+    {
+        "key":  "admin.reports.taxes_passthrough",
+        "fallback":  "Impostos (pass-through):"
+    },
+    {
+        "key":  "admin.reports.th_action",
+        "fallback":  "AÃ§Ã£o"
+    },
+    {
+        "key":  "admin.reports.th_commission_brl",
+        "fallback":  "ComissÃ£o BRL"
+    },
+    {
+        "key":  "admin.reports.th_commission_usd",
+        "fallback":  "ComissÃ£o USD"
+    },
+    {
+        "key":  "admin.reports.th_cost_prod_brl",
+        "fallback":  "Custo Prod BRL"
+    },
+    {
+        "key":  "admin.reports.th_cost_prod_usd",
+        "fallback":  "Custo Prod USD"
+    },
+    {
+        "key":  "admin.reports.th_created",
+        "fallback":  "Criado"
+    },
+    {
+        "key":  "admin.reports.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.reports.th_days_to_expire",
+        "fallback":  "Dias para Vencer"
+    },
+    {
+        "key":  "admin.reports.th_details",
+        "fallback":  "Detalhes"
+    },
+    {
+        "key":  "admin.reports.th_expiry_date",
+        "fallback":  "Data Validade"
+    },
+    {
+        "key":  "admin.reports.th_ideal",
+        "fallback":  "Ideal"
+    },
+    {
+        "key":  "admin.reports.th_in_stock",
+        "fallback":  "Em Estoque"
+    },
+    {
+        "key":  "admin.reports.th_items",
+        "fallback":  "Itens"
+    },
+    {
+        "key":  "admin.reports.th_minimum",
+        "fallback":  "MÃ­nimo"
+    },
+    {
+        "key":  "admin.reports.th_missing",
+        "fallback":  "Faltante"
+    },
+    {
+        "key":  "admin.reports.th_needed",
+        "fallback":  "NecessÃ¡rio"
+    },
+    {
+        "key":  "admin.reports.th_new",
+        "fallback":  "Nova"
+    },
+    {
+        "key":  "admin.reports.th_number",
+        "fallback":  "NÃºmero"
+    },
+    {
+        "key":  "admin.reports.th_origin",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.reports.th_paid",
+        "fallback":  "Pago"
+    },
+    {
+        "key":  "admin.reports.th_previous",
+        "fallback":  "Anterior"
+    },
+    {
+        "key":  "admin.reports.th_priority",
+        "fallback":  "Prioridade"
+    },
+    {
+        "key":  "admin.reports.th_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.reports.th_profit_brl",
+        "fallback":  "Lucro BRL"
+    },
+    {
+        "key":  "admin.reports.th_profit_usd",
+        "fallback":  "Lucro USD"
+    },
+    {
+        "key":  "admin.reports.th_quantity",
+        "fallback":  "Quantidade"
+    },
+    {
+        "key":  "admin.reports.th_rate",
+        "fallback":  "Tx"
+    },
+    {
+        "key":  "admin.reports.th_reason",
+        "fallback":  "Motivo"
+    },
+    {
+        "key":  "admin.reports.th_service_brl",
+        "fallback":  "Taxa Serv BRL"
+    },
+    {
+        "key":  "admin.reports.th_service_usd",
+        "fallback":  "Taxa Serv USD"
+    },
+    {
+        "key":  "admin.reports.th_shipping_brl",
+        "fallback":  "Envio BRL"
+    },
+    {
+        "key":  "admin.reports.th_shipping_usd",
+        "fallback":  "Envio USD"
+    },
+    {
+        "key":  "admin.reports.th_stock",
+        "fallback":  "Estoque"
+    },
+    {
+        "key":  "admin.reports.th_subtotal_prod_brl",
+        "fallback":  "Subtotal Prod BRL"
+    },
+    {
+        "key":  "admin.reports.th_subtotal_prod_usd",
+        "fallback":  "Subtotal Prod USD"
+    },
+    {
+        "key":  "admin.reports.th_target",
+        "fallback":  "Alvo"
+    },
+    {
+        "key":  "admin.reports.th_taxes_brl",
+        "fallback":  "Impostos BRL"
+    },
+    {
+        "key":  "admin.reports.th_taxes_usd",
+        "fallback":  "Impostos USD"
+    },
+    {
+        "key":  "admin.reports.th_unit_price",
+        "fallback":  "PreÃ§o Unit."
+    },
+    {
+        "key":  "admin.reports.th_value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.reports.title",
+        "fallback":  "RelatÃ³rios e AnÃ¡lises"
+    },
+    {
+        "key":  "admin.reports.to",
+        "fallback":  "AtÃ©"
+    },
+    {
+        "key":  "admin.reports.total_collected",
+        "fallback":  "Total arrecadado:"
+    },
+    {
+        "key":  "admin.reports.total_collected_origin",
+        "fallback":  "Total arrecadado (origem)"
+    },
+    {
+        "key":  "admin.reports.type",
+        "fallback":  "Tipo"
+    },
+    {
+        "key":  "admin.reports.type_flow",
+        "fallback":  "Fluxo (Pedidos/Compras)"
+    },
+    {
+        "key":  "admin.reports.type_orders",
+        "fallback":  "Pedidos"
+    },
+    {
+        "key":  "admin.reports.type_purchases",
+        "fallback":  "Compras"
+    },
+    {
+        "key":  "admin.reports.type_stock",
+        "fallback":  "Estoque"
+    },
+    {
+        "key":  "admin.reports.urgent_purchases",
+        "fallback":  "Compras Urgentes"
+    },
+    {
+        "key":  "admin.reports.user",
+        "fallback":  "UsuÃ¡rio"
+    },
+    {
+        "key":  "admin.reports.user_label",
+        "fallback":  "UsuÃ¡rio #"
+    },
+    {
+        "key":  "admin.role.redirecionador",
+        "fallback":  "Redirecionamento"
+    },
+    {
+        "key":  "admin.shipment_correios.badge_label_generated",
+        "fallback":  "Etiqueta Gerada"
+    },
+    {
+        "key":  "admin.shipment_correios.cannot_delete_posted",
+        "fallback":  "NÃ£o Ã© possÃ­vel deletar uma etiqueta jÃ¡ postada"
+    },
+    {
+        "key":  "admin.shipment_correios.confirm_generate",
+        "fallback":  "Deseja gerar a etiqueta dos Correios para esta remessa?"
+    },
+    {
+        "key":  "admin.shipment_correios.confirm_posting",
+        "fallback":  "Confirmar Postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.delete_label_title",
+        "fallback":  "Deletar esta etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.enter_order_number",
+        "fallback":  "Digite o nÃºmero do pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.err_invalid_label_format",
+        "fallback":  "Correios retornou uma etiqueta em formato invÃ¡lido:"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_address",
+        "fallback":  "PrÃ©-Postagem: pedido sem dados completos de endereÃ§o do destinatÃ¡rio"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_create",
+        "fallback":  "Falha ao criar prÃ©-postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_create_failed",
+        "fallback":  "PrÃ©-Postagem falhou ao criar:"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_dims_invalid",
+        "fallback":  "PrÃ©-Postagem: pedido com dimensÃµes invÃ¡lidas"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_dims_invalid_detail",
+        "fallback":  "PrÃ©-Postagem: pedido com dimensÃµes invÃ¡lidas (altura/largura/comprimento)"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_doc",
+        "fallback":  "PrÃ©-Postagem: CPF/CNPJ do destinatÃ¡rio invÃ¡lido ou ausente"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_ncm_prefix",
+        "fallback":  "PrÃ©-Postagem: item #"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_ncm_suffix",
+        "fallback":  " sem NCM"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_qty_prefix",
+        "fallback":  "PrÃ©-Postagem: item #"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_qty_suffix",
+        "fallback":  " com quantidade invÃ¡lida"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_no_code",
+        "fallback":  "PrÃ©-Postagem: resposta sem codigoObjeto"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_no_items",
+        "fallback":  "PrÃ©-Postagem: pedido sem itens"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_no_valid_items",
+        "fallback":  "PrÃ©-Postagem: pedido sem itens vÃ¡lidos para declaraÃ§Ã£o de conteÃºdo"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_sender",
+        "fallback":  "PrÃ©-Postagem: configure o remetente (JSON) no Admin"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_service_code",
+        "fallback":  "PrÃ©-Postagem: informe o cÃ³digo do serviÃ§o nas configuraÃ§Ãµes"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_token",
+        "fallback":  "PrÃ©-Postagem: configure o token (CartÃ£o de Postagem) no Admin"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_weight_invalid",
+        "fallback":  "PrÃ©-Postagem: pedido com peso invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_weight_invalid_detail",
+        "fallback":  "PrÃ©-Postagem: pedido com peso invÃ¡lido (peso_total/peso)"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_disabled",
+        "fallback":  "SIGEP estÃ¡ desabilitado. Habilite e configure em /admin/configuracoes \u003e Entrega \u003e Correios (SIGEP Web)."
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_dv_format",
+        "fallback":  "SIGEP: etiqueta sem DV em formato invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_fill",
+        "fallback":  "SIGEP: preencha usuÃ¡rio/senha/contrato/cartÃ£o/cÃ³digo do serviÃ§o no Admin"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_generate",
+        "fallback":  "SIGEP falhou ao gerar etiqueta:"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_incomplete",
+        "fallback":  "SIGEP: configuraÃ§Ã£o incompleta. Preencha usuÃ¡rio, senha, contrato, cartÃ£o de postagem e cÃ³digo do serviÃ§o."
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_soap",
+        "fallback":  "SIGEP: extensÃ£o SOAP nÃ£o disponÃ­vel no PHP do servidor"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_unexpected",
+        "fallback":  "SIGEP: resposta inesperada ao solicitar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_wsdl",
+        "fallback":  "SIGEP falhou ao carregar WSDL:"
+    },
+    {
+        "key":  "admin.shipment_correios.generate_batch",
+        "fallback":  "Gerar Lote"
+    },
+    {
+        "key":  "admin.shipment_correios.generate_label",
+        "fallback":  "Gerar Etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.generated_labels_title",
+        "fallback":  "Etiquetas Geradas"
+    },
+    {
+        "key":  "admin.shipment_correios.heading",
+        "fallback":  "Remessa Correios"
+    },
+    {
+        "key":  "admin.shipment_correios.invalid_label_id",
+        "fallback":  "ID da etiqueta invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_batch_prefix",
+        "fallback":  "Deseja gerar etiquetas para"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_batch_suffix",
+        "fallback":  "remessas selecionadas?"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_delete_prefix",
+        "fallback":  "Tem certeza que deseja DELETAR a etiqueta #"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_delete_suffix",
+        "fallback":  "? Essa aÃ§Ã£o nÃ£o pode ser desfeita."
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_posting",
+        "fallback":  "Confirmar postagem desta etiqueta?"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_regenerate_prefix",
+        "fallback":  "Isso vai DELETAR a etiqueta atual (#"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_regenerate_suffix",
+        "fallback":  ") e gerar uma nova com as medidas atuais do pedido. Continuar?"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_batch",
+        "fallback":  "Erro ao gerar lote:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_batch_short",
+        "fallback":  "Erro ao gerar lote de etiquetas"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_confirm_posting",
+        "fallback":  "Erro ao confirmar postagem:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_confirm_posting_short",
+        "fallback":  "Erro ao confirmar postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_delete",
+        "fallback":  "Erro ao deletar:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_delete_short",
+        "fallback":  "Erro ao deletar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_generate",
+        "fallback":  "Erro ao gerar etiqueta:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_generate_short",
+        "fallback":  "Erro ao gerar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_regenerate",
+        "fallback":  "Erro ao regerar etiqueta:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_regenerate_short",
+        "fallback":  "Erro ao regerar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.js_label_deleted",
+        "fallback":  "Etiqueta deletada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.js_label_generated",
+        "fallback":  "Etiqueta gerada com sucesso! CÃ³digo:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_label_regenerated",
+        "fallback":  "Etiqueta regerada com sucesso! Novo cÃ³digo:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_posting_confirmed",
+        "fallback":  "Postagem confirmada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.js_select_at_least_one",
+        "fallback":  "Selecione pelo menos uma remessa para gerar etiquetas em lote"
+    },
+    {
+        "key":  "admin.shipment_correios.js_unknown_error",
+        "fallback":  "Erro desconhecido"
+    },
+    {
+        "key":  "admin.shipment_correios.label_deleted_success",
+        "fallback":  "Etiqueta deletada com sucesso"
+    },
+    {
+        "key":  "admin.shipment_correios.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta Correios para este pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.label_generated_success",
+        "fallback":  "Etiqueta gerada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.label_not_found",
+        "fallback":  "Etiqueta nÃ£o encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.label_regenerated_success",
+        "fallback":  "Etiqueta regerada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.labels_generated_count",
+        "fallback":  "Etiquetas geradas:"
+    },
+    {
+        "key":  "admin.shipment_correios.no_generated_labels",
+        "fallback":  "Nenhuma etiqueta gerada encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.no_order_selected",
+        "fallback":  "Nenhum pedido selecionado"
+    },
+    {
+        "key":  "admin.shipment_correios.no_printed_labels",
+        "fallback":  "Nenhuma etiqueta impressa encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.no_ready_shipments",
+        "fallback":  "Nenhuma remessa pronta para etiqueta encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.no_ready_shipments_short",
+        "fallback":  "Nenhuma remessa pronta"
+    },
+    {
+        "key":  "admin.shipment_correios.not_found_in_page",
+        "fallback":  "nÃ£o encontrado nas tabelas desta pÃ¡gina."
+    },
+    {
+        "key":  "admin.shipment_correios.order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.shipment_correios.page_title",
+        "fallback":  "Remessa Correios"
+    },
+    {
+        "key":  "admin.shipment_correios.posting_confirmed_success",
+        "fallback":  "Postagem confirmada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.print_all",
+        "fallback":  "Imprimir Todas"
+    },
+    {
+        "key":  "admin.shipment_correios.print_page_title",
+        "fallback":  "Etiquetas Correios"
+    },
+    {
+        "key":  "admin.shipment_correios.printed_labels_title",
+        "fallback":  "Etiquetas Impressas"
+    },
+    {
+        "key":  "admin.shipment_correios.ready_shipments_title",
+        "fallback":  "Remessas Prontas para Etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.regenerate",
+        "fallback":  "Regerar"
+    },
+    {
+        "key":  "admin.shipment_correios.regenerate_title",
+        "fallback":  "Deletar etiqueta atual e gerar nova com as medidas atuais do pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.reprint",
+        "fallback":  "Reimprimir"
+    },
+    {
+        "key":  "admin.shipment_correios.search_order_placeholder",
+        "fallback":  "NÂº pedido..."
+    },
+    {
+        "key":  "admin.shipment_correios.stat_generated",
+        "fallback":  "Geradas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_labels",
+        "fallback":  "Etiquetas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_posted",
+        "fallback":  "Postadas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_printed",
+        "fallback":  "Impressas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_ready",
+        "fallback":  "Prontas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_ready_to_post",
+        "fallback":  "Prontas para postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_sent",
+        "fallback":  "Enviadas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_waiting_label",
+        "fallback":  "Aguardando etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.th_code",
+        "fallback":  "CÃ³digo"
+    },
+    {
+        "key":  "admin.shipment_correios.th_generation_date",
+        "fallback":  "Data GeraÃ§Ã£o"
+    },
+    {
+        "key":  "admin.shipment_correios.th_label",
+        "fallback":  "Etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.th_order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.th_print_date",
+        "fallback":  "Data ImpressÃ£o"
+    },
+    {
+        "key":  "admin.shipment_correios.th_shipment",
+        "fallback":  "Remessa"
+    },
+    {
+        "key":  "admin.shipment_correios.th_shipment_date",
+        "fallback":  "Data Remessa"
+    },
+    {
+        "key":  "admin.shipment_correios.th_value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.shipment_correios.th_weight",
+        "fallback":  "Peso"
+    },
+    {
+        "key":  "admin.shipstation.confirm_generate",
+        "fallback":  "Gerar etiqueta ShipStation para o pedido"
+    },
+    {
+        "key":  "admin.shipstation.delivery_menu",
+        "fallback":  "Entrega"
+    },
+    {
+        "key":  "admin.shipstation.disabled_warning",
+        "fallback":  "ShipStation estÃ¡ desabilitado ou nÃ£o configurado. VÃ¡ em"
+    },
+    {
+        "key":  "admin.shipstation.enable_configure",
+        "fallback":  "e ative/configure."
+    },
+    {
+        "key":  "admin.shipstation.err_carrier_id",
+        "fallback":  "ShipStation: configure shipstation_carrier_id em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.shipstation.err_from_address",
+        "fallback":  "ShipStation: configure shipstation_from_address_json (JSON) em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.shipstation.err_incomplete_address",
+        "fallback":  "ShipStation: endereÃ§o de entrega incompleto no pedido (address_line1)."
+    },
+    {
+        "key":  "admin.shipstation.generate_label",
+        "fallback":  "Gerar etiqueta"
+    },
+    {
+        "key":  "admin.shipstation.generated_labels",
+        "fallback":  "Etiquetas geradas"
+    },
+    {
+        "key":  "admin.shipstation.heading",
+        "fallback":  "Remessa ShipStation (UPS)"
+    },
+    {
+        "key":  "admin.shipstation.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipstation.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta ShipStation para este pedido"
+    },
+    {
+        "key":  "admin.shipstation.no_labels",
+        "fallback":  "Nenhuma etiqueta gerada."
+    },
+    {
+        "key":  "admin.shipstation.no_orders_waiting",
+        "fallback":  "Nenhum pedido exterior aguardando etiqueta."
+    },
+    {
+        "key":  "admin.shipstation.no_shipment_id",
+        "fallback":  "ShipStation: shipment_id nÃ£o retornou."
+    },
+    {
+        "key":  "admin.shipstation.open",
+        "fallback":  "Abrir"
+    },
+    {
+        "key":  "admin.shipstation.order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipstation.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.shipstation.orders_ready_label",
+        "fallback":  "Pedidos pagos (exterior) - prontos para etiqueta"
+    },
+    {
+        "key":  "admin.shipstation.page_title",
+        "fallback":  "Remessa ShipStation (UPS)"
+    },
+    {
+        "key":  "admin.shipstation.table_missing",
+        "fallback":  "Tabela shipstation_etiquetas nÃ£o encontrada. Rode a migration database/migrations/070_create_shipstation_etiquetas_schema.sql"
+    },
+    {
+        "key":  "admin.shipstation.th_carrier",
+        "fallback":  "Carrier"
+    },
+    {
+        "key":  "admin.shipstation.th_country",
+        "fallback":  "PaÃ­s"
+    },
+    {
+        "key":  "admin.shipstation.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.shipstation.th_label",
+        "fallback":  "Label"
+    },
+    {
+        "key":  "admin.shipstation.th_order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipstation.th_tracking",
+        "fallback":  "Tracking"
+    },
+    {
+        "key":  "admin.stamps.confirm_generate",
+        "fallback":  "Gerar etiqueta Stamps para o pedido"
+    },
+    {
+        "key":  "admin.stamps.delivery_menu",
+        "fallback":  "Entrega"
+    },
+    {
+        "key":  "admin.stamps.disabled_warning",
+        "fallback":  "Stamps estÃ¡ desabilitado ou nÃ£o configurado. VÃ¡ em"
+    },
+    {
+        "key":  "admin.stamps.enable_configure",
+        "fallback":  "e ative/configure."
+    },
+    {
+        "key":  "admin.stamps.err_from_address",
+        "fallback":  "Stamps: configure stamps_from_address_json (JSON) em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.stamps.err_incomplete_address",
+        "fallback":  "Stamps: endereÃ§o de entrega incompleto no pedido (address_line1)."
+    },
+    {
+        "key":  "admin.stamps.err_service_type",
+        "fallback":  "Stamps: configure stamps_service_type em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.stamps.generate_label",
+        "fallback":  "Gerar etiqueta"
+    },
+    {
+        "key":  "admin.stamps.generated_labels",
+        "fallback":  "Etiquetas geradas"
+    },
+    {
+        "key":  "admin.stamps.heading",
+        "fallback":  "Remessa Stamps (UPS)"
+    },
+    {
+        "key":  "admin.stamps.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.stamps.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta Stamps para este pedido"
+    },
+    {
+        "key":  "admin.stamps.no_labels",
+        "fallback":  "Nenhuma etiqueta gerada."
+    },
+    {
+        "key":  "admin.stamps.no_orders_waiting",
+        "fallback":  "Nenhum pedido exterior aguardando etiqueta."
+    },
+    {
+        "key":  "admin.stamps.open",
+        "fallback":  "Abrir"
+    },
+    {
+        "key":  "admin.stamps.order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.stamps.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.stamps.orders_ready_label",
+        "fallback":  "Pedidos pagos (exterior) - prontos para etiqueta"
+    },
+    {
+        "key":  "admin.stamps.page_title",
+        "fallback":  "Remessa Stamps (UPS)"
+    },
+    {
+        "key":  "admin.stamps.table_missing",
+        "fallback":  "Tabela stamps_etiquetas nÃ£o encontrada. Rode a migration database/migrations/070_create_stamps_etiquetas.sql"
+    },
+    {
+        "key":  "admin.stamps.th_carrier",
+        "fallback":  "Carrier"
+    },
+    {
+        "key":  "admin.stamps.th_country",
+        "fallback":  "PaÃ­s"
+    },
+    {
+        "key":  "admin.stamps.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.stamps.th_label",
+        "fallback":  "Label"
+    },
+    {
+        "key":  "admin.stamps.th_order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.stamps.th_tracking",
+        "fallback":  "Tracking"
+    },
+    {
+        "key":  "admin.stores.confirm_delete",
+        "fallback":  "Excluir esta loja?"
+    },
+    {
+        "key":  "admin.stores.delete_error",
+        "fallback":  "Erro ao excluir loja."
+    },
+    {
+        "key":  "admin.stores.deleted_success",
+        "fallback":  "Loja excluÃ­da com sucesso."
+    },
+    {
+        "key":  "admin.stores.edit",
+        "fallback":  "Editar Loja"
+    },
+    {
+        "key":  "admin.stores.empty",
+        "fallback":  "Nenhuma loja cadastrada."
+    },
+    {
+        "key":  "admin.stores.form.name",
+        "fallback":  "Nome *"
+    },
+    {
+        "key":  "admin.stores.form.slug",
+        "fallback":  "Slug"
+    },
+    {
+        "key":  "admin.stores.form.slug_hint",
+        "fallback":  "Se vazio, serÃ¡ gerado automaticamente."
+    },
+    {
+        "key":  "admin.stores.invalid_slug",
+        "fallback":  "Slug invÃ¡lido."
+    },
+    {
+        "key":  "admin.stores.list_title",
+        "fallback":  "Lista de Lojas"
+    },
+    {
+        "key":  "admin.stores.name_required",
+        "fallback":  "Informe o nome da loja."
+    },
+    {
+        "key":  "admin.stores.new",
+        "fallback":  "Nova Loja"
+    },
+    {
+        "key":  "admin.stores.save_error",
+        "fallback":  "Erro ao salvar loja"
+    },
+    {
+        "key":  "admin.stores.saved_success",
+        "fallback":  "Loja salva com sucesso."
+    },
+    {
+        "key":  "admin.stores.status.active",
+        "fallback":  "Ativa"
+    },
+    {
+        "key":  "admin.stores.status.inactive",
+        "fallback":  "Inativa"
+    },
+    {
+        "key":  "admin.stores.title",
+        "fallback":  "Lojas"
+    },
+    {
+        "key":  "admin.users.created_at",
+        "fallback":  "Cadastro"
+    },
+    {
+        "key":  "admin.wallet.batch_credit_by_admin",
+        "fallback":  "CrÃ©dito em lote adicionado pelo admin"
+    },
+    {
+        "key":  "admin.wallet.batch_processed",
+        "fallback":  "Processado: {ok} sucessos, {err} erros"
+    },
+    {
+        "key":  "admin.wallet.batch_user_error",
+        "fallback":  "Erro no usuÃ¡rio ID {id}: "
+    },
+    {
+        "key":  "admin.wallet.batch_user_not_found",
+        "fallback":  "UsuÃ¡rio ID {id} nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.wallet.conversion_success",
+        "fallback":  "ConversÃ£o realizada com sucesso"
+    },
+    {
+        "key":  "admin.wallet.conversion_usd_brl",
+        "fallback":  "ConversÃ£o USD para BRL"
+    },
+    {
+        "key":  "admin.wallet.credit_added_by_admin",
+        "fallback":  "CrÃ©dito adicionado pelo admin"
+    },
+    {
+        "key":  "admin.wallet.credit_added_success",
+        "fallback":  "CrÃ©dito adicionado com sucesso"
+    },
+    {
+        "key":  "admin.wallet.debit_by_admin",
+        "fallback":  "DÃ©bito realizado pelo admin"
+    },
+    {
+        "key":  "admin.wallet.debit_success",
+        "fallback":  "DÃ©bito realizado com sucesso"
+    },
+    {
+        "key":  "admin.wallet.insufficient_balance",
+        "fallback":  "Saldo insuficiente"
+    },
+    {
+        "key":  "admin.wallet.insufficient_balance_current",
+        "fallback":  "Saldo insuficiente. Saldo atual: "
+    },
+    {
+        "key":  "admin.wallet.invalid_data",
+        "fallback":  "Dados invÃ¡lidos"
+    },
+    {
+        "key":  "admin.wallet.user_not_found",
+        "fallback":  "UsuÃ¡rio nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.wallet_config.already_in_mode",
+        "fallback":  "ConfiguraÃ§Ã£o jÃ¡ estÃ¡ nesse modo."
+    },
+    {
+        "key":  "admin.wallet_config.change_success",
+        "fallback":  "ConfiguraÃ§Ã£o alterada com sucesso de \"{from}\" para \"{to}\"."
+    },
+    {
+        "key":  "admin.wallet_config.invalid_mode",
+        "fallback":  "Modo invÃ¡lido."
+    },
+    {
+        "key":  "admin.wallet_config.mode_subtotal_fee",
+        "fallback":  "Subtotal + Taxa de ServiÃ§o"
+    },
+    {
+        "key":  "admin.wallet_config.mode_subtotal_fee_taxes",
+        "fallback":  "Subtotal + Taxa + Impostos"
+    },
+    {
+        "key":  "admin.wallet_config.reason_required",
+        "fallback":  "O motivo da alteraÃ§Ã£o Ã© obrigatÃ³rio."
+    },
+    {
+        "key":  "admin.wallet_config.save_error",
+        "fallback":  "Erro ao salvar: "
+    },
+    {
+        "key":  "auth.address_line_1",
+        "fallback":  "Address line 1"
+    },
+    {
+        "key":  "auth.address_line_2_optional",
+        "fallback":  "Address line 2 (optional)"
+    },
+    {
+        "key":  "auth.cep",
+        "fallback":  "CEP"
+    },
+    {
+        "key":  "auth.city_en",
+        "fallback":  "City"
+    },
+    {
+        "key":  "auth.city_example",
+        "fallback":  "SÃ£o Paulo"
+    },
+    {
+        "key":  "auth.country_of_residence",
+        "fallback":  "PaÃ­s de ResidÃªncia"
+    },
+    {
+        "key":  "auth.cpf",
+        "fallback":  "CPF"
+    },
+    {
+        "key":  "auth.district",
+        "fallback":  "Bairro"
+    },
+    {
+        "key":  "auth.logout",
+        "fallback":  "Sair"
+    },
+    {
+        "key":  "auth.neighborhood_example",
+        "fallback":  "Centro"
+    },
+    {
+        "key":  "auth.number_example",
+        "fallback":  "123"
+    },
+    {
+        "key":  "auth.state_en",
+        "fallback":  "State"
+    },
+    {
+        "key":  "auth.street",
+        "fallback":  "Rua"
+    },
+    {
+        "key":  "auth.type_to_filter_countries",
+        "fallback":  "Digite para filtrar paÃ­ses..."
+    },
+    {
+        "key":  "checkout.auto_account_note",
+        "fallback":  "Se vocÃª continuar preenchendo os dados, o sistema cria sua conta automaticamente no final do checkout."
+    },
+    {
+        "key":  "checkout.brazil_taxes",
+        "fallback":  "Impostos do Brasil"
+    },
+    {
+        "key":  "checkout.cpf_cnpj",
+        "fallback":  "CPF/CNPJ"
+    },
+    {
+        "key":  "checkout.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "checkout.free_shipping",
+        "fallback":  "Frete grÃ¡tis"
+    },
+    {
+        "key":  "checkout.have_account_hint",
+        "fallback":  "FaÃ§a login para finalizar mais rÃ¡pido."
+    },
+    {
+        "key":  "checkout.have_account_title",
+        "fallback":  "JÃ¡ tem conta?"
+    },
+    {
+        "key":  "checkout.local_tax",
+        "fallback":  "Imposto local"
+    },
+    {
+        "key":  "checkout.min_order_warning",
+        "fallback":  "O valor mÃ­nimo de produtos para processamento Ã© de $5.00 (USD). Adicione mais itens ao carrinho para continuar."
+    },
+    {
+        "key":  "checkout.neighborhood",
+        "fallback":  "Bairro"
+    },
+    {
+        "key":  "checkout.number",
+        "fallback":  "NÃºmero"
+    },
+    {
+        "key":  "checkout.payment",
+        "fallback":  "Pagamento"
+    },
+    {
+        "key":  "checkout.payment.debit_card",
+        "fallback":  "CartÃ£o de DÃ©bito"
+    },
+    {
+        "key":  "checkout.payment_status.awaiting",
+        "fallback":  "Aguardando"
+    },
+    {
+        "key":  "checkout.payment_status.cancelled",
+        "fallback":  "Cancelado"
+    },
+    {
+        "key":  "checkout.payment_status.label",
+        "fallback":  "Status do pagamento:"
+    },
+    {
+        "key":  "checkout.payment_status.paid",
+        "fallback":  "Pago"
+    },
+    {
+        "key":  "checkout.payment_status.refunded",
+        "fallback":  "Estornado"
+    },
+    {
+        "key":  "checkout.recipient",
+        "fallback":  "DestinatÃ¡rio"
+    },
+    {
+        "key":  "checkout.service_fee",
+        "fallback":  "Taxa de ServiÃ§o"
+    },
+    {
+        "key":  "checkout.shipping",
+        "fallback":  "Frete"
+    },
+    {
+        "key":  "checkout.total",
+        "fallback":  "Total"
+    },
+    {
+        "key":  "checkout_done.copy_and_paste",
+        "fallback":  "Copia e cola:"
+    },
+    {
+        "key":  "checkout_done.local_tax",
+        "fallback":  "Imposto local"
+    },
+    {
+        "key":  "checkout_done.open",
+        "fallback":  "Abrir"
+    },
+    {
+        "key":  "checkout_done.partial_paid",
+        "fallback":  "Parcialmente pago"
+    },
+    {
+        "key":  "checkout_done.partial_payment_desc",
+        "fallback":  "Seu pedido continuarÃ¡ como pendente atÃ© que todos os pagamentos sejam concluÃ­dos (produtos, taxa de serviÃ§o e, se houver, impostos). Se vocÃª pagar apenas parte deles, o pedido nÃ£o serÃ¡ confirmado."
+    },
+    {
+        "key":  "checkout_done.partial_payment_title",
+        "fallback":  "Pagamento parcial detectado"
+    },
+    {
+        "key":  "checkout_done.pay_by_card",
+        "fallback":  "Pagar com cartÃ£o"
+    },
+    {
+        "key":  "checkout_done.payment_link",
+        "fallback":  "Link de pagamento:"
+    },
+    {
+        "key":  "checkout_done.pix_qr_code",
+        "fallback":  "QR Code PIX"
+    },
+    {
+        "key":  "checkout_done.regenerate_billing",
+        "fallback":  "Gerar nova cobranÃ§a"
+    },
+    {
+        "key":  "common.customer",
+        "fallback":  "Cliente"
+    },
+    {
+        "key":  "common.date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "common.required_fields_note",
+        "fallback":  "Campos com * sÃ£o obrigatÃ³rios."
+    },
+    {
+        "key":  "home.search_placeholder",
+        "fallback":  "Buscar produtos..."
+    },
+    {
+        "key":  "nav.club",
+        "fallback":  "Clube Braziliana"
+    },
+    {
+        "key":  "order_detail.carne_full_price_msg",
+        "fallback":  "Os produtos neste pedido foram cobrados pelo valor original (sem promoÃ§Ã£o), pois promoÃ§Ãµes podem nÃ£o estar vigentes durante todo o perÃ­odo de parcelamento."
+    },
+    {
+        "key":  "order_detail.carne_full_price_title",
+        "fallback":  "CarnÃª Braziliana â€” Valor original"
+    },
+    {
+        "key":  "order_item.pending_purchase",
+        "fallback":  "Aguardando compra"
+    },
+    {
+        "key":  "order_item.purchased",
+        "fallback":  "Comprado"
+    },
+    {
+        "key":  "product_details.brand",
+        "fallback":  "Marca"
+    },
+    {
+        "key":  "product_details.no_description",
+        "fallback":  "Sem descriÃ§Ã£o disponÃ­vel."
+    },
+    {
+        "key":  "user.recadastro_cta",
+        "fallback":  "Clique aqui para atualizar agora."
+    },
+    {
+        "key":  "user.recadastro_warning",
+        "fallback":  "Como este Ã© um site novo, precisamos que vocÃª atualize seus dados cadastrais. "
+    },
+    {
+        "key":  "user_data.avatar.change",
+        "fallback":  "Alterar"
+    },
+    {
+        "key":  "user_data.avatar.reset",
+        "fallback":  "Voltar ao padrÃ£o"
+    },
+    {
+        "key":  "user_data.avatar.view",
+        "fallback":  "Ver"
+    },
+    {
+        "key":  "user_data.cpf_invalid_warning",
+        "fallback":  "AtenÃ§Ã£o: seu CPF estÃ¡ invÃ¡lido. Atualize seus dados cadastrais para continuar comprando."
+    },
+    {
+        "key":  "user_order_details.track_order",
+        "fallback":  "Acompanhar rastreio"
+    },
+    {
+        "key":  "user_order_details.tracking_code",
+        "fallback":  "CÃ³digo de rastreio:"
+    },
+    {
+        "key":  "user_order_details.tracking_source",
+        "fallback":  "Fonte:"
+    },
+    {
+        "key":  "user_order_details.view_label",
+        "fallback":  "Ver etiqueta"
+    },
+    {
+        "key":  "user_orders.actions.open_ticket",
+        "fallback":  "Abrir Ticket para este Pedido"
+    }
+]

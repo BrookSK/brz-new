@@ -1,0 +1,642 @@
+﻿[
+    {
+        "key":  "admin.received_packages.cannot_edit",
+        "fallback":  "Este pacote nÃ£o pode mais ser editado."
+    },
+    {
+        "key":  "admin.received_packages.created_success",
+        "fallback":  "Pacote cadastrado com sucesso. E-mail enviado ao cliente."
+    },
+    {
+        "key":  "admin.received_packages.deleted_success",
+        "fallback":  "Pacote excluÃ­do com sucesso."
+    },
+    {
+        "key":  "admin.received_packages.email_attention",
+        "fallback":  "AtenÃ§Ã£o:"
+    },
+    {
+        "key":  "admin.received_packages.email_deadline",
+        "fallback":  "VocÃª tem atÃ© \u003cstrong\u003e30 dias\u003c/strong\u003e para concluir suas compras e solicitar o envio."
+    },
+    {
+        "key":  "admin.received_packages.email_discard",
+        "fallback":  "ApÃ³s 42 dias, o produto serÃ¡ descartado."
+    },
+    {
+        "key":  "admin.received_packages.email_fee",
+        "fallback":  "ApÃ³s 15 dias, serÃ¡ cobrada uma taxa de armazenamento de US$ 2,00/dia."
+    },
+    {
+        "key":  "admin.received_packages.email_footer",
+        "fallback":  "Braziliana - Seu parceiro em compras internacionais"
+    },
+    {
+        "key":  "admin.received_packages.email_hello",
+        "fallback":  "OlÃ¡"
+    },
+    {
+        "key":  "admin.received_packages.email_intro",
+        "fallback":  "Informamos que recebemos um novo produto em nosso armazÃ©m vinculado Ã  sua suite:"
+    },
+    {
+        "key":  "admin.received_packages.email_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.received_packages.email_quantity",
+        "fallback":  "Quantidade"
+    },
+    {
+        "key":  "admin.received_packages.email_receipt_date",
+        "fallback":  "Data de Recebimento"
+    },
+    {
+        "key":  "admin.received_packages.email_subject",
+        "fallback":  "Seu produto foi cadastrado!"
+    },
+    {
+        "key":  "admin.received_packages.email_supplier",
+        "fallback":  "Fornecedor"
+    },
+    {
+        "key":  "admin.received_packages.email_view_cart",
+        "fallback":  "Ver meu Carrinho"
+    },
+    {
+        "key":  "admin.received_packages.email_weight",
+        "fallback":  "Peso"
+    },
+    {
+        "key":  "admin.received_packages.fill_required_fields",
+        "fallback":  "Preencha todos os campos obrigatÃ³rios."
+    },
+    {
+        "key":  "admin.received_packages.no_client_for_suite",
+        "fallback":  "Nenhum cliente encontrado com a suite"
+    },
+    {
+        "key":  "admin.received_packages.no_client_found",
+        "fallback":  "Nenhum cliente encontrado com"
+    },
+    {
+        "key":  "admin.received_packages.not_found",
+        "fallback":  "Pacote nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.received_packages.settings_saved",
+        "fallback":  "ConfiguraÃ§Ãµes salvas com sucesso."
+    },
+    {
+        "key":  "admin.received_packages.status_discarded",
+        "fallback":  "Descartado"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_confirmed",
+        "fallback":  "Invoice Confirmado"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_disputed",
+        "fallback":  "Invoice Contestado"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_paid",
+        "fallback":  "Fatura Paga"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_pending",
+        "fallback":  "Fatura Pendente"
+    },
+    {
+        "key":  "admin.received_packages.status_invoice_released",
+        "fallback":  "Invoice Liberado"
+    },
+    {
+        "key":  "admin.received_packages.status_order_created",
+        "fallback":  "Pedido Criado"
+    },
+    {
+        "key":  "admin.received_packages.status_pending",
+        "fallback":  "Pendente"
+    },
+    {
+        "key":  "admin.received_packages.status_shipped",
+        "fallback":  "Enviado"
+    },
+    {
+        "key":  "admin.received_packages.updated_success",
+        "fallback":  "Pacote atualizado com sucesso."
+    },
+    {
+        "key":  "admin.report_general.discount_prefix",
+        "fallback":  "Desconto - "
+    },
+    {
+        "key":  "admin.report_general.no_category",
+        "fallback":  "Sem categoria"
+    },
+    {
+        "key":  "admin.report_general.order_word",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.report_general.seller_paren",
+        "fallback":  "(vendedor: "
+    },
+    {
+        "key":  "admin.report_general.title",
+        "fallback":  "RelatÃ³rio Geral"
+    },
+    {
+        "key":  "admin.report_orders.desapego_mix_suffix",
+        "fallback":  " ContÃ©m {count} item(ns) de Desapego Braziliana."
+    },
+    {
+        "key":  "admin.report_orders.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.report_orders.title",
+        "fallback":  "RelatÃ³rio de Pedidos"
+    },
+    {
+        "key":  "admin.report_orders.type_advisory_desc",
+        "fallback":  "Pedido criado via orÃ§amento de assessoria personalizada."
+    },
+    {
+        "key":  "admin.report_orders.type_advisory_label",
+        "fallback":  "Assessoria de Compra"
+    },
+    {
+        "key":  "admin.report_orders.type_desapego_desc",
+        "fallback":  "Pedido de produto(s) do Desapego Braziliana (entrega somente EUA)."
+    },
+    {
+        "key":  "admin.report_orders.type_desapego_label",
+        "fallback":  "Desapego Braziliana"
+    },
+    {
+        "key":  "admin.report_orders.type_forwarding_desc",
+        "fallback":  "Pedido originado do serviÃ§o de redirecionamento de pacotes (compras prÃ³prias do cliente)."
+    },
+    {
+        "key":  "admin.report_orders.type_forwarding_label",
+        "fallback":  "Redirecionamento de Pacote"
+    },
+    {
+        "key":  "admin.report_orders.type_manual_desc",
+        "fallback":  "Pedido criado manualmente pela equipe administrativa."
+    },
+    {
+        "key":  "admin.report_orders.type_manual_label",
+        "fallback":  "Pedido Manual"
+    },
+    {
+        "key":  "admin.report_orders.type_mixed_desc",
+        "fallback":  "Este pedido contÃ©m {fwd} item(ns) de redirecionamento e {site} item(ns) do catÃ¡logo do site."
+    },
+    {
+        "key":  "admin.report_orders.type_mixed_label",
+        "fallback":  "Pedido Misto"
+    },
+    {
+        "key":  "admin.report_orders.type_site_desc",
+        "fallback":  "Pedido de produtos disponÃ­veis no catÃ¡logo da loja."
+    },
+    {
+        "key":  "admin.report_orders.type_site_label",
+        "fallback":  "Produtos do Site"
+    },
+    {
+        "key":  "admin.reports.action_created_manual_order",
+        "fallback":  "Criou pedido manual"
+    },
+    {
+        "key":  "admin.reports.action_generated_payment_link",
+        "fallback":  "Gerou link de pagamento"
+    },
+    {
+        "key":  "admin.reports.action_updated_profile",
+        "fallback":  "Atualizou perfil"
+    },
+    {
+        "key":  "admin.reports.all_currencies",
+        "fallback":  "Todas"
+    },
+    {
+        "key":  "admin.reports.audit_page_title",
+        "fallback":  "Auditoria de AÃ§Ãµes - Admin"
+    },
+    {
+        "key":  "admin.reports.audit_search_placeholder",
+        "fallback":  "aÃ§Ã£o, rota, tabela..."
+    },
+    {
+        "key":  "admin.reports.audit_title",
+        "fallback":  "Auditoria / Logs de Uso"
+    },
+    {
+        "key":  "admin.reports.btn_complete_report",
+        "fallback":  "RelatÃ³rio Completo"
+    },
+    {
+        "key":  "admin.reports.btn_financial_complete",
+        "fallback":  "Financeiro (Completo)"
+    },
+    {
+        "key":  "admin.reports.btn_movement",
+        "fallback":  "MovimentaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.reports.btn_purchases",
+        "fallback":  "Compras"
+    },
+    {
+        "key":  "admin.reports.btn_stock",
+        "fallback":  "Estoque"
+    },
+    {
+        "key":  "admin.reports.card_expiring",
+        "fallback":  "Vencendo"
+    },
+    {
+        "key":  "admin.reports.card_in_shopping_list",
+        "fallback":  "Na lista de compras"
+    },
+    {
+        "key":  "admin.reports.card_needs_buy",
+        "fallback":  "Precisa Comprar"
+    },
+    {
+        "key":  "admin.reports.card_next_30_days",
+        "fallback":  "PrÃ³ximos 30 dias"
+    },
+    {
+        "key":  "admin.reports.card_registered",
+        "fallback":  "Cadastrados no sistema"
+    },
+    {
+        "key":  "admin.reports.card_total_products",
+        "fallback":  "Total Produtos"
+    },
+    {
+        "key":  "admin.reports.card_with_stock",
+        "fallback":  "Com Estoque"
+    },
+    {
+        "key":  "admin.reports.card_with_stock_items",
+        "fallback":  "Com itens em estoque"
+    },
+    {
+        "key":  "admin.reports.clear_filters",
+        "fallback":  "Limpar Filtros"
+    },
+    {
+        "key":  "admin.reports.commission",
+        "fallback":  "ComissÃ£o:"
+    },
+    {
+        "key":  "admin.reports.consolidated_brl",
+        "fallback":  "Consolidado (BRL)"
+    },
+    {
+        "key":  "admin.reports.consolidated_usd",
+        "fallback":  "Consolidado (USD)"
+    },
+    {
+        "key":  "admin.reports.creation_from",
+        "fallback":  "CriaÃ§Ã£o (de)"
+    },
+    {
+        "key":  "admin.reports.creation_to",
+        "fallback":  "CriaÃ§Ã£o (atÃ©)"
+    },
+    {
+        "key":  "admin.reports.critical_products",
+        "fallback":  "Produtos CrÃ­ticos"
+    },
+    {
+        "key":  "admin.reports.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.reports.days",
+        "fallback":  "dias"
+    },
+    {
+        "key":  "admin.reports.end_date",
+        "fallback":  "Data Final"
+    },
+    {
+        "key":  "admin.reports.export_csv",
+        "fallback":  "Exportar CSV"
+    },
+    {
+        "key":  "admin.reports.export_pdf",
+        "fallback":  "Exportar PDF"
+    },
+    {
+        "key":  "admin.reports.fields_label",
+        "fallback":  "Campos: "
+    },
+    {
+        "key":  "admin.reports.filters_for_reports",
+        "fallback":  "Filtros para RelatÃ³rios"
+    },
+    {
+        "key":  "admin.reports.financial_page_title",
+        "fallback":  "RelatÃ³rio Financeiro - Admin"
+    },
+    {
+        "key":  "admin.reports.financial_title",
+        "fallback":  "RelatÃ³rio Financeiro (Completo)"
+    },
+    {
+        "key":  "admin.reports.fixed_shipping_cost",
+        "fallback":  "Custo envio fixo:"
+    },
+    {
+        "key":  "admin.reports.flow_page_title",
+        "fallback":  "MovimentaÃ§Ã£o do Fluxo - Admin"
+    },
+    {
+        "key":  "admin.reports.flow_title",
+        "fallback":  "MovimentaÃ§Ã£o do Fluxo"
+    },
+    {
+        "key":  "admin.reports.from",
+        "fallback":  "De"
+    },
+    {
+        "key":  "admin.reports.generate_custom_report",
+        "fallback":  "Gerar RelatÃ³rio Personalizado"
+    },
+    {
+        "key":  "admin.reports.no_records",
+        "fallback":  "Nenhum registro encontrado."
+    },
+    {
+        "key":  "admin.reports.of",
+        "fallback":  "de"
+    },
+    {
+        "key":  "admin.reports.only_movement",
+        "fallback":  "Apenas MovimentaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.reports.only_purchases",
+        "fallback":  "Apenas Compras"
+    },
+    {
+        "key":  "admin.reports.only_stock",
+        "fallback":  "Apenas Estoque"
+    },
+    {
+        "key":  "admin.reports.page",
+        "fallback":  "PÃ¡gina"
+    },
+    {
+        "key":  "admin.reports.page_title",
+        "fallback":  "RelatÃ³rios - Braziliana Admin"
+    },
+    {
+        "key":  "admin.reports.payment_from",
+        "fallback":  "Pagamento (de)"
+    },
+    {
+        "key":  "admin.reports.payment_to",
+        "fallback":  "Pagamento (atÃ©)"
+    },
+    {
+        "key":  "admin.reports.pdf_error",
+        "fallback":  "Erro ao gerar PDF: "
+    },
+    {
+        "key":  "admin.reports.pdf_footer",
+        "fallback":  "RelatÃ³rio gerado pelo Sistema Braziliana Estoque - PÃ¡gina "
+    },
+    {
+        "key":  "admin.reports.pdf_generated_at",
+        "fallback":  "Gerado em: "
+    },
+    {
+        "key":  "admin.reports.pdf_report_of",
+        "fallback":  "RelatÃ³rio de "
+    },
+    {
+        "key":  "admin.reports.product_cost",
+        "fallback":  "Custo produtos:"
+    },
+    {
+        "key":  "admin.reports.products_by_expiry",
+        "fallback":  "Produtos por Validade"
+    },
+    {
+        "key":  "admin.reports.profit",
+        "fallback":  "Lucro:"
+    },
+    {
+        "key":  "admin.reports.profit_consolidated",
+        "fallback":  "Lucro (consolidado)"
+    },
+    {
+        "key":  "admin.reports.recent_movements",
+        "fallback":  "MovimentaÃ§Ãµes Recentes"
+    },
+    {
+        "key":  "admin.reports.records",
+        "fallback":  "registros"
+    },
+    {
+        "key":  "admin.reports.report_type",
+        "fallback":  "Tipo de RelatÃ³rio"
+    },
+    {
+        "key":  "admin.reports.sales_quantity",
+        "fallback":  "Quantidade de vendas"
+    },
+    {
+        "key":  "admin.reports.search_placeholder",
+        "fallback":  "pedido, produto, sku..."
+    },
+    {
+        "key":  "admin.reports.service_fee",
+        "fallback":  "Taxa de serviÃ§o:"
+    },
+    {
+        "key":  "admin.reports.start_date",
+        "fallback":  "Data Inicial"
+    },
+    {
+        "key":  "admin.reports.status_critical",
+        "fallback":  "CrÃ­tico"
+    },
+    {
+        "key":  "admin.reports.status_out_of_stock",
+        "fallback":  "Esgotado"
+    },
+    {
+        "key":  "admin.reports.status_placeholder",
+        "fallback":  "ex: pago"
+    },
+    {
+        "key":  "admin.reports.store",
+        "fallback":  "Loja"
+    },
+    {
+        "key":  "admin.reports.store_other",
+        "fallback":  "Outro"
+    },
+    {
+        "key":  "admin.reports.subtotal_products",
+        "fallback":  "Subtotal produtos:"
+    },
+    {
+        "key":  "admin.reports.system",
+        "fallback":  "Sistema"
+    },
+    {
+        "key":  "admin.reports.table_auditoria_missing",
+        "fallback":  "A tabela \u003cstrong\u003eauditoria_logs\u003c/strong\u003e nÃ£o existe no banco. Rode as migrations 068 e 069."
+    },
+    {
+        "key":  "admin.reports.table_auditoria_missing2",
+        "fallback":  "A tabela \u003cstrong\u003eauditoria_logs\u003c/strong\u003e nÃ£o existe no banco. Rode a migration \u003ccode\u003e068_create_auditoria_logs.sql\u003c/code\u003e."
+    },
+    {
+        "key":  "admin.reports.table_estoque_movimentacao_missing",
+        "fallback":  "A tabela \u003cstrong\u003eestoque_movimentacao\u003c/strong\u003e nÃ£o existe no banco."
+    },
+    {
+        "key":  "admin.reports.taxes_collected_origin",
+        "fallback":  "Impostos arrecadados (origem)"
+    },
+    {
+        "key":  "admin.reports.taxes_passthrough",
+        "fallback":  "Impostos (pass-through):"
+    },
+    {
+        "key":  "admin.reports.th_action",
+        "fallback":  "AÃ§Ã£o"
+    },
+    {
+        "key":  "admin.reports.th_commission_brl",
+        "fallback":  "ComissÃ£o BRL"
+    },
+    {
+        "key":  "admin.reports.th_commission_usd",
+        "fallback":  "ComissÃ£o USD"
+    },
+    {
+        "key":  "admin.reports.th_cost_prod_brl",
+        "fallback":  "Custo Prod BRL"
+    },
+    {
+        "key":  "admin.reports.th_cost_prod_usd",
+        "fallback":  "Custo Prod USD"
+    },
+    {
+        "key":  "admin.reports.th_created",
+        "fallback":  "Criado"
+    },
+    {
+        "key":  "admin.reports.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.reports.th_days_to_expire",
+        "fallback":  "Dias para Vencer"
+    },
+    {
+        "key":  "admin.reports.th_details",
+        "fallback":  "Detalhes"
+    },
+    {
+        "key":  "admin.reports.th_expiry_date",
+        "fallback":  "Data Validade"
+    },
+    {
+        "key":  "admin.reports.th_ideal",
+        "fallback":  "Ideal"
+    },
+    {
+        "key":  "admin.reports.th_in_stock",
+        "fallback":  "Em Estoque"
+    },
+    {
+        "key":  "admin.reports.th_items",
+        "fallback":  "Itens"
+    },
+    {
+        "key":  "admin.reports.th_minimum",
+        "fallback":  "MÃ­nimo"
+    },
+    {
+        "key":  "admin.reports.th_missing",
+        "fallback":  "Faltante"
+    },
+    {
+        "key":  "admin.reports.th_needed",
+        "fallback":  "NecessÃ¡rio"
+    },
+    {
+        "key":  "admin.reports.th_new",
+        "fallback":  "Nova"
+    },
+    {
+        "key":  "admin.reports.th_number",
+        "fallback":  "NÃºmero"
+    },
+    {
+        "key":  "admin.reports.th_origin",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.reports.th_paid",
+        "fallback":  "Pago"
+    },
+    {
+        "key":  "admin.reports.th_previous",
+        "fallback":  "Anterior"
+    },
+    {
+        "key":  "admin.reports.th_priority",
+        "fallback":  "Prioridade"
+    },
+    {
+        "key":  "admin.reports.th_product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.reports.th_profit_brl",
+        "fallback":  "Lucro BRL"
+    },
+    {
+        "key":  "admin.reports.th_profit_usd",
+        "fallback":  "Lucro USD"
+    },
+    {
+        "key":  "admin.reports.th_quantity",
+        "fallback":  "Quantidade"
+    },
+    {
+        "key":  "admin.reports.th_rate",
+        "fallback":  "Tx"
+    },
+    {
+        "key":  "admin.reports.th_reason",
+        "fallback":  "Motivo"
+    },
+    {
+        "key":  "admin.reports.th_service_brl",
+        "fallback":  "Taxa Serv BRL"
+    },
+    {
+        "key":  "admin.reports.th_service_usd",
+        "fallback":  "Taxa Serv USD"
+    },
+    {
+        "key":  "admin.reports.th_shipping_brl",
+        "fallback":  "Envio BRL"
+    }
+]

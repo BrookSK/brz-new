@@ -1,0 +1,642 @@
+﻿[
+    {
+        "key":  "admin.orders_wp.table.source",
+        "fallback":  "Origem"
+    },
+    {
+        "key":  "admin.orders_wp.wexpress_sender_config",
+        "fallback":  "W-Express: configure o Sender (JSON) em Admin \u003e ConfiguraÃ§Ãµes \u003e Entrega"
+    },
+    {
+        "key":  "admin.orders_wp.xlsx_error",
+        "fallback":  "Erro ao gerar XLSX:"
+    },
+    {
+        "key":  "admin.payment_links.add_product",
+        "fallback":  "Adicionar produto"
+    },
+    {
+        "key":  "admin.payment_links.address",
+        "fallback":  "EndereÃ§o: "
+    },
+    {
+        "key":  "admin.payment_links.birth",
+        "fallback":  "Nascimento: "
+    },
+    {
+        "key":  "admin.payment_links.create_failed",
+        "fallback":  "Falha ao criar link"
+    },
+    {
+        "key":  "admin.payment_links.create_link",
+        "fallback":  "Criar link"
+    },
+    {
+        "key":  "admin.payment_links.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.payment_links.description",
+        "fallback":  "DescriÃ§Ã£o"
+    },
+    {
+        "key":  "admin.payment_links.description_placeholder",
+        "fallback":  "Ex: Pagamento avulso"
+    },
+    {
+        "key":  "admin.payment_links.detail_page_title",
+        "fallback":  "HistÃ³rico - Payment Link"
+    },
+    {
+        "key":  "admin.payment_links.duplicate",
+        "fallback":  "Duplicar"
+    },
+    {
+        "key":  "admin.payment_links.duplicate_failed",
+        "fallback":  "Falha ao duplicar link"
+    },
+    {
+        "key":  "admin.payment_links.expires",
+        "fallback":  "Expira"
+    },
+    {
+        "key":  "admin.payment_links.expires_note",
+        "fallback":  "O link expira automaticamente em 30 dias."
+    },
+    {
+        "key":  "admin.payment_links.generate_link",
+        "fallback":  "Gerar link"
+    },
+    {
+        "key":  "admin.payment_links.generated_links",
+        "fallback":  "Links gerados"
+    },
+    {
+        "key":  "admin.payment_links.history",
+        "fallback":  "HistÃ³rico"
+    },
+    {
+        "key":  "admin.payment_links.invalid_link",
+        "fallback":  "Link invÃ¡lido."
+    },
+    {
+        "key":  "admin.payment_links.link_created",
+        "fallback":  "Link criado: "
+    },
+    {
+        "key":  "admin.payment_links.link_duplicated",
+        "fallback":  "Link duplicado: "
+    },
+    {
+        "key":  "admin.payment_links.link_not_found",
+        "fallback":  "Link nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.payment_links.no_links",
+        "fallback":  "Nenhum link criado."
+    },
+    {
+        "key":  "admin.payment_links.no_payments",
+        "fallback":  "Nenhum pagamento registrado."
+    },
+    {
+        "key":  "admin.payment_links.open",
+        "fallback":  "Abrir"
+    },
+    {
+        "key":  "admin.payment_links.open_link",
+        "fallback":  "abrir link"
+    },
+    {
+        "key":  "admin.payment_links.page_title",
+        "fallback":  "Payment Links - Admin"
+    },
+    {
+        "key":  "admin.payment_links.payments",
+        "fallback":  "Pagamentos"
+    },
+    {
+        "key":  "admin.payment_links.product",
+        "fallback":  "Produto"
+    },
+    {
+        "key":  "admin.payment_links.products",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.payment_links.products_subtotal",
+        "fallback":  "Subtotal produtos"
+    },
+    {
+        "key":  "admin.payment_links.receipt_pdf",
+        "fallback":  "Comprovante (PDF)"
+    },
+    {
+        "key":  "admin.payment_links.recipient",
+        "fallback":  "DestinatÃ¡rio: "
+    },
+    {
+        "key":  "admin.payment_links.service_fee",
+        "fallback":  "Taxa de serviÃ§o"
+    },
+    {
+        "key":  "admin.payment_links.service_fee_value",
+        "fallback":  "Taxa de serviÃ§o (valor)"
+    },
+    {
+        "key":  "admin.payment_links.taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.payment_links.taxes_value",
+        "fallback":  "Impostos (valor)"
+    },
+    {
+        "key":  "admin.payment_links.th_component",
+        "fallback":  "Componente"
+    },
+    {
+        "key":  "admin.payment_links.th_created",
+        "fallback":  "Criado"
+    },
+    {
+        "key":  "admin.payment_links.th_customer",
+        "fallback":  "Cliente"
+    },
+    {
+        "key":  "admin.payment_links.th_data",
+        "fallback":  "Dados"
+    },
+    {
+        "key":  "admin.payment_links.th_fee",
+        "fallback":  "Taxa"
+    },
+    {
+        "key":  "admin.payment_links.th_gateway",
+        "fallback":  "Gateway"
+    },
+    {
+        "key":  "admin.payment_links.th_method",
+        "fallback":  "MÃ©todo"
+    },
+    {
+        "key":  "admin.payment_links.title",
+        "fallback":  "Payment Links"
+    },
+    {
+        "key":  "admin.payment_links.url_label",
+        "fallback":  "URL:"
+    },
+    {
+        "key":  "admin.payments.adjustment",
+        "fallback":  "Ajuste"
+    },
+    {
+        "key":  "admin.payments.all_gateways",
+        "fallback":  "Todos gateways"
+    },
+    {
+        "key":  "admin.payments.all_methods",
+        "fallback":  "Todos mÃ©todos"
+    },
+    {
+        "key":  "admin.payments.all_status",
+        "fallback":  "Todos status"
+    },
+    {
+        "key":  "admin.payments.approve",
+        "fallback":  "Aprovar"
+    },
+    {
+        "key":  "admin.payments.cambioreal_fees_note",
+        "fallback":  "(taxa de serviÃ§o e impostos)"
+    },
+    {
+        "key":  "admin.payments.cancel_not_implemented",
+        "fallback":  "Cancelamento ainda nÃ£o implementado para este gateway"
+    },
+    {
+        "key":  "admin.payments.cancel_order",
+        "fallback":  "Cancelar pedido"
+    },
+    {
+        "key":  "admin.payments.cancel_payment",
+        "fallback":  "Cancelar pag."
+    },
+    {
+        "key":  "admin.payments.card_approved",
+        "fallback":  "Aprovados"
+    },
+    {
+        "key":  "admin.payments.card_pending",
+        "fallback":  "Pendentes"
+    },
+    {
+        "key":  "admin.payments.card_rejected",
+        "fallback":  "Recusados"
+    },
+    {
+        "key":  "admin.payments.card_transactions_30d",
+        "fallback":  "TransaÃ§Ãµes (30 dias)"
+    },
+    {
+        "key":  "admin.payments.carne_advanced_settings",
+        "fallback":  "ConfiguraÃ§Ãµes avanÃ§adas do CarnÃª"
+    },
+    {
+        "key":  "admin.payments.carne_note",
+        "fallback":  "Controla se o mÃ©todo de pagamento CarnÃª Braziliana aparece no checkout para novas compras. Desativar nÃ£o afeta carnÃªs jÃ¡ existentes."
+    },
+    {
+        "key":  "admin.payments.carne_show_checkout",
+        "fallback":  "Exibir CarnÃª Braziliana no Checkout"
+    },
+    {
+        "key":  "admin.payments.commissions_page_title",
+        "fallback":  "ComissÃµes gerais - Admin"
+    },
+    {
+        "key":  "admin.payments.commissions_schema_missing",
+        "fallback":  "Schema de ComissÃµes gerais nÃ£o encontrado. Rode as migrations 052, 053 e 057."
+    },
+    {
+        "key":  "admin.payments.commissions_title",
+        "fallback":  "ComissÃµes gerais"
+    },
+    {
+        "key":  "admin.payments.config_page_title",
+        "fallback":  "ConfiguraÃ§Ãµes de Pagamento - Braziliana Admin"
+    },
+    {
+        "key":  "admin.payments.config_table_not_found",
+        "fallback":  "Tabela de configuraÃ§Ãµes nÃ£o encontrada"
+    },
+    {
+        "key":  "admin.payments.config_title",
+        "fallback":  "ConfiguraÃ§Ãµes de Pagamento"
+    },
+    {
+        "key":  "admin.payments.create_adjustment",
+        "fallback":  "Criar ajuste"
+    },
+    {
+        "key":  "admin.payments.credit",
+        "fallback":  "CrÃ©dito"
+    },
+    {
+        "key":  "admin.payments.credit_card",
+        "fallback":  "CartÃ£o de CrÃ©dito"
+    },
+    {
+        "key":  "admin.payments.currency_brl",
+        "fallback":  "Real (BRL)"
+    },
+    {
+        "key":  "admin.payments.currency_usd",
+        "fallback":  "DÃ³lar (USD)"
+    },
+    {
+        "key":  "admin.payments.debit",
+        "fallback":  "DÃ©bito"
+    },
+    {
+        "key":  "admin.payments.default_currency",
+        "fallback":  "Moeda PadrÃ£o"
+    },
+    {
+        "key":  "admin.payments.default_method",
+        "fallback":  "MÃ©todo PadrÃ£o"
+    },
+    {
+        "key":  "admin.payments.delete",
+        "fallback":  "Deletar"
+    },
+    {
+        "key":  "admin.payments.enable_cambioreal",
+        "fallback":  "Habilitar CÃ¢mbio Real"
+    },
+    {
+        "key":  "admin.payments.enable_mercadopago",
+        "fallback":  "Habilitar Mercado Pago"
+    },
+    {
+        "key":  "admin.payments.enable_pix",
+        "fallback":  "Habilitar PIX"
+    },
+    {
+        "key":  "admin.payments.enable_stripe",
+        "fallback":  "Habilitar Stripe"
+    },
+    {
+        "key":  "admin.payments.export_report",
+        "fallback":  "Exportar RelatÃ³rio"
+    },
+    {
+        "key":  "admin.payments.feature_in_development",
+        "fallback":  "Funcionalidade em desenvolvimento"
+    },
+    {
+        "key":  "admin.payments.gateway_label",
+        "fallback":  "Gateway:"
+    },
+    {
+        "key":  "admin.payments.gateway_wallet",
+        "fallback":  "Carteira"
+    },
+    {
+        "key":  "admin.payments.general_settings",
+        "fallback":  "ConfiguraÃ§Ãµes Gerais"
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_confirm",
+        "fallback":  "Cancelar o pedido no sistema?"
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_error",
+        "fallback":  "Erro ao cancelar pedido: "
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_error_generic",
+        "fallback":  "Erro ao cancelar pedido"
+    },
+    {
+        "key":  "admin.payments.js_cancel_order_refund_too",
+        "fallback":  "Deseja estornar/cancelar o pagamento tambÃ©m?"
+    },
+    {
+        "key":  "admin.payments.js_cancel_payment_confirm",
+        "fallback":  "Cancelar pagamento no gateway?"
+    },
+    {
+        "key":  "admin.payments.js_cancel_payment_error",
+        "fallback":  "Erro ao cancelar pagamento: "
+    },
+    {
+        "key":  "admin.payments.js_cancel_payment_error_generic",
+        "fallback":  "Erro ao cancelar pagamento"
+    },
+    {
+        "key":  "admin.payments.js_confirm_error",
+        "fallback":  "Erro ao confirmar pagamento: "
+    },
+    {
+        "key":  "admin.payments.js_confirm_error_generic",
+        "fallback":  "Erro ao confirmar pagamento"
+    },
+    {
+        "key":  "admin.payments.js_confirm_payment",
+        "fallback":  "Tem certeza que deseja confirmar este pagamento?"
+    },
+    {
+        "key":  "admin.payments.js_refresh_error",
+        "fallback":  "Erro ao atualizar status: "
+    },
+    {
+        "key":  "admin.payments.js_refresh_error_generic",
+        "fallback":  "Erro ao atualizar status"
+    },
+    {
+        "key":  "admin.payments.js_refund_confirm",
+        "fallback":  "Confirmar estorno?"
+    },
+    {
+        "key":  "admin.payments.js_refund_error",
+        "fallback":  "Erro ao estornar: "
+    },
+    {
+        "key":  "admin.payments.js_refund_error_generic",
+        "fallback":  "Erro ao estornar"
+    },
+    {
+        "key":  "admin.payments.js_refund_reason",
+        "fallback":  "Motivo do estorno (opcional):"
+    },
+    {
+        "key":  "admin.payments.key_type",
+        "fallback":  "Tipo da Chave"
+    },
+    {
+        "key":  "admin.payments.load_error",
+        "fallback":  "Erro ao carregar pagamentos: "
+    },
+    {
+        "key":  "admin.payments.method",
+        "fallback":  "MÃ©todo"
+    },
+    {
+        "key":  "admin.payments.method_boleto",
+        "fallback":  "Boleto"
+    },
+    {
+        "key":  "admin.payments.method_card",
+        "fallback":  "CartÃ£o"
+    },
+    {
+        "key":  "admin.payments.method_label",
+        "fallback":  "MÃ©todo:"
+    },
+    {
+        "key":  "admin.payments.nav_dashboard",
+        "fallback":  "Dashboard"
+    },
+    {
+        "key":  "admin.payments.nav_orders",
+        "fallback":  "Pedidos"
+    },
+    {
+        "key":  "admin.payments.nav_products",
+        "fallback":  "Produtos"
+    },
+    {
+        "key":  "admin.payments.nav_users",
+        "fallback":  "UsuÃ¡rios"
+    },
+    {
+        "key":  "admin.payments.no_payments_window",
+        "fallback":  "Sem pagamentos nesta janela."
+    },
+    {
+        "key":  "admin.payments.none_found",
+        "fallback":  "Nenhum pagamento encontrado"
+    },
+    {
+        "key":  "admin.payments.observation",
+        "fallback":  "ObservaÃ§Ã£o"
+    },
+    {
+        "key":  "admin.payments.order_label",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.payments.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.payments.page_title",
+        "fallback":  "Pagamentos - Braziliana Admin"
+    },
+    {
+        "key":  "admin.payments.payment",
+        "fallback":  "Pagamento"
+    },
+    {
+        "key":  "admin.payments.pix_key",
+        "fallback":  "Chave PIX"
+    },
+    {
+        "key":  "admin.payments.pix_random",
+        "fallback":  "AleatÃ³ria"
+    },
+    {
+        "key":  "admin.payments.public_key",
+        "fallback":  "Chave PÃºblica"
+    },
+    {
+        "key":  "admin.payments.reason",
+        "fallback":  "Motivo"
+    },
+    {
+        "key":  "admin.payments.refresh_not_implemented",
+        "fallback":  "Refresh automÃ¡tico ainda nÃ£o implementado para este gateway"
+    },
+    {
+        "key":  "admin.payments.refresh_status",
+        "fallback":  "Atualizar status"
+    },
+    {
+        "key":  "admin.payments.refund",
+        "fallback":  "Estornar"
+    },
+    {
+        "key":  "admin.payments.refund_not_implemented",
+        "fallback":  "Estorno ainda nÃ£o implementado para este gateway"
+    },
+    {
+        "key":  "admin.payments.register_payment",
+        "fallback":  "Registrar pagamento"
+    },
+    {
+        "key":  "admin.payments.remove_payment_confirm",
+        "fallback":  "Remover este pagamento?"
+    },
+    {
+        "key":  "admin.payments.save_adjustment",
+        "fallback":  "Salvar ajuste"
+    },
+    {
+        "key":  "admin.payments.save_payment",
+        "fallback":  "Salvar pagamento"
+    },
+    {
+        "key":  "admin.payments.save_settings",
+        "fallback":  "Salvar ConfiguraÃ§Ãµes"
+    },
+    {
+        "key":  "admin.payments.search_placeholder",
+        "fallback":  "Buscar pedido, cliente ou transaÃ§Ã£o..."
+    },
+    {
+        "key":  "admin.payments.secret_key",
+        "fallback":  "Chave Secreta"
+    },
+    {
+        "key":  "admin.payments.seller_label",
+        "fallback":  "Vendedor #"
+    },
+    {
+        "key":  "admin.payments.settings",
+        "fallback":  "ConfiguraÃ§Ãµes"
+    },
+    {
+        "key":  "admin.payments.status_approved",
+        "fallback":  "Aprovado"
+    },
+    {
+        "key":  "admin.payments.status_pending",
+        "fallback":  "Pendente"
+    },
+    {
+        "key":  "admin.payments.status_refunded",
+        "fallback":  "Estornado"
+    },
+    {
+        "key":  "admin.payments.status_rejected",
+        "fallback":  "Recusado"
+    },
+    {
+        "key":  "admin.payments.summary_by_seller",
+        "fallback":  "Resumo por vendedor"
+    },
+    {
+        "key":  "admin.payments.th_adjustments",
+        "fallback":  "Ajustes"
+    },
+    {
+        "key":  "admin.payments.th_calculated_commission",
+        "fallback":  "ComissÃ£o calculada"
+    },
+    {
+        "key":  "admin.payments.th_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.payments.th_paid",
+        "fallback":  "Pago"
+    },
+    {
+        "key":  "admin.payments.th_seller",
+        "fallback":  "Vendedor"
+    },
+    {
+        "key":  "admin.payments.title",
+        "fallback":  "Pagamentos"
+    },
+    {
+        "key":  "admin.payments.to",
+        "fallback":  "atÃ©"
+    },
+    {
+        "key":  "admin.payments.transaction_label",
+        "fallback":  "TransaÃ§Ã£o:"
+    },
+    {
+        "key":  "admin.payments.transactions_word",
+        "fallback":  "transaÃ§Ãµes"
+    },
+    {
+        "key":  "admin.payments.type",
+        "fallback":  "Tipo"
+    },
+    {
+        "key":  "admin.payments.value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.payments.value_label",
+        "fallback":  "Valor:"
+    },
+    {
+        "key":  "admin.payments.value_paid",
+        "fallback":  "Valor pago"
+    },
+    {
+        "key":  "admin.payments.view_order",
+        "fallback":  "Ver Pedido"
+    },
+    {
+        "key":  "admin.payments.visitor",
+        "fallback":  "Visitante"
+    },
+    {
+        "key":  "admin.payments.wallet_status_local",
+        "fallback":  "Status da carteira Ã© local (sem refresh externo)"
+    },
+    {
+        "key":  "admin.payments.window",
+        "fallback":  "Janela"
+    },
+    {
+        "key":  "admin.received_packages.cannot_delete",
+        "fallback":  "Pacote nÃ£o pode ser excluÃ­do."
+    }
+]

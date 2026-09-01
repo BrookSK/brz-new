@@ -1,0 +1,642 @@
+﻿[
+    {
+        "key":  "admin.reports.th_shipping_usd",
+        "fallback":  "Envio USD"
+    },
+    {
+        "key":  "admin.reports.th_stock",
+        "fallback":  "Estoque"
+    },
+    {
+        "key":  "admin.reports.th_subtotal_prod_brl",
+        "fallback":  "Subtotal Prod BRL"
+    },
+    {
+        "key":  "admin.reports.th_subtotal_prod_usd",
+        "fallback":  "Subtotal Prod USD"
+    },
+    {
+        "key":  "admin.reports.th_target",
+        "fallback":  "Alvo"
+    },
+    {
+        "key":  "admin.reports.th_taxes_brl",
+        "fallback":  "Impostos BRL"
+    },
+    {
+        "key":  "admin.reports.th_taxes_usd",
+        "fallback":  "Impostos USD"
+    },
+    {
+        "key":  "admin.reports.th_unit_price",
+        "fallback":  "PreÃ§o Unit."
+    },
+    {
+        "key":  "admin.reports.th_value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.reports.title",
+        "fallback":  "RelatÃ³rios e AnÃ¡lises"
+    },
+    {
+        "key":  "admin.reports.to",
+        "fallback":  "AtÃ©"
+    },
+    {
+        "key":  "admin.reports.total_collected",
+        "fallback":  "Total arrecadado:"
+    },
+    {
+        "key":  "admin.reports.total_collected_origin",
+        "fallback":  "Total arrecadado (origem)"
+    },
+    {
+        "key":  "admin.reports.type",
+        "fallback":  "Tipo"
+    },
+    {
+        "key":  "admin.reports.type_flow",
+        "fallback":  "Fluxo (Pedidos/Compras)"
+    },
+    {
+        "key":  "admin.reports.type_orders",
+        "fallback":  "Pedidos"
+    },
+    {
+        "key":  "admin.reports.type_purchases",
+        "fallback":  "Compras"
+    },
+    {
+        "key":  "admin.reports.type_stock",
+        "fallback":  "Estoque"
+    },
+    {
+        "key":  "admin.reports.urgent_purchases",
+        "fallback":  "Compras Urgentes"
+    },
+    {
+        "key":  "admin.reports.user",
+        "fallback":  "UsuÃ¡rio"
+    },
+    {
+        "key":  "admin.reports.user_label",
+        "fallback":  "UsuÃ¡rio #"
+    },
+    {
+        "key":  "admin.role.redirecionador",
+        "fallback":  "Redirecionamento"
+    },
+    {
+        "key":  "admin.shipment_correios.badge_label_generated",
+        "fallback":  "Etiqueta Gerada"
+    },
+    {
+        "key":  "admin.shipment_correios.cannot_delete_posted",
+        "fallback":  "NÃ£o Ã© possÃ­vel deletar uma etiqueta jÃ¡ postada"
+    },
+    {
+        "key":  "admin.shipment_correios.confirm_generate",
+        "fallback":  "Deseja gerar a etiqueta dos Correios para esta remessa?"
+    },
+    {
+        "key":  "admin.shipment_correios.confirm_posting",
+        "fallback":  "Confirmar Postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.delete_label_title",
+        "fallback":  "Deletar esta etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.enter_order_number",
+        "fallback":  "Digite o nÃºmero do pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.err_invalid_label_format",
+        "fallback":  "Correios retornou uma etiqueta em formato invÃ¡lido:"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_address",
+        "fallback":  "PrÃ©-Postagem: pedido sem dados completos de endereÃ§o do destinatÃ¡rio"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_create",
+        "fallback":  "Falha ao criar prÃ©-postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_create_failed",
+        "fallback":  "PrÃ©-Postagem falhou ao criar:"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_dims_invalid",
+        "fallback":  "PrÃ©-Postagem: pedido com dimensÃµes invÃ¡lidas"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_dims_invalid_detail",
+        "fallback":  "PrÃ©-Postagem: pedido com dimensÃµes invÃ¡lidas (altura/largura/comprimento)"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_doc",
+        "fallback":  "PrÃ©-Postagem: CPF/CNPJ do destinatÃ¡rio invÃ¡lido ou ausente"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_ncm_prefix",
+        "fallback":  "PrÃ©-Postagem: item #"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_ncm_suffix",
+        "fallback":  " sem NCM"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_qty_prefix",
+        "fallback":  "PrÃ©-Postagem: item #"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_item_qty_suffix",
+        "fallback":  " com quantidade invÃ¡lida"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_no_code",
+        "fallback":  "PrÃ©-Postagem: resposta sem codigoObjeto"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_no_items",
+        "fallback":  "PrÃ©-Postagem: pedido sem itens"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_no_valid_items",
+        "fallback":  "PrÃ©-Postagem: pedido sem itens vÃ¡lidos para declaraÃ§Ã£o de conteÃºdo"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_sender",
+        "fallback":  "PrÃ©-Postagem: configure o remetente (JSON) no Admin"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_service_code",
+        "fallback":  "PrÃ©-Postagem: informe o cÃ³digo do serviÃ§o nas configuraÃ§Ãµes"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_token",
+        "fallback":  "PrÃ©-Postagem: configure o token (CartÃ£o de Postagem) no Admin"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_weight_invalid",
+        "fallback":  "PrÃ©-Postagem: pedido com peso invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.err_prepost_weight_invalid_detail",
+        "fallback":  "PrÃ©-Postagem: pedido com peso invÃ¡lido (peso_total/peso)"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_disabled",
+        "fallback":  "SIGEP estÃ¡ desabilitado. Habilite e configure em /admin/configuracoes \u003e Entrega \u003e Correios (SIGEP Web)."
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_dv_format",
+        "fallback":  "SIGEP: etiqueta sem DV em formato invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_fill",
+        "fallback":  "SIGEP: preencha usuÃ¡rio/senha/contrato/cartÃ£o/cÃ³digo do serviÃ§o no Admin"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_generate",
+        "fallback":  "SIGEP falhou ao gerar etiqueta:"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_incomplete",
+        "fallback":  "SIGEP: configuraÃ§Ã£o incompleta. Preencha usuÃ¡rio, senha, contrato, cartÃ£o de postagem e cÃ³digo do serviÃ§o."
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_soap",
+        "fallback":  "SIGEP: extensÃ£o SOAP nÃ£o disponÃ­vel no PHP do servidor"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_unexpected",
+        "fallback":  "SIGEP: resposta inesperada ao solicitar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.err_sigep_wsdl",
+        "fallback":  "SIGEP falhou ao carregar WSDL:"
+    },
+    {
+        "key":  "admin.shipment_correios.generate_batch",
+        "fallback":  "Gerar Lote"
+    },
+    {
+        "key":  "admin.shipment_correios.generate_label",
+        "fallback":  "Gerar Etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.generated_labels_title",
+        "fallback":  "Etiquetas Geradas"
+    },
+    {
+        "key":  "admin.shipment_correios.heading",
+        "fallback":  "Remessa Correios"
+    },
+    {
+        "key":  "admin.shipment_correios.invalid_label_id",
+        "fallback":  "ID da etiqueta invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_batch_prefix",
+        "fallback":  "Deseja gerar etiquetas para"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_batch_suffix",
+        "fallback":  "remessas selecionadas?"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_delete_prefix",
+        "fallback":  "Tem certeza que deseja DELETAR a etiqueta #"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_delete_suffix",
+        "fallback":  "? Essa aÃ§Ã£o nÃ£o pode ser desfeita."
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_posting",
+        "fallback":  "Confirmar postagem desta etiqueta?"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_regenerate_prefix",
+        "fallback":  "Isso vai DELETAR a etiqueta atual (#"
+    },
+    {
+        "key":  "admin.shipment_correios.js_confirm_regenerate_suffix",
+        "fallback":  ") e gerar uma nova com as medidas atuais do pedido. Continuar?"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_batch",
+        "fallback":  "Erro ao gerar lote:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_batch_short",
+        "fallback":  "Erro ao gerar lote de etiquetas"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_confirm_posting",
+        "fallback":  "Erro ao confirmar postagem:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_confirm_posting_short",
+        "fallback":  "Erro ao confirmar postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_delete",
+        "fallback":  "Erro ao deletar:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_delete_short",
+        "fallback":  "Erro ao deletar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_generate",
+        "fallback":  "Erro ao gerar etiqueta:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_generate_short",
+        "fallback":  "Erro ao gerar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_regenerate",
+        "fallback":  "Erro ao regerar etiqueta:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_err_regenerate_short",
+        "fallback":  "Erro ao regerar etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.js_label_deleted",
+        "fallback":  "Etiqueta deletada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.js_label_generated",
+        "fallback":  "Etiqueta gerada com sucesso! CÃ³digo:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_label_regenerated",
+        "fallback":  "Etiqueta regerada com sucesso! Novo cÃ³digo:"
+    },
+    {
+        "key":  "admin.shipment_correios.js_posting_confirmed",
+        "fallback":  "Postagem confirmada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.js_select_at_least_one",
+        "fallback":  "Selecione pelo menos uma remessa para gerar etiquetas em lote"
+    },
+    {
+        "key":  "admin.shipment_correios.js_unknown_error",
+        "fallback":  "Erro desconhecido"
+    },
+    {
+        "key":  "admin.shipment_correios.label_deleted_success",
+        "fallback":  "Etiqueta deletada com sucesso"
+    },
+    {
+        "key":  "admin.shipment_correios.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta Correios para este pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.label_generated_success",
+        "fallback":  "Etiqueta gerada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.label_not_found",
+        "fallback":  "Etiqueta nÃ£o encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.label_regenerated_success",
+        "fallback":  "Etiqueta regerada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.labels_generated_count",
+        "fallback":  "Etiquetas geradas:"
+    },
+    {
+        "key":  "admin.shipment_correios.no_generated_labels",
+        "fallback":  "Nenhuma etiqueta gerada encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.no_order_selected",
+        "fallback":  "Nenhum pedido selecionado"
+    },
+    {
+        "key":  "admin.shipment_correios.no_printed_labels",
+        "fallback":  "Nenhuma etiqueta impressa encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.no_ready_shipments",
+        "fallback":  "Nenhuma remessa pronta para etiqueta encontrada"
+    },
+    {
+        "key":  "admin.shipment_correios.no_ready_shipments_short",
+        "fallback":  "Nenhuma remessa pronta"
+    },
+    {
+        "key":  "admin.shipment_correios.not_found_in_page",
+        "fallback":  "nÃ£o encontrado nas tabelas desta pÃ¡gina."
+    },
+    {
+        "key":  "admin.shipment_correios.order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.shipment_correios.page_title",
+        "fallback":  "Remessa Correios"
+    },
+    {
+        "key":  "admin.shipment_correios.posting_confirmed_success",
+        "fallback":  "Postagem confirmada com sucesso!"
+    },
+    {
+        "key":  "admin.shipment_correios.print_all",
+        "fallback":  "Imprimir Todas"
+    },
+    {
+        "key":  "admin.shipment_correios.print_page_title",
+        "fallback":  "Etiquetas Correios"
+    },
+    {
+        "key":  "admin.shipment_correios.printed_labels_title",
+        "fallback":  "Etiquetas Impressas"
+    },
+    {
+        "key":  "admin.shipment_correios.ready_shipments_title",
+        "fallback":  "Remessas Prontas para Etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.regenerate",
+        "fallback":  "Regerar"
+    },
+    {
+        "key":  "admin.shipment_correios.regenerate_title",
+        "fallback":  "Deletar etiqueta atual e gerar nova com as medidas atuais do pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.reprint",
+        "fallback":  "Reimprimir"
+    },
+    {
+        "key":  "admin.shipment_correios.search_order_placeholder",
+        "fallback":  "NÂº pedido..."
+    },
+    {
+        "key":  "admin.shipment_correios.stat_generated",
+        "fallback":  "Geradas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_labels",
+        "fallback":  "Etiquetas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_posted",
+        "fallback":  "Postadas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_printed",
+        "fallback":  "Impressas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_ready",
+        "fallback":  "Prontas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_ready_to_post",
+        "fallback":  "Prontas para postagem"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_sent",
+        "fallback":  "Enviadas"
+    },
+    {
+        "key":  "admin.shipment_correios.stat_waiting_label",
+        "fallback":  "Aguardando etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.th_code",
+        "fallback":  "CÃ³digo"
+    },
+    {
+        "key":  "admin.shipment_correios.th_generation_date",
+        "fallback":  "Data GeraÃ§Ã£o"
+    },
+    {
+        "key":  "admin.shipment_correios.th_label",
+        "fallback":  "Etiqueta"
+    },
+    {
+        "key":  "admin.shipment_correios.th_order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipment_correios.th_print_date",
+        "fallback":  "Data ImpressÃ£o"
+    },
+    {
+        "key":  "admin.shipment_correios.th_shipment",
+        "fallback":  "Remessa"
+    },
+    {
+        "key":  "admin.shipment_correios.th_shipment_date",
+        "fallback":  "Data Remessa"
+    },
+    {
+        "key":  "admin.shipment_correios.th_value",
+        "fallback":  "Valor"
+    },
+    {
+        "key":  "admin.shipment_correios.th_weight",
+        "fallback":  "Peso"
+    },
+    {
+        "key":  "admin.shipstation.confirm_generate",
+        "fallback":  "Gerar etiqueta ShipStation para o pedido"
+    },
+    {
+        "key":  "admin.shipstation.delivery_menu",
+        "fallback":  "Entrega"
+    },
+    {
+        "key":  "admin.shipstation.disabled_warning",
+        "fallback":  "ShipStation estÃ¡ desabilitado ou nÃ£o configurado. VÃ¡ em"
+    },
+    {
+        "key":  "admin.shipstation.enable_configure",
+        "fallback":  "e ative/configure."
+    },
+    {
+        "key":  "admin.shipstation.err_carrier_id",
+        "fallback":  "ShipStation: configure shipstation_carrier_id em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.shipstation.err_from_address",
+        "fallback":  "ShipStation: configure shipstation_from_address_json (JSON) em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.shipstation.err_incomplete_address",
+        "fallback":  "ShipStation: endereÃ§o de entrega incompleto no pedido (address_line1)."
+    },
+    {
+        "key":  "admin.shipstation.generate_label",
+        "fallback":  "Gerar etiqueta"
+    },
+    {
+        "key":  "admin.shipstation.generated_labels",
+        "fallback":  "Etiquetas geradas"
+    },
+    {
+        "key":  "admin.shipstation.heading",
+        "fallback":  "Remessa ShipStation (UPS)"
+    },
+    {
+        "key":  "admin.shipstation.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.shipstation.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta ShipStation para este pedido"
+    },
+    {
+        "key":  "admin.shipstation.no_labels",
+        "fallback":  "Nenhuma etiqueta gerada."
+    },
+    {
+        "key":  "admin.shipstation.no_orders_waiting",
+        "fallback":  "Nenhum pedido exterior aguardando etiqueta."
+    },
+    {
+        "key":  "admin.shipstation.no_shipment_id",
+        "fallback":  "ShipStation: shipment_id nÃ£o retornou."
+    },
+    {
+        "key":  "admin.shipstation.open",
+        "fallback":  "Abrir"
+    },
+    {
+        "key":  "admin.shipstation.order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipstation.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.shipstation.orders_ready_label",
+        "fallback":  "Pedidos pagos (exterior) - prontos para etiqueta"
+    },
+    {
+        "key":  "admin.shipstation.page_title",
+        "fallback":  "Remessa ShipStation (UPS)"
+    },
+    {
+        "key":  "admin.shipstation.table_missing",
+        "fallback":  "Tabela shipstation_etiquetas nÃ£o encontrada. Rode a migration database/migrations/070_create_shipstation_etiquetas_schema.sql"
+    },
+    {
+        "key":  "admin.shipstation.th_carrier",
+        "fallback":  "Carrier"
+    },
+    {
+        "key":  "admin.shipstation.th_country",
+        "fallback":  "PaÃ­s"
+    },
+    {
+        "key":  "admin.shipstation.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.shipstation.th_label",
+        "fallback":  "Label"
+    },
+    {
+        "key":  "admin.shipstation.th_order",
+        "fallback":  "Pedido"
+    },
+    {
+        "key":  "admin.shipstation.th_tracking",
+        "fallback":  "Tracking"
+    },
+    {
+        "key":  "admin.stamps.confirm_generate",
+        "fallback":  "Gerar etiqueta Stamps para o pedido"
+    },
+    {
+        "key":  "admin.stamps.delivery_menu",
+        "fallback":  "Entrega"
+    },
+    {
+        "key":  "admin.stamps.disabled_warning",
+        "fallback":  "Stamps estÃ¡ desabilitado ou nÃ£o configurado. VÃ¡ em"
+    },
+    {
+        "key":  "admin.stamps.enable_configure",
+        "fallback":  "e ative/configure."
+    },
+    {
+        "key":  "admin.stamps.err_from_address",
+        "fallback":  "Stamps: configure stamps_from_address_json (JSON) em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.stamps.err_incomplete_address",
+        "fallback":  "Stamps: endereÃ§o de entrega incompleto no pedido (address_line1)."
+    },
+    {
+        "key":  "admin.stamps.err_service_type",
+        "fallback":  "Stamps: configure stamps_service_type em /admin/configuracoes \u003e Entrega"
+    },
+    {
+        "key":  "admin.stamps.generate_label",
+        "fallback":  "Gerar etiqueta"
+    }
+]

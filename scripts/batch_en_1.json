@@ -1,0 +1,642 @@
+﻿[
+    {
+        "key":  "admin.additional_invoices.cancelled_success",
+        "fallback":  "Fatura cancelada com sucesso."
+    },
+    {
+        "key":  "admin.additional_invoices.cannot_cancel",
+        "fallback":  "Fatura nÃ£o pode ser cancelada."
+    },
+    {
+        "key":  "admin.additional_invoices.cart_item_label",
+        "fallback":  "Fatura Adicional:"
+    },
+    {
+        "key":  "admin.additional_invoices.created_success",
+        "fallback":  "Fatura adicional criada. Item adicionado ao carrinho do cliente."
+    },
+    {
+        "key":  "admin.additional_invoices.fill_required_fields",
+        "fallback":  "Preencha todos os campos obrigatÃ³rios."
+    },
+    {
+        "key":  "admin.additional_invoices.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.commissions_global.all_currencies",
+        "fallback":  "Todas"
+    },
+    {
+        "key":  "admin.commissions_global.by_seller_header",
+        "fallback":  "ComissÃµes por Vendedor (Pedidos Manuais + Processamento) â€” valores em R$"
+    },
+    {
+        "key":  "admin.commissions_global.card_product_cost_usd",
+        "fallback":  "Custo Produtos (USD)"
+    },
+    {
+        "key":  "admin.commissions_global.card_service_fee",
+        "fallback":  "Taxa de ServiÃ§o"
+    },
+    {
+        "key":  "admin.commissions_global.card_shipping",
+        "fallback":  "Frete"
+    },
+    {
+        "key":  "admin.commissions_global.card_subtotal_products",
+        "fallback":  "Subtotal Produtos"
+    },
+    {
+        "key":  "admin.commissions_global.card_taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.commissions_global.card_total_collected",
+        "fallback":  "Total Arrecadado"
+    },
+    {
+        "key":  "admin.commissions_global.commission_period",
+        "fallback":  "PerÃ­odo de comissÃ£o"
+    },
+    {
+        "key":  "admin.commissions_global.cost",
+        "fallback":  "Custo:"
+    },
+    {
+        "key":  "admin.commissions_global.currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.commissions_global.detail_by_order",
+        "fallback":  "Detalhamento por Pedido"
+    },
+    {
+        "key":  "admin.commissions_global.end_date",
+        "fallback":  "Data fim"
+    },
+    {
+        "key":  "admin.commissions_global.exchange_label",
+        "fallback":  "CÃ¢mbio:"
+    },
+    {
+        "key":  "admin.commissions_global.formula_label",
+        "fallback":  "FÃ³rmula:"
+    },
+    {
+        "key":  "admin.commissions_global.formula_text",
+        "fallback":  "Bruto = total vendido (convertido para R$) | LÃ­quido = Bruto âˆ’ Custo âˆ’ Impostos | ComissÃ£o = LÃ­quido Ã— % da faixa"
+    },
+    {
+        "key":  "admin.commissions_global.from",
+        "fallback":  "De"
+    },
+    {
+        "key":  "admin.commissions_global.grand_total",
+        "fallback":  "Total Geral"
+    },
+    {
+        "key":  "admin.commissions_global.gross",
+        "fallback":  "Bruto:"
+    },
+    {
+        "key":  "admin.commissions_global.net",
+        "fallback":  "LÃ­quido:"
+    },
+    {
+        "key":  "admin.commissions_global.no_orders_filters",
+        "fallback":  "Nenhum pedido encontrado com os filtros selecionados."
+    },
+    {
+        "key":  "admin.commissions_global.orders_word",
+        "fallback":  "pedidos"
+    },
+    {
+        "key":  "admin.commissions_global.organic_sales",
+        "fallback":  "Vendas OrgÃ¢nicas (sem vendedor atribuÃ­do)"
+    },
+    {
+        "key":  "admin.commissions_global.page_title",
+        "fallback":  "ComissÃµes Global - Admin"
+    },
+    {
+        "key":  "admin.commissions_global.seller_label",
+        "fallback":  "Vendedor #"
+    },
+    {
+        "key":  "admin.commissions_global.start_date",
+        "fallback":  "Data inÃ­cio"
+    },
+    {
+        "key":  "admin.commissions_global.status_placeholder",
+        "fallback":  "ex: pago"
+    },
+    {
+        "key":  "admin.commissions_global.summary_page_title",
+        "fallback":  "Resumo Financeiro - Admin"
+    },
+    {
+        "key":  "admin.commissions_global.summary_title",
+        "fallback":  "Resumo Financeiro Global"
+    },
+    {
+        "key":  "admin.commissions_global.taxes",
+        "fallback":  "Impostos:"
+    },
+    {
+        "key":  "admin.commissions_global.th_code",
+        "fallback":  "CÃ³digo"
+    },
+    {
+        "key":  "admin.commissions_global.th_commission_pct",
+        "fallback":  "% ComissÃ£o"
+    },
+    {
+        "key":  "admin.commissions_global.th_cost_prod",
+        "fallback":  "Custo Prod."
+    },
+    {
+        "key":  "admin.commissions_global.th_currency",
+        "fallback":  "Moeda"
+    },
+    {
+        "key":  "admin.commissions_global.th_date",
+        "fallback":  "Data"
+    },
+    {
+        "key":  "admin.commissions_global.th_gross",
+        "fallback":  "Bruto (R$)"
+    },
+    {
+        "key":  "admin.commissions_global.th_manual_commission",
+        "fallback":  "ComissÃ£o Manual"
+    },
+    {
+        "key":  "admin.commissions_global.th_net",
+        "fallback":  "LÃ­quido"
+    },
+    {
+        "key":  "admin.commissions_global.th_orders",
+        "fallback":  "Pedidos"
+    },
+    {
+        "key":  "admin.commissions_global.th_proc_commission",
+        "fallback":  "ComissÃ£o Proc."
+    },
+    {
+        "key":  "admin.commissions_global.th_product_cost",
+        "fallback":  "Custo Produto"
+    },
+    {
+        "key":  "admin.commissions_global.th_seller",
+        "fallback":  "Vendedor"
+    },
+    {
+        "key":  "admin.commissions_global.th_service_fee_short",
+        "fallback":  "Taxa ServiÃ§o"
+    },
+    {
+        "key":  "admin.commissions_global.th_subtotal_prod",
+        "fallback":  "Subtotal Prod."
+    },
+    {
+        "key":  "admin.commissions_global.th_taxes",
+        "fallback":  "Impostos"
+    },
+    {
+        "key":  "admin.commissions_global.th_total_commission",
+        "fallback":  "Total ComissÃ£o"
+    },
+    {
+        "key":  "admin.commissions_global.title",
+        "fallback":  "ComissÃµes - VisÃ£o Global"
+    },
+    {
+        "key":  "admin.commissions_global.to",
+        "fallback":  "atÃ©"
+    },
+    {
+        "key":  "admin.consolidate_orders.title",
+        "fallback":  "Consolidar Pedidos"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_cnpj_invalid",
+        "fallback":  "CNPJ invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_cpf_invalid",
+        "fallback":  "CPF invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_dims_sum",
+        "fallback":  "Soma dimensÃµes \u003e 200cm"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_email_invalid",
+        "fallback":  "E-mail destinatÃ¡rio invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_has_label",
+        "fallback":  "JÃ¡ possui etiqueta"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_height_invalid",
+        "fallback":  "Altura invÃ¡lida (2-100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_length_invalid",
+        "fallback":  "Comprimento invÃ¡lido (16-100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_no_items",
+        "fallback":  "Sem itens"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_no_tracking",
+        "fallback":  "API nÃ£o retornou tracking"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_no_valid_items",
+        "fallback":  "Sem itens vÃ¡lidos"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_not_closed_box",
+        "fallback":  "NÃ£o estÃ¡ em Caixa Fechada"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_over_20_items",
+        "fallback":  "Mais de 20 itens"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_phone_invalid",
+        "fallback":  "Telefone destinatÃ¡rio invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_total_over_3000",
+        "fallback":  "Valor total \u003e USD 3000"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_weight_exceeds",
+        "fallback":  "Peso excede 30kg"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_weight_missing",
+        "fallback":  "Peso nÃ£o informado"
+    },
+    {
+        "key":  "admin.correios_mundial.batch_width_invalid",
+        "fallback":  "Largura invÃ¡lida (11-100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.bill_not_found",
+        "fallback":  "Fatura nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.bills_table_missing",
+        "fallback":  "Tabela correios_packet_bills nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.cn38_not_found",
+        "fallback":  "cn38Code nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.correios_mundial.container_not_found",
+        "fallback":  "Container nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.correios_mundial.container_not_found_dot",
+        "fallback":  "Container nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.correios_mundial.containers_invalid",
+        "fallback":  "Containers invÃ¡lidos."
+    },
+    {
+        "key":  "admin.correios_mundial.containers_not_found",
+        "fallback":  "Containers nÃ£o encontrados."
+    },
+    {
+        "key":  "admin.correios_mundial.containers_table_missing",
+        "fallback":  "Tabela correios_packet_containers nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.err_already_used",
+        "fallback":  "JÃ¡ usado em outro container:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_balance",
+        "fallback":  "Falha ao consultar saldo."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cancel_before_delete",
+        "fallback":  "Para deletar, primeiro cancele o despacho deste container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cancel_dispatch",
+        "fallback":  "Falha ao cancelar despacho."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cnpj_invalid",
+        "fallback":  "CNPJ do destinatÃ¡rio invÃ¡lido. Confira o nÃºmero informado."
+    },
+    {
+        "key":  "admin.correios_mundial.err_container_linked",
+        "fallback":  "Container jÃ¡ estÃ¡ vinculado a uma fatura."
+    },
+    {
+        "key":  "admin.correios_mundial.err_container_no_tn",
+        "fallback":  "Container sem trackingNumbers."
+    },
+    {
+        "key":  "admin.correios_mundial.err_container_no_unitcode",
+        "fallback":  "Container invÃ¡lido/sem unitCode."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cpf_invalid",
+        "fallback":  "CPF do destinatÃ¡rio invÃ¡lido. Confira o nÃºmero informado."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cpf_invalid_rf",
+        "fallback":  "CPF do destinatÃ¡rio invÃ¡lido. Confira se o CPF estÃ¡ correto e regular na Receita Federal."
+    },
+    {
+        "key":  "admin.correios_mundial.err_cpf_not_regular",
+        "fallback":  "CPF do destinatÃ¡rio nÃ£o estÃ¡ regular na Receita Federal. O pedido nÃ£o pode gerar etiqueta atÃ© regularizar."
+    },
+    {
+        "key":  "admin.correios_mundial.err_customs_sum",
+        "fallback":  "Soma de valores (frete+seguro+itens) nÃ£o pode ultrapassar 3000.00 USD"
+    },
+    {
+        "key":  "admin.correios_mundial.err_delete_container",
+        "fallback":  "Falha ao deletar container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_delete_previous",
+        "fallback":  "Erro ao deletar etiqueta anterior:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_dest_operator",
+        "fallback":  "destinationOperatorName deve ter 4 letras."
+    },
+    {
+        "key":  "admin.correios_mundial.err_dimensions_required",
+        "fallback":  "Informe Peso total (g), Comprimento, Largura e Altura para gerar a etiqueta."
+    },
+    {
+        "key":  "admin.correios_mundial.err_dims_sum",
+        "fallback":  "Soma das dimensÃµes (C+L+A) nÃ£o pode ultrapassar 200cm"
+    },
+    {
+        "key":  "admin.correios_mundial.err_dispatch_invalid",
+        "fallback":  "dispatchNumber invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.err_fetch_container",
+        "fallback":  "Erro ao buscar container"
+    },
+    {
+        "key":  "admin.correios_mundial.err_freight_min",
+        "fallback":  "Frete deve ser no mÃ­nimo 0.01"
+    },
+    {
+        "key":  "admin.correios_mundial.err_generate_generic",
+        "fallback":  "NÃ£o foi possÃ­vel gerar a etiqueta. Verifique os dados do destinatÃ¡rio e dos produtos e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.err_generate_prefix",
+        "fallback":  "NÃ£o foi possÃ­vel gerar a etiqueta:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_height_range",
+        "fallback":  "Altura invÃ¡lida (mÃ­n 2cm, mÃ¡x 100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_hs_not_allowed",
+        "fallback":  "NÃ£o foi possÃ­vel gerar o rastreio porque o NCM (HS Code) de algum item nÃ£o Ã© permitido no Brasil. Revise o NCM do produto."
+    },
+    {
+        "key":  "admin.correios_mundial.err_insufficient_balance",
+        "fallback":  "Saldo insuficiente para faturamento."
+    },
+    {
+        "key":  "admin.correios_mundial.err_insurance_min",
+        "fallback":  "Seguro deve ser no mÃ­nimo 0.01 (ou deixe vazio)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_ncm_prefix",
+        "fallback":  "Item #"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_ncm_suffix",
+        "fallback":  " sem NCM"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_qty_prefix",
+        "fallback":  "Item #"
+    },
+    {
+        "key":  "admin.correios_mundial.err_item_qty_suffix",
+        "fallback":  " com quantidade invÃ¡lida"
+    },
+    {
+        "key":  "admin.correios_mundial.err_label_cancelled",
+        "fallback":  "Etiqueta cancelada (nÃ£o pode ser usada):"
+    },
+    {
+        "key":  "admin.correios_mundial.err_length_range",
+        "fallback":  "Comprimento invÃ¡lido (mÃ­n 16cm, mÃ¡x 100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_limit_1000",
+        "fallback":  "Limite de 1000 pacotes por mala/unitCode."
+    },
+    {
+        "key":  "admin.correios_mundial.err_limit_500",
+        "fallback":  "Limite de 500 pacotes por container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_limit_5000",
+        "fallback":  "Limite de 5000 cÃ³digos de rastreio por fatura excedido."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_dispatch_number",
+        "fallback":  "dispatchNumber nÃ£o encontrado no container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_items",
+        "fallback":  "Pedido sem itens"
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_request_id",
+        "fallback":  "Correios nÃ£o retornou requestId."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_tracking",
+        "fallback":  "Resposta da API sem trackingNumber"
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_unitcode",
+        "fallback":  "Correios nÃ£o retornou unitCode."
+    },
+    {
+        "key":  "admin.correios_mundial.err_no_valid_items",
+        "fallback":  "Pedido sem itens vÃ¡lidos"
+    },
+    {
+        "key":  "admin.correios_mundial.err_only_created",
+        "fallback":  "Apenas containers com status created podem ser faturados."
+    },
+    {
+        "key":  "admin.correios_mundial.err_origin_operator",
+        "fallback":  "originOperatorName deve ter 4 letras."
+    },
+    {
+        "key":  "admin.correios_mundial.err_origin_us",
+        "fallback":  "originCountry deve ser US."
+    },
+    {
+        "key":  "admin.correios_mundial.err_phone_invalid",
+        "fallback":  "Telefone do destinatÃ¡rio invÃ¡lido. Informe DDD + nÃºmero (10 ou 11 dÃ­gitos), sem +55."
+    },
+    {
+        "key":  "admin.correios_mundial.err_postal_category",
+        "fallback":  "postalCategoryCode invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.err_process_bill",
+        "fallback":  "Erro ao processar fatura."
+    },
+    {
+        "key":  "admin.correios_mundial.err_save_bill",
+        "fallback":  "Falha ao salvar fatura no banco."
+    },
+    {
+        "key":  "admin.correios_mundial.err_save_container",
+        "fallback":  "Falha ao salvar container no banco."
+    },
+    {
+        "key":  "admin.correios_mundial.err_save_label",
+        "fallback":  "Falha ao salvar etiqueta:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_select_container",
+        "fallback":  "Selecione pelo menos 1 container."
+    },
+    {
+        "key":  "admin.correios_mundial.err_select_package",
+        "fallback":  "Selecione pelo menos 1 pacote."
+    },
+    {
+        "key":  "admin.correios_mundial.err_service_subclass",
+        "fallback":  "serviceSubclassCode deve ser NX ou IX."
+    },
+    {
+        "key":  "admin.correios_mundial.err_start_billing",
+        "fallback":  "Falha ao iniciar faturamento."
+    },
+    {
+        "key":  "admin.correios_mundial.err_too_many_items",
+        "fallback":  "Pedido possui mais de 20 itens (limite da API PACKET)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_tracking_not_found",
+        "fallback":  "Tracking nÃ£o encontrado:"
+    },
+    {
+        "key":  "admin.correios_mundial.err_unit_type",
+        "fallback":  "unitType invÃ¡lido (1 ou 2)."
+    },
+    {
+        "key":  "admin.correios_mundial.err_weight_range",
+        "fallback":  "Peso total invÃ¡lido (1 a 30000g)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_width_range",
+        "fallback":  "Largura invÃ¡lida (mÃ­n 11cm, mÃ¡x 100cm)"
+    },
+    {
+        "key":  "admin.correios_mundial.err_zip_invalid",
+        "fallback":  "CEP do destinatÃ¡rio invÃ¡lido. Informe um CEP vÃ¡lido com 8 dÃ­gitos."
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_id",
+        "fallback":  "ID invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_ids",
+        "fallback":  "IDs invÃ¡lidos"
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_order",
+        "fallback":  "Pedido invÃ¡lido"
+    },
+    {
+        "key":  "admin.correios_mundial.invalid_tracking",
+        "fallback":  "Tracking invÃ¡lido."
+    },
+    {
+        "key":  "admin.correios_mundial.label_exists",
+        "fallback":  "JÃ¡ existe etiqueta PACKET para este pedido"
+    },
+    {
+        "key":  "admin.correios_mundial.label_not_found_dot",
+        "fallback":  "Etiqueta nÃ£o encontrada."
+    },
+    {
+        "key":  "admin.correios_mundial.no_label_selected",
+        "fallback":  "Nenhuma etiqueta selecionada"
+    },
+    {
+        "key":  "admin.correios_mundial.no_labels_for_orders",
+        "fallback":  "Nenhuma etiqueta encontrada para os pedidos selecionados"
+    },
+    {
+        "key":  "admin.correios_mundial.no_order_selected",
+        "fallback":  "Nenhum pedido selecionado"
+    },
+    {
+        "key":  "admin.correios_mundial.not_closed_box",
+        "fallback":  "Pedido nÃ£o estÃ¡ em Caixa Fechada"
+    },
+    {
+        "key":  "admin.correios_mundial.not_forwarding",
+        "fallback":  "Pedido nÃ£o Ã© do redirecionamento"
+    },
+    {
+        "key":  "admin.correios_mundial.not_usd",
+        "fallback":  "Pedido nÃ£o estÃ¡ em USD"
+    },
+    {
+        "key":  "admin.correios_mundial.ok_bill_generated",
+        "fallback":  "Fatura gerada:"
+    },
+    {
+        "key":  "admin.correios_mundial.ok_container_created",
+        "fallback":  "Container criado:"
+    },
+    {
+        "key":  "admin.correios_mundial.ok_dispatch_cancelled",
+        "fallback":  "Despacho cancelado. Agora vocÃª pode deletar o container para liberar os pacotes."
+    },
+    {
+        "key":  "admin.correios_mundial.ok_request_created",
+        "fallback":  "SolicitaÃ§Ã£o criada. Aguarde e atualize o status."
+    },
+    {
+        "key":  "admin.correios_mundial.order_not_found",
+        "fallback":  "Pedido nÃ£o encontrado"
+    },
+    {
+        "key":  "admin.correios_mundial.order_not_found_dot",
+        "fallback":  "Pedido nÃ£o encontrado."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_cnpj",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: CNPJ invÃ¡lido (deve conter 14 dÃ­gitos). Atualize o CNPJ do cliente e tente novamente."
+    },
+    {
+        "key":  "admin.correios_mundial.page_err_cpf",
+        "fallback":  "Dados do destinatÃ¡rio incompletos: CPF invÃ¡lido (deve conter 11 dÃ­gitos). Atualize o CPF do cliente e tente novamente."
+    }
+]
