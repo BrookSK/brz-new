@@ -124,57 +124,60 @@ class AdminShippoController extends Controller {
         $colUserEmail = in_array('email', $colsU, true) ? 'u.email' : 'NULL';
         $colUserTel = in_array('telefone', $colsU, true) ? 'u.telefone' : (in_array('phone', $colsU, true) ? 'u.phone' : 'NULL');
 
-        // ─── Filtro para EXCLUIR pedidos com destino Brasil ──────────────────────
-        // Regra ABSOLUTA: se QUALQUER fonte de país do pedido indicar Brasil, o pedido
-        // NÃO aparece. Não importa se outra fonte diz outro país — basta UM sinal de
-        // Brasil para excluir. As fontes verificadas são:
-        //   - todas as colunas de país da tabela pedidos
-        //   - o país do endereço vinculado (endereco_entrega_id -> enderecos.pais)
-        //   - o país de QUALQUER endereço do usuário (enderecos por usuario_id)
-        //   - CEP brasileiro (8 dígitos) e estado brasileiro (UF)
+        // ─── Filtro: MOSTRAR APENAS pedidos com destino INTERNACIONAL confirmado ──
+        // Brasil é o país PADRÃO do sistema. Portanto, um pedido só é internacional
+        // quando existe uma indicação EXPLÍCITA de país estrangeiro (diferente de
+        // Brasil e não vazio). Pedidos sem país definido são tratados como nacionais
+        // e NÃO aparecem. Fontes de país consideradas (basta UMA ser internacional):
+        //   - coluna pais_entrega da tabela pedidos
+        //   - país do endereço vinculado (endereco_entrega_id -> enderecos.pais)
+        //   - país de QUALQUER endereço do usuário (enderecos por usuario_id)
         $paisFilter = '';
         $BR_VALUES = "('BR','BRA','BRAZIL','BRASIL')";
 
-        // 1) Excluir se QUALQUER coluna de país do pedido for Brasil.
+        // Uma fonte é "internacional" quando: não está vazia E não é Brasil.
+        $internacionalConds = [];
+
+        // 1) Coluna(s) de país da própria tabela pedidos.
         foreach (['pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'dest_country', 'endereco_pais', 'pais', 'country', 'country_code'] as $cp) {
             if (in_array($cp, $colsP, true)) {
-                $paisFilter .= " AND UPPER(TRIM(COALESCE(p." . $cp . ",''))) NOT IN " . $BR_VALUES;
+                $internacionalConds[] = "(TRIM(COALESCE(p." . $cp . ",'')) <> '' AND UPPER(TRIM(p." . $cp . ")) NOT IN " . $BR_VALUES . ")";
             }
         }
 
-        // 2/3) Excluir se o endereço vinculado OU QUALQUER endereço do usuário for Brasil.
+        // 2/3) País do endereço vinculado e de qualquer endereço do usuário.
         if ($this->tableExists('enderecos')) {
             $colsEnd = $this->getTableColumns('enderecos');
             $colEndPais = $this->pickColumn($colsEnd, ['pais', 'country', 'country_code', 'pais_code']);
             if ($colEndPais !== '') {
-                // Endereço vinculado ao pedido
+                // Endereço vinculado ao pedido é internacional
                 if (in_array('endereco_entrega_id', $colsP, true) && in_array('id', $colsEnd, true)) {
-                    $paisFilter .= " AND NOT EXISTS (
+                    $internacionalConds[] = "EXISTS (
                         SELECT 1 FROM enderecos e_vinc
                         WHERE e_vinc.id = p.endereco_entrega_id
-                          AND UPPER(TRIM(COALESCE(e_vinc." . $colEndPais . ",''))) IN " . $BR_VALUES . "
+                          AND TRIM(COALESCE(e_vinc." . $colEndPais . ",'')) <> ''
+                          AND UPPER(TRIM(e_vinc." . $colEndPais . ")) NOT IN " . $BR_VALUES . "
                     )";
                 }
-                // Qualquer endereço do usuário
+                // Algum endereço do usuário é internacional
                 if (in_array('usuario_id', $colsEnd, true)) {
-                    $paisFilter .= " AND NOT EXISTS (
+                    $internacionalConds[] = "EXISTS (
                         SELECT 1 FROM enderecos e_user
                         WHERE e_user.usuario_id = p.usuario_id
-                          AND UPPER(TRIM(COALESCE(e_user." . $colEndPais . ",''))) IN " . $BR_VALUES . "
+                          AND TRIM(COALESCE(e_user." . $colEndPais . ",'')) <> ''
+                          AND UPPER(TRIM(e_user." . $colEndPais . ")) NOT IN " . $BR_VALUES . "
                     )";
                 }
             }
         }
 
-        // 4) Reforço: excluir se CEP for brasileiro (8 dígitos) ou estado for UF brasileira.
-        $colCep = $this->pickColumn($colsP, ['cep_entrega', 'cep', 'zip', 'postal_code', 'endereco_cep']);
-        if ($colCep !== '') {
-            $paisFilter .= " AND LENGTH(REPLACE(REPLACE(COALESCE(p." . $colCep . ",''), '-', ''), '.', '')) != 8";
-        }
-        $colEstadoFilter = $this->pickColumn($colsP, ['estado_entrega', 'estado', 'state']);
-        if ($colEstadoFilter !== '') {
-            $estadosBr = "'SP','RJ','MG','BA','PR','RS','SC','GO','PE','CE','PA','MA','MT','MS','DF','AM','ES','PB','RN','AL','PI','SE','TO','RO','AC','AP','RR'";
-            $paisFilter .= " AND UPPER(COALESCE(p." . $colEstadoFilter . ",'')) NOT IN (" . $estadosBr . ")";
+        // O pedido aparece somente se PELO MENOS UMA fonte for internacional.
+        if (!empty($internacionalConds)) {
+            $paisFilter .= " AND ( " . implode(' OR ', $internacionalConds) . " )";
+        } else {
+            // Sem nenhuma fonte de país no schema: não há como confirmar internacional.
+            // Por segurança (Brasil é o padrão), não retornar nada.
+            $paisFilter .= " AND 1 = 0";
         }
 
         // Excluir pedidos removidos (soft-delete) e arquivados, quando essas colunas existirem.
