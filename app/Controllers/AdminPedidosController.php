@@ -2831,57 +2831,57 @@ JS;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Pedidos (' . $total . ')</h1>
+                    <h1 class="page-title">' . __('admin.sidebar.orders', 'Pedidos') . ' (' . $total . ')</h1>
                     <!-- Desktop: buttons inline -->
                     <div class="d-none d-md-flex gap-2">
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>Novo Pedido Manual
+                            <i class="fas fa-plus me-1"></i>' . __('admin.orders.new_manual_order', 'Novo Pedido Manual') . '
                         </a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary">
-                            <i class="fas fa-percentage me-1"></i>Minhas Comissões
+                            <i class="fas fa-percentage me-1"></i>' . __('admin.orders.my_commissions', 'Minhas Comissões') . '
                         </a>
                         <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger">
-                            <i class="fas fa-trash me-1"></i>Lixeira
+                            <i class="fas fa-trash me-1"></i>' . __('admin.orders.trash', 'Lixeira') . '
                         </a>
                         <a href="/admin/pedidos/arquivados" class="btn btn-outline-secondary">
-                            <i class="fas fa-archive me-1"></i>Arquivados
+                            <i class="fas fa-archive me-1"></i>' . __('admin.orders.archived', 'Arquivados') . '
                         </a>
                         <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
-                            <i class="fas fa-download me-1"></i>Exportar XLSX
+                            <i class="fas fa-download me-1"></i>' . __('admin.orders.export_xlsx', 'Exportar XLSX') . '
                         </a>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                            <i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '
                         </button>
                     </div>
                     <!-- Mobile: toggle button -->
                     <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'pedidosActionsCollapse\').classList.toggle(\'d-none\')">
-                        <i class="fas fa-ellipsis-v me-1"></i>Ações
+                        <i class="fas fa-ellipsis-v me-1"></i>' . __('admin.orders.actions', 'Ações') . '
                     </button>
                 </div>
                 <!-- Mobile: collapsible actions -->
                 <div id="pedidosActionsCollapse" class="d-none d-md-none mb-3">
                     <div class="d-flex flex-wrap gap-2">
-                        <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Novo Pedido</a>
-                        <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
-                        <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Lixeira</a>
-                        <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>Arquivados</a>
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>' . __('admin.orders.new_order', 'Novo Pedido') . '</a>
+                        <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>' . __('admin.orders.commissions', 'Comissões') . '</a>
+                        <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>' . __('admin.orders.trash', 'Lixeira') . '</a>
+                        <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>' . __('admin.orders.archived', 'Arquivados') . '</a>
                         <a class="btn btn-sm btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download me-1"></i>XLSX</a>
-                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '</button>
                     </div>
                 </div>
                 
                 <form method="GET" class="row g-2 mb-4" id="pedidosFilterForm">
                     <div class="col-md-5">
                         <div class="input-group">
-                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="' . htmlspecialchars(__('admin.orders.search_placeholder_list', 'Buscar pedido, cliente ou email...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca) . '">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <select class="form-select" name="status" id="pedidosStatusSelect">
-                            <option value="">Todos status</option>
+                            <option value="">' . __('admin.orders.all_statuses', 'Todos status') . '</option>
                             ' . $this->buildStatusOptions($status) . '
-                            <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
+                            <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>' . __('admin.orders.awaiting_receipt', 'Aguardando Comprovante') . '</option>
                         </select>
                     </div>
                 </form>
@@ -2895,12 +2895,12 @@ JS;
                     echo '<!-- Mobile: Dropdown -->
                     <div class="d-md-none mb-2">
                         <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
-                            <option value="todos" ' . (!$isSpecialFilter ? 'selected' : '') . '>Todos os Pedidos</option>
-                            <option value="dolar">Dólar</option>
-                            <option value="real">Reais</option>
-                            <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>Carnê</option>
-                            <option value="parcial" ' . ($isParcialFiltro ? 'selected' : '') . '>Parcialmente Comprado</option>
-                            <option value="comprado" ' . ($isCompradoFiltro ? 'selected' : '') . '>Comprado</option>
+                            <option value="todos" ' . (!$isSpecialFilter ? 'selected' : '') . '>' . __('admin.orders.tab_all', 'Todos os Pedidos') . '</option>
+                            <option value="dolar">' . __('admin.orders.tab_dollar', 'Dólar') . '</option>
+                            <option value="real">' . __('admin.orders.tab_real', 'Reais') . '</option>
+                            <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>' . __('admin.orders.tab_installment', 'Carnê') . '</option>
+                            <option value="parcial" ' . ($isParcialFiltro ? 'selected' : '') . '>' . __('admin.orders.tab_partially_purchased', 'Parcialmente Comprado') . '</option>
+                            <option value="comprado" ' . ($isCompradoFiltro ? 'selected' : '') . '>' . __('admin.orders.tab_purchased', 'Comprado') . '</option>
                         </select>
                     </div>
                     <!-- Desktop: Pills -->
@@ -2908,25 +2908,25 @@ JS;
                     echo '
                         <li class="nav-item" role="presentation">';
                     if ($isSpecialFilter) {
-                        echo '<a class="nav-link" href="/admin/pedidos">Todos os Pedidos</a>';
+                        echo '<a class="nav-link" href="/admin/pedidos">' . __('admin.orders.tab_all', 'Todos os Pedidos') . '</a>';
                     } else {
-                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">Todos os Pedidos</button>';
+                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">' . __('admin.orders.tab_all', 'Todos os Pedidos') . '</button>';
                     }
                     echo '</li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">Dólar</button>
+                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">' . __('admin.orders.tab_dollar', 'Dólar') . '</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">Reais</button>
+                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">' . __('admin.orders.tab_real', 'Reais') . '</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">Carnê</a>
+                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">' . __('admin.orders.tab_installment', 'Carnê') . '</a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isParcialFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=parcial" style="' . ($isParcialFiltro ? '' : 'color:#fd7e14;') . '">Parcial</a>
+                            <a class="nav-link ' . ($isParcialFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=parcial" style="' . ($isParcialFiltro ? '' : 'color:#fd7e14;') . '">' . __('admin.orders.tab_partial', 'Parcial') . '</a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isCompradoFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=comprado">Comprado</a>
+                            <a class="nav-link ' . ($isCompradoFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=comprado">' . __('admin.orders.tab_purchased', 'Comprado') . '</a>
                         </li>
                     </ul>';
                     echo '
@@ -2947,21 +2947,21 @@ JS;
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">' . __('admin.orders.cost_zero_empty', 'Custo 0/vazio') . '</span>';
                         }
                         if (!empty($warn['missing_ncm'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">' . __('admin.orders.no_ncm', 'Sem NCM') . '</span>';
                         }
                         if (!empty($warn['cpf_invalid'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">' . __('admin.orders.invalid_cpf', 'CPF inválido') . '</span>';
                         }
                         if (!empty($warn['valor_informado_cliente'])) {
-                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders.customer_value', 'Valor cliente') . '</span>';
                         }
                     }
                     $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
                     if ($aguardandoComprovante) {
-                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>' . __('admin.orders.awaiting_receipt_badge', 'Aguardando comprovante') . '</span>';
                     }
                     
                     $paisTxt = $resolverPaisPedido($pedido);
@@ -2982,7 +2982,7 @@ JS;
                         $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
                         $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+                    $origemTxt = $isManualBool ? __('admin.orders.origin_manual', 'Manual') : __('admin.orders.origin_organic', 'Orgânica');
 
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
@@ -2998,34 +2998,34 @@ JS;
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
                                             <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
-                                            <small class="text-muted">Total do Pedido</small>
-                                            <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'Moeda: R$' : 'Moeda: US$') . '</span></div>
+                                            <small class="text-muted">' . __('admin.orders.order_total', 'Total do Pedido') . '</small>
+                                            <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . __('admin.orders.currency_label', 'Moeda') . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? ': R$' : ': US$') . '</span></div>
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
+                                                <i class="fas fa-eye"></i> ' . __('common.view', 'Ver') . '
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
+                                                <option value="">' . __('common.status', 'Status') . '</option>
                                                 ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
@@ -3039,7 +3039,7 @@ JS;
                 if (empty($pedidos)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.none_found', 'Nenhum pedido encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -3068,21 +3068,21 @@ JS;
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">' . __('admin.orders.cost_zero_empty', 'Custo 0/vazio') . '</span>';
                         }
                         if (!empty($warn['missing_ncm'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">' . __('admin.orders.no_ncm', 'Sem NCM') . '</span>';
                         }
                         if (!empty($warn['cpf_invalid'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">' . __('admin.orders.invalid_cpf', 'CPF inválido') . '</span>';
                         }
                         if (!empty($warn['valor_informado_cliente'])) {
-                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders.customer_value', 'Valor cliente') . '</span>';
                         }
                     }
                     $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
                     if ($aguardandoComprovante) {
-                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>' . __('admin.orders.awaiting_receipt_badge', 'Aguardando comprovante') . '</span>';
                     }
 
                     $paisTxt = $resolverPaisPedido($pedido);
@@ -3103,7 +3103,7 @@ JS;
                         $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
                         $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+                    $origemTxt = $isManualBool ? __('admin.orders.origin_manual', 'Manual') : __('admin.orders.origin_organic', 'Orgânica');
 
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
@@ -3119,34 +3119,34 @@ JS;
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
                                             <h5 class="mb-0 text-success text-nowrap">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
-                                            <small class="text-muted">Total (USD)</small>
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (USD)</small>
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
+                                                <i class="fas fa-eye"></i> ' . __('common.view', 'Ver') . '
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
+                                                <option value="">' . __('common.status', 'Status') . '</option>
                                                 ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
@@ -3160,7 +3160,7 @@ JS;
                 if (empty($pedidosUSD)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-dollar-sign fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido em dólar encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.none_found_dollar', 'Nenhum pedido em dólar encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -3188,21 +3188,21 @@ JS;
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">' . __('admin.orders.cost_zero_empty', 'Custo 0/vazio') . '</span>';
                         }
                         if (!empty($warn['missing_ncm'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">' . __('admin.orders.no_ncm', 'Sem NCM') . '</span>';
                         }
                         if (!empty($warn['cpf_invalid'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">' . __('admin.orders.invalid_cpf', 'CPF inválido') . '</span>';
                         }
                         if (!empty($warn['valor_informado_cliente'])) {
-                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders.customer_value', 'Valor cliente') . '</span>';
                         }
                     }
                     $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
                     if ($aguardandoComprovante) {
-                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>' . __('admin.orders.awaiting_receipt_badge', 'Aguardando comprovante') . '</span>';
                     }
 
                     $paisTxt = $resolverPaisPedido($pedido);
@@ -3223,7 +3223,7 @@ JS;
                         $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
                         $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+                    $origemTxt = $isManualBool ? __('admin.orders.origin_manual', 'Manual') : __('admin.orders.origin_organic', 'Orgânica');
 
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
@@ -3239,34 +3239,34 @@ JS;
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
                                             <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
-                                            <small class="text-muted">Total (BRL)</small>
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (BRL)</small>
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
+                                                <i class="fas fa-eye"></i> ' . __('common.view', 'Ver') . '
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
+                                                <option value="">' . __('common.status', 'Status') . '</option>
                                                 ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
@@ -3280,7 +3280,7 @@ JS;
                 if (empty($pedidosBRL)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-currency-brl fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido em real encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.none_found_real', 'Nenhum pedido em real encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -6328,7 +6328,10 @@ LINKSCRIPT;
             'carne_aguardando' => 'Carnê Aguardando',
         ]);
         $status = trim($status);
-        return $map[$status] ?? ($status !== '' ? ucfirst($status) : '');
+        if (isset($map[$status])) {
+            return __('admin.order_status.' . $status, $map[$status]);
+        }
+        return $status !== '' ? ucfirst($status) : '';
     }
     
     private function getStatusIcon($status) {
@@ -6496,11 +6499,11 @@ LINKSCRIPT;
 
     /** Gera as <option> de status com o valor atual selecionado. */
     private function buildStatusOptions(string $current, bool $withEmpty = false): string {
-        $html = $withEmpty ? '<option value="">Selecione...</option>' : '';
+        $html = $withEmpty ? '<option value="">' . __('common.select', 'Selecione...') . '</option>' : '';
         $currentLower = strtolower(trim($current));
         foreach (self::getStatusList() as $val => $label) {
             $sel = ($currentLower === strtolower($val)) ? ' selected' : '';
-            $html .= '<option value="' . $val . '"' . $sel . '>' . htmlspecialchars($label) . '</option>';
+            $html .= '<option value="' . $val . '"' . $sel . '>' . htmlspecialchars(__('admin.order_status.' . $val, $label)) . '</option>';
         }
         // Se o status atual não está na lista, adicionar como opção selecionada
         if ($currentLower !== '' && !array_key_exists($currentLower, array_change_key_case(self::getStatusList(), CASE_LOWER))) {
