@@ -334,7 +334,7 @@ class AdminRelatorioGeralController extends Controller {
                 // Consolidar por categoria convertendo USD→BRL
                 $catMap = [];
                 foreach ($rawCats as $rc) {
-                    $catNome = $rc['categoria'] ?? 'Sem categoria';
+                    $catNome = $rc['categoria'] ?? __('admin.report_general.no_category', 'Sem categoria');
                     if (!isset($catMap[$catNome])) $catMap[$catNome] = ['categoria' => $catNome, 'cor' => $rc['cor'] ?? '#6b7280', 'grupo' => $rc['grupo'] ?? '', 'total' => 0, 'qtd' => 0];
                     $val = (float)($rc['total'] ?? 0);
                     if (strtoupper($rc['moeda'] ?? '') === 'USD') $val *= $taxaUsdBrl;
@@ -392,7 +392,7 @@ class AdminRelatorioGeralController extends Controller {
         require __DIR__ . '/../Views/admin/relatorio-geral/index.php';
         $content = ob_get_clean();
 
-        $title = 'Relatório Geral';
+        $title = __('admin.report_general.title', 'Relatório Geral');
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
@@ -441,7 +441,7 @@ class AdminRelatorioGeralController extends Controller {
                 if ($descVal <= 0) continue;
 
                 $moeda = strtoupper(trim((string)($dd['moeda'] ?? 'USD')));
-                $produtoNome = trim((string)($dd['produto_nome'] ?? 'Pedido'));
+                $produtoNome = trim((string)($dd['produto_nome'] ?? __('admin.report_general.order_word', 'Pedido')));
                 $vendedorNome = trim((string)($dd['vendedor_nome'] ?? ''));
                 $dataRef = isset($dd['created_at']) ? date('Y-m-d', strtotime($dd['created_at'])) : date('Y-m-d');
                 $competencia = date('Y-m-01', strtotime($dataRef));
@@ -463,7 +463,7 @@ class AdminRelatorioGeralController extends Controller {
                 }
 
                 // Inserir despesa
-                $descricao = "Desconto - {$produtoNome}" . ($vendedorNome !== '' ? " (vendedor: {$vendedorNome})" : '');
+                $descricao = __('admin.report_general.discount_prefix', 'Desconto - ') . $produtoNome . ($vendedorNome !== '' ? ' ' . __('admin.report_general.seller_paren', '(vendedor: ') . $vendedorNome . ')' : '');
                 $sql = "INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, observacoes, origem, created_at)
                         VALUES (:desc, :cat, 'avulsa', :valor, :moeda, :comp, :venc, 'paga', NULL, :fav, :obs, 'sistema', NOW())";
                 $stIns = $this->db->prepare($sql);

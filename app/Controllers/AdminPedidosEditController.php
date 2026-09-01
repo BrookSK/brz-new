@@ -440,8 +440,8 @@ class AdminPedidosEditController extends Controller {
 
             $id = (int) $request->getParam('id');
             if ($id <= 0) {
-                echo '<div class="alert alert-danger">Pedido inválido</div>';
-                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                echo '<div class="alert alert-danger">' . __('admin.orders_edit.invalid_order', 'Pedido inválido') . '</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
                 exit;
             }
 
@@ -457,8 +457,8 @@ class AdminPedidosEditController extends Controller {
                 $pedido = null;
             }
             if (!$pedido) {
-                echo '<div class="alert alert-danger">Pedido não encontrado</div>';
-                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                echo '<div class="alert alert-danger">' . __('admin.orders_edit.order_not_found', 'Pedido não encontrado') . '</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
                 exit;
             }
 
@@ -623,26 +623,26 @@ class AdminPedidosEditController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title">Editar Pedido #' . (int) $id . '</h1>
+                    <h1 class="page-title">' . __('admin.orders_edit.title', 'Editar Pedido') . ' #' . (int) $id . '</h1>
                     <div class="d-flex gap-2">
                         <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-1"></i>Voltar
+                            <i class="fas fa-arrow-left me-1"></i>' . __('common.back', 'Voltar') . '
                         </a>
                         <button type="button" class="btn btn-success" onclick="salvarPedido()">
-                            <i class="fas fa-save me-1"></i>Salvar
+                            <i class="fas fa-save me-1"></i>' . __('common.save', 'Salvar') . '
                         </button>
                     </div>
                 </div>
 
-                ' . (!$canEditItens ? '<div class="alert alert-warning">Este pedido está com status <strong>Pago</strong>. Você pode <strong>alterar o status</strong> abaixo, mas não pode editar/adicionar itens até voltar para <strong>Pendente</strong>.</div>' : '') . '
+                ' . (!$canEditItens ? '<div class="alert alert-warning">' . __('admin.orders_edit.paid_warning', 'Este pedido está com status <strong>Pago</strong>. Você pode <strong>alterar o status</strong> abaixo, mas não pode editar/adicionar itens até voltar para <strong>Pendente</strong>.') . '</div>' : '') . '
 
                 <div class="card mb-4 border-info">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex flex-wrap gap-4 align-items-center">
-                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>Pedido:</strong> #' . (int)$id . ' <span class="text-secondary">(' . htmlspecialchars($codigoPedido) . ')</span></span>
-                            <span class="text-muted small"><i class="fas fa-user me-1"></i><strong>Cliente:</strong> ' . htmlspecialchars((string)($pedido['cliente_nome'] ?? '—')) . '</span>
-                            ' . (!empty($pedido['cliente_cpf_cnpj']) ? '<span class="text-muted small"><i class="fas fa-id-card me-1"></i><strong>CPF/CNPJ:</strong> ' . htmlspecialchars((string)$pedido['cliente_cpf_cnpj']) . '</span>' : '') . '
-                            ' . (!empty($pedido['cliente_suite']) ? '<span class="text-muted small"><i class="fas fa-box me-1"></i><strong>Suíte:</strong> ' . htmlspecialchars((string)$pedido['cliente_suite']) . '</span>' : '') . '
+                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>' . __('admin.orders_edit.order_label', 'Pedido:') . '</strong> #' . (int)$id . ' <span class="text-secondary">(' . htmlspecialchars($codigoPedido) . ')</span></span>
+                            <span class="text-muted small"><i class="fas fa-user me-1"></i><strong>' . __('admin.orders_edit.customer_label', 'Cliente:') . '</strong> ' . htmlspecialchars((string)($pedido['cliente_nome'] ?? '—')) . '</span>
+                            ' . (!empty($pedido['cliente_cpf_cnpj']) ? '<span class="text-muted small"><i class="fas fa-id-card me-1"></i><strong>' . __('admin.orders_edit.doc_label', 'CPF/CNPJ:') . '</strong> ' . htmlspecialchars((string)$pedido['cliente_cpf_cnpj']) . '</span>' : '') . '
+                            ' . (!empty($pedido['cliente_suite']) ? '<span class="text-muted small"><i class="fas fa-box me-1"></i><strong>' . __('admin.orders_edit.suite_label', 'Suíte:') . '</strong> ' . htmlspecialchars((string)$pedido['cliente_suite']) . '</span>' : '') . '
                         </div>
                     </div>
                 </div>
@@ -651,20 +651,20 @@ class AdminPedidosEditController extends Controller {
                     <div class="col-12">
                         <div class="card mb-4">
                             <div class="card-body">
-                                <div class="fw-bold mb-1"><i class="fas fa-link me-2"></i>Cobrar diferença (Payment Link)</div>
-                                <div class="text-muted small mb-3">Salve o pedido primeiro com os novos itens. O valor da diferença é calculado automaticamente.</div>
+                                <div class="fw-bold mb-1"><i class="fas fa-link me-2"></i>' . __('admin.orders_edit.charge_difference', 'Cobrar diferença (Payment Link)') . '</div>
+                                <div class="text-muted small mb-3">' . __('admin.orders_edit.charge_difference_hint', 'Salve o pedido primeiro com os novos itens. O valor da diferença é calculado automaticamente.') . '</div>
                                 <div class="d-flex gap-2 align-items-center flex-wrap">
                                     <div>
-                                        <label class="form-label small mb-0">Diferença calculada</label>
+                                        <label class="form-label small mb-0">' . __('admin.orders_edit.calculated_difference', 'Diferença calculada') . '</label>
                                         <input type="text" class="form-control" id="diferenca_calculada" readonly style="max-width:180px;" value="R$ 0,00">
                                     </div>
                                     <div>
-                                        <label class="form-label small mb-0">Valor manual (opcional)</label>
-                                        <input type="number" step="0.01" min="0" class="form-control" id="diferenca_valor" placeholder="Deixe vazio p/ automático" style="max-width:180px;">
+                                        <label class="form-label small mb-0">' . __('admin.orders_edit.manual_value_optional', 'Valor manual (opcional)') . '</label>
+                                        <input type="number" step="0.01" min="0" class="form-control" id="diferenca_valor" placeholder="' . htmlspecialchars(__('admin.orders_edit.leave_empty_auto', 'Deixe vazio p/ automático'), ENT_QUOTES, 'UTF-8') . '" style="max-width:180px;">
                                     </div>
                                     <div class="d-flex align-items-end" style="padding-bottom:1px;">
                                         <button type="button" class="btn btn-primary" onclick="gerarLinkDiferenca()">
-                                            <i class="fas fa-link me-1"></i>Gerar link de pagamento
+                                            <i class="fas fa-link me-1"></i>' . __('admin.orders_edit.generate_payment_link', 'Gerar link de pagamento') . '
                                         </button>
                                     </div>
                                 </div>
@@ -678,15 +678,15 @@ class AdminPedidosEditController extends Controller {
                     <div class="col-md-4">
                         <div class="card shadow-sm mb-4">
                             <div class="card-header bg-primary text-white">
-                                <h5><i class="fas fa-info-circle me-2"></i>Informações</h5>
+                                <h5><i class="fas fa-info-circle me-2"></i>' . __('admin.orders_edit.information', 'Informações') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Código</label>
+                                    <label class="form-label">' . __('admin.orders_edit.code', 'Código') . '</label>
                                     <input type="text" class="form-control" value="' . htmlspecialchars($codigoPedido) . '" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Status</label>
+                                    <label class="form-label">' . __('common.status', 'Status') . '</label>
                                     <select class="form-select" id="pedido_status">
                                         ' . (function() use ($statusAtual) {
                                             $html = '';
@@ -702,82 +702,82 @@ class AdminPedidosEditController extends Controller {
                                         })() . '
                                     </select>
                                     <button type="button" class="btn btn-outline-primary w-100 mt-2" onclick="atualizarSomenteStatus()">
-                                        <i class="fas fa-rotate me-1"></i>Atualizar Status
+                                        <i class="fas fa-rotate me-1"></i>' . __('admin.orders_edit.update_status', 'Atualizar Status') . '
                                     </button>
                                 </div>
 
                                 <!-- Botão Liberar Invoice -->
                                 <div class="mb-3">
-                                    <div class="fw-bold mb-1"><i class="fas fa-file-invoice me-1"></i>Invoice (Conferência)</div>
-                                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/liberar-invoice" onsubmit="return confirm(\'Liberar invoice para conferência do cliente?\')">
+                                    <div class="fw-bold mb-1"><i class="fas fa-file-invoice me-1"></i>' . __('admin.orders_edit.invoice_check', 'Invoice (Conferência)') . '</div>
+                                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/liberar-invoice" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.orders_edit.release_invoice_confirm', 'Liberar invoice para conferência do cliente?'), ENT_QUOTES, 'UTF-8') . '\')">
                                         <button type="submit" class="btn btn-outline-info w-100">
-                                            <i class="fas fa-paper-plane me-1"></i>Liberar Invoice
+                                            <i class="fas fa-paper-plane me-1"></i>' . __('admin.orders_edit.release_invoice', 'Liberar Invoice') . '
                                         </button>
                                     </form>
-                                    <div class="form-text">Libera os dados para o cliente conferir antes do envio.</div>
+                                    <div class="form-text">' . __('admin.orders_edit.release_invoice_hint', 'Libera os dados para o cliente conferir antes do envio.') . '</div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <div class="fw-bold">Medidas e peso (obrigatório para gerar etiqueta)</div>
+                                    <div class="fw-bold">' . __('admin.orders_edit.measures_weight', 'Medidas e peso (obrigatório para gerar etiqueta)') . '</div>
                                     <div class="row g-2 mt-1">
                                         <div class="col-6">
-                                            <label class="form-label">Peso real (gramas)</label>
+                                            <label class="form-label">' . __('admin.orders_edit.real_weight_grams', 'Peso real (gramas)') . '</label>
                                             <input type="number" class="form-control" id="pedido_peso_total" step="1" min="0" value="' . htmlspecialchars((string) (($pedido['peso_total'] ?? 0) > 0 ? round(((float)$pedido['peso_total']) * 1000) : ''), ENT_QUOTES, 'UTF-8') . '">
                                             <div class="form-text" id="peso_kg_display" style="color:#0d6efd;font-weight:500;"></div>
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label">Comprimento (cm)</label>
+                                            <label class="form-label">' . __('admin.orders_edit.length_cm', 'Comprimento (cm)') . '</label>
                                             <input type="number" class="form-control" id="pedido_comprimento" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['comprimento'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label">Largura (cm)</label>
+                                            <label class="form-label">' . __('admin.orders_edit.width_cm', 'Largura (cm)') . '</label>
                                             <input type="number" class="form-control" id="pedido_largura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['largura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label">Altura (cm)</label>
+                                            <label class="form-label">' . __('admin.orders_edit.height_cm', 'Altura (cm)') . '</label>
                                             <input type="number" class="form-control" id="pedido_altura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['altura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Código de Rastreio</label>
-                                    <input type="text" class="form-control" id="tracking_code" value="' . htmlspecialchars((string) ($pedido['tracking_code'] ?? ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Ex: AB123456789BR">
-                                    <div class="form-text">Código de rastreio exibido para o cliente. Deixe vazio se não houver.</div>
+                                    <label class="form-label">' . __('admin.orders_edit.tracking_code', 'Código de Rastreio') . '</label>
+                                    <input type="text" class="form-control" id="tracking_code" value="' . htmlspecialchars((string) ($pedido['tracking_code'] ?? ''), ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars(__('admin.orders_edit.tracking_placeholder', 'Ex: AB123456789BR'), ENT_QUOTES, 'UTF-8') . '">
+                                    <div class="form-text">' . __('admin.orders_edit.tracking_hint', 'Código de rastreio exibido para o cliente. Deixe vazio se não houver.') . '</div>
                                 </div>
 
                                 <div class="mb-0">
-                                    <label class="form-label">Observação do vendedor</label>
-                                    <textarea class="form-control" id="observacao_vendedor" rows="4" placeholder="Observação interna para compras/PDF...">' . htmlspecialchars((string) ($pedido['observacao_vendedor'] ?? ''), ENT_QUOTES, 'UTF-8') . '</textarea>
-                                    <div class="form-text">Essa observação é interna e aparece no PDF do relatório de compras.</div>
+                                    <label class="form-label">' . __('admin.orders_edit.seller_note', 'Observação do vendedor') . '</label>
+                                    <textarea class="form-control" id="observacao_vendedor" rows="4" placeholder="' . htmlspecialchars(__('admin.orders_edit.seller_note_placeholder', 'Observação interna para compras/PDF...'), ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars((string) ($pedido['observacao_vendedor'] ?? ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                    <div class="form-text">' . __('admin.orders_edit.seller_note_hint', 'Essa observação é interna e aparece no PDF do relatório de compras.') . '</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="card shadow-sm mb-4">
                             <div class="card-header bg-success text-white">
-                                <h5><i class="fas fa-calculator me-2"></i>Financeiro</h5>
+                                <h5><i class="fas fa-calculator me-2"></i>' . __('admin.orders_edit.financial', 'Financeiro') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Subtotal</label>
+                                    <label class="form-label">' . __('admin.orders_edit.subtotal', 'Subtotal') . '</label>
                                     <input type="text" class="form-control" id="subtotal_produtos" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Frete</label>
+                                    <label class="form-label">' . __('admin.orders_edit.shipping', 'Frete') . '</label>
                                     <input type="number" class="form-control" id="valor_frete" value="' . (float) ($pedido['frete'] ?? 0) . '" step="0.01" onchange="calcularTotal()">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Desconto (%)</label>
+                                    <label class="form-label">' . __('admin.orders_edit.discount_pct', 'Desconto (%)') . '</label>
                                     <input type="number" class="form-control" id="percentual_desconto" value="0" min="0" max="100" step="0.01" onchange="calcularTotal()">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Valor Desconto</label>
+                                    <label class="form-label">' . __('admin.orders_edit.discount_value', 'Valor Desconto') . '</label>
                                     <input type="text" class="form-control" id="valor_desconto" readonly>
                                 </div>
                                 <hr>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Total</label>
+                                    <label class="form-label fw-bold">' . __('common.total', 'Total') . '</label>
                                     <input type="text" class="form-control fw-bold fs-5" id="valor_total" readonly>
                                 </div>
                             </div>
@@ -787,19 +787,19 @@ class AdminPedidosEditController extends Controller {
                     <div class="col-md-8">
                         <div class="card shadow-sm mb-4">
                             <div class="card-header bg-success text-white">
-                                <h5><i class="fas fa-shopping-cart me-2"></i>Itens</h5>
+                                <h5><i class="fas fa-shopping-cart me-2"></i>' . __('admin.orders_edit.items', 'Itens') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
-                                                <th>Produto</th>
-                                                <th>Loja</th>
-                                                <th>Qtd</th>
-                                                <th>Preço</th>
-                                                <th>Subtotal</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.orders_edit.th_product', 'Produto') . '</th>
+                                                <th>' . __('admin.orders_edit.th_store', 'Loja') . '</th>
+                                                <th>' . __('admin.orders_edit.th_qty', 'Qtd') . '</th>
+                                                <th>' . __('admin.orders_edit.th_price', 'Preço') . '</th>
+                                                <th>' . __('admin.orders_edit.th_subtotal', 'Subtotal') . '</th>
+                                                <th>' . __('common.actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody id="itens_pedido">';
@@ -813,7 +813,7 @@ class AdminPedidosEditController extends Controller {
                                     <input type="text" class="form-control form-control-sm item-nome-input" value="' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '" style="display:none;">
                                     <br><small class="text-muted">SKU: ' . htmlspecialchars((string) ($item['nome_produto_sku'] ?? 'N/A')) . '</small>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editarNomeItem(this)" title="Editar nome do produto">
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editarNomeItem(this)" title="' . htmlspecialchars(__('admin.orders_edit.edit_product_name', 'Editar nome do produto'), ENT_QUOTES, 'UTF-8') . '">
                                     <i class="fas fa-pencil-alt" style="font-size:11px;"></i>
                                 </button>
                             </div>
@@ -841,7 +841,7 @@ class AdminPedidosEditController extends Controller {
                                 </div>
 
                                 <button type="button" class="btn btn-primary" onclick="abrirModalAdicionarProduto()" ' . (!$canEditItens ? 'disabled' : '') . '>
-                                    <i class="fas fa-plus me-2"></i>Adicionar Produto
+                                    <i class="fas fa-plus me-2"></i>' . __('admin.orders_edit.add_product', 'Adicionar Produto') . '
                                 </button>
                             </div>
                         </div>
@@ -855,13 +855,13 @@ class AdminPedidosEditController extends Controller {
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Adicionar Produto</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    <h5 class="modal-title">' . __('admin.orders_edit.add_product', 'Adicionar Produto') . '</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('common.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                 </div>
                 <div class="modal-body">
                     <div class="input-group mb-3">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" class="form-control" id="busca_produto" placeholder="Buscar produto..." oninput="buscarProdutos()">
+                        <input type="text" class="form-control" id="busca_produto" placeholder="' . htmlspecialchars(__('admin.orders_edit.search_product', 'Buscar produto...'), ENT_QUOTES, 'UTF-8') . '" oninput="buscarProdutos()">
                     </div>
                     <div class="row" id="lista_produtos">';
 
@@ -887,7 +887,7 @@ class AdminPedidosEditController extends Controller {
                     . '<div>'
                     . '<div style="font-weight:700;">' . htmlspecialchars($nome) . '</div>'
                     . '<div class="small text-muted">SKU: ' . htmlspecialchars($sku !== '' ? $sku : 'N/A') . '</div>'
-                    . (!empty($loja) ? ('<div class="small text-muted">Loja: ' . htmlspecialchars($loja) . '</div>') : '')
+                    . (!empty($loja) ? ('<div class="small text-muted">' . __('admin.orders_edit.store_label', 'Loja:') . ' ' . htmlspecialchars($loja) . '</div>') : '')
                     . '</div>'
                     . '<div class="text-end">'
                     . '<div class="small text-muted">R$</div>'
@@ -895,7 +895,7 @@ class AdminPedidosEditController extends Controller {
                     . '</div>'
                     . '</div>'
                     . '<div class="mt-2">'
-                    . '<button type="button" class="btn btn-sm btn-primary" onclick="selecionarProduto(' . (int) $pid . ', ' . $jsNome . ', ' . (float) $preco . ', ' . $jsSku . ', ' . $jsLoja . ')">Adicionar</button>'
+                    . '<button type="button" class="btn btn-sm btn-primary" onclick="selecionarProduto(' . (int) $pid . ', ' . $jsNome . ', ' . (float) $preco . ', ' . $jsSku . ', ' . $jsLoja . ')">' . __('admin.orders_edit.add', 'Adicionar') . '</button>'
                     . '</div>'
                     . '</div>'
                     . '</div>'
@@ -905,7 +905,7 @@ class AdminPedidosEditController extends Controller {
             echo '        </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.close', 'Fechar') . '</button>
                 </div>
             </div>
         </div>
@@ -939,7 +939,7 @@ class AdminPedidosEditController extends Controller {
                 if (!canEditItens) return;
                 const el = document.getElementById("modalAdicionarProduto");
                 if (!el) {
-                    alert("Modal de produto não encontrado na página. Atualize a página com Ctrl+F5 e tente novamente.");
+                    alert("' . htmlspecialchars(__('admin.orders_edit.js_modal_not_found', 'Modal de produto não encontrado na página. Atualize a página com Ctrl+F5 e tente novamente.'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
                 try {
@@ -996,7 +996,7 @@ class AdminPedidosEditController extends Controller {
 
             window.removerItem = function(btn){
                 if (!canEditItens) return;
-                if (confirm("Tem certeza que deseja remover este item?")) {
+                if (confirm("' . htmlspecialchars(__('admin.orders_edit.js_confirm_remove_item', 'Tem certeza que deseja remover este item?'), ENT_QUOTES, 'UTF-8') . '")) {
                     const row = btn.closest(".item-row");
                     if (row) row.remove();
                     window.calcularTotal();
@@ -1089,10 +1089,10 @@ class AdminPedidosEditController extends Controller {
                         window.location.href = returnUrl;
                         return;
                     }
-                    alert("Erro: " + (data.message || "Falha ao salvar"));
+                    alert("' . htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') . ': " + (data.message || "' . htmlspecialchars(__('admin.orders_edit.js_save_failed', 'Falha ao salvar'), ENT_QUOTES, 'UTF-8') . '"));
                 })
                 .catch(function(){
-                    alert("Erro ao salvar pedido");
+                    alert("' . htmlspecialchars(__('admin.orders_edit.js_save_error', 'Erro ao salvar pedido'), ENT_QUOTES, 'UTF-8') . '");
                 });
             };
 
@@ -1145,10 +1145,10 @@ class AdminPedidosEditController extends Controller {
                         window.location.href = returnUrl;
                         return;
                     }
-                    alert("Erro: " + (data.message || "Falha ao atualizar status"));
+                    alert("' . htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') . ': " + (data.message || "' . htmlspecialchars(__('admin.orders_edit.js_status_failed', 'Falha ao atualizar status'), ENT_QUOTES, 'UTF-8') . '"));
                 })
                 .catch(function(){
-                    alert("Erro ao atualizar status");
+                    alert("' . htmlspecialchars(__('admin.orders_edit.js_status_error', 'Erro ao atualizar status'), ENT_QUOTES, 'UTF-8') . '");
                 });
             };
 
@@ -1230,7 +1230,7 @@ class AdminPedidosEditController extends Controller {
                 } else {
                     var novoNome = input.value.trim();
                     if (novoNome === "") {
-                        alert("O nome não pode ficar vazio.");
+                        alert("' . htmlspecialchars(__('admin.orders_edit.js_name_empty', 'O nome não pode ficar vazio.'), ENT_QUOTES, 'UTF-8') . '");
                         input.focus();
                         return;
                     }
@@ -1271,8 +1271,8 @@ class AdminPedidosEditController extends Controller {
 </html>';
 
     } catch (\Exception $e) {
-        echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
-        echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+        echo '<div class="alert alert-danger">' . __('common.error', 'Erro') . ': ' . $e->getMessage() . '</div>';
+        echo '<a href="/admin/pedidos" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
         exit;
 
     }
@@ -1288,7 +1288,7 @@ class AdminPedidosEditController extends Controller {
             $valorManual = trim((string) ($dados['valor_manual'] ?? ''));
 
             if ($pedidoId <= 0) {
-                echo json_encode(['success' => false, 'error' => 'Pedido inválido']);
+                echo json_encode(['success' => false, 'error' => __('admin.orders_edit.invalid_order', 'Pedido inválido')]);
                 return;
             }
 
@@ -1301,7 +1301,7 @@ class AdminPedidosEditController extends Controller {
             $st->execute([$pedidoId]);
             $pedido = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$pedido) {
-                echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                echo json_encode(['success' => false, 'error' => __('admin.orders_edit.order_not_found', 'Pedido não encontrado')]);
                 return;
             }
 
@@ -1338,7 +1338,7 @@ class AdminPedidosEditController extends Controller {
             }
 
             if ($diferenca <= 0) {
-                echo json_encode(['success' => false, 'error' => 'Sem diferença a cobrar. Adicione itens e salve o pedido primeiro.']);
+                echo json_encode(['success' => false, 'error' => __('admin.orders_edit.no_difference', 'Sem diferença a cobrar. Adicione itens e salve o pedido primeiro.')]);
                 return;
             }
 
@@ -1360,7 +1360,7 @@ class AdminPedidosEditController extends Controller {
             ], $adminId);
 
             if (empty($result['success'])) {
-                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Falha ao criar link']);
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? __('admin.orders_edit.link_creation_failed', 'Falha ao criar link')]);
                 return;
             }
 
@@ -1423,7 +1423,7 @@ class AdminPedidosEditController extends Controller {
 
             $pedidoId = (int) ($dados['pedido_id'] ?? 0);
             if ($pedidoId <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Pedido inválido']);
+                echo json_encode(['success' => false, 'message' => __('admin.orders_edit.invalid_order', 'Pedido inválido')]);
                 return;
             }
 
@@ -1511,7 +1511,7 @@ class AdminPedidosEditController extends Controller {
                 if ($pesoTotal <= 0 || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Para marcar como Caixa Fechada (ou status seguintes), preencha Peso real (gramas), Altura, Largura e Comprimento.'
+                        'message' => __('admin.orders_edit.measures_required', 'Para marcar como Caixa Fechada (ou status seguintes), preencha Peso real (gramas), Altura, Largura e Comprimento.')
                     ]);
                     return;
                 }
@@ -2018,7 +2018,7 @@ class AdminPedidosEditController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            echo json_encode(['success' => true, 'message' => 'Pedido atualizado com sucesso']);
+            echo json_encode(['success' => true, 'message' => __('admin.orders_edit.updated_success', 'Pedido atualizado com sucesso')]);
         } catch (\Exception $e) {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();

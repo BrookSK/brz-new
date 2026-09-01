@@ -52,7 +52,7 @@ class AdminFaturasAdicionaisController extends Controller {
         $descricao = trim($params['descricao'] ?? '');
 
         if ($pedidoId <= 0 || $motivo === '' || $valor <= 0) {
-            $this->setFlash('Preencha todos os campos obrigatórios.', 'danger');
+            $this->setFlash(__('admin.additional_invoices.fill_required_fields', 'Preencha todos os campos obrigatórios.'), 'danger');
             $this->redirect('/admin/faturas-adicionais');
             return;
         }
@@ -62,7 +62,7 @@ class AdminFaturasAdicionaisController extends Controller {
         $stmt->execute([$pedidoId]);
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$pedido) {
-            $this->setFlash('Pedido não encontrado.', 'danger');
+            $this->setFlash(__('admin.additional_invoices.order_not_found', 'Pedido não encontrado.'), 'danger');
             $this->redirect('/admin/faturas-adicionais');
             return;
         }
@@ -83,7 +83,7 @@ class AdminFaturasAdicionaisController extends Controller {
         // Adicionar item ao carrinho do cliente automaticamente
         $this->adicionarFaturaAoCarrinho((int) $pedido['usuario_id'], (int) $faturaId, $motivo, $valor);
 
-        $this->setFlash('Fatura adicional criada. Item adicionado ao carrinho do cliente.', 'success');
+        $this->setFlash(__('admin.additional_invoices.created_success', 'Fatura adicional criada. Item adicionado ao carrinho do cliente.'), 'success');
         $this->redirect('/admin/faturas-adicionais');
     }
 
@@ -99,7 +99,7 @@ class AdminFaturasAdicionaisController extends Controller {
 
         $fatura = $this->model->find($id);
         if (!$fatura || $fatura['status'] !== 'pendente') {
-            $this->setFlash('Fatura não pode ser cancelada.', 'danger');
+            $this->setFlash(__('admin.additional_invoices.cannot_cancel', 'Fatura não pode ser cancelada.'), 'danger');
             $this->redirect('/admin/faturas-adicionais');
             return;
         }
@@ -109,7 +109,7 @@ class AdminFaturasAdicionaisController extends Controller {
         // Remover item do carrinho se existir
         $this->removerFaturaDoCarrinho($id);
 
-        $this->setFlash('Fatura cancelada com sucesso.', 'success');
+        $this->setFlash(__('admin.additional_invoices.cancelled_success', 'Fatura cancelada com sucesso.'), 'success');
         $this->redirect('/admin/faturas-adicionais');
     }
 
@@ -155,7 +155,7 @@ class AdminFaturasAdicionaisController extends Controller {
                 "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, fatura_adicional_id, nome_item)
                  VALUES (?, 0, 1, ?, ?, 'fatura_adicional', ?, ?)"
             );
-            $stIns->execute([$cartId, $valor, $valor, $faturaId, 'Fatura Adicional: ' . $motivo]);
+            $stIns->execute([$cartId, $valor, $valor, $faturaId, __('admin.additional_invoices.cart_item_label', 'Fatura Adicional:') . ' ' . $motivo]);
         } catch (\Throwable $e) {
             error_log('[FaturasAdicionais] Erro ao adicionar ao carrinho: ' . $e->getMessage());
         }

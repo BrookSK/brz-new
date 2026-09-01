@@ -52,8 +52,8 @@ class AdminPedidosSplitController extends Controller {
         }
 
         echo '<div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="page-title"><i class="fas fa-cut me-2"></i>Split Order</h1>
-                <a href="/admin/pedidos" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                <h1 class="page-title"><i class="fas fa-cut me-2"></i>' . __('admin.orders_split.title', 'Split Order') . '</h1>
+                <a href="/admin/pedidos" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('common.back', 'Voltar') . '</a>
               </div>';
 
         // Form para buscar pedido
@@ -61,10 +61,10 @@ class AdminPedidosSplitController extends Controller {
                 <div class="card-body">
                     <form method="get" action="/admin/pedidos/split" class="d-flex align-items-end gap-3">
                         <div>
-                            <label for="order_id" class="form-label fw-bold">ID do Pedido</label>
-                            <input type="number" class="form-control" id="order_id" name="id" value="' . ($id > 0 ? $id : '') . '" required placeholder="Ex: 1234" style="max-width:200px;">
+                            <label for="order_id" class="form-label fw-bold">' . __('admin.orders_split.order_id', 'ID do Pedido') . '</label>
+                            <input type="number" class="form-control" id="order_id" name="id" value="' . ($id > 0 ? $id : '') . '" required placeholder="' . htmlspecialchars(__('admin.orders_split.order_id_placeholder', 'Ex: 1234'), ENT_QUOTES, 'UTF-8') . '" style="max-width:200px;">
                         </div>
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>Buscar</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>' . __('common.search', 'Buscar') . '</button>
                     </form>
                 </div>
               </div>';
@@ -90,12 +90,12 @@ class AdminPedidosSplitController extends Controller {
             $stmt->execute([':id' => $pedidoId]);
             $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro ao buscar pedido: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.orders_split.error_fetch_order', 'Erro ao buscar pedido:') . ' ' . htmlspecialchars($e->getMessage()) . '</div>';
             return;
         }
 
         if (!$pedido) {
-            echo '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Pedido #' . $pedidoId . ' não encontrado.</div>';
+            echo '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>' . __('admin.orders_split.order_label', 'Pedido') . ' #' . $pedidoId . ' ' . __('admin.orders_split.not_found_suffix', 'não encontrado.') . '</div>';
             return;
         }
 
@@ -148,12 +148,12 @@ class AdminPedidosSplitController extends Controller {
             $stmt->execute([':pedido_id' => $pedidoId]);
             $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro ao buscar itens: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.orders_split.error_fetch_items', 'Erro ao buscar itens:') . ' ' . htmlspecialchars($e->getMessage()) . '</div>';
             return;
         }
 
         if (empty($itens)) {
-            echo '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Pedido #' . $pedidoId . ' não possui itens.</div>';
+            echo '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>' . __('admin.orders_split.order_label', 'Pedido') . ' #' . $pedidoId . ' ' . __('admin.orders_split.no_items_suffix', 'não possui itens.') . '</div>';
             return;
         }
 
@@ -169,18 +169,18 @@ class AdminPedidosSplitController extends Controller {
 
         echo '<div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-box-open me-2"></i>Pedido #' . htmlspecialchars($codigoPedido) . ' 
+                    <h5 class="mb-0"><i class="fas fa-box-open me-2"></i>' . __('admin.orders_split.order_label', 'Pedido') . ' #' . htmlspecialchars($codigoPedido) . ' 
                     <span class="badge bg-light text-dark ms-2">' . htmlspecialchars(ucfirst($statusPedido)) . '</span>
                     <span class="badge bg-info ms-1">' . htmlspecialchars($moeda) . '</span>
-                    <span class="float-end fw-normal fs-6">Total: ' . $simboloMoeda . ' ' . number_format($valorTotalPedido, 2, ',', '.') . '</span></h5>
+                    <span class="float-end fw-normal fs-6">' . __('common.total', 'Total') . ': ' . $simboloMoeda . ' ' . number_format($valorTotalPedido, 2, ',', '.') . '</span></h5>
                 </div>
                 <div class="card-body">';
 
-        echo '<p class="text-muted mb-3"><i class="fas fa-info-circle me-1"></i>Selecione os itens que deseja <strong>separar</strong> para um novo pedido. Os itens selecionados serão removidos deste pedido e um novo pedido será criado com eles.</p>';
+        echo '<p class="text-muted mb-3"><i class="fas fa-info-circle me-1"></i>' . __('admin.orders_split.instructions', 'Selecione os itens que deseja <strong>separar</strong> para um novo pedido. Os itens selecionados serão removidos deste pedido e um novo pedido será criado com eles.') . '</p>';
 
         echo '<div class="mb-3">
-                <strong>Peso total selecionado:</strong> <span id="total-weight" class="badge bg-warning text-dark fs-6">0.000 kg</span>
-                <span class="ms-3"><strong>Valor selecionado:</strong> <span id="total-value" class="badge bg-success fs-6">' . $simboloMoeda . ' 0,00</span></span>
+                <strong>' . __('admin.orders_split.total_selected_weight', 'Peso total selecionado:') . '</strong> <span id="total-weight" class="badge bg-warning text-dark fs-6">0.000 kg</span>
+                <span class="ms-3"><strong>' . __('admin.orders_split.selected_value', 'Valor selecionado:') . '</strong> <span id="total-value" class="badge bg-success fs-6">' . $simboloMoeda . ' 0,00</span></span>
               </div>';
 
         echo '<form method="post" action="/admin/pedidos/split" id="split-order-form">
@@ -190,13 +190,13 @@ class AdminPedidosSplitController extends Controller {
                     <thead class="table-light">
                         <tr>
                             <th style="width:40px;"><input type="checkbox" id="select-all" class="form-check-input"></th>
-                            <th>Produto</th>
-                            <th>SKU</th>
-                            <th class="text-center">Qtd Total</th>
-                            <th class="text-center">Qtd a Separar</th>
-                            <th class="text-end">Preço Unit.</th>
-                            <th class="text-end">Subtotal</th>
-                            <th class="text-end">Peso Total</th>
+                            <th>' . __('admin.orders_split.th_product', 'Produto') . '</th>
+                            <th>' . __('admin.orders_split.th_sku', 'SKU') . '</th>
+                            <th class="text-center">' . __('admin.orders_split.th_total_qty', 'Qtd Total') . '</th>
+                            <th class="text-center">' . __('admin.orders_split.th_qty_to_split', 'Qtd a Separar') . '</th>
+                            <th class="text-end">' . __('admin.orders_split.th_unit_price', 'Preço Unit.') . '</th>
+                            <th class="text-end">' . __('admin.orders_split.th_subtotal', 'Subtotal') . '</th>
+                            <th class="text-end">' . __('admin.orders_split.th_total_weight', 'Peso Total') . '</th>
                         </tr>
                     </thead>
                     <tbody>';
@@ -227,7 +227,7 @@ class AdminPedidosSplitController extends Controller {
 
         echo '<div class="d-flex justify-content-end mt-3">
                 <button type="submit" class="btn btn-danger btn-lg" id="btn-split" disabled>
-                    <i class="fas fa-cut me-2"></i>Separar Itens Selecionados
+                    <i class="fas fa-cut me-2"></i>' . __('admin.orders_split.split_selected_items', 'Separar Itens Selecionados') . '
                 </button>
               </div>';
 
@@ -335,10 +335,10 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         if (checkedCount >= checkboxes.length && allFullQty) {
             e.preventDefault();
-            alert("Você não pode separar TODOS os itens com quantidade total. Pelo menos um item (ou parte dele) deve permanecer no pedido original.");
+            alert("' . htmlspecialchars(__('admin.orders_split.js_cannot_split_all', 'Você não pode separar TODOS os itens com quantidade total. Pelo menos um item (ou parte dele) deve permanecer no pedido original.'), ENT_QUOTES, 'UTF-8') . '");
             return;
         }
-        if (!confirm("Tem certeza que deseja separar os itens selecionados em um novo pedido? Esta ação não pode ser desfeita.")) {
+        if (!confirm("' . htmlspecialchars(__('admin.orders_split.js_confirm_split', 'Tem certeza que deseja separar os itens selecionados em um novo pedido? Esta ação não pode ser desfeita.'), ENT_QUOTES, 'UTF-8') . '")) {
             e.preventDefault();
         }
     });
@@ -354,7 +354,7 @@ document.addEventListener("DOMContentLoaded", function() {
         $selectedItems = $_POST['items'] ?? [];
 
         if ($pedidoId <= 0 || empty($selectedItems)) {
-            $this->redirectWithMessage('/admin/pedidos/split', 'ID do pedido inválido ou nenhum item selecionado.', 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split', __('admin.orders_split.invalid_or_no_items', 'ID do pedido inválido ou nenhum item selecionado.'), 'danger');
             return;
         }
 
@@ -365,12 +365,12 @@ document.addEventListener("DOMContentLoaded", function() {
             $stmt->execute([':id' => $pedidoId]);
             $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
-            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Erro ao buscar pedido: ' . $e->getMessage(), 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, __('admin.orders_split.error_fetch_order', 'Erro ao buscar pedido:') . ' ' . $e->getMessage(), 'danger');
             return;
         }
 
         if (!$pedido) {
-            $this->redirectWithMessage('/admin/pedidos/split', 'Pedido não encontrado.', 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split', __('admin.orders_split.order_not_found', 'Pedido não encontrado.'), 'danger');
             return;
         }
 
@@ -385,7 +385,7 @@ document.addEventListener("DOMContentLoaded", function() {
             $stmt->execute([':pedido_id' => $pedidoId]);
             $todosItens = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {
-            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Erro ao buscar itens: ' . $e->getMessage(), 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, __('admin.orders_split.error_fetch_items', 'Erro ao buscar itens:') . ' ' . $e->getMessage(), 'danger');
             return;
         }
 
@@ -415,7 +415,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         if ($allFull) {
-            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Você não pode separar todos os itens com quantidade total. Pelo menos um item (ou parte) deve permanecer no pedido original.', 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, __('admin.orders_split.cannot_split_all', 'Você não pode separar todos os itens com quantidade total. Pelo menos um item (ou parte) deve permanecer no pedido original.'), 'danger');
             return;
         }
 
@@ -456,7 +456,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         if (empty($itensSeparar)) {
-            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Nenhum item válido selecionado para separar.', 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, __('admin.orders_split.no_valid_items', 'Nenhum item válido selecionado para separar.'), 'danger');
             return;
         }
 
@@ -805,13 +805,13 @@ document.addEventListener("DOMContentLoaded", function() {
             $novoCodigoPedido = $colCodigo ? $dadosNovoPedido[$colCodigo] : (string) $novoPedidoId;
             $this->redirectWithMessage(
                 '/admin/pedidos/split?id=' . $pedidoId,
-                'Split realizado com sucesso! Novo pedido criado: <a href="/admin/pedidos/detalhes/' . $novoPedidoId . '" class="alert-link">#' . htmlspecialchars($novoCodigoPedido) . ' (ID: ' . $novoPedidoId . ')</a>',
+                __('admin.orders_split.split_success', 'Split realizado com sucesso! Novo pedido criado:') . ' <a href="/admin/pedidos/detalhes/' . $novoPedidoId . '" class="alert-link">#' . htmlspecialchars($novoCodigoPedido) . ' (ID: ' . $novoPedidoId . ')</a>',
                 'success'
             );
 
         } catch (\Exception $e) {
             $this->connection->rollBack();
-            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Erro ao processar split: ' . $e->getMessage(), 'danger');
+            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, __('admin.orders_split.error_processing', 'Erro ao processar split:') . ' ' . $e->getMessage(), 'danger');
         }
     }
 

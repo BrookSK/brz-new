@@ -219,7 +219,7 @@ class AdminRelatorioPedidosController extends Controller {
         $content = ob_get_clean();
 
         // Renderizar com layout admin
-        $title = 'Relatório de Pedidos';
+        $title = __('admin.report_orders.title', 'Relatório de Pedidos');
         $sidebarActive = 'relatorio-pedidos';
         include __DIR__ . '/../Views/layouts/admin.php';
     }
@@ -264,7 +264,7 @@ class AdminRelatorioPedidosController extends Controller {
 
         $pedidoModel = new \App\Models\PedidoEcommerce();
         $pedido = $pedidoModel->getComDetalhes($id);
-        if (!$pedido) { echo 'Pedido não encontrado'; exit; }
+        if (!$pedido) { echo __('admin.report_orders.order_not_found', 'Pedido não encontrado'); exit; }
 
         $itens = $pedido['items'] ?? [];
         $moeda = strtoupper(trim((string)($pedido['moeda'] ?? 'BRL')));
@@ -473,40 +473,40 @@ class AdminRelatorioPedidosController extends Controller {
         // Montar informação do tipo de pedido
         $tipoPedido = [
             'codigo' => 'site',
-            'label' => 'Produtos do Site',
-            'descricao' => 'Pedido de produtos disponíveis no catálogo da loja.',
+            'label' => __('admin.report_orders.type_site_label', 'Produtos do Site'),
+            'descricao' => __('admin.report_orders.type_site_desc', 'Pedido de produtos disponíveis no catálogo da loja.'),
             'cor' => '#0b6623', // verde
             'icone' => '🛒',
         ];
         if ($origemReal === 'redirecionamento') {
             $tipoPedido = [
                 'codigo' => 'redirecionamento',
-                'label' => 'Redirecionamento de Pacote',
-                'descricao' => 'Pedido originado do serviço de redirecionamento de pacotes (compras próprias do cliente).',
+                'label' => __('admin.report_orders.type_forwarding_label', 'Redirecionamento de Pacote'),
+                'descricao' => __('admin.report_orders.type_forwarding_desc', 'Pedido originado do serviço de redirecionamento de pacotes (compras próprias do cliente).'),
                 'cor' => '#1565c0', // azul
                 'icone' => '📦',
             ];
         } elseif ($origemReal === 'misto') {
             $tipoPedido = [
                 'codigo' => 'misto',
-                'label' => 'Pedido Misto',
-                'descricao' => 'Este pedido contém ' . $itensRedirecionamento . ' item(ns) de redirecionamento e ' . $itensSite . ' item(ns) do catálogo do site.',
+                'label' => __('admin.report_orders.type_mixed_label', 'Pedido Misto'),
+                'descricao' => __('admin.report_orders.type_mixed_desc', 'Este pedido contém {fwd} item(ns) de redirecionamento e {site} item(ns) do catálogo do site.', ['fwd' => $itensRedirecionamento, 'site' => $itensSite]),
                 'cor' => '#37474f', // cinza escuro
                 'icone' => '🔀',
             ];
         } elseif ($origemReal === 'assessoria') {
             $tipoPedido = [
                 'codigo' => 'assessoria',
-                'label' => 'Assessoria de Compra',
-                'descricao' => 'Pedido criado via orçamento de assessoria personalizada.',
+                'label' => __('admin.report_orders.type_advisory_label', 'Assessoria de Compra'),
+                'descricao' => __('admin.report_orders.type_advisory_desc', 'Pedido criado via orçamento de assessoria personalizada.'),
                 'cor' => '#6a1b9a', // roxo
                 'icone' => '🎯',
             ];
         } elseif ($origemReal === 'manual') {
             $tipoPedido = [
                 'codigo' => 'manual',
-                'label' => 'Pedido Manual',
-                'descricao' => 'Pedido criado manualmente pela equipe administrativa.',
+                'label' => __('admin.report_orders.type_manual_label', 'Pedido Manual'),
+                'descricao' => __('admin.report_orders.type_manual_desc', 'Pedido criado manualmente pela equipe administrativa.'),
                 'cor' => '#e65100', // laranja
                 'icone' => '✏️',
             ];
@@ -518,14 +518,14 @@ class AdminRelatorioPedidosController extends Controller {
                 // Todos os itens são desapego
                 $tipoPedido = [
                     'codigo' => 'desapego',
-                    'label' => 'Desapego Braziliana',
-                    'descricao' => 'Pedido de produto(s) do Desapego Braziliana (entrega somente EUA).',
+                    'label' => __('admin.report_orders.type_desapego_label', 'Desapego Braziliana'),
+                    'descricao' => __('admin.report_orders.type_desapego_desc', 'Pedido de produto(s) do Desapego Braziliana (entrega somente EUA).'),
                     'cor' => '#0891b2', // teal
                     'icone' => '💚',
                 ];
             } else {
                 // Mix de desapego + site
-                $tipoPedido['descricao'] .= ' Contém ' . $itensDesapego . ' item(ns) de Desapego Braziliana.';
+                $tipoPedido['descricao'] .= __('admin.report_orders.desapego_mix_suffix', ' Contém {count} item(ns) de Desapego Braziliana.', ['count' => $itensDesapego]);
             }
         }
 

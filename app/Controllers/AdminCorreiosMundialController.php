@@ -257,28 +257,28 @@ class AdminCorreiosMundialController extends Controller {
 
         // Códigos conhecidos
         if (strpos($mUpper, 'SUA-121') !== false) {
-            return 'CPF do destinatário inválido. Confira se o CPF está correto e regular na Receita Federal.';
+            return __('admin.correios_mundial.err_cpf_invalid_rf', 'CPF do destinatário inválido. Confira se o CPF está correto e regular na Receita Federal.');
         }
 
         // Mensagens conhecidas (inglês)
         $mLower = strtolower($m);
         if (strpos($mLower, 'cpf') !== false && strpos($mLower, 'regular') !== false) {
-            return 'CPF do destinatário não está regular na Receita Federal. O pedido não pode gerar etiqueta até regularizar.';
+            return __('admin.correios_mundial.err_cpf_not_regular', 'CPF do destinatário não está regular na Receita Federal. O pedido não pode gerar etiqueta até regularizar.');
         }
         if (strpos($mLower, 'cpf number is invalid') !== false) {
-            return 'CPF do destinatário inválido. Confira o número informado.';
+            return __('admin.correios_mundial.err_cpf_invalid', 'CPF do destinatário inválido. Confira o número informado.');
         }
         if (strpos($mLower, 'cnpj') !== false && strpos($mLower, 'invalid') !== false) {
-            return 'CNPJ do destinatário inválido. Confira o número informado.';
+            return __('admin.correios_mundial.err_cnpj_invalid', 'CNPJ do destinatário inválido. Confira o número informado.');
         }
         if (strpos($mLower, 'zip') !== false && (strpos($mLower, 'invalid') !== false || strpos($mLower, 'must') !== false)) {
-            return 'CEP do destinatário inválido. Informe um CEP válido com 8 dígitos.';
+            return __('admin.correios_mundial.err_zip_invalid', 'CEP do destinatário inválido. Informe um CEP válido com 8 dígitos.');
         }
         if (strpos($mLower, 'phone') !== false && (strpos($mLower, 'invalid') !== false || strpos($mLower, 'digits') !== false)) {
-            return 'Telefone do destinatário inválido. Informe DDD + número (10 ou 11 dígitos), sem +55.';
+            return __('admin.correios_mundial.err_phone_invalid', 'Telefone do destinatário inválido. Informe DDD + número (10 ou 11 dígitos), sem +55.');
         }
         if (strpos($mLower, 'hs') !== false && (strpos($mLower, 'not') !== false || strpos($mLower, 'allowed') !== false)) {
-            return 'Não foi possível gerar o rastreio porque o NCM (HS Code) de algum item não é permitido no Brasil. Revise o NCM do produto.';
+            return __('admin.correios_mundial.err_hs_not_allowed', 'Não foi possível gerar o rastreio porque o NCM (HS Code) de algum item não é permitido no Brasil. Revise o NCM do produto.');
         }
 
         // Tenta extrair mensagens em listas/estruturas comuns
@@ -309,10 +309,10 @@ class AdminCorreiosMundialController extends Controller {
 
         // Fallback genérico em PT
         if ($m === '') {
-            return 'Não foi possível gerar a etiqueta. Verifique os dados do destinatário e dos produtos e tente novamente.';
+            return __('admin.correios_mundial.err_generate_generic', 'Não foi possível gerar a etiqueta. Verifique os dados do destinatário e dos produtos e tente novamente.');
         }
 
-        return 'Não foi possível gerar a etiqueta: ' . $m;
+        return __('admin.correios_mundial.err_generate_prefix', 'Não foi possível gerar a etiqueta:') . ' ' . $m;
     }
 
     private function pickFirstNonEmpty(array $row, array $keys): string {
@@ -621,7 +621,7 @@ class AdminCorreiosMundialController extends Controller {
         if (empty($r['success'])) {
             $this->json([
                 'success' => false,
-                'error' => (string) ($r['error'] ?? 'Falha ao consultar saldo.'),
+                'error' => (string) ($r['error'] ?? __('admin.correios_mundial.err_balance', 'Falha ao consultar saldo.')),
                 'http_code' => $r['http_code'] ?? null,
                 'request_url' => $r['request_url'] ?? null,
             ], 400);
@@ -680,16 +680,16 @@ class AdminCorreiosMundialController extends Controller {
         $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? ($pedido['moeda_original'] ?? '')))));
         if ($isRedirecionador) {
             if ($origem !== '' && !in_array($origem, ['redirecionador', 'redirecionamento'], true)) {
-                $pageError = 'Este pedido não é do redirecionamento.';
+                $pageError = __('admin.correios_mundial.page_err_not_forwarding', 'Este pedido não é do redirecionamento.');
             }
             if ($pageError === '' && $moeda !== '' && $moeda !== 'USD') {
-                $pageError = 'Este pedido não está em USD.';
+                $pageError = __('admin.correios_mundial.page_err_not_usd', 'Este pedido não está em USD.');
             }
         }
         $zipDigits = $this->onlyDigits((string) ($destinatario['recipientZipCode'] ?? ''));
         if (strlen($zipDigits) !== 8) {
             if ($pageError === '') {
-                $pageError = 'Dados do destinatário incompletos: CEP inválido (deve conter 8 dígitos). Atualize o endereço do cliente/pedido e tente novamente.';
+                $pageError = __('admin.correios_mundial.page_err_zip', 'Dados do destinatário incompletos: CEP inválido (deve conter 8 dígitos). Atualize o endereço do cliente/pedido e tente novamente.');
             }
         }
         $destinatario['recipientZipCode'] = $zipDigits;
@@ -697,34 +697,34 @@ class AdminCorreiosMundialController extends Controller {
         $phoneDigits = $this->onlyDigits((string) ($destinatario['recipientPhoneNumber'] ?? ''));
         if (strlen($phoneDigits) === 0) {
             if ($pageError === '') {
-                $pageError = 'Dados do destinatário incompletos: telefone é obrigatório (10 ou 11 dígitos, sem +55). Atualize o cadastro e tente novamente.';
+                $pageError = __('admin.correios_mundial.page_err_phone_required', 'Dados do destinatário incompletos: telefone é obrigatório (10 ou 11 dígitos, sem +55). Atualize o cadastro e tente novamente.');
             }
         }
         if ($pageError === '' && !in_array(strlen($phoneDigits), [10, 11], true)) {
-            $pageError = 'Dados do destinatário incompletos: telefone inválido (deve conter 10 ou 11 dígitos, sem +55). Atualize o cadastro e tente novamente.';
+            $pageError = __('admin.correios_mundial.page_err_phone_invalid', 'Dados do destinatário incompletos: telefone inválido (deve conter 10 ou 11 dígitos, sem +55). Atualize o cadastro e tente novamente.');
         }
         $destinatario['recipientPhoneNumber'] = $phoneDigits;
 
         $destEmail = trim((string) ($destinatario['recipientEmail'] ?? ''));
         if ($destEmail === '') {
             if ($pageError === '') {
-                $pageError = 'Dados do destinatário incompletos: e-mail é obrigatório. Atualize o cadastro e tente novamente.';
+                $pageError = __('admin.correios_mundial.page_err_email_required', 'Dados do destinatário incompletos: e-mail é obrigatório. Atualize o cadastro e tente novamente.');
             }
         }
         if ($pageError === '' && filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
-            $pageError = 'Dados do destinatário incompletos: e-mail inválido. Atualize o cadastro e tente novamente.';
+            $pageError = __('admin.correios_mundial.page_err_email_invalid', 'Dados do destinatário incompletos: e-mail inválido. Atualize o cadastro e tente novamente.');
         }
 
         $docType = strtoupper(trim((string) ($destinatario['recipientDocumentType'] ?? '')));
         $docNum = $this->onlyDigits((string) ($destinatario['recipientDocumentNumber'] ?? ''));
         if ($pageError === '' && $docType === 'CPF' && strlen($docNum) !== 11) {
-            $pageError = 'Dados do destinatário incompletos: CPF inválido (deve conter 11 dígitos). Atualize o CPF do cliente e tente novamente.';
+            $pageError = __('admin.correios_mundial.page_err_cpf', 'Dados do destinatário incompletos: CPF inválido (deve conter 11 dígitos). Atualize o CPF do cliente e tente novamente.');
         }
         if ($pageError === '' && $docType === 'CNPJ' && strlen($docNum) !== 14) {
-            $pageError = 'Dados do destinatário incompletos: CNPJ inválido (deve conter 14 dígitos). Atualize o CNPJ do cliente e tente novamente.';
+            $pageError = __('admin.correios_mundial.page_err_cnpj', 'Dados do destinatário incompletos: CNPJ inválido (deve conter 14 dígitos). Atualize o CNPJ do cliente e tente novamente.');
         }
         if ($pageError === '' && !in_array($docType, ['CPF', 'CNPJ', 'PASSPORT'], true)) {
-            $pageError = 'Dados do destinatário incompletos: tipo de documento inválido (CPF/CNPJ/PASSPORT).';
+            $pageError = __('admin.correios_mundial.page_err_doctype', 'Dados do destinatário incompletos: tipo de documento inválido (CPF/CNPJ/PASSPORT).');
         }
         $destinatario['recipientDocumentType'] = $docType;
         $destinatario['recipientDocumentNumber'] = $docNum;
@@ -793,13 +793,13 @@ class AdminCorreiosMundialController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.invalid_order', 'Pedido inválido')], 400);
             return;
         }
 
         $this->ensurePacketEtiquetasTable();
         if (!$this->tableExists('correios_packet_etiquetas')) {
-            $this->json(['success' => false, 'error' => 'Tabela correios_packet_etiquetas não encontrada.'], 500);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.table_missing', 'Tabela correios_packet_etiquetas não encontrada.')], 500);
             return;
         }
 
@@ -808,7 +808,7 @@ class AdminCorreiosMundialController extends Controller {
             $stCheck->execute([$id]);
             $exists = (int) ($stCheck->fetchColumn() ?: 0);
             if ($exists > 0) {
-                $this->json(['success' => false, 'error' => 'Já existe etiqueta PACKET para este pedido'], 400);
+                $this->json(['success' => false, 'error' => __('admin.correios_mundial.label_exists', 'Já existe etiqueta PACKET para este pedido')], 400);
                 return;
             }
         } catch (\Exception $e) {
@@ -817,7 +817,7 @@ class AdminCorreiosMundialController extends Controller {
         $pedidoModel = new PedidoEcommerce();
         $pedido = $pedidoModel->getComDetalhes($id);
         if (!is_array($pedido) || empty($pedido['id'])) {
-            $this->json(['success' => false, 'error' => 'Pedido não encontrado'], 404);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.order_not_found', 'Pedido não encontrado')], 404);
             return;
         }
 
@@ -825,18 +825,18 @@ class AdminCorreiosMundialController extends Controller {
         $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? ($pedido['moeda_original'] ?? '')))));
         if ($isRedirecionador) {
             if ($origem !== '' && !in_array($origem, ['redirecionador', 'redirecionamento'], true)) {
-                $this->json(['success' => false, 'error' => 'Pedido não é do redirecionamento'], 400);
+                $this->json(['success' => false, 'error' => __('admin.correios_mundial.not_forwarding', 'Pedido não é do redirecionamento')], 400);
                 return;
             }
             if ($moeda !== '' && $moeda !== 'USD') {
-                $this->json(['success' => false, 'error' => 'Pedido não está em USD'], 400);
+                $this->json(['success' => false, 'error' => __('admin.correios_mundial.not_usd', 'Pedido não está em USD')], 400);
                 return;
             }
         }
 
         $status = strtolower(trim((string) ($pedido['status'] ?? '')));
         if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
-            $this->json(['success' => false, 'error' => 'Pedido não está em Caixa Fechada'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.not_closed_box', 'Pedido não está em Caixa Fechada')], 400);
             return;
         }
 
@@ -870,7 +870,7 @@ class AdminCorreiosMundialController extends Controller {
         if ($totalWeight <= 0 || $packagingLength <= 0 || $packagingWidth <= 0 || $packagingHeight <= 0) {
             $this->json([
                 'success' => false,
-                'error' => 'Informe Peso total (g), Comprimento, Largura e Altura para gerar a etiqueta.',
+                'error' => __('admin.correios_mundial.err_dimensions_required', 'Informe Peso total (g), Comprimento, Largura e Altura para gerar a etiqueta.'),
             ], 400);
             return;
         }
@@ -920,31 +920,31 @@ class AdminCorreiosMundialController extends Controller {
 
         // Validações mínimas (regras doc)
         if ($totalWeight < 1 || $totalWeight > 30000) {
-            $this->json(['success' => false, 'error' => 'Peso total inválido (1 a 30000g)'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_weight_range', 'Peso total inválido (1 a 30000g)')], 400);
             return;
         }
         if ($packagingLength < 16 || $packagingLength > 100) {
-            $this->json(['success' => false, 'error' => 'Comprimento inválido (mín 16cm, máx 100cm)'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_length_range', 'Comprimento inválido (mín 16cm, máx 100cm)')], 400);
             return;
         }
         if ($packagingWidth < 11 || $packagingWidth > 100) {
-            $this->json(['success' => false, 'error' => 'Largura inválida (mín 11cm, máx 100cm)'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_width_range', 'Largura inválida (mín 11cm, máx 100cm)')], 400);
             return;
         }
         if ($packagingHeight < 2 || $packagingHeight > 100) {
-            $this->json(['success' => false, 'error' => 'Altura inválida (mín 2cm, máx 100cm)'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_height_range', 'Altura inválida (mín 2cm, máx 100cm)')], 400);
             return;
         }
         if (($packagingLength + $packagingWidth + $packagingHeight) > 200.0001) {
-            $this->json(['success' => false, 'error' => 'Soma das dimensões (C+L+A) não pode ultrapassar 200cm'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_dims_sum', 'Soma das dimensões (C+L+A) não pode ultrapassar 200cm')], 400);
             return;
         }
         if ($freightPaidValue < 0.01) {
-            $this->json(['success' => false, 'error' => 'Frete deve ser no mínimo 0.01'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_freight_min', 'Frete deve ser no mínimo 0.01')], 400);
             return;
         }
         if ($insurancePaidValue !== null && $insurancePaidValue < 0.01) {
-            $this->json(['success' => false, 'error' => 'Seguro deve ser no mínimo 0.01 (ou deixe vazio)'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_insurance_min', 'Seguro deve ser no mínimo 0.01 (ou deixe vazio)')], 400);
             return;
         }
 
@@ -954,12 +954,12 @@ class AdminCorreiosMundialController extends Controller {
         // Itens
         $itemsIn = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
         if (empty($itemsIn)) {
-            $this->json(['success' => false, 'error' => 'Pedido sem itens'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_no_items', 'Pedido sem itens')], 400);
             return;
         }
 
         if (count($itemsIn) > 20) {
-            $this->json(['success' => false, 'error' => 'Pedido possui mais de 20 itens (limite da API PACKET)'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_too_many_items', 'Pedido possui mais de 20 itens (limite da API PACKET)')], 400);
             return;
         }
 
@@ -979,7 +979,7 @@ class AdminCorreiosMundialController extends Controller {
             $idx++;
             $qtd = (int) ($it['quantidade'] ?? 0);
             if ($qtd <= 0) {
-                $this->json(['success' => false, 'error' => 'Item #' . $idx . ' com quantidade inválida'], 400);
+                $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_item_qty_prefix', 'Item #') . $idx . __('admin.correios_mundial.err_item_qty_suffix', ' com quantidade inválida')], 400);
                 return;
             }
             $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
@@ -987,7 +987,7 @@ class AdminCorreiosMundialController extends Controller {
 
             $ncmDigits = $this->onlyDigits((string) ($it['ncm'] ?? ''));
             if ($ncmDigits === '' || strlen($ncmDigits) < 6) {
-                $this->json(['success' => false, 'error' => 'Item #' . $idx . ' sem NCM'], 400);
+                $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_item_ncm_prefix', 'Item #') . $idx . __('admin.correios_mundial.err_item_ncm_suffix', ' sem NCM')], 400);
                 return;
             }
             $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
@@ -1010,13 +1010,13 @@ class AdminCorreiosMundialController extends Controller {
             ];
         }
         if (empty($items)) {
-            $this->json(['success' => false, 'error' => 'Pedido sem itens válidos'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_no_valid_items', 'Pedido sem itens válidos')], 400);
             return;
         }
 
         $sumAduaneiro = $freightPaidValue + ($insurancePaidValue ?? 0.0) + $sumItems;
         if ($sumAduaneiro > 3000.0 + 0.0001) {
-            $this->json(['success' => false, 'error' => 'Soma de valores (frete+seguro+itens) não pode ultrapassar 3000.00 USD'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_customs_sum', 'Soma de valores (frete+seguro+itens) não pode ultrapassar 3000.00 USD')], 400);
             return;
         }
 
@@ -1065,7 +1065,7 @@ class AdminCorreiosMundialController extends Controller {
             }
         }
         if (trim($tracking) === '') {
-            $this->json(['success' => false, 'error' => 'Resposta da API sem trackingNumber', 'raw' => $rawResp], 500);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_no_tracking', 'Resposta da API sem trackingNumber'), 'raw' => $rawResp], 500);
             return;
         }
 
@@ -1081,7 +1081,7 @@ class AdminCorreiosMundialController extends Controller {
                 (int) ($resp['http_code'] ?? 200),
             ]);
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => 'Falha ao salvar etiqueta: ' . $e->getMessage()], 500);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_save_label', 'Falha ao salvar etiqueta:') . ' ' . $e->getMessage()], 500);
             return;
         }
 
@@ -1119,13 +1119,13 @@ class AdminCorreiosMundialController extends Controller {
         $ids = $body['ids'] ?? [];
 
         if (!is_array($ids) || empty($ids)) {
-            echo json_encode(['success' => false, 'error' => 'Nenhum pedido selecionado']);
+            echo json_encode(['success' => false, 'error' => __('admin.correios_mundial.no_order_selected', 'Nenhum pedido selecionado')]);
             exit;
         }
 
         $ids = array_filter(array_map('intval', $ids), fn($v) => $v > 0);
         if (empty($ids)) {
-            echo json_encode(['success' => false, 'error' => 'IDs inválidos']);
+            echo json_encode(['success' => false, 'error' => __('admin.correios_mundial.invalid_ids', 'IDs inválidos')]);
             exit;
         }
 
@@ -1141,21 +1141,21 @@ class AdminCorreiosMundialController extends Controller {
                 $stCheck = $this->connection->prepare('SELECT id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
                 $stCheck->execute([$pid]);
                 if ((int) ($stCheck->fetchColumn() ?: 0) > 0) {
-                    $result['error'] = 'Já possui etiqueta';
+                    $result['error'] = __('admin.correios_mundial.batch_has_label', 'Já possui etiqueta');
                     $results[] = $result;
                     continue;
                 }
 
                 $pedido = $pedidoModel->getComDetalhes($pid);
                 if (!is_array($pedido) || empty($pedido['id'])) {
-                    $result['error'] = 'Pedido não encontrado';
+                    $result['error'] = __('admin.correios_mundial.order_not_found', 'Pedido não encontrado');
                     $results[] = $result;
                     continue;
                 }
 
                 $status = strtolower(trim((string) ($pedido['status'] ?? '')));
                 if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
-                    $result['error'] = 'Não está em Caixa Fechada';
+                    $result['error'] = __('admin.correios_mundial.batch_not_closed_box', 'Não está em Caixa Fechada');
                     $results[] = $result;
                     continue;
                 }
@@ -1172,32 +1172,32 @@ class AdminCorreiosMundialController extends Controller {
                 $packagingHeight = $alturaCm > 0 ? $alturaCm : 2;
 
                 if ($totalWeight <= 0) {
-                    $result['error'] = 'Peso não informado';
+                    $result['error'] = __('admin.correios_mundial.batch_weight_missing', 'Peso não informado');
                     $results[] = $result;
                     continue;
                 }
                 if ($totalWeight > 30000) {
-                    $result['error'] = 'Peso excede 30kg';
+                    $result['error'] = __('admin.correios_mundial.batch_weight_exceeds', 'Peso excede 30kg');
                     $results[] = $result;
                     continue;
                 }
                 if ($packagingLength < 16 || $packagingLength > 100) {
-                    $result['error'] = 'Comprimento inválido (16-100cm)';
+                    $result['error'] = __('admin.correios_mundial.batch_length_invalid', 'Comprimento inválido (16-100cm)');
                     $results[] = $result;
                     continue;
                 }
                 if ($packagingWidth < 11 || $packagingWidth > 100) {
-                    $result['error'] = 'Largura inválida (11-100cm)';
+                    $result['error'] = __('admin.correios_mundial.batch_width_invalid', 'Largura inválida (11-100cm)');
                     $results[] = $result;
                     continue;
                 }
                 if ($packagingHeight < 2 || $packagingHeight > 100) {
-                    $result['error'] = 'Altura inválida (2-100cm)';
+                    $result['error'] = __('admin.correios_mundial.batch_height_invalid', 'Altura inválida (2-100cm)');
                     $results[] = $result;
                     continue;
                 }
                 if (($packagingLength + $packagingWidth + $packagingHeight) > 200) {
-                    $result['error'] = 'Soma dimensões > 200cm';
+                    $result['error'] = __('admin.correios_mundial.batch_dims_sum', 'Soma dimensões > 200cm');
                     $results[] = $result;
                     continue;
                 }
@@ -1212,25 +1212,25 @@ class AdminCorreiosMundialController extends Controller {
                 // Validar destinatário
                 $phoneDigits = $this->onlyDigits((string) ($destinatario['recipientPhoneNumber'] ?? ''));
                 if ($phoneDigits === '' || !in_array(strlen($phoneDigits), [10, 11], true)) {
-                    $result['error'] = 'Telefone destinatário inválido';
+                    $result['error'] = __('admin.correios_mundial.batch_phone_invalid', 'Telefone destinatário inválido');
                     $results[] = $result;
                     continue;
                 }
                 $destEmail = trim((string) ($destinatario['recipientEmail'] ?? ''));
                 if ($destEmail === '' || filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
-                    $result['error'] = 'E-mail destinatário inválido';
+                    $result['error'] = __('admin.correios_mundial.batch_email_invalid', 'E-mail destinatário inválido');
                     $results[] = $result;
                     continue;
                 }
                 $docType = strtoupper(trim((string) ($destinatario['recipientDocumentType'] ?? '')));
                 $docNum = $this->onlyDigits((string) ($destinatario['recipientDocumentNumber'] ?? ''));
                 if ($docType === 'CPF' && strlen($docNum) !== 11) {
-                    $result['error'] = 'CPF inválido';
+                    $result['error'] = __('admin.correios_mundial.batch_cpf_invalid', 'CPF inválido');
                     $results[] = $result;
                     continue;
                 }
                 if ($docType === 'CNPJ' && strlen($docNum) !== 14) {
-                    $result['error'] = 'CNPJ inválido';
+                    $result['error'] = __('admin.correios_mundial.batch_cnpj_invalid', 'CNPJ inválido');
                     $results[] = $result;
                     continue;
                 }
@@ -1238,12 +1238,12 @@ class AdminCorreiosMundialController extends Controller {
                 // Itens
                 $itemsIn = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
                 if (empty($itemsIn)) {
-                    $result['error'] = 'Sem itens';
+                    $result['error'] = __('admin.correios_mundial.batch_no_items', 'Sem itens');
                     $results[] = $result;
                     continue;
                 }
                 if (count($itemsIn) > 20) {
-                    $result['error'] = 'Mais de 20 itens';
+                    $result['error'] = __('admin.correios_mundial.batch_over_20_items', 'Mais de 20 itens');
                     $results[] = $result;
                     continue;
                 }
@@ -1279,14 +1279,14 @@ class AdminCorreiosMundialController extends Controller {
                     continue;
                 }
                 if (empty($items)) {
-                    $result['error'] = 'Sem itens válidos';
+                    $result['error'] = __('admin.correios_mundial.batch_no_valid_items', 'Sem itens válidos');
                     $results[] = $result;
                     continue;
                 }
 
                 $sumAduaneiro = $freightPaidValue + $sumItems;
                 if ($sumAduaneiro > 3000.0) {
-                    $result['error'] = 'Valor total > USD 3000';
+                    $result['error'] = __('admin.correios_mundial.batch_total_over_3000', 'Valor total > USD 3000');
                     $results[] = $result;
                     continue;
                 }
@@ -1326,7 +1326,7 @@ class AdminCorreiosMundialController extends Controller {
                     }
                 }
                 if (trim($tracking) === '') {
-                    $result['error'] = 'API não retornou tracking';
+                    $result['error'] = __('admin.correios_mundial.batch_no_tracking', 'API não retornou tracking');
                     $results[] = $result;
                     continue;
                 }
@@ -1363,7 +1363,7 @@ class AdminCorreiosMundialController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.invalid_order', 'Pedido inválido')], 400);
             return;
         }
 
@@ -1374,7 +1374,7 @@ class AdminCorreiosMundialController extends Controller {
             $stDel = $this->connection->prepare('DELETE FROM correios_packet_etiquetas WHERE pedido_id = ?');
             $stDel->execute([$id]);
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => 'Erro ao deletar etiqueta anterior: ' . $e->getMessage()], 500);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.err_delete_previous', 'Erro ao deletar etiqueta anterior:') . ' ' . $e->getMessage()], 500);
             return;
         }
 
@@ -1561,7 +1561,7 @@ class AdminCorreiosMundialController extends Controller {
 
         // Buscar container
         if (!$this->tableExists('correios_packet_containers')) {
-            echo json_encode(['error' => 'Tabela não encontrada']);
+            echo json_encode(['error' => __('admin.correios_mundial.table_not_found', 'Tabela não encontrada')]);
             exit;
         }
 
@@ -1570,12 +1570,12 @@ class AdminCorreiosMundialController extends Controller {
             $st->execute([$id]);
             $container = $st->fetch(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
-            echo json_encode(['error' => 'Erro ao buscar container']);
+            echo json_encode(['error' => __('admin.correios_mundial.err_fetch_container', 'Erro ao buscar container')]);
             exit;
         }
 
         if (!$container) {
-            echo json_encode(['error' => 'Container não encontrado']);
+            echo json_encode(['error' => __('admin.correios_mundial.container_not_found', 'Container não encontrado')]);
             exit;
         }
 
@@ -1705,7 +1705,7 @@ class AdminCorreiosMundialController extends Controller {
         $this->ensureContainersHasBillIdColumn();
 
         if (!$this->tableExists('correios_packet_bills')) {
-            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode('Tabela correios_packet_bills não encontrada.'));
+            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode(__('admin.correios_mundial.bills_table_missing', 'Tabela correios_packet_bills não encontrada.')));
             exit;
         }
 
@@ -1718,18 +1718,18 @@ class AdminCorreiosMundialController extends Controller {
         }, $containerIds), fn($v) => $v > 0)));
 
         if (empty($containerIds)) {
-            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Selecione pelo menos 1 container.'));
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_select_container', 'Selecione pelo menos 1 container.')));
             exit;
         }
 
         $balance = $this->svc->getBalance();
         if (empty($balance['success'])) {
-            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode((string) ($balance['error'] ?? 'Falha ao consultar saldo.')));
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode((string) ($balance['error'] ?? __('admin.correios_mundial.err_balance', 'Falha ao consultar saldo.'))));
             exit;
         }
         $currentBalance = (int) ($balance['currentBalance'] ?? 0);
         if ($currentBalance <= 0) {
-            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Saldo insuficiente para faturamento.'));
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_insufficient_balance', 'Saldo insuficiente para faturamento.')));
             exit;
         }
 
@@ -1747,7 +1747,7 @@ class AdminCorreiosMundialController extends Controller {
         }
 
         if (empty($containerRows)) {
-            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Containers não encontrados.'));
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.containers_not_found', 'Containers não encontrados.')));
             exit;
         }
 
@@ -1757,15 +1757,15 @@ class AdminCorreiosMundialController extends Controller {
             $billId = (int) ($row['bill_id'] ?? 0);
             $status = strtolower(trim((string) ($row['status'] ?? '')));
             if ($cid <= 0 || $uc === '') {
-                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Container inválido/sem unitCode.'));
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_container_no_unitcode', 'Container inválido/sem unitCode.')));
                 exit;
             }
             if ($billId > 0) {
-                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Container já está vinculado a uma fatura.'));
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_container_linked', 'Container já está vinculado a uma fatura.')));
                 exit;
             }
             if ($status !== 'created') {
-                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Apenas containers com status created podem ser faturados.'));
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_only_created', 'Apenas containers com status created podem ser faturados.')));
                 exit;
             }
 
@@ -1781,17 +1781,17 @@ class AdminCorreiosMundialController extends Controller {
             }, is_array($tn) ? $tn : [])));
 
             if (empty($tn)) {
-                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Container sem trackingNumbers.'));
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_container_no_tn', 'Container sem trackingNumbers.')));
                 exit;
             }
             if (count($tn) > 1000) {
-                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Limite de 1000 pacotes por mala/unitCode.'));
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_limit_1000', 'Limite de 1000 pacotes por mala/unitCode.')));
                 exit;
             }
 
             $totalTrackings += count($tn);
             if ($totalTrackings > 5000) {
-                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Limite de 5000 códigos de rastreio por fatura excedido.'));
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_limit_5000', 'Limite de 5000 códigos de rastreio por fatura excedido.')));
                 exit;
             }
 
@@ -1812,7 +1812,7 @@ class AdminCorreiosMundialController extends Controller {
             ]);
             $billId = (int) $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Falha ao salvar fatura no banco.'));
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode(__('admin.correios_mundial.err_save_bill', 'Falha ao salvar fatura no banco.')));
             exit;
         }
 
@@ -1838,7 +1838,7 @@ class AdminCorreiosMundialController extends Controller {
             } catch (\Exception $e) {
             }
 
-            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode((string) ($api['error'] ?? 'Falha ao iniciar faturamento.')));
+            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode((string) ($api['error'] ?? __('admin.correios_mundial.err_start_billing', 'Falha ao iniciar faturamento.'))));
             exit;
         }
 
@@ -1846,7 +1846,7 @@ class AdminCorreiosMundialController extends Controller {
         $requestId = (string) ($rawResp['requestId'] ?? '');
         $requestStatus = (string) ($rawResp['requestStatus'] ?? '');
         if ($requestId === '') {
-            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode('Correios não retornou requestId.'));
+            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode(__('admin.correios_mundial.err_no_request_id', 'Correios não retornou requestId.')));
             exit;
         }
 
@@ -1900,16 +1900,16 @@ class AdminCorreiosMundialController extends Controller {
             }
 
             if ($statusFinal === 'error') {
-                header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode($errMsg !== '' ? $errMsg : 'Erro ao processar fatura.'));
+                header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode($errMsg !== '' ? $errMsg : __('admin.correios_mundial.err_process_bill', 'Erro ao processar fatura.')));
                 exit;
             }
             if ($statusFinal === 'success' && $cn38 !== '') {
-                header('Location: /admin/correios-mundial/faturas?success=' . rawurlencode('Fatura gerada: ' . $cn38));
+                header('Location: /admin/correios-mundial/faturas?success=' . rawurlencode(__('admin.correios_mundial.ok_bill_generated', 'Fatura gerada:') . ' ' . $cn38));
                 exit;
             }
         }
 
-        header('Location: /admin/correios-mundial/faturas?success=' . rawurlencode('Solicitação criada. Aguarde e atualize o status.'));
+        header('Location: /admin/correios-mundial/faturas?success=' . rawurlencode(__('admin.correios_mundial.ok_request_created', 'Solicitação criada. Aguarde e atualize o status.')));
         exit;
     }
 
@@ -1920,7 +1920,7 @@ class AdminCorreiosMundialController extends Controller {
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
             http_response_code(400);
-            echo 'ID inválido.';
+            echo __('admin.correios_mundial.invalid_id', 'ID inválido.');
             return;
         }
 
@@ -1928,7 +1928,7 @@ class AdminCorreiosMundialController extends Controller {
         $this->ensurePacketContainersTable();
         if (!$this->tableExists('correios_packet_bills')) {
             http_response_code(500);
-            echo 'Tabela correios_packet_bills não encontrada.';
+            echo __('admin.correios_mundial.bills_table_missing', 'Tabela correios_packet_bills não encontrada.');
             return;
         }
 
@@ -1942,14 +1942,14 @@ class AdminCorreiosMundialController extends Controller {
         }
         if (!is_array($bill)) {
             http_response_code(404);
-            echo 'Fatura não encontrada.';
+            echo __('admin.correios_mundial.bill_not_found', 'Fatura não encontrada.');
             return;
         }
 
         $cn38Code = (string) ($bill['cn38_code'] ?? '');
         if ($cn38Code === '') {
             http_response_code(400);
-            echo 'cn38Code não encontrado.';
+            echo __('admin.correios_mundial.cn38_not_found', 'cn38Code não encontrado.');
             return;
         }
 
@@ -1963,7 +1963,7 @@ class AdminCorreiosMundialController extends Controller {
         }
         if (empty($containersIds)) {
             http_response_code(400);
-            echo 'Containers não encontrados.';
+            echo __('admin.correios_mundial.containers_not_found', 'Containers não encontrados.');
             return;
         }
 
@@ -1979,7 +1979,7 @@ class AdminCorreiosMundialController extends Controller {
 
         if (empty($containers)) {
             http_response_code(400);
-            echo 'Containers inválidos.';
+            echo __('admin.correios_mundial.containers_invalid', 'Containers inválidos.');
             return;
         }
 
@@ -2089,13 +2089,13 @@ class AdminCorreiosMundialController extends Controller {
 
         $id = (int) ($request->getParam('id') ?? 0);
         if ($id <= 0) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('ID inválido.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.invalid_id', 'ID inválido.')));
             exit;
         }
 
         $this->ensurePacketContainersTable();
         if (!$this->tableExists('correios_packet_containers')) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Tabela correios_packet_containers não encontrada.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.containers_table_missing', 'Tabela correios_packet_containers não encontrada.')));
             exit;
         }
 
@@ -2108,7 +2108,7 @@ class AdminCorreiosMundialController extends Controller {
             $row = null;
         }
         if (!is_array($row)) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Container não encontrado.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.container_not_found_dot', 'Container não encontrado.')));
             exit;
         }
 
@@ -2116,7 +2116,7 @@ class AdminCorreiosMundialController extends Controller {
 
         $dispatchNumber = trim((string) ($row['dispatch_number'] ?? ''));
         if ($dispatchNumber === '') {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('dispatchNumber não encontrado no container.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.err_no_dispatch_number', 'dispatchNumber não encontrado no container.')));
             exit;
         }
 
@@ -2213,7 +2213,7 @@ class AdminCorreiosMundialController extends Controller {
             }
 
             if (empty($api['success'])) {
-                $err = $this->packetFriendlyError((string) ($api['error'] ?? 'Falha ao cancelar despacho.'), $api['raw'] ?? null);
+                $err = $this->packetFriendlyError((string) ($api['error'] ?? __('admin.correios_mundial.err_cancel_dispatch', 'Falha ao cancelar despacho.')), $api['raw'] ?? null);
                 header('Location: /admin/correios-mundial/containers?error=' . rawurlencode($err));
                 exit;
             }
@@ -2231,7 +2231,7 @@ class AdminCorreiosMundialController extends Controller {
         } catch (\Exception $e) {
         }
 
-        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode('Despacho cancelado. Agora você pode deletar o container para liberar os pacotes.'));
+        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode(__('admin.correios_mundial.ok_dispatch_cancelled', 'Despacho cancelado. Agora você pode deletar o container para liberar os pacotes.')));
         exit;
     }
 
@@ -2241,13 +2241,13 @@ class AdminCorreiosMundialController extends Controller {
 
         $id = (int) ($request->getParam('id') ?? 0);
         if ($id <= 0) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('ID inválido.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.invalid_id', 'ID inválido.')));
             exit;
         }
 
         $this->ensurePacketContainersTable();
         if (!$this->tableExists('correios_packet_containers')) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Tabela correios_packet_containers não encontrada.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.containers_table_missing', 'Tabela correios_packet_containers não encontrada.')));
             exit;
         }
 
@@ -2260,13 +2260,13 @@ class AdminCorreiosMundialController extends Controller {
             $row = null;
         }
         if (!is_array($row)) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Container não encontrado.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.container_not_found_dot', 'Container não encontrado.')));
             exit;
         }
 
         $status = strtolower(trim((string) ($row['status'] ?? '')));
         if ($status !== 'cancelled') {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Para deletar, primeiro cancele o despacho deste container.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.err_cancel_before_delete', 'Para deletar, primeiro cancele o despacho deste container.')));
             exit;
         }
 
@@ -2283,7 +2283,7 @@ class AdminCorreiosMundialController extends Controller {
             $stDel = $this->connection->prepare('DELETE FROM correios_packet_containers WHERE id = ? LIMIT 1');
             $stDel->execute([$id]);
         } catch (\Exception $e) {
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Falha ao deletar container.'));
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode(__('admin.correios_mundial.err_delete_container', 'Falha ao deletar container.')));
             exit;
         }
 
@@ -2467,39 +2467,39 @@ class AdminCorreiosMundialController extends Controller {
         }
 
         if ($dispatchNumber <= 0) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('dispatchNumber inválido.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_dispatch_invalid', 'dispatchNumber inválido.')));
             exit;
         }
         if ($originCountry !== 'US') {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('originCountry deve ser US.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_origin_us', 'originCountry deve ser US.')));
             exit;
         }
         if ($originOperatorName === '' || strlen($originOperatorName) !== 4) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('originOperatorName deve ter 4 letras.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_origin_operator', 'originOperatorName deve ter 4 letras.')));
             exit;
         }
         if ($destinationOperatorName === '' || strlen($destinationOperatorName) !== 4) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('destinationOperatorName deve ter 4 letras.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_dest_operator', 'destinationOperatorName deve ter 4 letras.')));
             exit;
         }
         if ($postalCategoryCode === '') {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('postalCategoryCode inválido.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_postal_category', 'postalCategoryCode inválido.')));
             exit;
         }
         if (!in_array($serviceSubclassCode, ['NX', 'IX'], true)) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('serviceSubclassCode deve ser NX ou IX.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_service_subclass', 'serviceSubclassCode deve ser NX ou IX.')));
             exit;
         }
         if (!in_array($unitType, ['1', '2'], true)) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('unitType inválido (1 ou 2).'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_unit_type', 'unitType inválido (1 ou 2).')));
             exit;
         }
         if (count($trackingNumbers) <= 0) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Selecione pelo menos 1 pacote.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_select_package', 'Selecione pelo menos 1 pacote.')));
             exit;
         }
         if (count($trackingNumbers) > 500) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Limite de 500 pacotes por container.'));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_limit_500', 'Limite de 500 pacotes por container.')));
             exit;
         }
 
@@ -2529,15 +2529,15 @@ class AdminCorreiosMundialController extends Controller {
             }
         }
         if (!empty($cancelled)) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Etiqueta cancelada (não pode ser usada): ' . implode(', ', array_slice($cancelled, 0, 20))));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_label_cancelled', 'Etiqueta cancelada (não pode ser usada):') . ' ' . implode(', ', array_slice($cancelled, 0, 20))));
             exit;
         }
         if (!empty($invalid)) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Tracking não encontrado: ' . implode(', ', array_slice($invalid, 0, 20))));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_tracking_not_found', 'Tracking não encontrado:') . ' ' . implode(', ', array_slice($invalid, 0, 20))));
             exit;
         }
         if (!empty($already)) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Já usado em outro container: ' . implode(', ', array_slice($already, 0, 20))));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_already_used', 'Já usado em outro container:') . ' ' . implode(', ', array_slice($already, 0, 20))));
             exit;
         }
 
@@ -2596,7 +2596,7 @@ class AdminCorreiosMundialController extends Controller {
             }
         }
         if ($unitCode === '') {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Correios não retornou unitCode.') . '&bulk=' . rawurlencode($bulk));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_no_unitcode', 'Correios não retornou unitCode.')) . '&bulk=' . rawurlencode($bulk));
             exit;
         }
 
@@ -2622,7 +2622,7 @@ class AdminCorreiosMundialController extends Controller {
             ]);
             $containerId = (int) $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Falha ao salvar container no banco.') . '&bulk=' . rawurlencode($bulk));
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode(__('admin.correios_mundial.err_save_container', 'Falha ao salvar container no banco.')) . '&bulk=' . rawurlencode($bulk));
             exit;
         }
 
@@ -2638,7 +2638,7 @@ class AdminCorreiosMundialController extends Controller {
             }
         }
 
-        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode('Container criado: ' . $unitCode));
+        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode(__('admin.correios_mundial.ok_container_created', 'Container criado:') . ' ' . $unitCode));
         exit;
     }
 
@@ -2649,14 +2649,14 @@ class AdminCorreiosMundialController extends Controller {
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
             http_response_code(400);
-            echo 'ID inválido.';
+            echo __('admin.correios_mundial.invalid_id', 'ID inválido.');
             return;
         }
 
         $this->ensurePacketContainersTable();
         if (!$this->tableExists('correios_packet_containers')) {
             http_response_code(500);
-            echo 'Tabela correios_packet_containers não encontrada.';
+            echo __('admin.correios_mundial.containers_table_missing', 'Tabela correios_packet_containers não encontrada.');
             return;
         }
 
@@ -2670,14 +2670,14 @@ class AdminCorreiosMundialController extends Controller {
         }
         if (!is_array($row)) {
             http_response_code(404);
-            echo 'Container não encontrado.';
+            echo __('admin.correios_mundial.container_not_found_dot', 'Container não encontrado.');
             return;
         }
 
         $unitCode = (string) ($row['unit_code'] ?? '');
         if ($unitCode === '') {
             http_response_code(400);
-            echo 'unitCode não encontrado.';
+            echo __('admin.correios_mundial.unitcode_not_found', 'unitCode não encontrado.');
             return;
         }
 
@@ -2826,14 +2826,14 @@ class AdminCorreiosMundialController extends Controller {
         $tracking = trim($tracking);
         if ($tracking === '') {
             http_response_code(400);
-            echo 'Tracking inválido.';
+            echo __('admin.correios_mundial.invalid_tracking', 'Tracking inválido.');
             return;
         }
 
         $this->ensurePacketEtiquetasTable();
         if (!$this->tableExists('correios_packet_etiquetas')) {
             http_response_code(500);
-            echo 'Tabela correios_packet_etiquetas não encontrada.';
+            echo __('admin.correios_mundial.table_missing', 'Tabela correios_packet_etiquetas não encontrada.');
             return;
         }
 
@@ -2848,7 +2848,7 @@ class AdminCorreiosMundialController extends Controller {
 
         if (!$etiqueta || empty($etiqueta['pedido_id'])) {
             http_response_code(404);
-            echo 'Etiqueta não encontrada.';
+            echo __('admin.correios_mundial.label_not_found_dot', 'Etiqueta não encontrada.');
             return;
         }
 
@@ -2857,7 +2857,7 @@ class AdminCorreiosMundialController extends Controller {
         $pedido = $pedidoModel->getComDetalhes($pedidoId);
         if (!is_array($pedido) || empty($pedido['id'])) {
             http_response_code(404);
-            echo 'Pedido não encontrado.';
+            echo __('admin.correios_mundial.order_not_found_dot', 'Pedido não encontrado.');
             return;
         }
 
@@ -3257,7 +3257,7 @@ class AdminCorreiosMundialController extends Controller {
         $ids = isset($data['ids']) && is_array($data['ids']) ? array_map('intval', $data['ids']) : [];
 
         if (empty($ids)) {
-            $this->json(['success' => false, 'error' => 'Nenhuma etiqueta selecionada'], 400);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.no_label_selected', 'Nenhuma etiqueta selecionada')], 400);
             return;
         }
 
@@ -3273,7 +3273,7 @@ class AdminCorreiosMundialController extends Controller {
         $etiquetas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         if (empty($etiquetas)) {
-            $this->json(['success' => false, 'error' => 'Nenhuma etiqueta encontrada para os pedidos selecionados'], 404);
+            $this->json(['success' => false, 'error' => __('admin.correios_mundial.no_labels_for_orders', 'Nenhuma etiqueta encontrada para os pedidos selecionados')], 404);
             return;
         }
 

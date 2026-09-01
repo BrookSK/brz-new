@@ -69,14 +69,14 @@ class AdminCarteiraConfigController extends Controller {
         // Validar modo
         $modosValidos = ['subtotal_taxa', 'subtotal_taxa_impostos'];
         if (!in_array($novoModo, $modosValidos, true)) {
-            $_SESSION['_flash_carteira_config_success'] = 'Modo inválido.';
+            $_SESSION['_flash_carteira_config_success'] = __('admin.wallet_config.invalid_mode', 'Modo inválido.');
             $this->redirect('/admin/carteira-config');
             return;
         }
 
         // Validar motivo obrigatório
         if ($motivo === '') {
-            $_SESSION['_flash_carteira_config_success'] = 'O motivo da alteração é obrigatório.';
+            $_SESSION['_flash_carteira_config_success'] = __('admin.wallet_config.reason_required', 'O motivo da alteração é obrigatório.');
             $this->redirect('/admin/carteira-config');
             return;
         }
@@ -96,7 +96,7 @@ class AdminCarteiraConfigController extends Controller {
 
         // Se não mudou, não fazer nada
         if ($novoModo === $modoAtual) {
-            $_SESSION['_flash_carteira_config_success'] = 'Configuração já está nesse modo.';
+            $_SESSION['_flash_carteira_config_success'] = __('admin.wallet_config.already_in_mode', 'Configuração já está nesse modo.');
             $this->redirect('/admin/carteira-config');
             return;
         }
@@ -116,7 +116,7 @@ class AdminCarteiraConfigController extends Controller {
                 $st->execute([$novoModo]);
             }
         } catch (\Exception $e) {
-            $_SESSION['_flash_carteira_config_success'] = 'Erro ao salvar: ' . $e->getMessage();
+            $_SESSION['_flash_carteira_config_success'] = __('admin.wallet_config.save_error', 'Erro ao salvar: ') . $e->getMessage();
             $this->redirect('/admin/carteira-config');
             return;
         }
@@ -134,14 +134,14 @@ class AdminCarteiraConfigController extends Controller {
             ]);
         } catch (\Exception $e) {}
 
-        $_SESSION['_flash_carteira_config_success'] = 'Configuração alterada com sucesso de "' . $this->getModoLabel($modoAtual) . '" para "' . $this->getModoLabel($novoModo) . '".';
+        $_SESSION['_flash_carteira_config_success'] = __('admin.wallet_config.change_success', 'Configuração alterada com sucesso de "{from}" para "{to}".', ['from' => $this->getModoLabel($modoAtual), 'to' => $this->getModoLabel($novoModo)]);
         $this->redirect('/admin/carteira-config');
     }
 
     private function getModoLabel(string $modo): string {
         $labels = [
-            'subtotal_taxa' => 'Subtotal + Taxa de Serviço',
-            'subtotal_taxa_impostos' => 'Subtotal + Taxa + Impostos',
+            'subtotal_taxa' => __('admin.wallet_config.mode_subtotal_fee', 'Subtotal + Taxa de Serviço'),
+            'subtotal_taxa_impostos' => __('admin.wallet_config.mode_subtotal_fee_taxes', 'Subtotal + Taxa + Impostos'),
         ];
         return $labels[$modo] ?? $modo;
     }

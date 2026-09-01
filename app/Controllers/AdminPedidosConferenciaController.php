@@ -52,7 +52,7 @@ class AdminPedidosConferenciaController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Pedidos para Conferência</h1>
+                <h1 class="page-title">' . __('admin.orders_check.title', 'Pedidos para Conferência') . '</h1>
             </div>';
 
         $this->renderFlashIfAny();
@@ -98,7 +98,7 @@ HTML;
         unset($_SESSION['message'], $_SESSION['message_type']);
         echo '<div class="alert alert-' . htmlspecialchars($type) . ' alert-dismissible fade show" role="alert">'
             . htmlspecialchars($msg)
-            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>'
+            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="' . htmlspecialchars(__('common.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>'
             . '</div>';
     }
 
@@ -227,7 +227,7 @@ HTML;
         }
 
         if (!in_array('status_conferencia', $colsPedidos, true)) {
-            $_SESSION['message'] = 'Sua base ainda não possui o campo status_conferencia. Rode a migration 085_add_tipo_compra_e_conferencia.sql.';
+            $_SESSION['message'] = __('admin.orders_check.missing_column', 'Sua base ainda não possui o campo status_conferencia. Rode a migration 085_add_tipo_compra_e_conferencia.sql.');
             $_SESSION['message_type'] = 'warning';
         }
 
@@ -369,9 +369,9 @@ HTML;
             <div class="card-body">';
 
         if (empty($pedidos)) {
-            echo '<div class="text-center py-5"><i class="fas fa-check-circle fa-3x text-success mb-3"></i><h5>Nenhum pedido pendente de conferência</h5></div>';
+            echo '<div class="text-center py-5"><i class="fas fa-check-circle fa-3x text-success mb-3"></i><h5>' . __('admin.orders_check.no_pending', 'Nenhum pedido pendente de conferência') . '</h5></div>';
         } else {
-            echo '<div class="small text-muted mb-3">' . count($pedidos) . ' pedido(s) pendente(s)</div>';
+            echo '<div class="small text-muted mb-3">' . count($pedidos) . ' ' . __('admin.orders_check.pending_count_suffix', 'pedido(s) pendente(s)') . '</div>';
 
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['id'] ?? 0);
@@ -404,7 +404,7 @@ HTML;
                 echo '<div class="fw-bold">' . htmlspecialchars($simbolo . ' ' . number_format($total, 2, ',', '.')) . '</div>';
                 echo '</div>';
                 if ($clienteNome !== '') echo '<div class="small mt-1"><i class="fas fa-user me-1"></i>' . htmlspecialchars($clienteNome) . '</div>';
-                if ($temValorCliente) echo '<span class="badge bg-danger mt-1"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
+                if ($temValorCliente) echo '<span class="badge bg-danger mt-1"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders_check.customer_value_badge', 'Valor informado pelo cliente') . '</span>';
                 echo '</div>';
 
                 // Itens do pedido
@@ -412,7 +412,7 @@ HTML;
                 if (!empty($itens)) {
                     echo '<table class="table table-sm table-hover mb-0 align-middle">';
                     echo '<thead class="table-light"><tr>';
-                    echo '<th style="width:60px"></th><th>Produto</th><th>Qtd</th><th>Preço Puxado</th><th>Valor Real</th><th>Link</th><th>Status</th>';
+                    echo '<th style="width:60px"></th><th>' . __('admin.orders_check.th_product', 'Produto') . '</th><th>' . __('admin.orders_check.th_qty', 'Qtd') . '</th><th>' . __('admin.orders_check.th_pulled_price', 'Preço Puxado') . '</th><th>' . __('admin.orders_check.th_real_value', 'Valor Real') . '</th><th>' . __('admin.orders_check.th_link', 'Link') . '</th><th>' . __('common.status', 'Status') . '</th>';
                     echo '</tr></thead><tbody>';
 
                     $itemIdx = 0;
@@ -455,8 +455,8 @@ HTML;
                         echo '<div class="fw-semibold">' . htmlspecialchars(mb_substr($nomeProd, 0, 80)) . (mb_strlen($nomeProd) > 80 ? '...' : '') . '</div>';
                         if ($varLabel !== '') echo '<div class="text-muted small">' . htmlspecialchars($varLabel) . '</div>';
                         if ($obs !== '') echo '<div class="text-danger small mt-1"><i class="fas fa-comment me-1"></i>' . htmlspecialchars($obs) . '</div>';
-                        if ($valorInf) echo '<span class="badge bg-danger small">Preço informado pelo cliente</span>';
-                        if ($pesoManualItem !== null && $pesoManualItem > 0) echo ' <span class="badge bg-warning text-dark small"><i class="fas fa-weight me-1"></i>Peso alterado: ' . number_format($pesoManualItem, 2) . ' kg</span>';
+                        if ($valorInf) echo '<span class="badge bg-danger small">' . __('admin.orders_check.price_by_customer', 'Preço informado pelo cliente') . '</span>';
+                        if ($pesoManualItem !== null && $pesoManualItem > 0) echo ' <span class="badge bg-warning text-dark small"><i class="fas fa-weight me-1"></i>' . __('admin.orders_check.weight_changed', 'Peso alterado:') . ' ' . number_format($pesoManualItem, 2) . ' kg</span>';
                         echo '</td>';
                         // Qtd
                         echo '<td>' . $qtd . '</td>';
@@ -467,7 +467,7 @@ HTML;
                         // Link
                         echo '<td>';
                         if ($url !== '') {
-                            echo '<a href="' . htmlspecialchars($url) . '" target="_blank" class="btn btn-outline-primary btn-sm" title="Abrir no site"><i class="fas fa-external-link-alt"></i></a>';
+                            echo '<a href="' . htmlspecialchars($url) . '" target="_blank" class="btn btn-outline-primary btn-sm" title="' . htmlspecialchars(__('admin.orders_check.open_on_site', 'Abrir no site'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-external-link-alt"></i></a>';
                         } else {
                             echo '<span class="text-muted">-</span>';
                         }
@@ -475,7 +475,7 @@ HTML;
                         // Status
                         echo '<td>';
                         if ($valorInf || ($pesoManualItem !== null && $pesoManualItem > 0)) {
-                            echo '<span class="badge bg-warning text-dark">Conferir</span>';
+                            echo '<span class="badge bg-warning text-dark">' . __('admin.orders_check.status_check', 'Conferir') . '</span>';
                         } else {
                             echo '<span class="badge bg-success">OK</span>';
                         }
@@ -485,7 +485,7 @@ HTML;
                     }
                     echo '</tbody></table>';
                 } else {
-                    echo '<div class="p-3 text-muted small">Nenhum item encontrado.</div>';
+                    echo '<div class="p-3 text-muted small">' . __('admin.orders_check.no_items', 'Nenhum item encontrado.') . '</div>';
                 }
                 echo '</div>';
 
@@ -495,16 +495,16 @@ HTML;
                 echo '<input type="hidden" name="tipo_compra" value="online">';
 
                 echo '<div>';
-                echo '<label class="form-label small mb-0">Comprovante de compra (opcional)</label>';
+                echo '<label class="form-label small mb-0">' . __('admin.orders_check.purchase_receipt_optional', 'Comprovante de compra (opcional)') . '</label>';
                 echo '<input class="form-control form-control-sm" type="file" name="comprovante_compra" accept="image/*,application/pdf">';
                 echo '</div>';
 
                 echo '<div class="d-flex gap-2 ms-auto">';
-                echo '<a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-eye me-1"></i>Pedido completo</a>';
-                echo '<button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Confirmar pedido</button>';
+                echo '<a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-eye me-1"></i>' . __('admin.orders_check.full_order', 'Pedido completo') . '</a>';
+                echo '<button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>' . __('admin.orders_check.confirm_order', 'Confirmar pedido') . '</button>';
                 echo '</form>';
-                echo '<form class="d-inline" method="POST" action="/admin/pedidos/conferencia/cancelar/' . $pid . '" onsubmit="return confirm(\'Cancelar este pedido? O cliente será notificado.\');">';
-                echo '<button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i>Cancelar</button>';
+                echo '<form class="d-inline" method="POST" action="/admin/pedidos/conferencia/cancelar/' . $pid . '" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.orders_check.cancel_confirm', 'Cancelar este pedido? O cliente será notificado.'), ENT_QUOTES, 'UTF-8') . '\');">';
+                echo '<button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i>' . __('common.cancel', 'Cancelar') . '</button>';
                 echo '</form>';
                 echo '</div>';
 
@@ -528,7 +528,7 @@ HTML;
         $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
 
         if ($id <= 0) {
-            $_SESSION['message'] = 'Pedido inválido.';
+            $_SESSION['message'] = __('admin.orders_check.invalid_order', 'Pedido inválido.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/pedidos/conferencia');
             exit;
@@ -842,10 +842,10 @@ HTML;
                 $this->connection->commit();
 
                 if (!$podeMudarParaConsolidado) {
-                    $_SESSION['message'] = 'Pedido confirmado (online), comprovante anexado e comissão registrada. ATENÇÃO: O status NÃO foi alterado para Caixa Fechada porque as medidas (peso, altura, largura, comprimento) não estão preenchidas. Preencha as medidas e altere o status manualmente.';
+                    $_SESSION['message'] = __('admin.orders_check.confirmed_no_measures', 'Pedido confirmado (online), comprovante anexado e comissão registrada. ATENÇÃO: O status NÃO foi alterado para Caixa Fechada porque as medidas (peso, altura, largura, comprimento) não estão preenchidas. Preencha as medidas e altere o status manualmente.');
                     $_SESSION['message_type'] = 'warning';
                 } else {
-                    $_SESSION['message'] = 'Pedido confirmado (online), comprovante anexado e comissão registrada.';
+                    $_SESSION['message'] = __('admin.orders_check.confirmed_online', 'Pedido confirmado (online), comprovante anexado e comissão registrada.');
                     $_SESSION['message_type'] = 'success';
                 }
                 header('Location: /admin/pedidos/conferencia');
@@ -1022,7 +1022,7 @@ HTML;
 
             $this->connection->commit();
 
-            $_SESSION['message'] = 'Pedido confirmado e enviado para a lista de compras.';
+            $_SESSION['message'] = __('admin.orders_check.confirmed_sent_to_list', 'Pedido confirmado e enviado para a lista de compras.');
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/pedidos/conferencia');
             exit;
@@ -1031,7 +1031,7 @@ HTML;
                 $this->connection->rollBack();
             } catch (\Exception $e2) {
             }
-            $_SESSION['message'] = 'Erro ao confirmar pedido.';
+            $_SESSION['message'] = __('admin.orders_check.confirm_error', 'Erro ao confirmar pedido.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/pedidos/conferencia');
             exit;
@@ -1045,7 +1045,7 @@ HTML;
 
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            $_SESSION['message'] = 'Pedido inválido.';
+            $_SESSION['message'] = __('admin.orders_check.invalid_order', 'Pedido inválido.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/pedidos/conferencia');
             exit;
@@ -1077,10 +1077,10 @@ HTML;
                 $st->execute($params);
             }
 
-            $_SESSION['message'] = 'Pedido cancelado.';
+            $_SESSION['message'] = __('admin.orders_check.cancelled', 'Pedido cancelado.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao cancelar pedido.';
+            $_SESSION['message'] = __('admin.orders_check.cancel_error', 'Erro ao cancelar pedido.');
             $_SESSION['message_type'] = 'danger';
         }
 

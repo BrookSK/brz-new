@@ -218,7 +218,7 @@ class AdminRemessaCorreiosController extends Controller {
     private function buildPrepostagemPayload(array $pedido, array $cfg): array {
         $sender = $this->parseJsonConfig((string) ($cfg['prepostagem_sender_json'] ?? ''), 'Pré-Postagem: remetente');
         if (empty($sender)) {
-            throw new \Exception('Pré-Postagem: configure o remetente (JSON) no Admin');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_sender', 'Pré-Postagem: configure o remetente (JSON) no Admin'));
         }
 
         if (isset($sender['pais'])) {
@@ -244,7 +244,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
         $destDocDigits = $this->onlyDigits($destDoc);
         if ($destDocDigits === '' || !$this->isValidCpfCnpj($destDocDigits)) {
-            throw new \Exception('Pré-Postagem: CPF/CNPJ do destinatário inválido ou ausente');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_doc', 'Pré-Postagem: CPF/CNPJ do destinatário inválido ou ausente'));
         }
 
         $cep = $this->onlyDigits((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? '')));
@@ -256,7 +256,7 @@ class AdminRemessaCorreiosController extends Controller {
         $uf = (string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''));
 
         if ($destNome === '' || $cep === '' || $logradouro === '' || $numero === '' || $bairro === '' || $cidade === '' || $uf === '') {
-            throw new \Exception('Pré-Postagem: pedido sem dados completos de endereço do destinatário');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_address', 'Pré-Postagem: pedido sem dados completos de endereço do destinatário'));
         }
 
         $ddd = '';
@@ -298,7 +298,7 @@ class AdminRemessaCorreiosController extends Controller {
             $codigoServico = $sigepCodigo;
         }
         if ($codigoServico === '') {
-            throw new \Exception('Pré-Postagem: informe o código do serviço nas configurações');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_service_code', 'Pré-Postagem: informe o código do serviço nas configurações'));
         }
 
         $idCorreios = trim((string) ($cfg['prepostagem_id_correios'] ?? ''));
@@ -310,7 +310,7 @@ class AdminRemessaCorreiosController extends Controller {
             $items = $pedido['itens'];
         }
         if (empty($items)) {
-            throw new \Exception('Pré-Postagem: pedido sem itens');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_no_items', 'Pré-Postagem: pedido sem itens'));
         }
 
         $itensDeclaracao = [];
@@ -322,7 +322,7 @@ class AdminRemessaCorreiosController extends Controller {
             $idx++;
             $qtd = (int) ($it['quantidade'] ?? ($it['qty'] ?? 0));
             if ($qtd <= 0) {
-                throw new \Exception('Pré-Postagem: item #' . $idx . ' com quantidade inválida');
+                throw new \Exception(__('admin.shipment_correios.err_prepost_item_qty_prefix', 'Pré-Postagem: item #') . $idx . __('admin.shipment_correios.err_prepost_item_qty_suffix', ' com quantidade inválida'));
             }
 
             $nomeItem = trim((string) ($it['nome'] ?? ($it['nome_produto'] ?? ($it['produto_nome'] ?? ''))));
@@ -332,7 +332,7 @@ class AdminRemessaCorreiosController extends Controller {
 
             $ncm = $this->onlyDigits((string) ($it['ncm'] ?? ($it['codigo_ncm'] ?? '')));
             if ($ncm === '' || strlen($ncm) < 8) {
-                throw new \Exception('Pré-Postagem: item #' . $idx . ' sem NCM');
+                throw new \Exception(__('admin.shipment_correios.err_prepost_item_ncm_prefix', 'Pré-Postagem: item #') . $idx . __('admin.shipment_correios.err_prepost_item_ncm_suffix', ' sem NCM'));
             }
 
             $valor = null;
@@ -356,7 +356,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         if (empty($itensDeclaracao)) {
-            throw new \Exception('Pré-Postagem: pedido sem itens válidos para declaração de conteúdo');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_no_valid_items', 'Pré-Postagem: pedido sem itens válidos para declaração de conteúdo'));
         }
 
         $pesoKg = null;
@@ -367,11 +367,11 @@ class AdminRemessaCorreiosController extends Controller {
             }
         }
         if ($pesoKg === null || $pesoKg <= 0) {
-            throw new \Exception('Pré-Postagem: pedido com peso inválido (peso_total/peso)');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_weight_invalid_detail', 'Pré-Postagem: pedido com peso inválido (peso_total/peso)'));
         }
         $pesoGramas = (int) round($pesoKg * 1000);
         if ($pesoGramas <= 0) {
-            throw new \Exception('Pré-Postagem: pedido com peso inválido');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_weight_invalid', 'Pré-Postagem: pedido com peso inválido'));
         }
 
         $altura = null;
@@ -396,14 +396,14 @@ class AdminRemessaCorreiosController extends Controller {
             }
         }
         if ($altura === null || $largura === null || $comprimento === null || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
-            throw new \Exception('Pré-Postagem: pedido com dimensões inválidas (altura/largura/comprimento)');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_dims_invalid_detail', 'Pré-Postagem: pedido com dimensões inválidas (altura/largura/comprimento)'));
         }
 
         $altura = (int) round($altura);
         $largura = (int) round($largura);
         $comprimento = (int) round($comprimento);
         if ($altura <= 0 || $largura <= 0 || $comprimento <= 0) {
-            throw new \Exception('Pré-Postagem: pedido com dimensões inválidas');
+            throw new \Exception(__('admin.shipment_correios.err_prepost_dims_invalid', 'Pré-Postagem: pedido com dimensões inválidas'));
         }
 
         $formato = '2';
@@ -443,11 +443,11 @@ class AdminRemessaCorreiosController extends Controller {
 
     private function solicitarEtiquetaSigep(array $cfg): string {
         if (empty($cfg['usuario']) || empty($cfg['senha']) || empty($cfg['cartao']) || empty($cfg['contrato']) || empty($cfg['servico_codigo'])) {
-            throw new \Exception('SIGEP: preencha usuário/senha/contrato/cartão/código do serviço no Admin');
+            throw new \Exception(__('admin.shipment_correios.err_sigep_fill', 'SIGEP: preencha usuário/senha/contrato/cartão/código do serviço no Admin'));
         }
 
         if (!class_exists('\\SoapClient')) {
-            throw new \Exception('SIGEP: extensão SOAP não disponível no PHP do servidor');
+            throw new \Exception(__('admin.shipment_correios.err_sigep_soap', 'SIGEP: extensão SOAP não disponível no PHP do servidor'));
         }
 
         $amb = strtolower(trim((string) ($cfg['ambiente'] ?? 'homologacao')));
@@ -489,7 +489,7 @@ class AdminRemessaCorreiosController extends Controller {
             $extra[] = 'allow_url_fopen=' . (ini_get('allow_url_fopen') ? '1' : '0');
             $extra[] = 'openssl.cafile=' . (string) ini_get('openssl.cafile');
             $extra[] = 'curl.cainfo=' . (string) ini_get('curl.cainfo');
-            throw new \Exception('SIGEP falhou ao carregar WSDL: ' . $e->getMessage() . ' | ' . implode(', ', $extra));
+            throw new \Exception(__('admin.shipment_correios.err_sigep_wsdl', 'SIGEP falhou ao carregar WSDL:') . ' ' . $e->getMessage() . ' | ' . implode(', ', $extra));
         }
 
         // Observação: o SIGEP varia por contrato. Aqui tentamos usar solicitaEtiquetas.
@@ -522,7 +522,7 @@ class AdminRemessaCorreiosController extends Controller {
             return trim($raw);
         }
 
-        throw new \Exception('SIGEP: resposta inesperada ao solicitar etiqueta');
+        throw new \Exception(__('admin.shipment_correios.err_sigep_unexpected', 'SIGEP: resposta inesperada ao solicitar etiqueta'));
     }
 
     private function normalizarEtiquetaCorreios(string $code): string {
@@ -534,7 +534,7 @@ class AdminRemessaCorreiosController extends Controller {
     private function calcularDvEtiqueta(string $semDv): string {
         $c = $this->normalizarEtiquetaCorreios($semDv);
         if (!preg_match('/^[A-Z]{2}[0-9]{8}[A-Z]{2}$/', $c)) {
-            throw new \Exception('SIGEP: etiqueta sem DV em formato inválido');
+            throw new \Exception(__('admin.shipment_correios.err_sigep_dv_format', 'SIGEP: etiqueta sem DV em formato inválido'));
         }
 
         $num = substr($c, 2, 8);
@@ -611,7 +611,7 @@ class AdminRemessaCorreiosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa Correios - Braziliana Admin</title>
+    <title>' . __('admin.shipment_correios.page_title', 'Remessa Correios') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -660,7 +660,7 @@ class AdminRemessaCorreiosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Remessa Correios';
+                    <h1 class="page-title">' . __('admin.shipment_correios.heading', 'Remessa Correios') . '';
         
         // Mostrar badge do serviço configurado (SEDEX/PAC)
         $__cfgProvider = $this->getCorreiosProviderConfig();
@@ -681,31 +681,31 @@ class AdminRemessaCorreiosController extends Controller {
         echo '</h1>
                     <div class="d-none d-md-flex gap-2 align-items-center">
                         <div class="input-group input-group-sm" style="width:180px">
-                            <input type="text" class="form-control" id="buscarPedidoCorreios" placeholder="Nº pedido..." onkeydown="if(event.key===\'Enter\'){irParaPedidoCorreios();event.preventDefault();}">
+                            <input type="text" class="form-control" id="buscarPedidoCorreios" placeholder="' . __('admin.shipment_correios.search_order_placeholder', 'Nº pedido...') . '" onkeydown="if(event.key===\'Enter\'){irParaPedidoCorreios();event.preventDefault();}">
                             <button class="btn btn-outline-primary" type="button" onclick="irParaPedidoCorreios()"><i class="fas fa-search"></i></button>
                         </div>
-                        <button type="button" class="btn btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
-                        <button type="button" class="btn btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir Todas</button>
-                        <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                        <button type="button" class="btn btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>' . __('admin.shipment_correios.generate_batch', 'Gerar Lote') . '</button>
+                        <button type="button" class="btn btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>' . __('admin.shipment_correios.print_all', 'Imprimir Todas') . '</button>
+                        <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '</button>
                     </div>
-                    <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'correiosActionsM\').classList.toggle(\'d-none\')"><i class="fas fa-ellipsis-v me-1"></i>Ações</button>
+                    <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'correiosActionsM\').classList.toggle(\'d-none\')"><i class="fas fa-ellipsis-v me-1"></i>' . __('common.actions', 'Ações') . '</button>
                 </div>
                 <div id="correiosActionsM" class="d-none d-md-none mb-3">
                     <div class="d-flex flex-wrap gap-2">
                         <div class="input-group input-group-sm" style="width:180px">
-                            <input type="text" class="form-control" id="buscarPedidoCorreiosM" placeholder="Nº pedido..." onkeydown="if(event.key===\'Enter\'){irParaPedidoCorreios(\'M\');event.preventDefault();}">
+                            <input type="text" class="form-control" id="buscarPedidoCorreiosM" placeholder="' . __('admin.shipment_correios.search_order_placeholder', 'Nº pedido...') . '" onkeydown="if(event.key===\'Enter\'){irParaPedidoCorreios(\'M\');event.preventDefault();}">
                             <button class="btn btn-outline-primary" type="button" onclick="irParaPedidoCorreios(\'M\')"><i class="fas fa-search"></i></button>
                         </div>
-                        <button type="button" class="btn btn-sm btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
-                        <button type="button" class="btn btn-sm btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir</button>
-                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                        <button type="button" class="btn btn-sm btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>' . __('admin.shipment_correios.generate_batch', 'Gerar Lote') . '</button>
+                        <button type="button" class="btn btn-sm btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>' . __('common.print', 'Imprimir') . '</button>
+                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '</button>
                     </div>
                 </div>
                 <script>
                 function irParaPedidoCorreios(suffix){
                     var el = document.getElementById("buscarPedidoCorreios"+(suffix||""));
                     var v = el.value.replace(/\\D/g,"").trim();
-                    if(v===""){alert("Digite o número do pedido");return;}
+                    if(v===""){alert("' . __('admin.shipment_correios.enter_order_number', 'Digite o número do pedido') . '");return;}
                     var num = parseInt(v,10);
                     // Procurar na tabela de remessas prontas e etiquetas
                     var found = false;
@@ -725,7 +725,7 @@ class AdminRemessaCorreiosController extends Controller {
                         }
                     });
                     if(!found){
-                        alert("Pedido #"+num+" não encontrado nas tabelas desta página.");
+                        alert("' . __('admin.shipment_correios.order', 'Pedido') . ' #"+num+" ' . __('admin.shipment_correios.not_found_in_page', 'não encontrado nas tabelas desta página.') . '");
                     }
                 }
                 </script>
@@ -735,36 +735,36 @@ class AdminRemessaCorreiosController extends Controller {
                     <div class="col-6 col-md-3">
                         <div class="card card-stats bg-info text-white">
                             <div class="card-body py-2">
-                                <h6 class="card-title mb-0">Prontas</h6>
+                                <h6 class="card-title mb-0">' . __('admin.shipment_correios.stat_ready', 'Prontas') . '</h6>
                                 <h3 class="mb-0">' . count($remessasProntas) . '</h3>
-                                <small>Aguardando etiqueta</small>
+                                <small>' . __('admin.shipment_correios.stat_waiting_label', 'Aguardando etiqueta') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="card card-stats bg-purple text-white">
                             <div class="card-body py-2">
-                                <h6 class="card-title mb-0">Etiquetas</h6>
+                                <h6 class="card-title mb-0">' . __('admin.shipment_correios.stat_labels', 'Etiquetas') . '</h6>
                                 <h3 class="mb-0">' . count($etiquetasGeradas) . '</h3>
-                                <small>Geradas</small>
+                                <small>' . __('admin.shipment_correios.stat_generated', 'Geradas') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="card card-stats bg-success text-white">
                             <div class="card-body py-2">
-                                <h6 class="card-title mb-0">Impressas</h6>
+                                <h6 class="card-title mb-0">' . __('admin.shipment_correios.stat_printed', 'Impressas') . '</h6>
                                 <h3 class="mb-0">' . count($etiquetasImpressas) . '</h3>
-                                <small>Prontas para postagem</small>
+                                <small>' . __('admin.shipment_correios.stat_ready_to_post', 'Prontas para postagem') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body py-2">
-                                <h6 class="card-title mb-0">Postadas</h6>
+                                <h6 class="card-title mb-0">' . __('admin.shipment_correios.stat_posted', 'Postadas') . '</h6>
                                 <h3 class="mb-0">' . $this->getTotalPostadas() . '</h3>
-                                <small>Enviadas</small>
+                                <small>' . __('admin.shipment_correios.stat_sent', 'Enviadas') . '</small>
                             </div>
                         </div>
                     </div>
@@ -775,7 +775,7 @@ class AdminRemessaCorreiosController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-info text-white">
-                                <h5 class="mb-0">Remessas Prontas para Etiqueta</h5>
+                                <h5 class="mb-0">' . __('admin.shipment_correios.ready_shipments_title', 'Remessas Prontas para Etiqueta') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive d-none d-md-block">
@@ -783,13 +783,13 @@ class AdminRemessaCorreiosController extends Controller {
                                         <thead>
                                             <tr>
                                                 <th><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
-                                                <th>Remessa</th>
-                                                <th>Pedido</th>
-                                                <th>Cliente</th>
-                                                <th>Data Remessa</th>
-                                                <th>Peso</th>
-                                                <th>Valor</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.shipment_correios.th_shipment', 'Remessa') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_order', 'Pedido') . '</th>
+                                                <th>' . __('common.customer', 'Cliente') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_shipment_date', 'Data Remessa') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_weight', 'Peso') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_value', 'Valor') . '</th>
+                                                <th>' . __('common.actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -804,7 +804,7 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td>' . ($remessa['peso_total'] !== null && (float)$remessa['peso_total'] > 0 ? number_format((float)$remessa['peso_total'], 3, ',', '.') . ' kg' : '<span class="text-muted">—</span>') . '</td>
                                                 <td>' . ($remessa['valor_total'] !== null ? 'R$ ' . number_format((float)$remessa['valor_total'], 2, ',', '.') : '-') . '</td>                                                <td>
                                                     <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
-                                                        <i class="fas fa-tags"></i> Gerar Etiqueta
+                                                        <i class="fas fa-tags"></i> ' . __('admin.shipment_correios.generate_label', 'Gerar Etiqueta') . '
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-primary" onclick="verDetalhesRemessa(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-eye"></i>
@@ -814,7 +814,7 @@ class AdminRemessaCorreiosController extends Controller {
                                         }
                                         
                                         if (empty($remessasProntas)) {
-                                            echo '<tr><td colspan="8" class="text-center text-muted">Nenhuma remessa pronta para etiqueta encontrada</td></tr>';
+                                            echo '<tr><td colspan="8" class="text-center text-muted">' . __('admin.shipment_correios.no_ready_shipments', 'Nenhuma remessa pronta para etiqueta encontrada') . '</td></tr>';
                                         }
                                         
                                         echo '</tbody>
@@ -839,7 +839,7 @@ class AdminRemessaCorreiosController extends Controller {
                                     </div>';
                                 }
                                 if (empty($remessasProntas)) {
-                                    echo '<div class="text-center text-muted py-3 small">Nenhuma remessa pronta</div>';
+                                    echo '<div class="text-center text-muted py-3 small">' . __('admin.shipment_correios.no_ready_shipments_short', 'Nenhuma remessa pronta') . '</div>';
                                 }
                                 echo '</div>
                             </div>
@@ -852,21 +852,21 @@ class AdminRemessaCorreiosController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-purple text-white">
-                                <h5 class="mb-0"><i class="fas fa-tags me-2"></i>Etiquetas Geradas</h5>
+                                <h5 class="mb-0"><i class="fas fa-tags me-2"></i>' . __('admin.shipment_correios.generated_labels_title', 'Etiquetas Geradas') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
-                                                <th>Etiqueta</th>
-                                                <th>Remessa</th>
-                                                <th>Pedido</th>
-                                                <th>Cliente</th>
-                                                <th>Código</th>
-                                                <th>Data Geração</th>
-                                                <th>Status</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.shipment_correios.th_label', 'Etiqueta') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_shipment', 'Remessa') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_order', 'Pedido') . '</th>
+                                                <th>' . __('common.customer', 'Cliente') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_code', 'Código') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_generation_date', 'Data Geração') . '</th>
+                                                <th>' . __('common.status', 'Status') . '</th>
+                                                <th>' . __('common.actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -881,15 +881,15 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td>' . htmlspecialchars($etiqueta['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td><div class="codigo-etiqueta">' . htmlspecialchars($etiqueta['codigo_etiqueta']) . '</div>' . ($__svcLabel !== '' ? ' <span class="badge bg-' . $__svcBadge . '" style="font-size:.7rem">' . htmlspecialchars($__svcLabel) . '</span>' : '') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($etiqueta['created_at'])) . '</td>
-                                                <td><span class="badge bg-purple">Etiqueta Gerada</span></td>
+                                                <td><span class="badge bg-purple">' . __('admin.shipment_correios.badge_label_generated', 'Etiqueta Gerada') . '</span></td>
                                                 <td>
                                                     <button class="btn btn-sm btn-success" onclick="imprimirEtiqueta(' . $etiqueta['id'] . ')">
-                                                        <i class="fas fa-print"></i> Imprimir
+                                                        <i class="fas fa-print"></i> ' . __('common.print', 'Imprimir') . '
                                                     </button>
-                                                    <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="Deletar etiqueta atual e gerar nova com as medidas atuais do pedido">
-                                                        <i class="fas fa-redo"></i> Regerar
+                                                    <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="' . htmlspecialchars(__('admin.shipment_correios.regenerate_title', 'Deletar etiqueta atual e gerar nova com as medidas atuais do pedido'), ENT_QUOTES, 'UTF-8') . '">
+                                                        <i class="fas fa-redo"></i> ' . __('admin.shipment_correios.regenerate', 'Regerar') . '
                                                     </button>
-                                                    <button class="btn btn-sm btn-danger" onclick="deletarEtiqueta(' . $etiqueta['id'] . ')" title="Deletar esta etiqueta">
+                                                    <button class="btn btn-sm btn-danger" onclick="deletarEtiqueta(' . $etiqueta['id'] . ')" title="' . htmlspecialchars(__('admin.shipment_correios.delete_label_title', 'Deletar esta etiqueta'), ENT_QUOTES, 'UTF-8') . '">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-info" onclick="rastrearEtiqueta(' . $etiqueta['id'] . ')">
@@ -900,7 +900,7 @@ class AdminRemessaCorreiosController extends Controller {
                                         }
                                         
                                         if (empty($etiquetasGeradas)) {
-                                            echo '<tr><td colspan="8" class="text-center text-muted">Nenhuma etiqueta gerada encontrada</td></tr>';
+                                            echo '<tr><td colspan="8" class="text-center text-muted">' . __('admin.shipment_correios.no_generated_labels', 'Nenhuma etiqueta gerada encontrada') . '</td></tr>';
                                         }
                                         
                                         echo '</tbody>
@@ -916,20 +916,20 @@ class AdminRemessaCorreiosController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-success text-white">
-                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Etiquetas Impressas</h5>
+                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>' . __('admin.shipment_correios.printed_labels_title', 'Etiquetas Impressas') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
-                                                <th>Etiqueta</th>
-                                                <th>Remessa</th>
-                                                <th>Pedido</th>
-                                                <th>Cliente</th>
-                                                <th>Código</th>
-                                                <th>Data Impressão</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.shipment_correios.th_label', 'Etiqueta') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_shipment', 'Remessa') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_order', 'Pedido') . '</th>
+                                                <th>' . __('common.customer', 'Cliente') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_code', 'Código') . '</th>
+                                                <th>' . __('admin.shipment_correios.th_print_date', 'Data Impressão') . '</th>
+                                                <th>' . __('common.actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -946,15 +946,15 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td>' . date('d/m/Y H:i', strtotime($etiqueta['data_impressao'])) . '</td>
                                                 <td>
                                                     <button class="btn btn-sm btn-success" onclick="imprimirEtiqueta(' . $etiqueta['id'] . ')">
-                                                        <i class="fas fa-print"></i> Reimprimir
+                                                        <i class="fas fa-print"></i> ' . __('admin.shipment_correios.reprint', 'Reimprimir') . '
                                                     </button>
                                                     <button class="btn btn-sm btn-primary" onclick="confirmarPostagem(' . $etiqueta['id'] . ')">
-                                                        <i class="fas fa-check"></i> Confirmar Postagem
+                                                        <i class="fas fa-check"></i> ' . __('admin.shipment_correios.confirm_posting', 'Confirmar Postagem') . '
                                                     </button>
-                                                    <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="Deletar etiqueta atual e gerar nova com as medidas atuais do pedido">
-                                                        <i class="fas fa-redo"></i> Regerar
+                                                    <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="' . htmlspecialchars(__('admin.shipment_correios.regenerate_title', 'Deletar etiqueta atual e gerar nova com as medidas atuais do pedido'), ENT_QUOTES, 'UTF-8') . '">
+                                                        <i class="fas fa-redo"></i> ' . __('admin.shipment_correios.regenerate', 'Regerar') . '
                                                     </button>
-                                                    <button class="btn btn-sm btn-danger" onclick="deletarEtiqueta(' . $etiqueta['id'] . ')" title="Deletar esta etiqueta">
+                                                    <button class="btn btn-sm btn-danger" onclick="deletarEtiqueta(' . $etiqueta['id'] . ')" title="' . htmlspecialchars(__('admin.shipment_correios.delete_label_title', 'Deletar esta etiqueta'), ENT_QUOTES, 'UTF-8') . '">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-info" onclick="rastrearEtiqueta(' . $etiqueta['id'] . ')">
@@ -965,7 +965,7 @@ class AdminRemessaCorreiosController extends Controller {
                                         }
                                         
                                         if (empty($etiquetasImpressas)) {
-                                            echo '<tr><td colspan="7" class="text-center text-muted">Nenhuma etiqueta impressa encontrada</td></tr>';
+                                            echo '<tr><td colspan="7" class="text-center text-muted">' . __('admin.shipment_correios.no_printed_labels', 'Nenhuma etiqueta impressa encontrada') . '</td></tr>';
                                         }
                                         
                                         echo '</tbody>
@@ -994,7 +994,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         function gerarEtiqueta(remessaId) {
-            if (confirm("Deseja gerar a etiqueta dos Correios para esta remessa?")) {
+            if (confirm("' . __('admin.shipment_correios.confirm_generate', 'Deseja gerar a etiqueta dos Correios para esta remessa?') . '")) {
                 fetch("/admin/remessa-correios/gerar-etiqueta/" + remessaId, {
                     method: "POST",
                     headers: {
@@ -1004,15 +1004,15 @@ class AdminRemessaCorreiosController extends Controller {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert("Etiqueta gerada com sucesso! Código: " + data.codigo_etiqueta);
+                        alert("' . __('admin.shipment_correios.js_label_generated', 'Etiqueta gerada com sucesso! Código:') . ' " + data.codigo_etiqueta);
                         location.reload();
                     } else {
-                        alert("Erro ao gerar etiqueta: " + data.message);
+                        alert("' . __('admin.shipment_correios.js_err_generate', 'Erro ao gerar etiqueta:') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao gerar etiqueta");
+                    alert("' . __('admin.shipment_correios.js_err_generate_short', 'Erro ao gerar etiqueta') . '");
                 });
             }
         }
@@ -1021,11 +1021,11 @@ class AdminRemessaCorreiosController extends Controller {
             const checkboxes = document.querySelectorAll(\'.remessa-checkbox:checked\');
             
             if (checkboxes.length === 0) {
-                alert("Selecione pelo menos uma remessa para gerar etiquetas em lote");
+                alert("' . __('admin.shipment_correios.js_select_at_least_one', 'Selecione pelo menos uma remessa para gerar etiquetas em lote') . '");
                 return;
             }
             
-            if (confirm("Deseja gerar etiquetas para " + checkboxes.length + " remessas selecionadas?")) {
+            if (confirm("' . __('admin.shipment_correios.js_confirm_batch_prefix', 'Deseja gerar etiquetas para') . ' " + checkboxes.length + " ' . __('admin.shipment_correios.js_confirm_batch_suffix', 'remessas selecionadas?') . '")) {
                 const remessas = Array.from(checkboxes).map(cb => cb.value);
                 
                 fetch("/admin/remessa-correios/gerar-lote-etiquetas", {
@@ -1041,12 +1041,12 @@ class AdminRemessaCorreiosController extends Controller {
                         alert(data.message);
                         location.reload();
                     } else {
-                        alert("Erro ao gerar lote: " + data.message);
+                        alert("' . __('admin.shipment_correios.js_err_batch', 'Erro ao gerar lote:') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao gerar lote de etiquetas");
+                    alert("' . __('admin.shipment_correios.js_err_batch_short', 'Erro ao gerar lote de etiquetas') . '");
                 });
             }
         }
@@ -1064,7 +1064,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         function confirmarPostagem(etiquetaId) {
-            if (confirm("Confirmar postagem desta etiqueta?")) {
+            if (confirm("' . __('admin.shipment_correios.js_confirm_posting', 'Confirmar postagem desta etiqueta?') . '")) {
                 fetch("/admin/remessa-correios/confirmar-postagem/" + etiquetaId, {
                     method: "POST",
                     headers: {
@@ -1074,15 +1074,15 @@ class AdminRemessaCorreiosController extends Controller {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert("Postagem confirmada com sucesso!");
+                        alert("' . __('admin.shipment_correios.js_posting_confirmed', 'Postagem confirmada com sucesso!') . '");
                         location.reload();
                     } else {
-                        alert("Erro ao confirmar postagem: " + data.message);
+                        alert("' . __('admin.shipment_correios.js_err_confirm_posting', 'Erro ao confirmar postagem:') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao confirmar postagem");
+                    alert("' . __('admin.shipment_correios.js_err_confirm_posting_short', 'Erro ao confirmar postagem') . '");
                 });
             }
         }
@@ -1092,7 +1092,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         function regerarEtiqueta(pedidoId, etiquetaId) {
-            if (!confirm("Isso vai DELETAR a etiqueta atual (#" + etiquetaId + ") e gerar uma nova com as medidas atuais do pedido. Continuar?")) return;
+            if (!confirm("' . __('admin.shipment_correios.js_confirm_regenerate_prefix', 'Isso vai DELETAR a etiqueta atual (#') . '" + etiquetaId + "' . __('admin.shipment_correios.js_confirm_regenerate_suffix', ') e gerar uma nova com as medidas atuais do pedido. Continuar?') . '")) return;
             fetch("/admin/remessa-correios/regerar-etiqueta/" + pedidoId, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1101,17 +1101,17 @@ class AdminRemessaCorreiosController extends Controller {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert("Etiqueta regerada com sucesso! Novo código: " + data.codigo_etiqueta);
+                    alert("' . __('admin.shipment_correios.js_label_regenerated', 'Etiqueta regerada com sucesso! Novo código:') . ' " + data.codigo_etiqueta);
                     location.reload();
                 } else {
-                    alert("Erro ao regerar etiqueta: " + data.message);
+                    alert("' . __('admin.shipment_correios.js_err_regenerate', 'Erro ao regerar etiqueta:') . ' " + data.message);
                 }
             })
-            .catch(() => alert("Erro ao regerar etiqueta"));
+            .catch(() => alert("' . __('admin.shipment_correios.js_err_regenerate_short', 'Erro ao regerar etiqueta') . '"));
         }
 
         function deletarEtiqueta(etiquetaId) {
-            if (!confirm("Tem certeza que deseja DELETAR a etiqueta #" + etiquetaId + "? Essa ação não pode ser desfeita.")) return;
+            if (!confirm("' . __('admin.shipment_correios.js_confirm_delete_prefix', 'Tem certeza que deseja DELETAR a etiqueta #') . '" + etiquetaId + "' . __('admin.shipment_correios.js_confirm_delete_suffix', '? Essa ação não pode ser desfeita.') . '")) return;
             fetch("/admin/remessa-correios/deletar-etiqueta/" + etiquetaId, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" }
@@ -1119,13 +1119,13 @@ class AdminRemessaCorreiosController extends Controller {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert("Etiqueta deletada com sucesso!");
+                    alert("' . __('admin.shipment_correios.js_label_deleted', 'Etiqueta deletada com sucesso!') . '");
                     location.reload();
                 } else {
-                    alert("Erro ao deletar: " + (data.message || "Erro desconhecido"));
+                    alert("' . __('admin.shipment_correios.js_err_delete', 'Erro ao deletar:') . ' " + (data.message || "' . __('admin.shipment_correios.js_unknown_error', 'Erro desconhecido') . '"));
                 }
             })
-            .catch(() => alert("Erro ao deletar etiqueta"));
+            .catch(() => alert("' . __('admin.shipment_correios.js_err_delete_short', 'Erro ao deletar etiqueta') . '"));
         }
     </script>
 </body>
@@ -1145,7 +1145,7 @@ class AdminRemessaCorreiosController extends Controller {
 
             $ids = $payload['remessas'] ?? $payload['pedidos'] ?? [];
             if (!is_array($ids) || empty($ids)) {
-                echo json_encode(['success' => false, 'message' => 'Nenhum pedido selecionado']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipment_correios.no_order_selected', 'Nenhum pedido selecionado')]);
                 exit;
             }
 
@@ -1167,17 +1167,17 @@ class AdminRemessaCorreiosController extends Controller {
                         $this->connection->rollBack();
                     } catch (\Exception $e2) {
                     }
-                    $erros[] = 'Pedido #' . $pid . ': ' . $e->getMessage();
+                    $erros[] = __('admin.shipment_correios.order', 'Pedido') . ' #' . $pid . ': ' . $e->getMessage();
                 }
             }
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Etiquetas geradas: ' . $ok,
+                'message' => __('admin.shipment_correios.labels_generated_count', 'Etiquetas geradas:') . ' ' . $ok,
                 'errors' => $erros,
             ]);
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('common.error', 'Erro') . ': ' . $e->getMessage()]);
         }
         exit;
     }
@@ -1203,12 +1203,12 @@ class AdminRemessaCorreiosController extends Controller {
             $contratoGlobal = (string) ($cfgSigep['contrato'] ?? '');
 
             // Renderizar cada etiqueta usando o template novo
-            echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Etiquetas Correios</title>';
+            echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>' . __('admin.shipment_correios.print_page_title', 'Etiquetas Correios') . '</title>';
             echo '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>';
             echo '<script src="https://cdn.jsdelivr.net/npm/bwip-js@4.3.0/dist/bwip-js-min.js"></script>';
             echo '<style>@page{size:100mm 140mm;margin:0}body{margin:0;padding:0}.page-break{page-break-after:always}@media print{.no-print{display:none!important}}</style>';
             echo '</head><body>';
-            echo '<button class="no-print" style="position:fixed;top:10px;right:10px;background:#003087;color:#fff;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;z-index:9999" onclick="window.print()">🖨 Imprimir Todas</button>';
+            echo '<button class="no-print" style="position:fixed;top:10px;right:10px;background:#003087;color:#fff;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;z-index:9999" onclick="window.print()">🖨 ' . __('admin.shipment_correios.print_all', 'Imprimir Todas') . '</button>';
 
             $idx = 0;
             foreach ($etiquetas as $etiqueta) {
@@ -1299,7 +1299,7 @@ class AdminRemessaCorreiosController extends Controller {
 
             echo '<script>setTimeout(function(){ window.print(); }, 1000);</script></body></html>';
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<div class="alert alert-danger">' . __('common.error', 'Erro') . ': ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
         exit;
     }
@@ -1313,28 +1313,28 @@ class AdminRemessaCorreiosController extends Controller {
             $stmt->execute([$etiquetaId]);
             $codigo = (string) ($stmt->fetchColumn() ?: '');
             if ($codigo === '') {
-                echo '<div class="alert alert-danger">Etiqueta não encontrada</div>';
+                echo '<div class="alert alert-danger">' . __('admin.shipment_correios.label_not_found', 'Etiqueta não encontrada') . '</div>';
                 exit;
             }
 
             $url = 'https://rastreamento.correios.com.br/app/index.php?objeto=' . urlencode($codigo);
             header('Location: ' . $url);
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<div class="alert alert-danger">' . __('common.error', 'Erro') . ': ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
         exit;
     }
 
     private function criarEtiquetaCorreiosParaPedido(int $pedidoId): array {
         if ($pedidoId <= 0) {
-            throw new \Exception('Pedido inválido');
+            throw new \Exception(__('admin.shipment_correios.invalid_order', 'Pedido inválido'));
         }
 
         $stmtExiste = $this->connection->prepare('SELECT id, codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? LIMIT 1');
         $stmtExiste->execute([$pedidoId]);
         $rowExiste = $stmtExiste->fetch(\PDO::FETCH_ASSOC);
         if (is_array($rowExiste) && !empty($rowExiste['id'])) {
-            throw new \Exception('Já existe etiqueta Correios para este pedido');
+            throw new \Exception(__('admin.shipment_correios.label_exists', 'Já existe etiqueta Correios para este pedido'));
         }
 
         $pedidoModel = new PedidoEcommerce();
@@ -1346,7 +1346,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         if (!is_array($pedido) || empty($pedido['id'])) {
-            throw new \Exception('Pedido não encontrado');
+            throw new \Exception(__('admin.shipment_correios.order_not_found', 'Pedido não encontrado'));
         }
 
         $cfgSigep = $this->getSigepConfig();
@@ -1383,7 +1383,7 @@ class AdminRemessaCorreiosController extends Controller {
                 }
             }
             if (trim($token) === '') {
-                throw new \Exception('Pré-Postagem: configure o token (Cartão de Postagem) no Admin');
+                throw new \Exception(__('admin.shipment_correios.err_prepost_token', 'Pré-Postagem: configure o token (Cartão de Postagem) no Admin'));
             }
             $baseUrl = $this->getPrepostagemBaseUrl((string) ($cfgProvider['ambiente'] ?? 'homologacao'));
             $svc = new CorreiosPrepostagemService($baseUrl, $token);
@@ -1405,9 +1405,9 @@ class AdminRemessaCorreiosController extends Controller {
                 }
             }
             if (empty($r['success'])) {
-                $prepostagemErr = (string) ($r['error'] ?? 'Falha ao criar pré-postagem');
+                $prepostagemErr = (string) ($r['error'] ?? __('admin.shipment_correios.err_prepost_create', 'Falha ao criar pré-postagem'));
                 $prepostagemResp = $r['raw'] ?? $r;
-                throw new \Exception('Pré-Postagem falhou ao criar: ' . $prepostagemErr);
+                throw new \Exception(__('admin.shipment_correios.err_prepost_create_failed', 'Pré-Postagem falhou ao criar:') . ' ' . $prepostagemErr);
             }
             $prepostagemResp = $r['data'] ?? null;
 
@@ -1415,7 +1415,7 @@ class AdminRemessaCorreiosController extends Controller {
             $codigoEtiqueta = is_array($prepostagemResp) ? ((string) ($prepostagemResp['codigoObjeto'] ?? '')) : '';
             $codigoEtiqueta = $this->normalizarEtiquetaCorreios($codigoEtiqueta);
             if ($codigoEtiqueta === '') {
-                throw new \Exception('Pré-Postagem: resposta sem codigoObjeto');
+                throw new \Exception(__('admin.shipment_correios.err_prepost_no_code', 'Pré-Postagem: resposta sem codigoObjeto'));
             }
 
             // solicitar rótulo assíncrono (best-effort)
@@ -1442,12 +1442,12 @@ class AdminRemessaCorreiosController extends Controller {
             }
         } else {
             if (empty($cfgSigep['enabled'])) {
-                throw new \Exception('SIGEP está desabilitado. Habilite e configure em /admin/configuracoes > Entrega > Correios (SIGEP Web).');
+                throw new \Exception(__('admin.shipment_correios.err_sigep_disabled', 'SIGEP está desabilitado. Habilite e configure em /admin/configuracoes > Entrega > Correios (SIGEP Web).'));
             }
 
             $hasMin = !empty($cfgSigep['usuario']) && !empty($cfgSigep['senha']) && !empty($cfgSigep['contrato']) && !empty($cfgSigep['cartao']) && !empty($cfgSigep['servico_codigo']);
             if (!$hasMin) {
-                throw new \Exception('SIGEP: configuração incompleta. Preencha usuário, senha, contrato, cartão de postagem e código do serviço.');
+                throw new \Exception(__('admin.shipment_correios.err_sigep_incomplete', 'SIGEP: configuração incompleta. Preencha usuário, senha, contrato, cartão de postagem e código do serviço.'));
             }
 
             $sigepUsed = 1;
@@ -1469,13 +1469,13 @@ class AdminRemessaCorreiosController extends Controller {
                 $sigepDv = $packed['dv'] ?? null;
             } catch (\Exception $e) {
                 $sigepErr = $e->getMessage();
-                throw new \Exception('SIGEP falhou ao gerar etiqueta: ' . $sigepErr);
+                throw new \Exception(__('admin.shipment_correios.err_sigep_generate', 'SIGEP falhou ao gerar etiqueta:') . ' ' . $sigepErr);
             }
         }
 
         $codigoEtiqueta = $this->normalizarEtiquetaCorreios($codigoEtiqueta);
         if (!preg_match('/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/', $codigoEtiqueta)) {
-            throw new \Exception('Correios retornou uma etiqueta em formato inválido: ' . $codigoEtiqueta);
+            throw new \Exception(__('admin.shipment_correios.err_invalid_label_format', 'Correios retornou uma etiqueta em formato inválido:') . ' ' . $codigoEtiqueta);
         }
 
         $cols = ['pedido_id', 'codigo_etiqueta', 'dados_remetente', 'dados_destinatario', 'status', 'created_at'];
@@ -1743,14 +1743,14 @@ class AdminRemessaCorreiosController extends Controller {
             
             echo json_encode([
                 'success' => true, 
-                'message' => 'Etiqueta gerada com sucesso!',
+                'message' => __('admin.shipment_correios.label_generated_success', 'Etiqueta gerada com sucesso!'),
                 'etiqueta_id' => $etiquetaId,
                 'codigo_etiqueta' => $codigoEtiqueta
             ]);
             
         } catch (\Exception $e) {
             $this->connection->rollBack();
-            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('common.error', 'Erro') . ': ' . $e->getMessage()]);
         }
         exit;
     }
@@ -1773,13 +1773,13 @@ class AdminRemessaCorreiosController extends Controller {
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Etiqueta regerada com sucesso!',
+                'message' => __('admin.shipment_correios.label_regenerated_success', 'Etiqueta regerada com sucesso!'),
                 'etiqueta_id' => (int) ($r['etiqueta_id'] ?? 0),
                 'codigo_etiqueta' => (string) ($r['codigo_etiqueta'] ?? ''),
             ]);
         } catch (\Exception $e) {
             try { $this->connection->rollBack(); } catch (\Exception $e2) {}
-            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('common.error', 'Erro') . ': ' . $e->getMessage()]);
         }
         exit;
     }
@@ -1790,7 +1790,7 @@ class AdminRemessaCorreiosController extends Controller {
         $etiquetaId = (int) $request->getParam('id');
 
         if ($etiquetaId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'ID da etiqueta inválido']);
+            echo json_encode(['success' => false, 'message' => __('admin.shipment_correios.invalid_label_id', 'ID da etiqueta inválido')]);
             exit;
         }
 
@@ -1801,13 +1801,13 @@ class AdminRemessaCorreiosController extends Controller {
             $etiqueta = $st->fetch(\PDO::FETCH_ASSOC);
 
             if (!$etiqueta) {
-                echo json_encode(['success' => false, 'message' => 'Etiqueta não encontrada']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipment_correios.label_not_found', 'Etiqueta não encontrada')]);
                 exit;
             }
 
             // Não permitir deletar etiquetas já postadas
             if (strtolower(trim((string) ($etiqueta['status'] ?? ''))) === 'postada') {
-                echo json_encode(['success' => false, 'message' => 'Não é possível deletar uma etiqueta já postada']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipment_correios.cannot_delete_posted', 'Não é possível deletar uma etiqueta já postada')]);
                 exit;
             }
 
@@ -1815,9 +1815,9 @@ class AdminRemessaCorreiosController extends Controller {
             $stDel = $this->connection->prepare('DELETE FROM correios_etiquetas WHERE id = ?');
             $stDel->execute([$etiquetaId]);
 
-            echo json_encode(['success' => true, 'message' => 'Etiqueta deletada com sucesso']);
+            echo json_encode(['success' => true, 'message' => __('admin.shipment_correios.label_deleted_success', 'Etiqueta deletada com sucesso')]);
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('common.error', 'Erro') . ': ' . $e->getMessage()]);
         }
         exit;
     }
@@ -1998,10 +1998,10 @@ class AdminRemessaCorreiosController extends Controller {
             } catch (\Exception $e) {
             }
             
-            echo json_encode(['success' => true, 'message' => 'Postagem confirmada com sucesso!']);
+            echo json_encode(['success' => true, 'message' => __('admin.shipment_correios.posting_confirmed_success', 'Postagem confirmada com sucesso!')]);
             
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('common.error', 'Erro') . ': ' . $e->getMessage()]);
         }
         exit;
     }

@@ -244,12 +244,12 @@ class AdminComissoesGlobalController
 
         echo '<div class="pt-3">';
         echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
-        echo '<h1 class="page-title">Comissões - Visão Global</h1>';
+        echo '<h1 class="page-title">' . __('admin.commissions_global.title', 'Comissões - Visão Global') . '</h1>';
         echo '</div>';
 
         echo '<div class="alert alert-light border mb-4 small">';
-        echo '<strong>Fórmula:</strong> Bruto = total vendido (convertido para R$) | Líquido = Bruto − Custo − Impostos | Comissão = Líquido × % da faixa';
-        echo ' &nbsp;|&nbsp; <strong>Câmbio:</strong> 1 USD = R$ ' . number_format($usdToBrl, 4, ',', '.');
+        echo '<strong>' . __('admin.commissions_global.formula_label', 'Fórmula:') . '</strong> ' . __('admin.commissions_global.formula_text', 'Bruto = total vendido (convertido para R$) | Líquido = Bruto − Custo − Impostos | Comissão = Líquido × % da faixa');
+        echo ' &nbsp;|&nbsp; <strong>' . __('admin.commissions_global.exchange_label', 'Câmbio:') . '</strong> 1 USD = R$ ' . number_format($usdToBrl, 4, ',', '.');
         echo '</div>';
 
         // Filtro por período (seletor de mês)
@@ -280,40 +280,40 @@ class AdminComissoesGlobalController
 
         echo '<div class="card mb-4"><div class="card-body">';
         echo '<form method="GET" class="row g-2 align-items-end">';
-        echo '<div class="col-md-5"><label class="form-label fw-semibold">Período de comissão</label>';
+        echo '<div class="col-md-5"><label class="form-label fw-semibold">' . __('admin.commissions_global.commission_period', 'Período de comissão') . '</label>';
         echo '<select class="form-select" name="periodo" onchange="this.form.submit()">';
         foreach ($periodos as $k => $label) {
             echo '<option value="' . htmlspecialchars($k) . '"' . ($k === $periodoSel ? ' selected' : '') . '>' . htmlspecialchars($label) . '</option>';
         }
         echo '</select></div>';
-        echo '<div class="col-md-auto d-grid"><button class="btn btn-primary" type="submit"><i class="fas fa-filter me-1"></i>Filtrar</button></div>';
-        echo '<div class="col-md-auto align-self-end"><small class="text-muted">De <strong>' . date('d/m/Y', strtotime($dataInicio)) . '</strong> até <strong>' . date('d/m/Y', strtotime($dataFim)) . '</strong></small></div>';
+        echo '<div class="col-md-auto d-grid"><button class="btn btn-primary" type="submit"><i class="fas fa-filter me-1"></i>' . __('common.filter', 'Filtrar') . '</button></div>';
+        echo '<div class="col-md-auto align-self-end"><small class="text-muted">' . __('admin.commissions_global.from', 'De') . ' <strong>' . date('d/m/Y', strtotime($dataInicio)) . '</strong> ' . __('admin.commissions_global.to', 'até') . ' <strong>' . date('d/m/Y', strtotime($dataFim)) . '</strong></small></div>';
         echo '</form></div></div>';
 
         // Vendas orgânicas
         if (!empty($organico)) {
-            echo '<div class="card mb-4"><div class="card-header bg-success bg-opacity-10"><strong><i class="fas fa-leaf me-1"></i>Vendas Orgânicas (sem vendedor atribuído)</strong></div><div class="card-body">';
-            echo $organico['qtd'] . ' pedidos | Bruto: <strong>' . $this->fmt($organico['faturado'], 'BRL') . '</strong>';
-            echo ' | Custo: ' . $this->fmt($organico['custo'], 'BRL');
-            echo ' | Impostos: ' . $this->fmt($organico['impostos'], 'BRL');
-            echo ' | Líquido: <strong>' . $this->fmt($organico['liquido'], 'BRL') . '</strong>';
+            echo '<div class="card mb-4"><div class="card-header bg-success bg-opacity-10"><strong><i class="fas fa-leaf me-1"></i>' . __('admin.commissions_global.organic_sales', 'Vendas Orgânicas (sem vendedor atribuído)') . '</strong></div><div class="card-body">';
+            echo $organico['qtd'] . ' ' . __('admin.commissions_global.orders_word', 'pedidos') . ' | ' . __('admin.commissions_global.gross', 'Bruto:') . ' <strong>' . $this->fmt($organico['faturado'], 'BRL') . '</strong>';
+            echo ' | ' . __('admin.commissions_global.cost', 'Custo:') . ' ' . $this->fmt($organico['custo'], 'BRL');
+            echo ' | ' . __('admin.commissions_global.taxes', 'Impostos:') . ' ' . $this->fmt($organico['impostos'], 'BRL');
+            echo ' | ' . __('admin.commissions_global.net', 'Líquido:') . ' <strong>' . $this->fmt($organico['liquido'], 'BRL') . '</strong>';
             echo '</div></div>';
         }
 
         // Tabela por vendedor — tudo em BRL
-        echo '<div class="card mb-4"><div class="card-header"><strong>Comissões por Vendedor (Pedidos Manuais + Processamento) — valores em R$</strong></div><div class="card-body">';
+        echo '<div class="card mb-4"><div class="card-header"><strong>' . __('admin.commissions_global.by_seller_header', 'Comissões por Vendedor (Pedidos Manuais + Processamento) — valores em R$') . '</strong></div><div class="card-body">';
         echo '<div class="table-responsive"><table class="table table-hover table-sm">';
         echo '<thead><tr>'
-            . '<th>Vendedor</th>'
-            . '<th class="text-end">Pedidos</th>'
-            . '<th class="text-end">Bruto (R$)</th>'
-            . '<th class="text-end">Custo Produto</th>'
-            . '<th class="text-end">Impostos</th>'
-            . '<th class="text-end">Líquido</th>'
-            . '<th class="text-end">% Comissão</th>'
-            . '<th class="text-end">Comissão Manual</th>'
-            . '<th class="text-end">Comissão Proc.</th>'
-            . '<th class="text-end">Total Comissão</th>'
+            . '<th>' . __('admin.commissions_global.th_seller', 'Vendedor') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_orders', 'Pedidos') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_gross', 'Bruto (R$)') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_product_cost', 'Custo Produto') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_taxes', 'Impostos') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_net', 'Líquido') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_commission_pct', '% Comissão') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_manual_commission', 'Comissão Manual') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_proc_commission', 'Comissão Proc.') . '</th>'
+            . '<th class="text-end">' . __('admin.commissions_global.th_total_commission', 'Total Comissão') . '</th>'
             . '</tr></thead><tbody>';
 
         $allUids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
@@ -322,7 +322,7 @@ class AdminComissoesGlobalController
 
         foreach ($allUids as $uid) {
             if ($uid <= 0) continue;
-            $nome = $nomes[$uid] ?? ('Vendedor #' . $uid);
+            $nome = $nomes[$uid] ?? (__('admin.commissions_global.seller_label', 'Vendedor #') . $uid);
             $t = $porVendedor[$uid] ?? ['faturado' => 0.0, 'impostos' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'qtd' => 0];
             $pct        = $this->resolvePercentualPorFaixas($t['faturado'], $faixas);
             $comManual  = max(0.0, $t['liquido']) * ($pct / 100);
@@ -345,14 +345,14 @@ class AdminComissoesGlobalController
         }
 
         echo '</tbody><tfoot><tr class="table-dark">';
-        echo '<td colspan="9" class="text-end fw-bold">Total Geral</td>';
+        echo '<td colspan="9" class="text-end fw-bold">' . __('admin.commissions_global.grand_total', 'Total Geral') . '</td>';
         echo '<td class="text-end fw-bold">' . $this->fmt($grandTotal, 'BRL') . '</td>';
         echo '</tr></tfoot></table></div></div></div>';
 
         echo '</div>';
         $content = ob_get_clean();
         $sidebarActive = 'comissoes-global';
-        $title = 'Comissões Global - Admin';
+        $title = __('admin.commissions_global.page_title', 'Comissões Global - Admin');
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -463,35 +463,35 @@ class AdminComissoesGlobalController
 
         echo '<div class="pt-3">';
         echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
-        echo '<h1 class="page-title">Resumo Financeiro Global</h1>';
+        echo '<h1 class="page-title">' . __('admin.commissions_global.summary_title', 'Resumo Financeiro Global') . '</h1>';
         echo '</div>';
 
         // Filtros
         echo '<div class="card mb-4"><div class="card-body">';
         echo '<form method="GET" class="row g-2 align-items-end">';
-        echo '<div class="col-md-2"><label class="form-label">Data início</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>';
-        echo '<div class="col-md-2"><label class="form-label">Data fim</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>';
-        echo '<div class="col-md-2"><label class="form-label">Status</label><input type="text" class="form-control" name="status" value="' . htmlspecialchars($status) . '" placeholder="ex: pago"></div>';
-        echo '<div class="col-md-2"><label class="form-label">Moeda</label><select class="form-select" name="moeda">';
-        echo '<option value="">Todas</option>';
+        echo '<div class="col-md-2"><label class="form-label">' . __('admin.commissions_global.start_date', 'Data início') . '</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>';
+        echo '<div class="col-md-2"><label class="form-label">' . __('admin.commissions_global.end_date', 'Data fim') . '</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>';
+        echo '<div class="col-md-2"><label class="form-label">' . __('common.status', 'Status') . '</label><input type="text" class="form-control" name="status" value="' . htmlspecialchars($status) . '" placeholder="' . htmlspecialchars(__('admin.commissions_global.status_placeholder', 'ex: pago'), ENT_QUOTES, 'UTF-8') . '"></div>';
+        echo '<div class="col-md-2"><label class="form-label">' . __('admin.commissions_global.currency', 'Moeda') . '</label><select class="form-select" name="moeda">';
+        echo '<option value="">' . __('admin.commissions_global.all_currencies', 'Todas') . '</option>';
         echo '<option value="USD"' . ($moedaFiltro === 'USD' ? ' selected' : '') . '>USD</option>';
         echo '<option value="BRL"' . ($moedaFiltro === 'BRL' ? ' selected' : '') . '>BRL</option>';
         echo '</select></div>';
-        echo '<div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>';
+        echo '<div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">' . __('common.filter', 'Filtrar') . '</button></div>';
         echo '</form></div></div>';
 
         // Cards de resumo por moeda
         foreach ($totais as $m => $t) {
             $lucro = $t['total'] - $t['impostos'] - $t['taxa_servico'] - $t['custo_produtos'] - $t['frete'];
-            echo '<div class="card mb-3"><div class="card-header"><strong>' . htmlspecialchars($m) . ' - ' . $t['qtd'] . ' pedidos</strong></div>';
+            echo '<div class="card mb-3"><div class="card-header"><strong>' . htmlspecialchars($m) . ' - ' . $t['qtd'] . ' ' . __('admin.commissions_global.orders_word', 'pedidos') . '</strong></div>';
             echo '<div class="card-body"><div class="row g-3">';
             $cards = [
-                ['Total Arrecadado', $t['total'], 'fas fa-dollar-sign', 'primary'],
-                ['Subtotal Produtos', $t['subtotal_produtos'], 'fas fa-box', 'info'],
-                ['Impostos', $t['impostos'], 'fas fa-landmark', 'warning'],
-                ['Taxa de Serviço', $t['taxa_servico'], 'fas fa-concierge-bell', 'secondary'],
-                ['Frete', $t['frete'], 'fas fa-truck', 'dark'],
-                ['Custo Produtos (USD)', $t['custo_produtos'], 'fas fa-coins', 'danger'],
+                [__('admin.commissions_global.card_total_collected', 'Total Arrecadado'), $t['total'], 'fas fa-dollar-sign', 'primary'],
+                [__('admin.commissions_global.card_subtotal_products', 'Subtotal Produtos'), $t['subtotal_produtos'], 'fas fa-box', 'info'],
+                [__('admin.commissions_global.card_taxes', 'Impostos'), $t['impostos'], 'fas fa-landmark', 'warning'],
+                [__('admin.commissions_global.card_service_fee', 'Taxa de Serviço'), $t['taxa_servico'], 'fas fa-concierge-bell', 'secondary'],
+                [__('admin.commissions_global.card_shipping', 'Frete'), $t['frete'], 'fas fa-truck', 'dark'],
+                [__('admin.commissions_global.card_product_cost_usd', 'Custo Produtos (USD)'), $t['custo_produtos'], 'fas fa-coins', 'danger'],
             ];
             foreach ($cards as $c) {
                 echo '<div class="col-md-2"><div class="border rounded p-3 text-center">';
@@ -503,14 +503,14 @@ class AdminComissoesGlobalController
         }
 
         if (empty($totais)) {
-            echo '<div class="alert alert-info">Nenhum pedido encontrado com os filtros selecionados.</div>';
+            echo '<div class="alert alert-info">' . __('admin.commissions_global.no_orders_filters', 'Nenhum pedido encontrado com os filtros selecionados.') . '</div>';
         }
 
         // Tabela detalhada
         if (!empty($pedidosOut)) {
-            echo '<div class="card mb-4"><div class="card-header"><strong>Detalhamento por Pedido</strong></div><div class="card-body">';
+            echo '<div class="card mb-4"><div class="card-header"><strong>' . __('admin.commissions_global.detail_by_order', 'Detalhamento por Pedido') . '</strong></div><div class="card-body">';
             echo '<div class="table-responsive"><table class="table table-sm table-hover">';
-            echo '<thead><tr><th>ID</th><th>Código</th><th>Status</th><th>Data</th><th>Moeda</th><th class="text-end">Total</th><th class="text-end">Subtotal Prod.</th><th class="text-end">Impostos</th><th class="text-end">Taxa Serviço</th><th class="text-end">Frete</th><th class="text-end">Custo Prod.</th></tr></thead><tbody>';
+            echo '<thead><tr><th>ID</th><th>' . __('admin.commissions_global.th_code', 'Código') . '</th><th>' . __('common.status', 'Status') . '</th><th>' . __('admin.commissions_global.th_date', 'Data') . '</th><th>' . __('admin.commissions_global.th_currency', 'Moeda') . '</th><th class="text-end">' . __('common.total', 'Total') . '</th><th class="text-end">' . __('admin.commissions_global.th_subtotal_prod', 'Subtotal Prod.') . '</th><th class="text-end">' . __('admin.commissions_global.th_taxes', 'Impostos') . '</th><th class="text-end">' . __('admin.commissions_global.th_service_fee_short', 'Taxa Serviço') . '</th><th class="text-end">' . __('admin.commissions_global.card_shipping', 'Frete') . '</th><th class="text-end">' . __('admin.commissions_global.th_cost_prod', 'Custo Prod.') . '</th></tr></thead><tbody>';
             foreach ($pedidosOut as $r) {
                 $m = $r['moeda'];
                 echo '<tr>';
@@ -533,7 +533,7 @@ class AdminComissoesGlobalController
         echo '</div>';
         $content = ob_get_clean();
         $sidebarActive = 'resumo-financeiro';
-        $title = 'Resumo Financeiro - Admin';
+        $title = __('admin.commissions_global.summary_page_title', 'Resumo Financeiro - Admin');
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
