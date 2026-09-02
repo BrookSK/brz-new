@@ -172,7 +172,7 @@
 
                 <div class="text-end mb-4">
                     <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="fas fa-save me-2"></i>Salvar Configurações
+                        <i class="fas fa-save me-2"></i><?= __('admin.copilot.save_settings','Salvar Configurações') ?>
                     </button>
                 </div>
 

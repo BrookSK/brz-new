@@ -314,7 +314,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                                 <th><?= __('admin.orders_wp.details.table.product', 'Produto') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.sku', 'SKU') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.ncm', 'NCM') ?></th>
-                                <th>Peso (kg)</th>
+                                <th><?= __('admin.orders_wp.details.table.weight_kg', 'Peso (kg)') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.qty', 'Qtd') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.unit_price', 'Unitário') ?></th>
                                 <?php if ($source === 'red'): ?>

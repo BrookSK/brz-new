@@ -1,8 +1,8 @@
 <?php ob_start(); ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Nova Fatura CN38 (Pacotes WP)</h1>
-        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress?action=faturas"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <h1 class="page-title"><?= __('admin.wp_packages.new_invoice_title', 'Nova Fatura CN38 (Pacotes WP)') ?></h1>
+        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress?action=faturas"><i class="fas fa-arrow-left me-1"></i><?= __('admin.wp_packages.back', 'Voltar') ?></a>
     </div>
 
     <div class="alert alert-danger" id="faturaError" style="display:none;"></div>
