@@ -7219,4 +7219,9 @@ return [
     'admin.products_new.outlet_help' => 'If active, the product appears on the Braziliana Outlet page.',
     'admin.products_new.label_local_tax' => 'Local Tax (%)',
     'admin.products_new.local_tax_help' => 'Local tax percentage charged on this product (e.g., US sales tax). Works like the purchase group\'s local tax.',
+
+    // ===== Group keys (auto EN) =====
+    'admin.products_new.save_first_hint' => 'To register variations (color/size, etc.), first save the product. Then go to <strong>Edit</strong> and use the <strong>Variations</strong> section.',
+    'admin.products_new.label_name_simple' => 'Name',
+    'admin.products_new.label_sku_simple' => 'SKU',
 ];

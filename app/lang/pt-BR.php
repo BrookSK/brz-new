@@ -5245,4 +5245,9 @@ return [
     'admin.products_new.outlet_help' => 'Se ativo, o produto aparece na página Braziliana Outlet.',
     'admin.products_new.label_local_tax' => 'Imposto Local (%)',
     'admin.products_new.local_tax_help' => 'Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.',
+
+    // ===== Group keys (auto PT) =====
+    'admin.products_new.save_first_hint' => 'Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.',
+    'admin.products_new.label_name_simple' => 'Nome',
+    'admin.products_new.label_sku_simple' => 'SKU',
 ];

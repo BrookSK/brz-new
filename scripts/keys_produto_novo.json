@@ -1,7 +1,7 @@
 [
-  { "key": "admin.products_new.variations_hint", "en": "To register variations (color/size, etc.), first save the product. Then go to <strong>Edit</strong> and use the <strong>Variations</strong> section.", "pt": "Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>." },
-  { "key": "admin.products_new.label_name", "en": "Name", "pt": "Nome" },
-  { "key": "admin.products_new.label_sku", "en": "SKU", "pt": "SKU" },
+  { "key": "admin.products_new.save_first_hint", "en": "To register variations (color/size, etc.), first save the product. Then go to <strong>Edit</strong> and use the <strong>Variations</strong> section.", "pt": "Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>." },
+  { "key": "admin.products_new.label_name_simple", "en": "Name", "pt": "Nome" },
+  { "key": "admin.products_new.label_sku_simple", "en": "SKU", "pt": "SKU" },
   { "key": "admin.products_new.search_store", "en": "Search store...", "pt": "Pesquisar loja..." },
   { "key": "admin.products_new.select_placeholder", "en": "Select...", "pt": "Selecione..." },
   { "key": "admin.products_new.store_help", "en": "Select the store where this product is available", "pt": "Selecione a loja onde este produto está disponível" },

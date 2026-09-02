@@ -5057,9 +5057,9 @@ JS;
         // Strings traduzidas (heredoc nao permite chamar funcoes, entao pre-calculamos)
         $tNewProduct   = __('admin.products_new.title', 'Novo Produto');
         $tBack         = __('admin.products_new.back', 'Voltar');
-        $tVariationsHint = __('admin.products_new.variations_hint', 'Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.');
-        $tName         = __('admin.products_new.label_name', 'Nome');
-        $tSku          = __('admin.products_new.label_sku', 'SKU');
+        $tVariationsHint = __('admin.products_new.save_first_hint', 'Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.');
+        $tName         = __('admin.products_new.label_name_simple', 'Nome');
+        $tSku          = __('admin.products_new.label_sku_simple', 'SKU');
         $tStore        = __('admin.products_new.label_store', 'Loja');
         $tSearchStore  = __('admin.products_new.search_store', 'Pesquisar loja...');
         $tSelect       = __('admin.products_new.select_placeholder', 'Selecione...');
