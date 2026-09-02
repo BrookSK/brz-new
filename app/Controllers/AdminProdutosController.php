@@ -5054,17 +5054,64 @@ JS;
         $lojas = $this->fetchLojasSafe();
         $ncmOptions = $this->getNcmOptions();
 
+        // Strings traduzidas (heredoc nao permite chamar funcoes, entao pre-calculamos)
+        $tNewProduct   = __('admin.products_new.title', 'Novo Produto');
+        $tBack         = __('admin.products_new.back', 'Voltar');
+        $tVariationsHint = __('admin.products_new.variations_hint', 'Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.');
+        $tName         = __('admin.products_new.label_name', 'Nome');
+        $tSku          = __('admin.products_new.label_sku', 'SKU');
+        $tStore        = __('admin.products_new.label_store', 'Loja');
+        $tSearchStore  = __('admin.products_new.search_store', 'Pesquisar loja...');
+        $tSelect       = __('admin.products_new.select_placeholder', 'Selecione...');
+        $tStoreHelp    = __('admin.products_new.store_help', 'Selecione a loja onde este produto está disponível');
+        $tNcm          = __('admin.products_new.label_ncm', 'NCM');
+        $tSearchNcm    = __('admin.products_new.search_ncm', 'Pesquisar NCM...');
+        $tOptional     = __('admin.products_new.optional', 'Opcional');
+        $tShortDesc    = __('admin.products_new.label_short_description', 'Descrição Curta');
+        $tFullDesc     = __('admin.products_new.label_full_description', 'Descrição Completa');
+        $tCategory     = __('admin.products_new.label_category', 'Categoria');
+        $tCoverPhoto   = __('admin.products_new.label_cover_photo', 'Foto de Capa');
+        $tGallery      = __('admin.products_new.label_gallery_simple', 'Galeria de Fotos');
+        $tPrice        = __('admin.products_new.label_price', 'Preço (USD)');
+        $tCostPrice    = __('admin.products_new.label_cost_price', 'Preço de Custo (USD)');
+        $tSalePrice    = __('admin.products_new.label_sale_price_usd', 'Preço Promocional (USD)');
+        $tPromoDeadline = __('admin.products_new.label_promo_deadline', 'Data Limite da Promoção');
+        $tPromoDeadlineHelp = __('admin.products_new.promo_deadline_help', 'Após essa data, o preço volta ao valor normal automaticamente.');
+        $tWeight       = __('admin.products_new.label_weight', 'Peso (kg)');
+        $tStock        = __('admin.products_new.label_stock', 'Estoque');
+        $tMinStock     = __('admin.products_new.label_min_stock', 'Estoque Mínimo');
+        $tStatus       = __('admin.products_new.label_status', 'Status');
+        $tStatusDraft  = __('admin.products_new.status_draft', 'Rascunho');
+        $tStatusPublished = __('admin.products_new.status_published', 'Publicado');
+        $tStatusArchived = __('admin.products_new.status_archived', 'Arquivado');
+        $tActive       = __('admin.products_new.label_active', 'Ativo');
+        $tActiveOn     = __('admin.products_new.active_yes', 'Ativo');
+        $tActiveOff    = __('admin.products_new.active_no', 'Inativo');
+        $tFeatured     = __('admin.products_new.label_featured', 'Destaque');
+        $tClubActive   = __('admin.products_new.label_club_active', 'Clube Ativo');
+        $tEligibleFree = __('admin.products_new.label_eligible_free', 'Elegível para Oferta Gratuita');
+        $tEligibleFreeHelp = __('admin.products_new.eligible_free_help', 'Se ativo, este produto poderá ser oferecido gratuitamente no carrinho');
+        $tHideSite     = __('admin.products_new.label_hide_site', 'Ocultar em todo o site');
+        $tHideSiteHelp = __('admin.products_new.hide_site_help_full', 'Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.');
+        $tOutlet       = __('admin.products_new.label_outlet', 'Braziliana Outlet');
+        $tOutletHelp   = __('admin.products_new.outlet_help', 'Se ativo, o produto aparece na página Braziliana Outlet.');
+        $tLocalTax     = __('admin.products_new.label_local_tax', 'Imposto Local (%)');
+        $tLocalTaxHelp = __('admin.products_new.local_tax_help', 'Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.');
+        $tYes          = __('admin.products_new.yes', 'Sim');
+        $tNo           = __('admin.products_new.no', 'Não');
+        $tSave         = __('common.save', 'Salvar');
+
         ob_start();
 
         echo <<<HTML
                 <div class="pt-3">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
-                    <h1 class="page-title">Novo Produto</h1>
-                    <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <h1 class="page-title">{$tNewProduct}</h1>
+                    <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> {$tBack}</a>
                 </div>
 
                 <div class="alert alert-info">
-                    Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.
+                    {$tVariationsHint}
                 </div>
                 
                 <form method="POST" action="/admin/produtos/salvar" enctype="multipart/form-data">
@@ -5073,18 +5120,18 @@ JS;
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Nome *</label>
+                                        <label class="form-label">{$tName} *</label>
                                         <input type="text" class="form-control" name="name" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">SKU</label>
+                                        <label class="form-label">{$tSku}</label>
                                         <input type="text" class="form-control" name="sku">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Loja *</label>
-                                        <input type="text" class="form-control mb-2" id="lojaSearch" placeholder="Pesquisar loja...">
+                                        <label class="form-label">{$tStore} *</label>
+                                        <input type="text" class="form-control mb-2" id="lojaSearch" placeholder="{$tSearchStore}">
                                         <select class="form-select" name="loja" id="lojaSelect" required>
-                                            <option value="">Selecione...</option>
+                                            <option value="">{$tSelect}</option>
 HTML;
 
         if (!empty($lojas)) {
@@ -5099,13 +5146,13 @@ HTML;
 
         echo <<<HTML
                                         </select>
-                                        <small class="text-muted">Selecione a loja onde este produto está disponível</small>
+                                        <small class="text-muted">{$tStoreHelp}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">NCM</label>
-                                        <input type="text" class="form-control" id="ncmSearch" placeholder="Pesquisar NCM...">
+                                        <label class="form-label">{$tNcm}</label>
+                                        <input type="text" class="form-control" id="ncmSearch" placeholder="{$tSearchNcm}">
                                         <select class="form-select mt-2" name="ncm" id="ncmSelect">
-                                            <option value="">Selecione...</option>
+                                            <option value="">{$tSelect}</option>
 HTML;
 
         foreach ($ncmOptions as $code => $label) {
@@ -5114,20 +5161,20 @@ HTML;
 
         echo <<<HTML
                                         </select>
-                                        <small class="text-muted">Opcional</small>
+                                        <small class="text-muted">{$tOptional}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Descrição Curta</label>
+                                        <label class="form-label">{$tShortDesc}</label>
                                         <textarea class="form-control" name="short_description" rows="3"></textarea>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Descrição Completa</label>
+                                        <label class="form-label">{$tFullDesc}</label>
                                         <textarea class="form-control" name="description" rows="5"></textarea>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Categoria</label>
+                                        <label class="form-label">{$tCategory}</label>
                                         <select class="form-select" name="category_id">
-                                            <option value="">Selecione...</option>
+                                            <option value="">{$tSelect}</option>
 HTML;
 
         foreach ($categorias as $cat) {
@@ -5139,12 +5186,12 @@ HTML;
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Foto de Capa</label>
+                                        <label class="form-label">{$tCoverPhoto}</label>
                                         <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
                                         <div id="capaPreview" class="row mt-3"></div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Galeria de Fotos</label>
+                                        <label class="form-label">{$tGallery}</label>
                                         <input type="file" class="form-control" name="imagens[]" multiple accept="image/*" id="imagensInput">
                                         <div id="imagePreview" class="row mt-3"></div>
                                     </div>
@@ -5155,106 +5202,106 @@ HTML;
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Preço (USD) *</label>
+                                        <label class="form-label">{$tPrice} *</label>
                                         <div class="input-group">
                                             <span class="input-group-text">$</span>
                                             <input type="text" class="form-control" name="price" required>
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Preço de Custo (USD)</label>
+                                        <label class="form-label">{$tCostPrice}</label>
                                         <div class="input-group">
                                             <span class="input-group-text">$</span>
                                             <input type="text" class="form-control" name="cost_price">
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Preço Promocional (USD)</label>
+                                        <label class="form-label">{$tSalePrice}</label>
                                         <div class="input-group">
                                             <span class="input-group-text">$</span>
                                             <input type="text" class="form-control" name="sale_price">
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Data Limite da Promoção <span class="text-muted small">Opcional</span></label>
+                                        <label class="form-label">{$tPromoDeadline} <span class="text-muted small">{$tOptional}</span></label>
                                         <input type="datetime-local" class="form-control" name="sale_price_expires">
-                                        <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
+                                        <small class="text-muted">{$tPromoDeadlineHelp}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Peso (kg)</label>
+                                        <label class="form-label">{$tWeight}</label>
                                         <input type="text" class="form-control" name="weight">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Estoque</label>
+                                        <label class="form-label">{$tStock}</label>
                                         <input type="number" class="form-control" name="stock">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Estoque Mínimo</label>
+                                        <label class="form-label">{$tMinStock}</label>
                                         <input type="number" class="form-control" name="min_stock">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Status</label>
+                                        <label class="form-label">{$tStatus}</label>
                                         <select class="form-select" name="status">
-                                            <option value="draft">Rascunho</option>
-                                            <option value="published" selected>Publicado</option>
-                                            <option value="archived">Arquivado</option>
+                                            <option value="draft">{$tStatusDraft}</option>
+                                            <option value="published" selected>{$tStatusPublished}</option>
+                                            <option value="archived">{$tStatusArchived}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Ativo</label>
+                                        <label class="form-label">{$tActive}</label>
                                         <select class="form-select" name="active">
-                                            <option value="1" selected>Ativo</option>
-                                            <option value="0">Inativo</option>
+                                            <option value="1" selected>{$tActiveOn}</option>
+                                            <option value="0">{$tActiveOff}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Destaque</label>
+                                        <label class="form-label">{$tFeatured}</label>
                                         <select class="form-select" name="featured">
-                                            <option value="0" selected>Não</option>
-                                            <option value="1">Sim</option>
+                                            <option value="0" selected>{$tNo}</option>
+                                            <option value="1">{$tYes}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Clube Ativo</label>
+                                        <label class="form-label">{$tClubActive}</label>
                                         <select class="form-select" name="clube_ativo">
-                                            <option value="0" selected>Não</option>
-                                            <option value="1">Sim</option>
+                                            <option value="0" selected>{$tNo}</option>
+                                            <option value="1">{$tYes}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Elegível para Oferta Gratuita</label>
+                                        <label class="form-label">{$tEligibleFree}</label>
                                         <select class="form-select" name="elegivel_oferta_gratis">
-                                            <option value="0" selected>Não</option>
-                                            <option value="1">Sim</option>
+                                            <option value="0" selected>{$tNo}</option>
+                                            <option value="1">{$tYes}</option>
                                         </select>
-                                        <small class="text-muted">Se ativo, este produto poderá ser oferecido gratuitamente no carrinho</small>
+                                        <small class="text-muted">{$tEligibleFreeHelp}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Ocultar em todo o site</label>
+                                        <label class="form-label">{$tHideSite}</label>
                                         <select class="form-select" name="oculto">
-                                            <option value="0" selected>Não</option>
-                                            <option value="1">Sim</option>
+                                            <option value="0" selected>{$tNo}</option>
+                                            <option value="1">{$tYes}</option>
                                         </select>
-                                        <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
+                                        <small class="text-muted">{$tHideSiteHelp}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Braziliana Outlet</label>
+                                        <label class="form-label">{$tOutlet}</label>
                                         <select class="form-select" name="outlet">
-                                            <option value="0" selected>Não</option>
-                                            <option value="1">Sim</option>
+                                            <option value="0" selected>{$tNo}</option>
+                                            <option value="1">{$tYes}</option>
                                         </select>
-                                        <small class="text-muted">Se ativo, o produto aparece na página Braziliana Outlet.</small>
+                                        <small class="text-muted">{$tOutletHelp}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Imposto Local (%)</label>
+                                        <label class="form-label">{$tLocalTax}</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" name="imposto_local_percent" value="0" placeholder="Ex: 8">
                                             <span class="input-group-text">%</span>
                                         </div>
-                                        <small class="text-muted">Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.</small>
+                                        <small class="text-muted">{$tLocalTaxHelp}</small>
                                     </div>
 
-                                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
+                                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> {$tSave}</button>
                                 </div>
                             </div>
                         </div>
@@ -5358,7 +5405,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Novo Produto - Braziliana Admin';
+        $title = __('admin.products_new.page_title', 'Novo Produto - Braziliana Admin');
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
