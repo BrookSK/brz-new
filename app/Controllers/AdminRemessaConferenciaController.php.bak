@@ -1212,7 +1212,7 @@ function baixarDocumentosMassa(janelaId) {
 </div></div></div>';
         }
 
-        // Informações Úteis - inclui todos os dados de pedido_pagamentos agrupados por gateway
+        // Informações Ãšteis - inclui todos os dados de pedido_pagamentos agrupados por gateway
         echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info me-1"></i>' . __('admin.shipment_check.useful_info', 'Informações Úteis') . '</strong></div><div class="card-body">';
         $useful = [
             __('admin.shipment_check.info_order_code', 'Código do pedido')   => $pedido['codigo_pedido'] ?? $pedido['codigo'] ?? '',

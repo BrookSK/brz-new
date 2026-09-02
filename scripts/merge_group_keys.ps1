@@ -25,11 +25,24 @@ $seenEn = @{}
 $seenPt = @{}
 
 function Escape-PhpSingle($s) {
-    return ($s -replace '\\', '\\' -replace "'", "\'")
+    # Em aspas simples do PHP, apenas \ e ' precisam de escape.
+    # Newlines reais (vindos do JSON \n) sao convertidos para a sequencia
+    # literal \n (2 chars) para que JS confirm()/alert() interprete a quebra
+    # e para nao quebrar a linha 'chave' => 'valor', do dicionario.
+    $s = [string]$s
+    # Primeiro escapar a barra invertida real do PHP: mas queremos manter \n literal.
+    # Estrategia: converter CRLF/CR/LF reais em token, escapar barras/aspas, restaurar token como \n.
+    $token = [char]0x0001
+    $s = $s -replace "`r`n", $token -replace "`n", $token -replace "`r", $token
+    $s = $s -replace '\\', '\\'
+    $s = $s -replace "'", "\'"
+    $s = $s -replace $token, '\n'
+    return $s
 }
 
 foreach ($gf in $groupFiles) {
-    $data = Get-Content $gf.FullName -Raw | ConvertFrom-Json
+    $rawJson = [System.IO.File]::ReadAllText($gf.FullName, [System.Text.Encoding]::UTF8)
+    $data = $rawJson | ConvertFrom-Json
     foreach ($item in $data) {
         $k = $item.key
         if (-not $k) { continue }
