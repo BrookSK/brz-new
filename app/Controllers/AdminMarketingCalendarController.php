@@ -441,16 +441,16 @@ class AdminMarketingCalendarController extends Controller {
                 ['date' => "{$year}-12-25", 'name' => "Christmas", 'emoji' => '🎄'],
             ],
             'brazil' => [
-                ['date' => "{$year}-02-28", 'name' => "Carnaval", 'emoji' => '🎭'],
-                ['date' => "{$year}-03-08", 'name' => "Dia da Mulher", 'emoji' => '👩'],
-                ['date' => "{$year}-03-15", 'name' => "Dia do Consumidor", 'emoji' => '🛒'],
-                ['date' => "{$year}-05-11", 'name' => "Dia das Mães", 'emoji' => '👩‍👧'],
-                ['date' => "{$year}-06-12", 'name' => "Dia dos Namorados", 'emoji' => '❤️'],
-                ['date' => "{$year}-08-10", 'name' => "Dia dos Pais", 'emoji' => '👨‍👧'],
-                ['date' => "{$year}-09-07", 'name' => "Independência do Brasil", 'emoji' => '🇧🇷'],
-                ['date' => "{$year}-10-12", 'name' => "Dia das Crianças", 'emoji' => '🧒'],
-                ['date' => "{$year}-11-28", 'name' => "Black Friday", 'emoji' => '🛍️'],
-                ['date' => "{$year}-12-25", 'name' => "Natal", 'emoji' => '🎄'],
+                ['date' => "{$year}-02-28", 'name' => __('admin.calendar.br_carnival', 'Carnaval'), 'emoji' => '🎭'],
+                ['date' => "{$year}-03-08", 'name' => __('admin.calendar.br_womens_day', 'Dia da Mulher'), 'emoji' => '👩'],
+                ['date' => "{$year}-03-15", 'name' => __('admin.calendar.br_consumer_day', 'Dia do Consumidor'), 'emoji' => '🛒'],
+                ['date' => "{$year}-05-11", 'name' => __('admin.calendar.br_mothers_day', 'Dia das Mães'), 'emoji' => '👩‍👧'],
+                ['date' => "{$year}-06-12", 'name' => __('admin.calendar.br_valentines_day', 'Dia dos Namorados'), 'emoji' => '❤️'],
+                ['date' => "{$year}-08-10", 'name' => __('admin.calendar.br_fathers_day', 'Dia dos Pais'), 'emoji' => '👨‍👧'],
+                ['date' => "{$year}-09-07", 'name' => __('admin.calendar.br_independence_day', 'Independência do Brasil'), 'emoji' => '🇧🇷'],
+                ['date' => "{$year}-10-12", 'name' => __('admin.calendar.br_childrens_day', 'Dia das Crianças'), 'emoji' => '🧒'],
+                ['date' => "{$year}-11-28", 'name' => __('admin.calendar.br_black_friday', 'Black Friday'), 'emoji' => '🛍️'],
+                ['date' => "{$year}-12-25", 'name' => __('admin.calendar.br_christmas', 'Natal'), 'emoji' => '🎄'],
             ]
         ];
     }
