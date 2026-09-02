@@ -71,6 +71,7 @@ class AdminShippoController extends Controller {
                 rate_amount DECIMAL(10,2) NULL,
                 rate_currency VARCHAR(10) DEFAULT 'USD',
                 status VARCHAR(30) DEFAULT 'gerada',
+                is_test TINYINT(1) NOT NULL DEFAULT 0,
                 last_request_json LONGTEXT NULL,
                 last_response_json LONGTEXT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -80,6 +81,15 @@ class AdminShippoController extends Controller {
                 KEY idx_shippo_etiquetas_status (status)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
             $this->connection->exec($sql);
+        } catch (\Exception $e) {
+        }
+
+        // Migração leve: garantir coluna is_test em tabelas já existentes.
+        try {
+            $cols = $this->getTableColumns('shippo_etiquetas');
+            if (!empty($cols) && !in_array('is_test', $cols, true)) {
+                $this->connection->exec("ALTER TABLE shippo_etiquetas ADD COLUMN is_test TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
+            }
         } catch (\Exception $e) {
         }
     }
@@ -196,7 +206,7 @@ class AdminShippoController extends Controller {
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             LEFT JOIN shippo_etiquetas se ON se.pedido_id = p.id
-            WHERE LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','pendente','rascunho','carrinho')
+            WHERE LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado')
               AND se.id IS NULL
               {$statusExtraFilter}
               {$paisFilter}
@@ -599,10 +609,11 @@ class AdminShippoController extends Controller {
             $stDel->execute([$id]);
 
             $stIns = $this->connection->prepare("
-                INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, last_response_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, NOW())
+                INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, is_test, last_response_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, ?, NOW())
             ");
 
+            $isTest = !empty($result['data']['test']) ? 1 : 0;
             $rateData = $result['rate'] ?? [];
             $carrier = '';
             $serviceLevel = '';
@@ -628,6 +639,7 @@ class AdminShippoController extends Controller {
                 $serviceLevel,
                 $rateAmount,
                 $rateCurrency,
+                $isTest,
                 json_encode($result['data'] ?? []),
             ]);
         } catch (\Exception $e) {
@@ -818,8 +830,8 @@ class AdminShippoController extends Controller {
                     $stDel->execute([$pid]);
 
                     $stIns = $this->connection->prepare("
-                        INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, last_response_json, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, NOW())
+                        INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, is_test, last_response_json, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, ?, NOW())
                     ");
                     $stIns->execute([
                         $pid,
@@ -833,6 +845,7 @@ class AdminShippoController extends Controller {
                         (string) ($matchedRate['servicelevel']['name'] ?? ($matchedRate['servicelevel_name'] ?? '')),
                         (float) ($matchedRate['amount'] ?? 0),
                         (string) ($matchedRate['currency'] ?? 'USD'),
+                        !empty($labelResult['data']['test']) ? 1 : 0,
                         json_encode($labelResult['data'] ?? []),
                     ]);
 
@@ -884,8 +897,8 @@ class AdminShippoController extends Controller {
                 $stDel->execute([$pid]);
 
                 $stIns = $this->connection->prepare("
-                    INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, last_response_json, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, NOW())
+                    INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, is_test, last_response_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, ?, NOW())
                 ");
                 $stIns->execute([
                     $pid,
@@ -899,6 +912,7 @@ class AdminShippoController extends Controller {
                     (string) ($cheapestRate['servicelevel']['name'] ?? ($cheapestRate['servicelevel_name'] ?? '')),
                     (float) ($cheapestRate['amount'] ?? 0),
                     (string) ($cheapestRate['currency'] ?? 'USD'),
+                    !empty($labelResult['data']['test']) ? 1 : 0,
                     json_encode($labelResult['data'] ?? []),
                 ]);
 

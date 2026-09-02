@@ -144,6 +144,12 @@
                                     $serviceLevel = (string) ($e['service_level'] ?? '');
                                     $rateAmount = (float) ($e['rate_amount'] ?? 0);
                                     $rateCurrency = (string) ($e['rate_currency'] ?? 'USD');
+                                    // Detecta etiqueta gerada em modo de teste (tracking fictício, ex.: 1ZXXXX...).
+                                    $isTest = !empty($e['is_test']);
+                                    if (!$isTest && !empty($e['last_response_json'])) {
+                                        $rj = json_decode((string) $e['last_response_json'], true);
+                                        $isTest = is_array($rj) && !empty($rj['test']);
+                                    }
                                 ?>
                                 <tr class="etiqueta-row" data-search="<?= htmlspecialchars(strtolower(($e['cliente_nome'] ?? '') . ' ' . $pid . ' ' . $trk)) ?>">
                                     <td><span class="fw-bold">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span></td>
@@ -154,6 +160,9 @@
                                                 <a href="<?= htmlspecialchars((string) $e['tracking_url']) ?>" target="_blank" class="text-primary"><?= htmlspecialchars($trk) ?></a>
                                             <?php else: ?>
                                                 <span><?= htmlspecialchars($trk) ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($isTest): ?>
+                                                <br><span class="badge bg-warning text-dark mt-1" title="<?= __('admin.shippo.test_label_hint','Etiqueta gerada em modo de teste (token shippo_test_). O rastreio é fictício. Use o token de produção para gerar etiquetas reais.') ?>"><?= __('admin.shippo.test_badge','TESTE') ?></span>
                                             <?php endif; ?>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
