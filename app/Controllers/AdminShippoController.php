@@ -14,6 +14,9 @@ class AdminShippoController extends Controller {
     private ShippoService $svc;
     private $connection;
 
+    /** @var array Diagnóstico do último funil de filtragem de pedidos. */
+    private array $lastDiag = ['caixa_fechada' => 0, 'internacionais' => 0, 'ja_com_etiqueta' => 0, 'disponiveis' => 0];
+
     public function __construct() {
         $this->svc = new ShippoService();
         $this->connection = Database::getConnection();
@@ -199,6 +202,11 @@ class AdminShippoController extends Controller {
             $statusExtraFilter .= " AND COALESCE(p.arquivado, 0) = 0";
         }
 
+        // Critério central de "caixa fechada": status produto_consolidado/consolidado.
+        $caixaFechadaWhere = "LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado')";
+        // Base = caixa fechada + exclusão de removidos/arquivados.
+        $baseWhere = $caixaFechadaWhere . $statusExtraFilter;
+
         $sql = "
             SELECT p.id AS pedido_id, {$colUserNome} AS cliente_nome, p.usuario_id, p.created_at
                    {$extraSelect},
@@ -206,9 +214,8 @@ class AdminShippoController extends Controller {
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             LEFT JOIN shippo_etiquetas se ON se.pedido_id = p.id
-            WHERE LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado')
+            WHERE {$baseWhere}
               AND se.id IS NULL
-              {$statusExtraFilter}
               {$paisFilter}
             ORDER BY p.created_at DESC
             LIMIT 200
@@ -222,6 +229,23 @@ class AdminShippoController extends Controller {
                 $r['id'] = (int) ($r['pedido_id'] ?? 0);
             }
             unset($r);
+
+            // Diagnóstico do funil (para explicar lista vazia sem acesso ao banco).
+            $this->lastDiag = ['caixa_fechada' => 0, 'internacionais' => 0, 'ja_com_etiqueta' => 0, 'disponiveis' => count($rows)];
+            try {
+                // 1) Total em caixa fechada (sem exigir internacional nem ausência de etiqueta).
+                $stCf = $this->connection->query("SELECT COUNT(*) FROM pedidos p WHERE {$caixaFechadaWhere}");
+                $this->lastDiag['caixa_fechada'] = (int) ($stCf ? $stCf->fetchColumn() : 0);
+            } catch (\Exception $e) {}
+            try {
+                // 2) Caixa fechada + internacional (ignora se já tem etiqueta).
+                $stIntl = $this->connection->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$baseWhere} {$paisFilter}");
+                $stIntl->execute();
+                $this->lastDiag['internacionais'] = (int) $stIntl->fetchColumn();
+            } catch (\Exception $e) {}
+            // 3) Quantos internacionais já têm etiqueta = internacionais - disponíveis.
+            $this->lastDiag['ja_com_etiqueta'] = max(0, $this->lastDiag['internacionais'] - $this->lastDiag['disponiveis']);
+
             return $rows;
         } catch (\Exception $e) {
             error_log('[SHIPPO] getPedidosSemEtiqueta error: ' . $e->getMessage());
@@ -422,6 +446,7 @@ class AdminShippoController extends Controller {
         $this->view('admin/shippo', [
             'pedidos' => $pedidos,
             'etiquetas' => $etiquetas,
+            'diag' => $this->lastDiag,
             'sidebarActive' => 'shippo',
         ]);
     }
