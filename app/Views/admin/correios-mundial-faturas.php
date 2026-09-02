@@ -1,10 +1,10 @@
 <?php ob_start(); ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Correios Mundial (PACKET) - Faturas (CN38)</h1>
+        <h1 class="page-title"><?= __('admin.correios_mundial.invoices_title','Correios Mundial (PACKET) - Faturas (CN38)') ?></h1>
         <div>
-            <a class="btn btn-sm btn-outline-secondary" href="/admin/correios-mundial">Voltar</a>
-            <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/faturas/nova">Nova fatura</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/admin/correios-mundial"><?= __('admin.correios_mundial.back','Voltar') ?></a>
+            <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/faturas/nova"><?= __('admin.correios_mundial.new_invoice','Nova fatura') ?></a>
         </div>
     </div>
 
@@ -17,26 +17,26 @@
     <?php endif; ?>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header"><strong>Faturas geradas</strong></div>
+        <div class="card-header"><strong><?= __('admin.correios_mundial.generated_invoices','Faturas geradas') ?></strong></div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Status</th>
-                            <th>CN38</th>
-                            <th>Request ID</th>
-                            <th>Containers</th>
-                            <th>Trackings</th>
-                            <th>PDF</th>
-                            <th>Data</th>
+                            <th><?= __('admin.correios_mundial.col_id','ID') ?></th>
+                            <th><?= __('admin.correios_mundial.col_status','Status') ?></th>
+                            <th><?= __('admin.correios_mundial.col_cn38','CN38') ?></th>
+                            <th><?= __('admin.correios_mundial.col_request_id','Request ID') ?></th>
+                            <th><?= __('admin.correios_mundial.col_containers','Containers') ?></th>
+                            <th><?= __('admin.correios_mundial.col_trackings','Trackings') ?></th>
+                            <th><?= __('admin.correios_mundial.col_pdf','PDF') ?></th>
+                            <th><?= __('admin.correios_mundial.col_date','Data') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $bills = isset($bills) && is_array($bills) ? $bills : []; ?>
                         <?php if (empty($bills)): ?>
-                            <tr><td colspan="8" class="text-muted">Nenhuma fatura encontrada.</td></tr>
+                            <tr><td colspan="8" class="text-muted"><?= __('admin.correios_mundial.no_invoices','Nenhuma fatura encontrada.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($bills as $b): ?>
                                 <?php $id = (int) ($b['id'] ?? 0); ?>

@@ -314,7 +314,7 @@ class AdminEstoqueController extends Controller {
 
         $produtoId = (int) $request->getParam('produto_id', 0);
         if ($produtoId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            echo json_encode(['success' => false, 'message' => __('admin.inventory.err_invalid_params', 'Parâmetros inválidos.')]);
             return;
         }
 
@@ -353,7 +353,7 @@ class AdminEstoqueController extends Controller {
                         $out[] = [
                             'id' => 0,
                             'codigo_pedido' => '',
-                            'status' => 'Reserva órfã (sem pedido)',
+                            'status' => __('admin.inventory.orphan_reservation', 'Reserva órfã (sem pedido)'),
                             'valor_total' => null,
                             'moeda' => '',
                             'created_at' => '',
@@ -431,7 +431,7 @@ class AdminEstoqueController extends Controller {
                     $pedidos[0] = [
                         'id' => 0,
                         'codigo_pedido' => '',
-                        'status' => 'Reserva órfã (sem pedido)',
+                        'status' => __('admin.inventory.orphan_reservation', 'Reserva órfã (sem pedido)'),
                         'valor_total' => null,
                         'moeda' => '',
                         'created_at' => '',
@@ -523,7 +523,7 @@ class AdminEstoqueController extends Controller {
             echo json_encode(['success' => true, 'pedidos' => array_values($pedidos)]);
             return;
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro ao buscar reservas.']);
+            echo json_encode(['success' => false, 'message' => __('admin.inventory.err_fetch_reservations', 'Erro ao buscar reservas.')]);
             return;
         }
     }
@@ -853,7 +853,7 @@ class AdminEstoqueController extends Controller {
         unset($_SESSION['message'], $_SESSION['message_type']);
         echo '<div class="alert alert-' . htmlspecialchars($type) . ' alert-dismissible fade show mt-3" role="alert">'
             . htmlspecialchars($msg)
-            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>'
+            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="' . htmlspecialchars(__('admin.inventory.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>'
             . '</div>';
     }
 
@@ -866,11 +866,11 @@ class AdminEstoqueController extends Controller {
         }
 
         if ($json) {
-            echo json_encode(['success' => false, 'message' => 'Acesso negado.']);
+            echo json_encode(['success' => false, 'message' => __('admin.inventory.access_denied', 'Acesso negado.')]);
             return false;
         }
 
-        $this->setFlash('Acesso negado.', 'danger');
+        $this->setFlash(__('admin.inventory.access_denied', 'Acesso negado.'), 'danger');
         header('Location: /admin/estoque');
         exit;
     }
@@ -1180,11 +1180,11 @@ class AdminEstoqueController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Entrada de Estoque - Braziliana Admin</title>
+    <title>' . __('admin.inventory.entry_page_title', 'Entrada de Estoque') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
 
@@ -1199,10 +1199,10 @@ class AdminEstoqueController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Entrada de Estoque (Galpão)</h1>
+                    <h1 class="page-title">' . __('admin.inventory.entry_heading', 'Entrada de Estoque (Galpão)') . '</h1>
                     <div>
                         <a class="btn btn-outline-secondary" href="/admin/estoque">
-                            <i class="fas fa-arrow-left me-1"></i>Voltar
+                            <i class="fas fa-arrow-left me-1"></i>' . __('admin.inventory.back', 'Voltar') . '
                         </a>
                     </div>
                 </div>';
@@ -1214,11 +1214,11 @@ class AdminEstoqueController extends Controller {
                     <div class="col-lg-5">
                         <div class="card">
                             <div class="card-header">
-                                <h6 class="mb-0">Buscar produto</h6>
+                                <h6 class="mb-0">' . __('admin.inventory.search_product', 'Buscar produto') . '</h6>
                             </div>
                             <div class="card-body">
-                                <input type="text" class="form-control" id="produto_busca" placeholder="Digite nome ou SKU..." oninput="buscarProdutos()" autocomplete="off">
-                                <div class="text-muted small mt-2">Clique em um produto para selecionar.</div>
+                                <input type="text" class="form-control" id="produto_busca" placeholder="' . htmlspecialchars(__('admin.inventory.search_product_placeholder', 'Digite nome ou SKU...'), ENT_QUOTES, 'UTF-8') . '" oninput="buscarProdutos()" autocomplete="off">
+                                <div class="text-muted small mt-2">' . __('admin.inventory.click_to_select', 'Clique em um produto para selecionar.') . '</div>
                                 <div id="resultado_busca" class="mt-3" style="max-height: 520px; overflow:auto;"></div>
                             </div>
                         </div>
@@ -1227,64 +1227,64 @@ class AdminEstoqueController extends Controller {
                     <div class="col-lg-7">
                         <div class="card">
                             <div class="card-header">
-                                <h6 class="mb-0">Dados da entrada</h6>
+                                <h6 class="mb-0">' . __('admin.inventory.entry_data', 'Dados da entrada') . '</h6>
                             </div>
                             <div class="card-body">
                                 <form method="POST" action="/admin/estoque/salvar" id="form_entrada_estoque">
                                     <input type="hidden" name="produto_id" id="produto_id" value="' . (int) $prefillProdutoId . '">
 
                                     <div class="mb-3">
-                                        <label class="form-label">Produto selecionado</label>
+                                        <label class="form-label">' . __('admin.inventory.selected_product', 'Produto selecionado') . '</label>
                                         <div id="produto_selecionado" class="p-3" style="border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 14px; background: #fff;">
-                                            <div class="text-muted">Nenhum produto selecionado.</div>
+                                            <div class="text-muted">' . __('admin.inventory.no_product_selected', 'Nenhum produto selecionado.') . '</div>
                                         </div>
                                     </div>
 
                                     <div class="row g-3">
                                         <div class="col-md-4">
-                                            <label class="form-label">Quantidade disponível</label>
+                                            <label class="form-label">' . __('admin.inventory.available_quantity', 'Quantidade disponível') . '</label>
                                             <input type="number" class="form-control" name="quantidade" min="1" step="1" required>
                                         </div>
 
                                         <div class="col-md-4">
-                                            <label class="form-label">Data da compra</label>
+                                            <label class="form-label">' . __('admin.inventory.purchase_date', 'Data da compra') . '</label>
                                             <input type="date" class="form-control" name="data_compra">
                                         </div>
 
                                         <div class="col-md-4">
-                                            <label class="form-label">Alimentício</label>
+                                            <label class="form-label">' . __('admin.inventory.food_item', 'Alimentício') . '</label>
                                             <div class="form-check form-switch mt-1">
                                                 <input class="form-check-input" type="checkbox" value="1" id="is_alimenticio" name="is_alimenticio" onchange="toggleValidade()">
-                                                <label class="form-check-label" for="is_alimenticio">Controlar validade</label>
+                                                <label class="form-check-label" for="is_alimenticio">' . __('admin.inventory.control_expiry', 'Controlar validade') . '</label>
                                             </div>
                                         </div>
 
                                         <div class="col-md-4" id="grupo_validade" style="display:none;">
-                                            <label class="form-label">Data de validade</label>
+                                            <label class="form-label">' . __('admin.inventory.expiry_date', 'Data de validade') . '</label>
                                             <input type="date" class="form-control" name="data_validade">
                                         </div>
 
                                         <div class="col-md-6">
-                                            <label class="form-label">Galpão</label>
-                                            <input type="text" class="form-control" name="galpao" placeholder="Ex: Galpão A">
+                                            <label class="form-label">' . __('admin.inventory.warehouse', 'Galpão') . '</label>
+                                            <input type="text" class="form-control" name="galpao" placeholder="' . htmlspecialchars(__('admin.inventory.warehouse_placeholder', 'Ex: Galpão A'), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
 
                                         <div class="col-md-6">
-                                            <label class="form-label">Prateleira</label>
-                                            <input type="text" class="form-control" name="prateleira" placeholder="Ex: 3">
+                                            <label class="form-label">' . __('admin.inventory.shelf', 'Prateleira') . '</label>
+                                            <input type="text" class="form-control" name="prateleira" placeholder="' . htmlspecialchars(__('admin.inventory.shelf_placeholder', 'Ex: 3'), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
 
                                         <div class="col-12">
-                                            <label class="form-label">Observação</label>
-                                            <input type="text" class="form-control" name="observacao" placeholder="Opcional">
+                                            <label class="form-label">' . __('admin.inventory.observation', 'Observação') . '</label>
+                                            <input type="text" class="form-control" name="observacao" placeholder="' . htmlspecialchars(__('admin.inventory.optional', 'Opcional'), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                     </div>
 
                                     <div class="mt-4 d-flex gap-2">
                                         <button type="submit" class="btn btn-primary" onclick="return validarEntradaEstoque()">
-                                            <i class="fas fa-save me-1"></i>Salvar entrada
+                                            <i class="fas fa-save me-1"></i>' . __('admin.inventory.save_entry', 'Salvar entrada') . '
                                         </button>
-                                        <a class="btn btn-outline-secondary" href="/admin/estoque">Cancelar</a>
+                                        <a class="btn btn-outline-secondary" href="/admin/estoque">' . __('admin.inventory.cancel', 'Cancelar') . '</a>
                                     </div>
                                 </form>
                             </div>
@@ -1327,7 +1327,7 @@ class AdminEstoqueController extends Controller {
                     <div class="d-flex gap-3 align-items-center">
                         ${img}
                         <div class="flex-grow-1">
-                            <div style="font-weight:700;color:#0f172a;">${item.nome || "(Sem nome)"}</div>
+                            <div style="font-weight:700;color:#0f172a;">${item.nome || "' . htmlspecialchars(__('admin.inventory.no_name', '(Sem nome)'), ENT_QUOTES, 'UTF-8') . '"}</div>
                             ${sku}
                             ${preco}
                         </div>
@@ -1351,13 +1351,13 @@ class AdminEstoqueController extends Controller {
                 .then(data => {
                     var items = (data && data.items) ? data.items : [];
                     if (!items.length) {
-                        box.innerHTML = `<div class="text-muted">Nenhum produto encontrado.</div>`;
+                        box.innerHTML = `<div class="text-muted">' . htmlspecialchars(__('admin.inventory.no_product_found', 'Nenhum produto encontrado.'), ENT_QUOTES, 'UTF-8') . '</div>`;
                         return;
                     }
                     box.innerHTML = items.map(renderItem).join("");
                 })
                 .catch(() => {
-                    box.innerHTML = `<div class="text-muted">Erro ao buscar produtos.</div>`;
+                    box.innerHTML = `<div class="text-muted">' . htmlspecialchars(__('admin.inventory.err_search_products', 'Erro ao buscar produtos.'), ENT_QUOTES, 'UTF-8') . '</div>`;
                 })
                 .finally(() => {
                     busy = false;
@@ -1371,7 +1371,7 @@ class AdminEstoqueController extends Controller {
 
             var item = produtosCache[id] || null;
             if (!item) {
-                alert("Não foi possível carregar os dados do produto selecionado.");
+                alert("' . htmlspecialchars(__('admin.inventory.js_cannot_load_product', 'Não foi possível carregar os dados do produto selecionado.'), ENT_QUOTES, 'UTF-8') . '");
                 return;
             }
 
@@ -1384,7 +1384,7 @@ class AdminEstoqueController extends Controller {
                 <div class="d-flex gap-3 align-items-center">
                     ${img}
                     <div>
-                        <div style="font-weight:800;color:#0f172a;">${item.nome || "(Sem nome)"}</div>
+                        <div style="font-weight:800;color:#0f172a;">${item.nome || "' . htmlspecialchars(__('admin.inventory.no_name', '(Sem nome)'), ENT_QUOTES, 'UTF-8') . '"}</div>
                         ${sku}
                         ${preco}
                     </div>
@@ -1395,7 +1395,7 @@ class AdminEstoqueController extends Controller {
         function validarEntradaEstoque() {
             var produtoId = document.getElementById("produto_id");
             if (!produtoId || !produtoId.value || produtoId.value === "0") {
-                alert("Selecione um produto antes de salvar.");
+                alert("' . htmlspecialchars(__('admin.inventory.js_select_product_first', 'Selecione um produto antes de salvar.'), ENT_QUOTES, 'UTF-8') . '");
                 return false;
             }
             return true;
@@ -1582,11 +1582,11 @@ class AdminEstoqueController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estoque Interno - Braziliana Admin</title>
+    <title>' . __('admin.inventory.page_title', 'Estoque Interno') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -1595,19 +1595,19 @@ class AdminEstoqueController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Estoque Interno</h1>
+                <h1 class="page-title">' . __('admin.inventory.page_title', 'Estoque Interno') . '</h1>
                 <div class="d-none d-md-flex gap-2">
-                    <a class="btn btn-success" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada de Estoque</a>
-                    <button type="button" class="btn btn-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</button>
-                    <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                    <a class="btn btn-success" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>' . __('admin.inventory.entry_page_title', 'Entrada de Estoque') . '</a>
+                    <button type="button" class="btn btn-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>' . __('admin.inventory.generate_pdf', 'Gerar PDF') . '</button>
+                    <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('admin.inventory.refresh', 'Atualizar') . '</button>
                 </div>
-                <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'estoqueActionsM\').classList.toggle(\'d-none\')"><i class="fas fa-ellipsis-v me-1"></i>Ações</button>
+                <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'estoqueActionsM\').classList.toggle(\'d-none\')"><i class="fas fa-ellipsis-v me-1"></i>' . __('admin.inventory.actions', 'Ações') . '</button>
             </div>
             <div id="estoqueActionsM" class="d-none d-md-none mb-3">
                 <div class="d-flex flex-wrap gap-2">
-                    <a class="btn btn-sm btn-success" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada</a>
+                    <a class="btn btn-sm btn-success" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>' . __('admin.inventory.entry_short', 'Entrada') . '</a>
                     <button type="button" class="btn btn-sm btn-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>PDF</button>
-                    <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                    <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('admin.inventory.refresh', 'Atualizar') . '</button>
                 </div>
             </div>';
 
@@ -1615,10 +1615,10 @@ class AdminEstoqueController extends Controller {
 
         // Cards de Estatisticas
         echo '<div class="row g-3 mb-4">';
-        echo '<div class="col-6 col-md-3"><div class="card bg-primary text-white"><div class="card-body py-2"><h6 class="card-title mb-0">Total Produtos</h6><h3 class="mb-0">' . number_format((int)($estatisticas['total_produtos'] ?? 0)) . '</h3><small>Ativos no sistema</small></div></div></div>';
-        echo '<div class="col-6 col-md-3"><div class="card bg-danger text-white" style="cursor:pointer" onclick="filtrarStatus(\'critico\')"><div class="card-body py-2"><h6 class="card-title mb-0">Estoque Critico</h6><h3 class="mb-0">' . number_format((int)($estatisticas['criticos'] ?? 0)) . '</h3><small>Abaixo do minimo</small></div></div></div>';
-        echo '<div class="col-6 col-md-3"><div class="card bg-warning text-dark" style="cursor:pointer" onclick="filtrarStatus(\'baixo\')"><div class="card-body py-2"><h6 class="card-title mb-0">Estoque Baixo</h6><h3 class="mb-0">' . number_format((int)($estatisticas['baixos'] ?? 0)) . '</h3><small>Abaixo do ideal</small></div></div></div>';
-        echo '<div class="col-6 col-md-3"><div class="card bg-success text-white" style="cursor:pointer" onclick="filtrarStatus(\'normal\')"><div class="card-body py-2"><h6 class="card-title mb-0">Estoque Normal</h6><h3 class="mb-0">' . number_format((int)($estatisticas['normais'] ?? 0)) . '</h3><small>Niveis adequados</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-primary text-white"><div class="card-body py-2"><h6 class="card-title mb-0">' . __('admin.inventory.stat_total_products', 'Total Produtos') . '</h6><h3 class="mb-0">' . number_format((int)($estatisticas['total_produtos'] ?? 0)) . '</h3><small>' . __('admin.inventory.stat_active', 'Ativos no sistema') . '</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-danger text-white" style="cursor:pointer" onclick="filtrarStatus(\'critico\')"><div class="card-body py-2"><h6 class="card-title mb-0">' . __('admin.inventory.stat_critical', 'Estoque Critico') . '</h6><h3 class="mb-0">' . number_format((int)($estatisticas['criticos'] ?? 0)) . '</h3><small>' . __('admin.inventory.stat_below_min', 'Abaixo do minimo') . '</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-warning text-dark" style="cursor:pointer" onclick="filtrarStatus(\'baixo\')"><div class="card-body py-2"><h6 class="card-title mb-0">' . __('admin.inventory.stat_low', 'Estoque Baixo') . '</h6><h3 class="mb-0">' . number_format((int)($estatisticas['baixos'] ?? 0)) . '</h3><small>' . __('admin.inventory.stat_below_ideal', 'Abaixo do ideal') . '</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-success text-white" style="cursor:pointer" onclick="filtrarStatus(\'normal\')"><div class="card-body py-2"><h6 class="card-title mb-0">' . __('admin.inventory.stat_normal', 'Estoque Normal') . '</h6><h3 class="mb-0">' . number_format((int)($estatisticas['normais'] ?? 0)) . '</h3><small>' . __('admin.inventory.stat_adequate', 'Niveis adequados') . '</small></div></div></div>';
         echo '</div>';
 
         // Filtros
@@ -1628,36 +1628,36 @@ class AdminEstoqueController extends Controller {
             <form method="GET" class="row g-2 align-items-center" id="formFiltroEstoque">
                 <div class="col-8 col-md-5">
                     <input type="text" class="form-control form-control-sm" name="busca" id="estoque_busca"
-                        placeholder="Buscar produto, SKU..."
+                        placeholder="' . htmlspecialchars(__('admin.inventory.search_product_sku', 'Buscar produto, SKU...'), ENT_QUOTES, 'UTF-8') . '"
                         value="' . $buscaEsc . '">
                 </div>
                 <div class="col-4 col-md-3">
                     <select class="form-select form-select-sm" name="status_filtro" id="status_filtro_sel" onchange="this.form.submit()">
-                        <option value="">Todos</option>
-                        <option value="critico"' . ($filtroStatus === 'critico' ? ' selected' : '') . '>Critico</option>
-                        <option value="baixo"'   . ($filtroStatus === 'baixo'   ? ' selected' : '') . '>Baixo</option>
-                        <option value="normal"'  . ($filtroStatus === 'normal'  ? ' selected' : '') . '>Normal</option>
+                        <option value="">' . __('admin.inventory.filter_all', 'Todos') . '</option>
+                        <option value="critico"' . ($filtroStatus === 'critico' ? ' selected' : '') . '>' . __('admin.inventory.filter_critical', 'Critico') . '</option>
+                        <option value="baixo"'   . ($filtroStatus === 'baixo'   ? ' selected' : '') . '>' . __('admin.inventory.filter_low', 'Baixo') . '</option>
+                        <option value="normal"'  . ($filtroStatus === 'normal'  ? ' selected' : '') . '>' . __('admin.inventory.filter_normal', 'Normal') . '</option>
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <a href="/admin/estoque" class="btn btn-sm btn-outline-secondary w-100">Limpar</a>
+                    <a href="/admin/estoque" class="btn btn-sm btn-outline-secondary w-100">' . __('admin.inventory.clear', 'Limpar') . '</a>
                 </div>
                 <div class="col-6 col-md-2">
-                    <small class="text-muted">' . number_format($totalItens) . ' produto(s)</small>
+                    <small class="text-muted">' . number_format($totalItens) . ' ' . __('admin.inventory.products_count', 'produto(s)') . '</small>
                 </div>
             </form>
         </div></div>';
 
         // Tabela
         echo '<div class="card">
-            <div class="card-header"><h5 class="mb-0">Estoque Atual</h5></div>
+            <div class="card-header"><h5 class="mb-0">' . __('admin.inventory.current_stock', 'Estoque Atual') . '</h5></div>
             <div class="card-body p-0">
                 <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover mb-0">
                         <thead class="table-dark">
                             <tr>
-                                <th>Produto</th><th>SKU</th><th>Quantidade</th><th>Reservado</th>
-                                <th>Disponivel</th><th>Status</th><th>Localizacao</th><th>Validade</th><th>Acoes</th>
+                                <th>' . __('admin.inventory.th_product', 'Produto') . '</th><th>' . __('admin.inventory.th_sku', 'SKU') . '</th><th>' . __('admin.inventory.th_quantity', 'Quantidade') . '</th><th>' . __('admin.inventory.th_reserved', 'Reservado') . '</th>
+                                <th>' . __('admin.inventory.th_available', 'Disponivel') . '</th><th>' . __('admin.inventory.th_status', 'Status') . '</th><th>' . __('admin.inventory.th_location', 'Localizacao') . '</th><th>' . __('admin.inventory.th_expiry', 'Validade') . '</th><th>' . __('admin.inventory.th_actions', 'Acoes') . '</th>
                             </tr>
                         </thead>
                         <tbody>';
@@ -1690,7 +1690,7 @@ class AdminEstoqueController extends Controller {
             $dispClass  = ($disponivel < 0) ? 'danger' : 'secondary';
             $dispBadge  = '<span class="badge bg-' . $dispClass . '">' . $disponivel . '</span>';
             $statusClass = ($status === 'critico' || $status === 'reposicao') ? 'danger' : ($status === 'baixo' ? 'warning' : 'success');
-            $statusLabel = $status === 'reposicao' ? 'Reposicao' : ucfirst($status);
+            $statusLabel = $status === 'reposicao' ? __('admin.inventory.status_replenishment', 'Reposicao') : ucfirst($status);
 
             echo '<tr>
                 <td><div class="d-flex gap-2 align-items-center">' . $imgTag . '<div><strong>' . htmlspecialchars($produtoNome) . '</strong><br><small class="text-muted">ID: ' . $produtoId . '</small></div></div></td>
@@ -1706,7 +1706,7 @@ class AdminEstoqueController extends Controller {
         }
 
         if (empty($status_geral)) {
-            echo '<tr><td colspan="9" class="text-center text-muted py-4">Nenhum produto encontrado.</td></tr>';
+            echo '<tr><td colspan="9" class="text-center text-muted py-4">' . __('admin.inventory.no_product_found', 'Nenhum produto encontrado.') . '</td></tr>';
         }
 
         echo '</tbody></table></div>';
@@ -1714,7 +1714,7 @@ class AdminEstoqueController extends Controller {
         // Mobile: Cards
         echo '<div class="d-md-none p-2">';
         if (empty($status_geral)) {
-            echo '<div class="text-center text-muted py-4">Nenhum produto encontrado.</div>';
+            echo '<div class="text-center text-muted py-4">' . __('admin.inventory.no_product_found', 'Nenhum produto encontrado.') . '</div>';
         }
         foreach ($status_geral as $item) {
             $produtoId   = (int)($item['produto_id'] ?? 0);
@@ -1726,7 +1726,7 @@ class AdminEstoqueController extends Controller {
             $status      = (string)($item['status_estoque'] ?? '');
             if ($reservado > $qtd) $status = 'reposicao';
             $statusClass = ($status === 'critico' || $status === 'reposicao') ? 'danger' : ($status === 'baixo' ? 'warning' : 'success');
-            $statusLabel = $status === 'reposicao' ? 'Reposição' : ucfirst($status);
+            $statusLabel = $status === 'reposicao' ? __('admin.inventory.status_replenishment', 'Reposicao') : ucfirst($status);
 
             echo '<div class="border-bottom py-2">
                 <div class="d-flex justify-content-between align-items-start">
@@ -1735,7 +1735,7 @@ class AdminEstoqueController extends Controller {
                         <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:11px;">
                             <span class="text-muted">#' . $produtoId . '</span>
                             ' . ($sku ? '<span class="badge bg-light text-dark">' . htmlspecialchars($sku) . '</span>' : '') . '
-                            <span class="badge bg-' . $statusClass . '">' . $qtd . ' un</span>
+                            <span class="badge bg-' . $statusClass . '">' . $qtd . ' ' . __('admin.inventory.unit_abbr', 'un') . '</span>
                             <span class="badge bg-' . $statusClass . '">' . $statusLabel . '</span>
                         </div>
                     </div>
@@ -1751,31 +1751,31 @@ class AdminEstoqueController extends Controller {
         if ($totalPaginas > 1) {
             $baseUrl = '/admin/estoque?busca=' . urlencode($busca) . '&status_filtro=' . urlencode($filtroStatus);
             echo '<nav class="mt-3"><ul class="pagination justify-content-center flex-wrap">';
-            if ($pagina > 1) echo '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pagina=' . ($pagina - 1) . '">&laquo; Anterior</a></li>';
+            if ($pagina > 1) echo '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pagina=' . ($pagina - 1) . '">&laquo; ' . __('admin.inventory.previous', 'Anterior') . '</a></li>';
             $start = max(1, $pagina - 3); $end = min($totalPaginas, $pagina + 3);
             if ($start > 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
             for ($i = $start; $i <= $end; $i++) {
                 echo '<li class="page-item' . ($i === $pagina ? ' active' : '') . '"><a class="page-link" href="' . $baseUrl . '&pagina=' . $i . '">' . $i . '</a></li>';
             }
             if ($end < $totalPaginas) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-            if ($pagina < $totalPaginas) echo '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pagina=' . ($pagina + 1) . '">Proxima &raquo;</a></li>';
+            if ($pagina < $totalPaginas) echo '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pagina=' . ($pagina + 1) . '">' . __('admin.inventory.next', 'Proxima') . ' &raquo;</a></li>';
             echo '</ul></nav>';
-            echo '<div class="text-center text-muted small mb-3">Pagina ' . $pagina . ' de ' . $totalPaginas . ' (' . number_format($totalItens) . ' produtos)</div>';
+            echo '<div class="text-center text-muted small mb-3">' . __('admin.inventory.page_of', 'Pagina {p} de {t} ({n} produtos)', ['p' => $pagina, 't' => $totalPaginas, 'n' => number_format($totalItens)]) . '</div>';
         }
 
         // Modal de reservas
         echo '<div class="modal fade" id="modalReservas" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg"><div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Reservas / Pedidos relacionados</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header"><h5 class="modal-title">' . __('admin.inventory.modal_reservations_title', 'Reservas / Pedidos relacionados') . '</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <div class="mb-2 text-muted" id="reservas_produto_nome"></div>
-                    <div id="reservas_loading" class="text-muted">Carregando...</div>
-                    <div id="reservas_empty" class="alert alert-warning d-none">Nenhum pedido encontrado.</div>
+                    <div id="reservas_loading" class="text-muted">' . __('admin.inventory.loading', 'Carregando...') . '</div>
+                    <div id="reservas_empty" class="alert alert-warning d-none">' . __('admin.inventory.no_order_found', 'Nenhum pedido encontrado.') . '</div>
                     <div class="accordion" id="accordionReservas"></div>
                 </div>
                 <div class="modal-footer">
-                    <a class="btn btn-outline-primary" href="/admin/estoque/compras" target="_blank">Abrir lista de compras</a>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <a class="btn btn-outline-primary" href="/admin/estoque/compras" target="_blank">' . __('admin.inventory.open_purchase_list', 'Abrir lista de compras') . '</a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.inventory.close', 'Fechar') . '</button>
                 </div>
             </div></div>
         </div>';
@@ -1785,8 +1785,8 @@ class AdminEstoqueController extends Controller {
         var _bt;document.getElementById("estoque_busca").addEventListener("input",function(){clearTimeout(_bt);_bt=setTimeout(function(){document.getElementById("formFiltroEstoque").submit();},600);});
         function escH(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
         function fmtM(v){if(v===null||v===undefined||v==="")return"-";var n=Number(v);return isNaN(n)?String(v):"$ "+n.toFixed(2);}
-        function renderRes(pedidos){var acc=document.getElementById("accordionReservas");if(!acc)return;acc.innerHTML="";pedidos.forEach(function(p){var pid=p.id||0,hId="rH"+pid,bId="rB"+pid,tot=fmtM(p.valor_total),st=escH(p.status||""),cod=escH(p.codigo_pedido||""),cli=(p.cliente_nome||"")+(p.cliente_email?" - "+p.cliente_email:"");var ih="";if(Array.isArray(p.itens)&&p.itens.length){ih="<table class=\"table table-sm\"><thead><tr><th>Produto</th><th>Qtd</th><th>Preco</th></tr></thead><tbody>";p.itens.forEach(function(it){ih+="<tr><td>"+escH(it.nome_produto||"")+"</td><td>"+escH(it.quantidade||0)+"</td><td>"+fmtM(it.preco_unitario)+"</td></tr>";});ih+="</tbody></table>";}else{ih="<div class=\"text-muted\">Sem itens.</div>";}var h="<div class=\"accordion-item\"><h2 class=\"accordion-header\" id=\""+hId+"\"><button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#"+bId+"\">Pedido #"+pid+(cod?" ("+cod+")":"")+" - "+st+" - "+tot+"</button></h2><div id=\""+bId+"\" class=\"accordion-collapse collapse\"><div class=\"accordion-body\"><div><strong>Cliente:</strong> "+escH(cli)+"</div><div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/"+pid+"\" target=\"_blank\">Abrir pedido</a></div>"+ih+"</div></div></div>";acc.insertAdjacentHTML("beforeend",h);});}
-        var mr=document.getElementById("modalReservas");if(mr){mr.addEventListener("show.bs.modal",function(ev){var btn=ev.relatedTarget,pid=btn.getAttribute("data-produto-id")||"",pnm=btn.getAttribute("data-produto-nome")||"";var lbl=document.getElementById("reservas_produto_nome");if(lbl)lbl.textContent=pnm;var ld=document.getElementById("reservas_loading"),em=document.getElementById("reservas_empty"),ac=document.getElementById("accordionReservas");if(ld)ld.classList.remove("d-none");if(em)em.classList.add("d-none");if(ac)ac.innerHTML="";fetch("/admin/estoque/reservas?produto_id="+encodeURIComponent(pid),{headers:{"Accept":"application/json"}}).then(function(r){return r.json();}).then(function(d){if(ld)ld.classList.add("d-none");if(!d||!d.success){if(em){em.classList.remove("d-none");em.textContent=(d&&d.message)?d.message:"Erro.";}return;}var ps=d.pedidos||[];if(!ps.length){if(em)em.classList.remove("d-none");return;}renderRes(ps);}).catch(function(){if(ld)ld.classList.add("d-none");if(em){em.classList.remove("d-none");em.textContent="Erro.";}});});}
+        function renderRes(pedidos){var acc=document.getElementById("accordionReservas");if(!acc)return;acc.innerHTML="";pedidos.forEach(function(p){var pid=p.id||0,hId="rH"+pid,bId="rB"+pid,tot=fmtM(p.valor_total),st=escH(p.status||""),cod=escH(p.codigo_pedido||""),cli=(p.cliente_nome||"")+(p.cliente_email?" - "+p.cliente_email:"");var ih="";if(Array.isArray(p.itens)&&p.itens.length){ih="<table class=\"table table-sm\"><thead><tr><th>' . htmlspecialchars(__('admin.inventory.th_product', 'Produto'), ENT_QUOTES, 'UTF-8') . '</th><th>' . htmlspecialchars(__('admin.inventory.js_qty', 'Qtd'), ENT_QUOTES, 'UTF-8') . '</th><th>' . htmlspecialchars(__('admin.inventory.js_price', 'Preco'), ENT_QUOTES, 'UTF-8') . '</th></tr></thead><tbody>";p.itens.forEach(function(it){ih+="<tr><td>"+escH(it.nome_produto||"")+"</td><td>"+escH(it.quantidade||0)+"</td><td>"+fmtM(it.preco_unitario)+"</td></tr>";});ih+="</tbody></table>";}else{ih="<div class=\"text-muted\">' . htmlspecialchars(__('admin.inventory.js_no_items', 'Sem itens.'), ENT_QUOTES, 'UTF-8') . '</div>";}var h="<div class=\"accordion-item\"><h2 class=\"accordion-header\" id=\""+hId+"\"><button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#"+bId+"\">' . htmlspecialchars(__('admin.inventory.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') . ' #"+pid+(cod?" ("+cod+")":"")+" - "+st+" - "+tot+"</button></h2><div id=\""+bId+"\" class=\"accordion-collapse collapse\"><div class=\"accordion-body\"><div><strong>' . htmlspecialchars(__('admin.inventory.js_customer', 'Cliente:'), ENT_QUOTES, 'UTF-8') . '</strong> "+escH(cli)+"</div><div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/"+pid+"\" target=\"_blank\">' . htmlspecialchars(__('admin.inventory.js_open_order', 'Abrir pedido'), ENT_QUOTES, 'UTF-8') . '</a></div>"+ih+"</div></div></div>";acc.insertAdjacentHTML("beforeend",h);});}
+        var mr=document.getElementById("modalReservas");if(mr){mr.addEventListener("show.bs.modal",function(ev){var btn=ev.relatedTarget,pid=btn.getAttribute("data-produto-id")||"",pnm=btn.getAttribute("data-produto-nome")||"";var lbl=document.getElementById("reservas_produto_nome");if(lbl)lbl.textContent=pnm;var ld=document.getElementById("reservas_loading"),em=document.getElementById("reservas_empty"),ac=document.getElementById("accordionReservas");if(ld)ld.classList.remove("d-none");if(em)em.classList.add("d-none");if(ac)ac.innerHTML="";fetch("/admin/estoque/reservas?produto_id="+encodeURIComponent(pid),{headers:{"Accept":"application/json"}}).then(function(r){return r.json();}).then(function(d){if(ld)ld.classList.add("d-none");if(!d||!d.success){if(em){em.classList.remove("d-none");em.textContent=(d&&d.message)?d.message:"' . htmlspecialchars(__('admin.inventory.js_error', 'Erro.'), ENT_QUOTES, 'UTF-8') . '";}return;}var ps=d.pedidos||[];if(!ps.length){if(em)em.classList.remove("d-none");return;}renderRes(ps);}).catch(function(){if(ld)ld.classList.add("d-none");if(em){em.classList.remove("d-none");em.textContent="' . htmlspecialchars(__('admin.inventory.js_error', 'Erro.'), ENT_QUOTES, 'UTF-8') . '";}});});}
         </script>';
 
         echo '</main></div></div>';
@@ -1822,12 +1822,12 @@ class AdminEstoqueController extends Controller {
             }
 
             if ($produtoId <= 0) {
-                $this->setFlash('Selecione um produto válido.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_select_valid_product', 'Selecione um produto válido.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
             if ($quantidade <= 0) {
-                $this->setFlash('Informe uma quantidade válida.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_inform_valid_qty', 'Informe uma quantidade válida.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -1840,7 +1840,7 @@ class AdminEstoqueController extends Controller {
                 if ($validadeTs !== false) {
                     $minTs = strtotime('+90 days');
                     if ($minTs !== false && $validadeTs < $minTs) {
-                        $this->setFlash('Produto com validade menor que 90 dias. O produto deve ser trocado antes de cadastrar novamente.', 'danger');
+                        $this->setFlash(__('admin.inventory.flash_expiry_less_90', 'Produto com validade menor que 90 dias. O produto deve ser trocado antes de cadastrar novamente.'), 'danger');
                         header('Location: /admin/estoque/entrada?produto_id=' . (int) $produtoId);
                         exit;
                     }
@@ -1848,7 +1848,7 @@ class AdminEstoqueController extends Controller {
             }
 
             if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_movimentacao')) {
-                $this->setFlash('Tabelas de estoque não encontradas no banco. Rode a migration 020_create_estoque_profissional_fix.sql no banco do servidor.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_tables_not_found', 'Tabelas de estoque não encontradas no banco. Rode a migration 020_create_estoque_profissional_fix.sql no banco do servidor.'), 'danger');
                 header('Location: /admin/estoque/entrada');
                 exit;
             }
@@ -1857,7 +1857,7 @@ class AdminEstoqueController extends Controller {
             $stmtProduto = $this->connection->prepare('SELECT id FROM produtos WHERE id = :id LIMIT 1');
             $stmtProduto->execute([':id' => $produtoId]);
             if (!$stmtProduto->fetchColumn()) {
-                $this->setFlash('Produto não encontrado.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_product_not_found', 'Produto não encontrado.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -1938,7 +1938,7 @@ class AdminEstoqueController extends Controller {
 
                 $this->connection->commit();
 
-                $this->setFlash('Quantidade atualizada com sucesso (sem duplicar localização).', 'success');
+                $this->setFlash(__('admin.inventory.flash_qty_updated', 'Quantidade atualizada com sucesso (sem duplicar localização).'), 'success');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -2033,7 +2033,7 @@ class AdminEstoqueController extends Controller {
 
             $this->connection->commit();
 
-            $this->setFlash('Entrada de estoque registrada com sucesso.', 'success');
+            $this->setFlash(__('admin.inventory.flash_entry_registered', 'Entrada de estoque registrada com sucesso.'), 'success');
             header('Location: /admin/estoque');
             exit;
         } catch (\Exception $e) {
@@ -2041,7 +2041,7 @@ class AdminEstoqueController extends Controller {
                 $this->connection->rollBack();
             }
             error_log('Erro ao registrar entrada de estoque: ' . $e->getMessage());
-            $this->setFlash('Erro ao registrar entrada de estoque: ' . $e->getMessage(), 'danger');
+            $this->setFlash(__('admin.inventory.flash_error_entry', 'Erro ao registrar entrada de estoque: {e}', ['e' => $e->getMessage()]), 'danger');
             header('Location: /admin/estoque/entrada');
             exit;
         }
@@ -2056,7 +2056,7 @@ class AdminEstoqueController extends Controller {
 
         try {
             if (!$this->tableExists('lista_compras')) {
-                echo json_encode(['success' => false, 'message' => 'Tabela lista_compras não encontrada.']);
+                echo json_encode(['success' => false, 'message' => __('admin.inventory.err_table_not_found', 'Tabela lista_compras não encontrada.')]);
                 return;
             }
 
@@ -2066,7 +2066,7 @@ class AdminEstoqueController extends Controller {
             $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
 
             if ($itemId <= 0 && $produtoId <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+                echo json_encode(['success' => false, 'message' => __('admin.inventory.err_invalid_params', 'Parâmetros inválidos.')]);
                 return;
             }
 
@@ -2102,11 +2102,11 @@ class AdminEstoqueController extends Controller {
             // Verificar se pedidos tiveram todos os itens comprados e atualizar status
             $this->atualizarStatusPedidosComprados();
 
-            echo json_encode(['success' => true, 'message' => 'Item(s) marcado(s) como comprado.']);
+            echo json_encode(['success' => true, 'message' => __('admin.inventory.msg_marked_purchased', 'Item(s) marcado(s) como comprado.')]);
             return;
         } catch (\Exception $e) {
             error_log('Erro ao marcar comprado (estoque): ' . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erro ao marcar como comprado.']);
+            echo json_encode(['success' => false, 'message' => __('admin.inventory.err_mark_purchased', 'Erro ao marcar como comprado.')]);
             return;
         }
     }
@@ -2115,13 +2115,13 @@ class AdminEstoqueController extends Controller {
         try {
             $produtoId = (int) $request->getParam('produto_id');
             if ($produtoId <= 0) {
-                $this->setFlash('Produto inválido.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_invalid_product', 'Produto inválido.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
 
             if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_movimentacao')) {
-                $this->setFlash('Tabelas de estoque não encontradas no banco. Rode as migrations de estoque no banco do servidor.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_tables_not_found_migrations', 'Tabelas de estoque não encontradas no banco. Rode as migrations de estoque no banco do servidor.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -2146,7 +2146,7 @@ class AdminEstoqueController extends Controller {
             $stmtP->execute([':id' => $produtoId]);
             $produto = $stmtP->fetch(\PDO::FETCH_ASSOC);
             if (!$produto) {
-                $this->setFlash('Produto não encontrado.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_product_not_found', 'Produto não encontrado.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -2239,7 +2239,7 @@ class AdminEstoqueController extends Controller {
             }
 
         } catch (\Exception $e) {
-            $this->setFlash('Erro ao carregar edição de estoque: ' . $e->getMessage(), 'danger');
+            $this->setFlash(__('admin.inventory.flash_error_load_edit', 'Erro ao carregar edição de estoque: {e}', ['e' => $e->getMessage()]), 'danger');
             header('Location: /admin/estoque');
             exit;
         }
@@ -2247,11 +2247,11 @@ class AdminEstoqueController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Estoque - Admin</title>
+    <title>' . __('admin.inventory.edit_page_title', 'Editar Estoque') . ' - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
 
@@ -2275,12 +2275,12 @@ class AdminEstoqueController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <div>
-                        <h1 class="page-title">Editar Estoque</h1>
-                        <div class="text-muted">Produto #' . (int) $produtoId . '</div>
+                        <h1 class="page-title">' . __('admin.inventory.edit_heading', 'Editar Estoque') . '</h1>
+                        <div class="text-muted">' . __('admin.inventory.product', 'Produto') . ' #' . (int) $produtoId . '</div>
                     </div>
                     <div>
-                        <a class="btn btn-outline-secondary" href="/admin/estoque"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
-                        <a class="btn btn-success ms-2" href="/admin/estoque/entrada?produto_id=' . (int) $produtoId . '"><i class="fas fa-plus me-1"></i>Adicionar localização</a>
+                        <a class="btn btn-outline-secondary" href="/admin/estoque"><i class="fas fa-arrow-left me-1"></i>' . __('admin.inventory.back', 'Voltar') . '</a>
+                        <a class="btn btn-success ms-2" href="/admin/estoque/entrada?produto_id=' . (int) $produtoId . '"><i class="fas fa-plus me-1"></i>' . __('admin.inventory.add_location', 'Adicionar localização') . '</a>
                     </div>
                 </div>';
 
@@ -2300,19 +2300,19 @@ class AdminEstoqueController extends Controller {
             </div>';
 
         echo '<div class="card mb-4">
-                <div class="card-header"><h5 class="mb-0">Resumo (evitar vender/comprar errado)</h5></div>
+                <div class="card-header"><h5 class="mb-0">' . __('admin.inventory.summary_title', 'Resumo (evitar vender/comprar errado)') . '</h5></div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Estoque total</div><div style="font-weight:900;font-size:20px;">' . (int) $totalEstoque . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reserva (real)</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservadoReal . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Pendência (compras)</div><div style="font-weight:900;font-size:20px;">' . (int) $pendenciaCompra . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">' . __('admin.inventory.total_stock', 'Estoque total') . '</div><div style="font-weight:900;font-size:20px;">' . (int) $totalEstoque . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">' . __('admin.inventory.reserved_real', 'Reserva (real)') . '</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservadoReal . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">' . __('admin.inventory.pending_purchases', 'Pendência (compras)') . '</div><div style="font-weight:900;font-size:20px;">' . (int) $pendenciaCompra . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">' . __('admin.inventory.available', 'Disponível') . '</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
-                        <a class="btn btn-outline-primary btn-sm" href="/admin/estoque/compras?produto_id=' . (int) $produtoId . '" target="_blank">Abrir lista de compras</a>
-                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . (int) $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '">Ver reservas</button>
+                        <a class="btn btn-outline-primary btn-sm" href="/admin/estoque/compras?produto_id=' . (int) $produtoId . '" target="_blank">' . __('admin.inventory.open_purchase_list', 'Abrir lista de compras') . '</a>
+                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . (int) $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '">' . __('admin.inventory.view_reservations', 'Ver reservas') . '</button>
                     </div>
-                    ' . ($statusReposicao ? '<div class="alert alert-warning mt-3 mb-0">Status: <strong>Reposição</strong>. Reservado acima do estoque; o disponível fica negativo até entrada.</div>' : '') . '
+                    ' . ($statusReposicao ? '<div class="alert alert-warning mt-3 mb-0">' . __('admin.inventory.status_replenishment_warning', 'Status: <strong>Reposição</strong>. Reservado acima do estoque; o disponível fica negativo até entrada.') . '</div>' : '') . '
                 </div>
             </div>';
 
@@ -2320,18 +2320,18 @@ class AdminEstoqueController extends Controller {
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Reservas / Pedidos relacionados</h5>
+                            <h5 class="modal-title">' . __('admin.inventory.modal_reservations_title', 'Reservas / Pedidos relacionados') . '</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-2 text-muted" id="reservas_produto_nome"></div>
-                            <div id="reservas_loading" class="text-muted">Carregando...</div>
-                            <div id="reservas_empty" class="alert alert-warning d-none">Nenhum pedido encontrado.</div>
+                            <div id="reservas_loading" class="text-muted">' . __('admin.inventory.loading', 'Carregando...') . '</div>
+                            <div id="reservas_empty" class="alert alert-warning d-none">' . __('admin.inventory.no_order_found', 'Nenhum pedido encontrado.') . '</div>
                             <div class="accordion" id="accordionReservas"></div>
                         </div>
                         <div class="modal-footer">
-                            <a class="btn btn-outline-primary" id="reservas_ir_compras" href="/admin/estoque/compras" target="_blank">Abrir lista de compras</a>
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            <a class="btn btn-outline-primary" id="reservas_ir_compras" href="/admin/estoque/compras" target="_blank">' . __('admin.inventory.open_purchase_list', 'Abrir lista de compras') . '</a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.inventory.close', 'Fechar') . '</button>
                         </div>
                     </div>
                 </div>
@@ -2371,10 +2371,10 @@ class AdminEstoqueController extends Controller {
                     var itensHtml = "";
                     if (Array.isArray(p.itens) && p.itens.length > 0) {
                         itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
-                        itensHtml += "<thead><tr><th>Produto</th><th style=\"width:90px;\">Qtd</th><th style=\"width:120px;\">Preço</th><th style=\"width:120px;\">Subtotal</th></tr></thead><tbody>";
+                        itensHtml += "<thead><tr><th>' . htmlspecialchars(__('admin.inventory.th_product', 'Produto'), ENT_QUOTES, 'UTF-8') . '</th><th style=\"width:90px;\">' . htmlspecialchars(__('admin.inventory.js_qty', 'Qtd'), ENT_QUOTES, 'UTF-8') . '</th><th style=\"width:120px;\">' . htmlspecialchars(__('admin.inventory.js_price', 'Preço'), ENT_QUOTES, 'UTF-8') . '</th><th style=\"width:120px;\">' . htmlspecialchars(__('admin.inventory.js_subtotal', 'Subtotal'), ENT_QUOTES, 'UTF-8') . '</th></tr></thead><tbody>";
                         p.itens.forEach(function(it){
                             itensHtml += "<tr>";
-                            itensHtml += "<td>" + escapeHtml2(it.nome_produto || it.nome_produto_sku || ("Produto ID: " + (it.produto_id||""))) + "</td>";
+                            itensHtml += "<td>" + escapeHtml2(it.nome_produto || it.nome_produto_sku || ("' . htmlspecialchars(__('admin.inventory.js_product_id', 'Produto ID:'), ENT_QUOTES, 'UTF-8') . ' " + (it.produto_id||""))) + "</td>";
                             itensHtml += "<td>" + escapeHtml2(it.quantidade || 0) + "</td>";
                             itensHtml += "<td>" + formatMoney2(it.preco_unitario) + "</td>";
                             itensHtml += "<td>" + formatMoney2(it.subtotal) + "</td>";
@@ -2382,22 +2382,22 @@ class AdminEstoqueController extends Controller {
                         });
                         itensHtml += "</tbody></table></div>";
                     } else {
-                        itensHtml = "<div class=\"text-muted\">Itens do pedido não disponíveis.</div>";
+                        itensHtml = "<div class=\"text-muted\">' . htmlspecialchars(__('admin.inventory.js_order_items_unavailable', 'Itens do pedido não disponíveis.'), ENT_QUOTES, 'UTF-8') . '</div>";
                     }
                     var html = "";
                     html += "<div class=\"accordion-item\">";
                     html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
                     html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
-                    html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - Qtd reservada: " + (isNaN(qtdReservada) ? 0 : qtdReservada) + (status ? (" - " + status) : "") + " - " + total;
+                    html += "' . htmlspecialchars(__('admin.inventory.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') . ' #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - ' . htmlspecialchars(__('admin.inventory.js_reserved_qty', 'Qtd reservada:'), ENT_QUOTES, 'UTF-8') . ' " + (isNaN(qtdReservada) ? 0 : qtdReservada) + (status ? (" - " + status) : "") + " - " + total;
                     html += "</button></h2>";
                     html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionReservas\">";
                     html += "<div class=\"accordion-body\">";
                     html += "<div class=\"mb-2\">";
-                    html += "<div><strong>Quantidade reservada:</strong> " + escapeHtml2(isNaN(qtdReservada) ? 0 : qtdReservada) + "</div>";
-                    html += "<div><strong>Cliente:</strong> " + escapeHtml2(cliente) + "</div>";
-                    html += "<div><strong>Criado em:</strong> " + criado + "</div>";
-                    if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
-                    html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a></div>";
+                    html += "<div><strong>' . htmlspecialchars(__('admin.inventory.js_reserved_quantity', 'Quantidade reservada:'), ENT_QUOTES, 'UTF-8') . '</strong> " + escapeHtml2(isNaN(qtdReservada) ? 0 : qtdReservada) + "</div>";
+                    html += "<div><strong>' . htmlspecialchars(__('admin.inventory.js_customer', 'Cliente:'), ENT_QUOTES, 'UTF-8') . '</strong> " + escapeHtml2(cliente) + "</div>";
+                    html += "<div><strong>' . htmlspecialchars(__('admin.inventory.js_created_at', 'Criado em:'), ENT_QUOTES, 'UTF-8') . '</strong> " + criado + "</div>";
+                    if (pagoEm) html += "<div><strong>' . htmlspecialchars(__('admin.inventory.js_paid_at', 'Pago em:'), ENT_QUOTES, 'UTF-8') . '</strong> " + pagoEm + "</div>";
+                    html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">' . htmlspecialchars(__('admin.inventory.js_open_order', 'Abrir pedido'), ENT_QUOTES, 'UTF-8') . '</a></div>";
                     html += "</div>";
                     html += itensHtml;
                     html += "</div></div></div>";
@@ -2449,17 +2449,17 @@ class AdminEstoqueController extends Controller {
         echo '<div class="row g-4">
                 <div class="col-lg-8">
                     <div class="card">
-                        <div class="card-header"><h5 class="mb-0">Informações do produto no estoque</h5></div>
+                        <div class="card-header"><h5 class="mb-0">' . __('admin.inventory.product_stock_info', 'Informações do produto no estoque') . '</h5></div>
                         <div class="card-body">';
 
         if (empty($entradas)) {
-            echo '<p class="text-muted mb-0">Nenhuma entrada encontrada para este produto no estoque interno.</p>';
+            echo '<p class="text-muted mb-0">' . __('admin.inventory.no_entry_found', 'Nenhuma entrada encontrada para este produto no estoque interno.') . '</p>';
         } else {
             echo '<form method="POST" action="/admin/estoque/editar/salvar" id="form_editar_estoque">'
                 . '<input type="hidden" name="produto_id" value="' . (int) $produtoId . '">'
                 . '<div class="table-responsive">'
                 . '<table class="table table-hover">'
-                . '<thead><tr><th>Localização</th><th>Qtd</th><th>Data compra</th><th>Validade</th><th>Obs.</th><th style="width:120px;">Ações</th></tr></thead><tbody>';
+                . '<thead><tr><th>' . __('admin.inventory.th_location', 'Localização') . '</th><th>' . __('admin.inventory.js_qty', 'Qtd') . '</th><th>' . __('admin.inventory.th_purchase_date', 'Data compra') . '</th><th>' . __('admin.inventory.th_expiry', 'Validade') . '</th><th>' . __('admin.inventory.th_notes', 'Obs.') . '</th><th style="width:120px;">' . __('admin.inventory.th_actions', 'Acoes') . '</th></tr></thead><tbody>';
 
             $qtdMap = [];
             foreach ($entradas as $e) {
@@ -2485,8 +2485,8 @@ class AdminEstoqueController extends Controller {
                     . '<td>'
                     . '<input type="hidden" name="estoque_id[]" value="' . $eid . '">'
                     . '<div class="row g-2">'
-                    . '<div class="col-6"><input type="text" class="form-control" name="galpao[]" value="' . htmlspecialchars($loc) . '" placeholder="Galpão"></div>'
-                    . '<div class="col-6"><input type="text" class="form-control" name="prateleira[]" value="' . htmlspecialchars($pr) . '" placeholder="Prateleira"></div>'
+                    . '<div class="col-6"><input type="text" class="form-control" name="galpao[]" value="' . htmlspecialchars($loc) . '" placeholder="' . htmlspecialchars(__('admin.inventory.warehouse', 'Galpão'), ENT_QUOTES, 'UTF-8') . '"></div>'
+                    . '<div class="col-6"><input type="text" class="form-control" name="prateleira[]" value="' . htmlspecialchars($pr) . '" placeholder="' . htmlspecialchars(__('admin.inventory.shelf', 'Prateleira'), ENT_QUOTES, 'UTF-8') . '"></div>'
                     . '</div>'
                     . '</td>'
                     . '<td style="max-width:140px;"><input type="number" class="form-control" name="quantidade[]" min="0" step="1" value="' . $qtd . '" required></td>'
@@ -2503,7 +2503,7 @@ class AdminEstoqueController extends Controller {
 
             echo '</tbody></table></div>'
                 . '<div class="d-flex gap-2">'
-                . '<button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar alterações</button>'
+                . '<button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>' . __('admin.inventory.save_changes', 'Salvar alterações') . '</button>'
                 . '</div>'
                 . '</form>';
 
@@ -2516,15 +2516,15 @@ class AdminEstoqueController extends Controller {
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">Confirmação</h5>
+                                <h5 class="modal-title">' . __('admin.inventory.confirmation', 'Confirmação') . '</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
                                 <div id="confirmEstoqueMessage" style="white-space:pre-wrap;"></div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-danger" id="confirmEstoqueOk">Confirmar</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.inventory.cancel', 'Cancelar') . '</button>
+                                <button type="button" class="btn btn-danger" id="confirmEstoqueOk">' . __('admin.inventory.confirm', 'Confirmar') . '</button>
                             </div>
                         </div>
                     </div>
@@ -2580,7 +2580,7 @@ class AdminEstoqueController extends Controller {
                                 if (total < reservadoTotal) {
                                     ev.preventDefault();
                                     showConfirmModal(
-                                        "ATENÇÃO: ao salvar, o estoque total ficará em " + total + ", abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?",
+                                        "' . htmlspecialchars(__('admin.inventory.js_warn_below_reserved_1', 'ATENÇÃO: ao salvar, o estoque total ficará em'), ENT_QUOTES, 'UTF-8') . ' " + total + ", ' . htmlspecialchars(__('admin.inventory.js_warn_below_reserved_2', 'abaixo do reservado'), ENT_QUOTES, 'UTF-8') . ' (" + reservadoTotal + ").\n\n' . htmlspecialchars(__('admin.inventory.js_continue_anyway', 'Deseja continuar mesmo assim?'), ENT_QUOTES, 'UTF-8') . '",
                                         function(){ form.submit(); }
                                     );
                                     return false;
@@ -2606,19 +2606,19 @@ class AdminEstoqueController extends Controller {
 
                             if (reservadoTotal > 0 && novoTotal < reservadoTotal) {
                                 showConfirmModal(
-                                    "ATENÇÃO: esta exclusão deixará o estoque total (" + novoTotal + ") abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?",
+                                    "' . htmlspecialchars(__('admin.inventory.js_delete_below_reserved', 'ATENÇÃO: esta exclusão deixará o estoque total'), ENT_QUOTES, 'UTF-8') . ' (" + novoTotal + ") ' . htmlspecialchars(__('admin.inventory.js_warn_below_reserved_2', 'abaixo do reservado'), ENT_QUOTES, 'UTF-8') . ' (" + reservadoTotal + ").\n\n' . htmlspecialchars(__('admin.inventory.js_continue_anyway', 'Deseja continuar mesmo assim?'), ENT_QUOTES, 'UTF-8') . '",
                                     function(){ f.submit(); }
                                 );
                                 return false;
                             }
 
                             showConfirmModal(
-                                "Excluir esta localização do estoque? Esta ação será registrada no log.",
+                                "' . htmlspecialchars(__('admin.inventory.js_delete_location_log', 'Excluir esta localização do estoque? Esta ação será registrada no log.'), ENT_QUOTES, 'UTF-8') . '",
                                 function(){ f.submit(); }
                             );
                             return false;
                         } catch (e) {
-                            return window.confirm("Excluir esta localização do estoque?");
+                            return window.confirm("' . htmlspecialchars(__('admin.inventory.js_delete_location', 'Excluir esta localização do estoque?'), ENT_QUOTES, 'UTF-8') . '");
                         }
                     };
                 })();
@@ -2631,11 +2631,11 @@ class AdminEstoqueController extends Controller {
 
                 <div class="col-lg-4">
                     <div class="card">
-                        <div class="card-header"><h5 class="mb-0">Logs de alterações</h5></div>
+                        <div class="card-header"><h5 class="mb-0">' . __('admin.inventory.change_logs', 'Logs de alterações') . '</h5></div>
                         <div class="card-body" style="max-height: 560px; overflow:auto;">';
 
         if (empty($logs)) {
-            echo '<p class="text-muted mb-0">Nenhum log encontrado.</p>';
+            echo '<p class="text-muted mb-0">' . __('admin.inventory.no_log_found', 'Nenhum log encontrado.') . '</p>';
         } else {
             foreach ($logs as $l) {
                 $tipo = (string) ($l['tipo_movimentacao'] ?? '');
@@ -2654,8 +2654,8 @@ class AdminEstoqueController extends Controller {
                     . '<span class="badge ' . $badge . '">' . htmlspecialchars($tipo) . '</span>'
                     . '<span class="text-muted small">' . ($data !== '' ? date('d/m/Y H:i', strtotime($data)) : '-') . '</span>'
                     . '</div>'
-                    . '<div class="small">Qtd: ' . htmlspecialchars($qtd) . ' (de ' . htmlspecialchars($ant) . ' para ' . htmlspecialchars($nov) . ')</div>'
-                    . ($who !== '' ? '<div class="text-muted small">Por: ' . htmlspecialchars((string) $who) . '</div>' : '')
+                    . '<div class="small">' . __('admin.inventory.log_qty', 'Qtd:') . ' ' . htmlspecialchars($qtd) . ' (' . __('admin.inventory.log_from', 'de') . ' ' . htmlspecialchars($ant) . ' ' . __('admin.inventory.log_to', 'para') . ' ' . htmlspecialchars($nov) . ')</div>'
+                    . ($who !== '' ? '<div class="text-muted small">' . __('admin.inventory.log_by', 'Por:') . ' ' . htmlspecialchars((string) $who) . '</div>' : '')
                     . ($motivo !== '' ? '<div class="text-muted small">' . htmlspecialchars($motivo) . '</div>' : '')
                     . '</div>';
             }
@@ -2680,7 +2680,7 @@ class AdminEstoqueController extends Controller {
         try {
             $produtoId = (int) $request->getParam('produto_id');
             if ($produtoId <= 0) {
-                $this->setFlash('Produto inválido.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_invalid_product', 'Produto inválido.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -2709,7 +2709,7 @@ class AdminEstoqueController extends Controller {
             $isAliArr = $request->getParam('is_alimenticio', []);
 
             if (!is_array($ids) || empty($ids)) {
-                $this->setFlash('Nenhuma entrada para atualizar.', 'warning');
+                $this->setFlash(__('admin.inventory.flash_no_entry_update', 'Nenhuma entrada para atualizar.'), 'warning');
                 header('Location: /admin/estoque/editar/' . (int) $produtoId);
                 exit;
             }
@@ -2830,7 +2830,7 @@ class AdminEstoqueController extends Controller {
                 ]);
                 if ($stmtDup->fetchColumn()) {
                     $this->connection->rollBack();
-                    $this->setFlash('Já existe uma entrada deste produto para esta localização. Ajuste a quantidade no registro existente.', 'danger');
+                    $this->setFlash(__('admin.inventory.flash_location_exists', 'Já existe uma entrada deste produto para esta localização. Ajuste a quantidade no registro existente.'), 'danger');
                     header('Location: /admin/estoque/editar/' . (int) $produtoId);
                     exit;
                 }
@@ -2907,9 +2907,9 @@ class AdminEstoqueController extends Controller {
                 $adicional = $this->garantirSomaZeroAposReducao($produtoId);
                 $reservadoAtual = $this->getTotalReservadoProduto($produtoId);
                 if ($reservadoAtual > 0) {
-                    $msg = 'Atenção: houve redução de estoque e existem reservas ativas. Pendência de compra foi ajustada automaticamente.';
+                    $msg = __('admin.inventory.flash_reduction_reservations', 'Atenção: houve redução de estoque e existem reservas ativas. Pendência de compra foi ajustada automaticamente.');
                     if ($adicional > 0) {
-                        $msg .= ' (+ ' . (int) $adicional . ' para cobrir déficit vs reservado)';
+                        $msg .= ' ' . __('admin.inventory.flash_deficit_added', '(+ {n} para cobrir déficit vs reservado)', ['n' => (int) $adicional]);
                     }
                     $this->setFlash($msg, 'warning');
                 }
@@ -2924,10 +2924,10 @@ class AdminEstoqueController extends Controller {
                     @session_start();
                 }
                 if (empty($_SESSION['message'])) {
-                    $this->setFlash('Alterações salvas e registradas no log.', 'success');
+                    $this->setFlash(__('admin.inventory.flash_changes_saved', 'Alterações salvas e registradas no log.'), 'success');
                 }
             } else {
-                $this->setFlash('Nenhuma alteração para salvar.', 'info');
+                $this->setFlash(__('admin.inventory.flash_no_change', 'Nenhuma alteração para salvar.'), 'info');
             }
             header('Location: /admin/estoque/editar/' . (int) $produtoId);
             exit;
@@ -2936,7 +2936,7 @@ class AdminEstoqueController extends Controller {
                 $this->connection->rollBack();
             }
             error_log('Erro ao salvar edição de estoque: ' . $e->getMessage());
-            $this->setFlash('Erro ao salvar edição de estoque: ' . $e->getMessage(), 'danger');
+            $this->setFlash(__('admin.inventory.flash_error_save_edit', 'Erro ao salvar edição de estoque: {e}', ['e' => $e->getMessage()]), 'danger');
             header('Location: /admin/estoque');
             exit;
         }
@@ -2948,7 +2948,7 @@ class AdminEstoqueController extends Controller {
             $produtoId = (int) $request->getParam('produto_id');
             $estoqueId = (int) $request->getParam('estoque_id');
             if ($produtoId <= 0 || $estoqueId <= 0) {
-                $this->setFlash('Parâmetros inválidos para exclusão.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_invalid_params_delete', 'Parâmetros inválidos para exclusão.'), 'danger');
                 header('Location: /admin/estoque');
                 exit;
             }
@@ -2960,7 +2960,7 @@ class AdminEstoqueController extends Controller {
             $old = $stmtGet->fetch(\PDO::FETCH_ASSOC);
             if (!$old) {
                 $this->connection->rollBack();
-                $this->setFlash('Entrada não encontrada.', 'danger');
+                $this->setFlash(__('admin.inventory.flash_entry_not_found', 'Entrada não encontrada.'), 'danger');
                 header('Location: /admin/estoque/editar/' . (int) $produtoId);
                 exit;
             }
@@ -3020,9 +3020,9 @@ class AdminEstoqueController extends Controller {
             $adicional = $this->garantirSomaZeroAposReducao($produtoId);
             $reservadoAtual = $this->getTotalReservadoProduto($produtoId);
             if ($reservadoAtual > 0) {
-                $msg = 'Atenção: você removeu estoque e existem reservas ativas. Pendência de compra foi ajustada automaticamente.';
+                $msg = __('admin.inventory.flash_removed_reservations', 'Atenção: você removeu estoque e existem reservas ativas. Pendência de compra foi ajustada automaticamente.');
                 if ($adicional > 0) {
-                    $msg .= ' (+ ' . (int) $adicional . ' para cobrir déficit vs reservado)';
+                    $msg .= ' ' . __('admin.inventory.flash_deficit_added', '(+ {n} para cobrir déficit vs reservado)', ['n' => (int) $adicional]);
                 }
                 $this->setFlash($msg, 'warning');
             }
@@ -3035,7 +3035,7 @@ class AdminEstoqueController extends Controller {
                 @session_start();
             }
             if (empty($_SESSION['message'])) {
-                $this->setFlash('Localização excluída e registrada no log.', 'success');
+                $this->setFlash(__('admin.inventory.flash_location_deleted', 'Localização excluída e registrada no log.'), 'success');
             }
             header('Location: /admin/estoque/editar/' . (int) $produtoId);
             exit;
@@ -3044,7 +3044,7 @@ class AdminEstoqueController extends Controller {
                 $this->connection->rollBack();
             }
             error_log('Erro ao excluir entrada de estoque: ' . $e->getMessage());
-            $this->setFlash('Erro ao excluir entrada de estoque: ' . $e->getMessage(), 'danger');
+            $this->setFlash(__('admin.inventory.flash_error_delete_entry', 'Erro ao excluir entrada de estoque: {e}', ['e' => $e->getMessage()]), 'danger');
             header('Location: /admin/estoque');
             exit;
         }

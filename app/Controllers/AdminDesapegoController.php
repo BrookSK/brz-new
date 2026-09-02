@@ -91,11 +91,11 @@ class AdminDesapegoController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Desapego - Comissões - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.desapego.commissions_page_title', 'Desapego - Comissões - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
@@ -127,21 +127,21 @@ class AdminDesapegoController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>Desapego Braziliana — Comissões</h1>
-                    <p class="text-muted mb-0">Gerencie desapeguistas, produtos vinculados e comissões.</p>
+                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>Desapego Braziliana — ' . __('admin.desapego.commissions', 'Comissões') . '</h1>
+                    <p class="text-muted mb-0">' . __('admin.desapego.commissions_subtitle', 'Gerencie desapeguistas, produtos vinculados e comissões.') . '</p>
                 </div>
             </div>';
 
         if (!$hasDesapego) {
-            echo '<div class="alert alert-warning">As colunas de desapego ainda não existem no banco. Execute a migration 213 primeiro.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.desapego.columns_missing', 'As colunas de desapego ainda não existem no banco. Execute a migration 213 primeiro.') . '</div>';
         } elseif (empty($desapeguistas)) {
-            echo '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>Nenhum desapeguista cadastrado ainda. Marque usuários como desapeguista na <a href="/admin/usuarios">listagem de usuários</a>.</div>';
+            echo '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>' . __('admin.desapego.no_sellers', 'Nenhum desapeguista cadastrado ainda. Marque usuários como desapeguista na') . ' <a href="/admin/usuarios">' . __('admin.desapego.user_listing', 'listagem de usuários') . '</a>.</div>';
         } else {
             // Filtro
             echo '<div class="mb-4">
                 <form method="GET" action="/admin/desapego/comissoes" class="d-flex gap-2 align-items-center">
                     <select name="desapeguista_id" class="form-select" style="max-width:300px;" onchange="this.form.submit()">
-                        <option value="0">Todos os desapeguistas</option>';
+                        <option value="0">' . htmlspecialchars(__('admin.desapego.all_sellers', 'Todos os desapeguistas'), ENT_QUOTES, 'UTF-8') . '</option>';
             foreach ($desapeguistas as $dOpt) {
                 $sel = ($filtroDesapeguista === (int) $dOpt['id']) ? ' selected' : '';
                 echo '<option value="' . (int) $dOpt['id'] . '"' . $sel . '>' . htmlspecialchars($dOpt['nome']) . '</option>';
@@ -159,24 +159,24 @@ class AdminDesapegoController extends Controller {
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                             <div>
                                 <h5 class="mb-0 fw-bold"><i class="bi bi-person-heart me-2"></i>' . htmlspecialchars($d['nome']) . '</h5>
-                                <small class="opacity-75">' . htmlspecialchars($d['email'] ?? '') . ' — Comissão: ' . htmlspecialchars((string) $d['desapeguista_comissao']) . '%</small>
+                                <small class="opacity-75">' . htmlspecialchars($d['email'] ?? '') . ' — ' . __('admin.desapego.commission_label', 'Comissão:') . ' ' . htmlspecialchars((string) $d['desapeguista_comissao']) . '%</small>
                             </div>
                             <div class="d-flex gap-2">
                                 <div class="stat-box">
                                     <div class="value">' . $totalProdutos . '</div>
-                                    <div class="label">Produtos</div>
+                                    <div class="label">' . __('admin.desapego.products', 'Produtos') . '</div>
                                 </div>
                                 <div class="stat-box">
                                     <div class="value">$' . number_format($d['total_comissao'], 2) . '</div>
-                                    <div class="label">Total Comissão</div>
+                                    <div class="label">' . __('admin.desapego.total_commission', 'Total Comissão') . '</div>
                                 </div>
                                 <div class="stat-box">
                                     <div class="value">$' . number_format($d['total_pago'], 2) . '</div>
-                                    <div class="label">Pago</div>
+                                    <div class="label">' . __('admin.desapego.paid', 'Pago') . '</div>
                                 </div>
                                 <div class="stat-box">
                                     <div class="value">$' . number_format($d['total_pendente'], 2) . '</div>
-                                    <div class="label">Pendente</div>
+                                    <div class="label">' . __('admin.desapego.pending', 'Pendente') . '</div>
                                 </div>
                             </div>
                         </div>
@@ -185,12 +185,12 @@ class AdminDesapegoController extends Controller {
 
                 // Produtos vinculados
                 if (empty($d['produtos'])) {
-                    echo '<p class="text-muted mb-0"><i class="bi bi-box-seam me-1"></i>Nenhum produto vinculado a este desapeguista.</p>';
+                    echo '<p class="text-muted mb-0"><i class="bi bi-box-seam me-1"></i>' . __('admin.desapego.no_linked_products', 'Nenhum produto vinculado a este desapeguista.') . '</p>';
                 } else {
-                    echo '<h6 class="fw-semibold mb-2"><i class="bi bi-box-seam me-1"></i>Produtos Vinculados</h6>
+                    echo '<h6 class="fw-semibold mb-2"><i class="bi bi-box-seam me-1"></i>' . __('admin.desapego.linked_products', 'Produtos Vinculados') . '</h6>
                         <div class="table-responsive">
                         <table class="table table-sm table-hover mb-3">
-                            <thead><tr><th>#</th><th>Produto</th><th>Preço</th><th>Estoque</th></tr></thead>
+                            <thead><tr><th>#</th><th>' . __('admin.desapego.product', 'Produto') . '</th><th>' . __('admin.desapego.price', 'Preço') . '</th><th>' . __('admin.desapego.stock', 'Estoque') . '</th></tr></thead>
                             <tbody>';
                     foreach ($d['produtos'] as $prod) {
                         echo '<tr>
@@ -205,14 +205,22 @@ class AdminDesapegoController extends Controller {
 
                 // Comissões
                 if (!empty($d['comissoes'])) {
-                    echo '<h6 class="fw-semibold mb-2 mt-3"><i class="bi bi-cash-stack me-1"></i>Histórico de Comissões</h6>
+                    echo '<h6 class="fw-semibold mb-2 mt-3"><i class="bi bi-cash-stack me-1"></i>' . __('admin.desapego.commission_history', 'Histórico de Comissões') . '</h6>
                         <div class="table-responsive">
                         <table class="table table-sm table-hover">
-                            <thead><tr><th>Data</th><th>Produto</th><th>Venda</th><th>%</th><th>Comissão</th><th>Pago</th><th>Restante</th><th>Status</th><th>Data Pgto</th><th>Ações</th></tr></thead>
+                            <thead><tr><th>' . __('admin.desapego.date', 'Data') . '</th><th>' . __('admin.desapego.product', 'Produto') . '</th><th>' . __('admin.desapego.sale', 'Venda') . '</th><th>%</th><th>' . __('admin.desapego.commission', 'Comissão') . '</th><th>' . __('admin.desapego.paid', 'Pago') . '</th><th>' . __('admin.desapego.remaining', 'Restante') . '</th><th>' . __('admin.desapego.status', 'Status') . '</th><th>' . __('admin.desapego.payment_date', 'Data Pgto') . '</th><th>' . __('admin.desapego.actions', 'Ações') . '</th></tr></thead>
                             <tbody>';
                     foreach ($d['comissoes'] as $c) {
                         $statusBadge = 'badge-' . ($c['status'] ?? 'pendente');
-                        $statusLabel = ucfirst(str_replace('_', ' ', $c['status'] ?? 'pendente'));
+                        $__statusMap = [
+                            'pendente' => __('admin.desapego.status_pending', 'Pendente'),
+                            'aprovado' => __('admin.desapego.status_approved', 'Aprovado'),
+                            'parcialmente_pago' => __('admin.desapego.status_partially_paid', 'Parcialmente pago'),
+                            'pago' => __('admin.desapego.status_paid', 'Pago'),
+                            'cancelado' => __('admin.desapego.status_cancelled', 'Cancelado'),
+                        ];
+                        $__statusKey = (string) ($c['status'] ?? 'pendente');
+                        $statusLabel = $__statusMap[$__statusKey] ?? ucfirst(str_replace('_', ' ', $__statusKey));
                         $dataPag = !empty($c['data_pagamento']) ? date('d/m/Y', strtotime($c['data_pagamento'])) : '—';
                         $comissaoId = (int) ($c['id'] ?? 0);
                         $comissaoStatus = (string) ($c['status'] ?? 'pendente');
@@ -224,16 +232,16 @@ class AdminDesapegoController extends Controller {
                         $acoesHtml = '';
                         if ($comissaoStatus === 'pendente' || $comissaoStatus === 'aprovado' || ($comissaoStatus === 'parcialmente_pago' && $restante > 0)) {
                             $maxPagar = $restante > 0 ? $restante : $valorComissao;
-                            $acoesHtml = '<button class="btn btn-sm btn-outline-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format($maxPagar, 2, '.', '') . ', ' . number_format($valorComissao, 2, '.', '') . ')" title="Registrar pagamento"><i class="bi bi-cash-coin"></i></button>';
+                            $acoesHtml = '<button class="btn btn-sm btn-outline-success" onclick="marcarPago(' . $comissaoId . ', ' . number_format($maxPagar, 2, '.', '') . ', ' . number_format($valorComissao, 2, '.', '') . ')" title="' . htmlspecialchars(__('admin.desapego.register_payment', 'Registrar pagamento'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-cash-coin"></i></button>';
                         }
                         if ($comissaoStatus === 'pago' || $comissaoStatus === 'parcialmente_pago') {
-                            $acoesHtml .= ' <button class="btn btn-sm btn-outline-danger" onclick="reverterComissao(' . $comissaoId . ')" title="Reverter para pendente"><i class="bi bi-arrow-counterclockwise"></i></button>';
+                            $acoesHtml .= ' <button class="btn btn-sm btn-outline-danger" onclick="reverterComissao(' . $comissaoId . ')" title="' . htmlspecialchars(__('admin.desapego.revert_to_pending', 'Reverter para pendente'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-arrow-counterclockwise"></i></button>';
                         }
                         if ($acoesHtml === '') $acoesHtml = '<span class="text-muted small">—</span>';
 
                         echo '<tr>
                             <td class="small">' . (!empty($c['created_at']) ? date('d/m/Y', strtotime($c['created_at'])) : '—') . '</td>
-                            <td class="small">' . htmlspecialchars($c['produto_nome'] ?? 'Produto #' . ($c['produto_id'] ?? '?')) . '</td>
+                            <td class="small">' . htmlspecialchars($c['produto_nome'] ?? __('admin.desapego.product_number', 'Produto #{n}', ['n'=>($c['produto_id'] ?? '?')])) . '</td>
                             <td class="small">US$ ' . number_format((float) ($c['valor_venda'] ?? 0), 2) . '</td>
                             <td class="small">' . htmlspecialchars((string) ($c['percentual_comissao'] ?? 30)) . '%</td>
                             <td class="fw-bold">US$ ' . number_format($valorComissao, 2) . '</td>
@@ -246,7 +254,7 @@ class AdminDesapegoController extends Controller {
                     }
                     echo '</tbody></table></div>';
                 } elseif (!empty($d['produtos'])) {
-                    echo '<p class="text-muted mt-3 mb-0"><i class="bi bi-clock-history me-1"></i>Nenhuma comissão registrada ainda para este desapeguista.</p>';
+                    echo '<p class="text-muted mt-3 mb-0"><i class="bi bi-clock-history me-1"></i>' . __('admin.desapego.no_commissions', 'Nenhuma comissão registrada ainda para este desapeguista.') . '</p>';
                 }
 
                 echo '</div></div>';
@@ -260,29 +268,29 @@ class AdminDesapegoController extends Controller {
         <div class="modal-dialog modal-sm">
             <div class="modal-content" style="border-radius:16px;">
                 <div class="modal-header border-0 pb-0">
-                    <h6 class="modal-title fw-bold"><i class="bi bi-cash-coin me-2 text-success"></i>Registrar Pagamento</h6>
+                    <h6 class="modal-title fw-bold"><i class="bi bi-cash-coin me-2 text-success"></i>' . __('admin.desapego.register_payment_title', 'Registrar Pagamento') . '</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="pagarComissaoId">
                     <input type="hidden" id="pagarMaximo">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Valor a pagar (USD)</label>
+                        <label class="form-label fw-semibold">' . __('admin.desapego.amount_to_pay', 'Valor a pagar (USD)') . '</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
                             <input type="number" class="form-control" id="pagarValor" step="0.01" min="0.01">
                         </div>
-                        <small class="text-muted">Máximo: <strong id="pagarMaxLabel">$0.00</strong>. Não é possível pagar acima do valor devido.</small>
+                        <small class="text-muted">' . __('admin.desapego.maximum', 'Máximo:') . ' <strong id="pagarMaxLabel">$0.00</strong>. ' . __('admin.desapego.cannot_pay_over', 'Não é possível pagar acima do valor devido.') . '</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Observação (opcional)</label>
-                        <input type="text" class="form-control" id="pagarObs" placeholder="Ex: PIX, transferência...">
+                        <label class="form-label">' . __('admin.desapego.observation_optional', 'Observação (opcional)') . '</label>
+                        <input type="text" class="form-control" id="pagarObs" placeholder="' . htmlspecialchars(__('admin.desapego.observation_placeholder', 'Ex: PIX, transferência...'), ENT_QUOTES, 'UTF-8') . '">
                     </div>
                     <div id="pagarErro" class="text-danger small" style="display:none;"></div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-success btn-sm" id="btnConfirmarPago"><i class="bi bi-check2 me-1"></i>Confirmar Pagamento</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">' . __('admin.desapego.cancel', 'Cancelar') . '</button>
+                    <button type="button" class="btn btn-success btn-sm" id="btnConfirmarPago"><i class="bi bi-check2 me-1"></i>' . __('admin.desapego.confirm_payment', 'Confirmar Pagamento') . '</button>
                 </div>
             </div>
         </div>
@@ -309,12 +317,12 @@ class AdminDesapegoController extends Controller {
         var obs = document.getElementById("pagarObs").value;
         var erro = document.getElementById("pagarErro");
 
-        if (valor <= 0) { erro.textContent = "Informe um valor maior que zero."; erro.style.display = ""; return; }
-        if (valor > maximo + 0.01) { erro.textContent = "Valor não pode ser maior que $" + maximo.toFixed(2); erro.style.display = ""; return; }
+        if (valor <= 0) { erro.textContent = "' . htmlspecialchars(__('admin.desapego.js_enter_value_gt_zero', 'Informe um valor maior que zero.'), ENT_QUOTES, 'UTF-8') . '"; erro.style.display = ""; return; }
+        if (valor > maximo + 0.01) { erro.textContent = "' . htmlspecialchars(__('admin.desapego.js_value_cannot_exceed', 'Valor não pode ser maior que $'), ENT_QUOTES, 'UTF-8') . '" + maximo.toFixed(2); erro.style.display = ""; return; }
         erro.style.display = "none";
 
         this.disabled = true;
-        this.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Salvando...\';
+        this.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>' . htmlspecialchars(__('admin.desapego.js_saving', 'Salvando...'), ENT_QUOTES, 'UTF-8') . '\';
         try {
             var resp = await fetch("/admin/desapego/comissoes/marcar-pago", {
                 method: "POST",
@@ -325,19 +333,19 @@ class AdminDesapegoController extends Controller {
             if (json.ok) {
                 location.reload();
             } else {
-                erro.textContent = json.error || "Falha ao salvar";
+                erro.textContent = json.error || "' . htmlspecialchars(__('admin.desapego.js_save_failed', 'Falha ao salvar'), ENT_QUOTES, 'UTF-8') . '";
                 erro.style.display = "";
             }
         } catch(e) {
-            erro.textContent = "Erro de conexão";
+            erro.textContent = "' . htmlspecialchars(__('admin.desapego.js_connection_error', 'Erro de conexão'), ENT_QUOTES, 'UTF-8') . '";
             erro.style.display = "";
         }
         this.disabled = false;
-        this.innerHTML = \'<i class="bi bi-check2 me-1"></i>Confirmar Pagamento\';
+        this.innerHTML = \'<i class="bi bi-check2 me-1"></i>' . htmlspecialchars(__('admin.desapego.confirm_payment', 'Confirmar Pagamento'), ENT_QUOTES, 'UTF-8') . '\';
     });
 
     async function reverterComissao(id) {
-        if (!confirm("Reverter esta comissão para pendente? O valor pago será zerado.")) return;
+        if (!confirm("' . htmlspecialchars(__('admin.desapego.js_revert_confirm', 'Reverter esta comissão para pendente? O valor pago será zerado.'), ENT_QUOTES, 'UTF-8') . '")) return;
         try {
             var resp = await fetch("/admin/desapego/comissoes/reverter", {
                 method: "POST",
@@ -345,8 +353,8 @@ class AdminDesapegoController extends Controller {
                 body: "id=" + encodeURIComponent(id)
             });
             var json = await resp.json();
-            if (json.ok) { location.reload(); } else { alert("Erro: " + (json.error || "Falha")); }
-        } catch(e) { alert("Erro de conexão"); }
+            if (json.ok) { location.reload(); } else { alert("' . htmlspecialchars(__('admin.desapego.js_error_prefix', 'Erro:'), ENT_QUOTES, 'UTF-8') . ' " + (json.error || "' . htmlspecialchars(__('admin.desapego.js_failure', 'Falha'), ENT_QUOTES, 'UTF-8') . '")); }
+        } catch(e) { alert("' . htmlspecialchars(__('admin.desapego.js_connection_error', 'Erro de conexão'), ENT_QUOTES, 'UTF-8') . '"); }
     }
     </script>
 </body>
@@ -427,11 +435,11 @@ class AdminDesapegoController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Desapego - Pendentes - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.desapego.pending_page_title', 'Desapego - Pendentes - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
@@ -448,30 +456,30 @@ class AdminDesapegoController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>Desapego — Itens Pendentes</h1>
-                    <p class="text-muted mb-0">Produtos de desapego em pedidos que ainda não foram enviados (até Caixa Fechada).</p>
+                    <h1 class="h3 fw-bold"><i class="fas fa-hand-holding-heart me-2 text-info"></i>' . __('admin.desapego.pending_items_title', 'Desapego — Itens Pendentes') . '</h1>
+                    <p class="text-muted mb-0">' . __('admin.desapego.pending_items_subtitle', 'Produtos de desapego em pedidos que ainda não foram enviados (até Caixa Fechada).') . '</p>
                 </div>
-                <a href="/admin/desapego/comissoes" class="btn btn-outline-primary btn-sm"><i class="fas fa-percentage me-1"></i>Comissões</a>
+                <a href="/admin/desapego/comissoes" class="btn btn-outline-primary btn-sm"><i class="fas fa-percentage me-1"></i>' . __('admin.desapego.commissions', 'Comissões') . '</a>
             </div>';
 
         if (!$hasDesapego) {
-            echo '<div class="alert alert-warning">Coluna desapego não encontrada. Execute a migration 213.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.desapego.column_not_found', 'Coluna desapego não encontrada. Execute a migration 213.') . '</div>';
         } elseif (empty($itens)) {
-            echo '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Nenhum item de desapego pendente no momento. Todos já foram enviados ou não há pedidos com itens de desapego.</div>';
+            echo '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' . __('admin.desapego.no_pending_items', 'Nenhum item de desapego pendente no momento. Todos já foram enviados ou não há pedidos com itens de desapego.') . '</div>';
         } else {
             echo '<div class="card border-0 shadow-sm" style="border-radius:14px;">
                 <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Pedido</th>
-                            <th>Produto</th>
-                            <th>Qtd</th>
-                            <th>Preço Unit.</th>
-                            <th>Status Pedido</th>
-                            <th>Cliente</th>
-                            <th>Desapeguista</th>
-                            <th>Data</th>
+                            <th>' . __('admin.desapego.order', 'Pedido') . '</th>
+                            <th>' . __('admin.desapego.product', 'Produto') . '</th>
+                            <th>' . __('admin.desapego.qty', 'Qtd') . '</th>
+                            <th>' . __('admin.desapego.unit_price', 'Preço Unit.') . '</th>
+                            <th>' . __('admin.desapego.order_status', 'Status Pedido') . '</th>
+                            <th>' . __('admin.desapego.customer', 'Cliente') . '</th>
+                            <th>' . __('admin.desapego.seller', 'Desapeguista') . '</th>
+                            <th>' . __('admin.desapego.date', 'Data') . '</th>
                         </tr>
                     </thead>
                     <tbody>';
@@ -488,7 +496,7 @@ class AdminDesapegoController extends Controller {
 
                 echo '<tr>
                     <td><a href="/admin/pedidos/detalhes/' . (int) $item['pedido_id'] . '" class="fw-bold">#' . str_pad((int) $item['pedido_id'], 6, '0', STR_PAD_LEFT) . '</a></td>
-                    <td>' . htmlspecialchars($item['produto_nome'] ?? 'Produto #' . $item['produto_id']) . '</td>
+                    <td>' . htmlspecialchars($item['produto_nome'] ?? __('admin.desapego.product_number', 'Produto #{n}', ['n'=>$item['produto_id']])) . '</td>
                     <td class="text-center">' . (int) ($item['quantidade'] ?? 1) . '</td>
                     <td>US$ ' . number_format((float) ($item['preco_unitario'] ?? $item['produto_preco'] ?? 0), 2) . '</td>
                     <td><span class="badge bg-' . $statusBadgeColor . '">' . htmlspecialchars(str_replace('_', ' ', ucfirst($item['pedido_status'] ?? ''))) . '</span></td>
@@ -521,7 +529,7 @@ class AdminDesapegoController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.desapego.err_invalid_id', 'ID inválido')]);
             exit;
         }
 
@@ -530,7 +538,7 @@ class AdminDesapegoController extends Controller {
         $observacao = trim((string) ($request->getParam('observacao') ?? ''));
 
         if ($valorPago <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'Informe um valor maior que zero.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.desapego.err_enter_value_gt_zero', 'Informe um valor maior que zero.')]);
             exit;
         }
 
@@ -550,7 +558,7 @@ class AdminDesapegoController extends Controller {
             $st->execute([$id]);
             $row = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$row) {
-                echo json_encode(['ok' => false, 'error' => 'Comissão não encontrada.']);
+                echo json_encode(['ok' => false, 'error' => __('admin.desapego.err_commission_not_found', 'Comissão não encontrada.')]);
                 exit;
             }
 
@@ -560,7 +568,7 @@ class AdminDesapegoController extends Controller {
 
             // Bloquear pagamento acima do devido
             if ($valorPago > $restante + 0.01) {
-                echo json_encode(['ok' => false, 'error' => 'Valor informado ($' . number_format($valorPago, 2) . ') excede o restante ($' . number_format($restante, 2) . ').']);
+                echo json_encode(['ok' => false, 'error' => __('admin.desapego.err_value_exceeds_remaining', 'Valor informado (${v}) excede o restante (${r}).', ['v'=>number_format($valorPago, 2), 'r'=>number_format($restante, 2)])]);
                 exit;
             }
 
@@ -600,7 +608,7 @@ class AdminDesapegoController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.desapego.err_invalid_id', 'ID inválido')]);
             exit;
         }
 
@@ -626,7 +634,7 @@ class AdminDesapegoController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.desapego.err_invalid_id', 'ID inválido')]);
             exit;
         }
 

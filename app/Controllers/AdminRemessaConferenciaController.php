@@ -309,7 +309,7 @@ class AdminRemessaConferenciaController extends Controller {
         $stats = ['total_pedidos' => 0, 'etiquetas_geradas' => 0, 'etiquetas_pendentes' => 0, 'janelas_atraso' => 0];
 
         try {
-            if (!$this->tableExists('remessa_janelas')) throw new \Exception('Tabela remessa_janelas não encontrada.');
+            if (!$this->tableExists('remessa_janelas')) throw new \Exception(__('admin.shipment_check.table_windows_not_found', 'Tabela remessa_janelas não encontrada.'));
 
             // Filtros (etiqueta padrão = 'gerada' quando não há parâmetro na URL)
             $etiquetaRaw = $request->getParam('etiqueta', '');
@@ -422,8 +422,8 @@ class AdminRemessaConferenciaController extends Controller {
             $filtros = ['janela_id' => '', 'janela_status' => '', 'etiqueta' => '', 'busca' => ''];
         }
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Conferência de Remessa</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>' . __('admin.shipment_check.page_title', 'Conferência de Remessa') . '</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -431,7 +431,7 @@ class AdminRemessaConferenciaController extends Controller {
         renderAdminSidebar('remessa-conferencia');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">';
 
-        if ($errorMsg) echo '<div class="alert alert-danger mt-3"><strong>Erro:</strong> ' . htmlspecialchars($errorMsg) . '</div>';
+        if ($errorMsg) echo '<div class="alert alert-danger mt-3"><strong>' . __('admin.shipment_check.error_label', 'Erro:') . '</strong> ' . htmlspecialchars($errorMsg) . '</div>';
 
         require __DIR__ . '/../Views/admin/remessa-conferencia/index-flat.php';
 
@@ -446,7 +446,7 @@ class AdminRemessaConferenciaController extends Controller {
         $janelasAbertas = $janelasFinalizadas = $janelasGeradas = [];
         $errorMsg = null;
         try {
-            if (!$this->tableExists('remessa_janelas')) throw new \Exception('Tabela remessa_janelas não encontrada.');
+            if (!$this->tableExists('remessa_janelas')) throw new \Exception(__('admin.shipment_check.table_windows_not_found', 'Tabela remessa_janelas não encontrada.'));
             $stA = $this->connection->query("SELECT * FROM remessa_janelas WHERE status = 'aberta' ORDER BY data_inicio DESC");
             $janelasAbertas = $stA ? $stA->fetchAll(\PDO::FETCH_ASSOC) : [];
             $stF = $this->connection->query("SELECT * FROM remessa_janelas WHERE status IN ('finalizada','atraso') ORDER BY data_inicio DESC LIMIT 20");
@@ -455,8 +455,8 @@ class AdminRemessaConferenciaController extends Controller {
             $janelasGeradas = $stG ? $stG->fetchAll(\PDO::FETCH_ASSOC) : [];
         } catch (\Exception $e) { $errorMsg = $e->getMessage(); }
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Conferência de Remessa</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>' . __('admin.shipment_check.page_title', 'Conferência de Remessa') . '</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -464,14 +464,14 @@ class AdminRemessaConferenciaController extends Controller {
         renderAdminSidebar('remessa-conferencia');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
 <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="page-title">Conferência de Remessa</h1>
-    <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+    <h1 class="page-title">' . __('admin.shipment_check.page_title', 'Conferência de Remessa') . '</h1>
+    <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('admin.shipment_check.refresh', 'Atualizar') . '</button>
 </div>';
-        if ($errorMsg) echo '<div class="alert alert-danger"><strong>Erro:</strong> ' . htmlspecialchars($errorMsg) . '</div>';
+        if ($errorMsg) echo '<div class="alert alert-danger"><strong>' . __('admin.shipment_check.error_label', 'Erro:') . '</strong> ' . htmlspecialchars($errorMsg) . '</div>';
 
         $renderJanelas = function(array $janelas, string $titulo, string $badgeClass) {
             echo '<div class="card mb-4"><div class="card-header"><strong>' . htmlspecialchars($titulo) . '</strong></div><div class="card-body">';
-            if (!$janelas) { echo '<div class="text-muted">Nenhuma janela.</div>'; }
+            if (!$janelas) { echo '<div class="text-muted">' . __('admin.shipment_check.no_window', 'Nenhuma janela.') . '</div>'; }
             else {
                 echo '<div class="list-group">';
                 foreach ($janelas as $j) {
@@ -479,7 +479,7 @@ class AdminRemessaConferenciaController extends Controller {
                     $df = date('d/m/Y', strtotime((string)$j['data_fim']));
                     echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-conferencia/janela/' . (int)$j['id'] . '">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div><strong>Janela #' . (int)$j['id'] . '</strong> <span class="text-muted small">(' . $di . ' a ' . $df . ')</span></div>
+                            <div><strong>' . __('admin.shipment_check.window_n', 'Janela #{n}', ['n' => (int)$j['id']]) . '</strong> <span class="text-muted small">(' . $di . ' ' . __('admin.shipment_check.date_range_to', 'a') . ' ' . $df . ')</span></div>
                             <span class="badge bg-' . $badgeClass . '">' . htmlspecialchars((string)($j['status'] ?? '')) . '</span>
                         </div></a>';
                 }
@@ -487,9 +487,9 @@ class AdminRemessaConferenciaController extends Controller {
             }
             echo '</div></div>';
         };
-        $renderJanelas($janelasAbertas, 'Janelas Abertas', 'success');
-        $renderJanelas($janelasFinalizadas, 'Janelas Finalizadas / Em Atraso', 'secondary');
-        $renderJanelas($janelasGeradas, 'Remessas Geradas', 'info');
+        $renderJanelas($janelasAbertas, __('admin.shipment_check.windows_open', 'Janelas Abertas'), 'success');
+        $renderJanelas($janelasFinalizadas, __('admin.shipment_check.windows_finished_late', 'Janelas Finalizadas / Em Atraso'), 'secondary');
+        $renderJanelas($janelasGeradas, __('admin.shipment_check.shipments_generated', 'Remessas Geradas'), 'info');
         echo '</main></div></div><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script></body></html>';
         exit;
     }
@@ -548,8 +548,8 @@ class AdminRemessaConferenciaController extends Controller {
         $pendentes = $total - $geradas;
         $badge = match($janela['status'] ?? '') { 'aberta' => 'success', 'atraso' => 'danger', 'remessa_gerada' => 'info', default => 'secondary' };
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Janela #' . $janelaId . ' - Conferência</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>' . __('admin.shipment_check.window_check_title', 'Janela #{n} - Conferência', ['n' => $janelaId]) . '</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -558,27 +558,27 @@ class AdminRemessaConferenciaController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
 <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
     <div>
-        <h1 class="h3 mb-0">Janela #' . $janelaId . ' <span class="badge bg-' . $badge . '">' . htmlspecialchars((string)($janela['status'] ?? '')) . '</span></h1>
-        <div class="text-muted small">' . date('d/m/Y', strtotime((string)$janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime((string)$janela['data_fim'])) . '</div>
+        <h1 class="h3 mb-0">' . __('admin.shipment_check.window_n', 'Janela #{n}', ['n' => $janelaId]) . ' <span class="badge bg-' . $badge . '">' . htmlspecialchars((string)($janela['status'] ?? '')) . '</span></h1>
+        <div class="text-muted small">' . date('d/m/Y', strtotime((string)$janela['data_inicio'])) . ' ' . __('admin.shipment_check.date_range_to', 'a') . ' ' . date('d/m/Y', strtotime((string)$janela['data_fim'])) . '</div>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="/admin/remessa-conferencia"><i class="fas fa-arrow-left"></i> Voltar</a>
-        <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync"></i> Atualizar</button>
+        <a class="btn btn-outline-secondary" href="/admin/remessa-conferencia"><i class="fas fa-arrow-left"></i> ' . __('admin.shipment_check.back', 'Voltar') . '</a>
+        <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync"></i> ' . __('admin.shipment_check.refresh', 'Atualizar') . '</button>
     </div>
 </div>
 <div class="row mb-3">
-    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">Total pedidos</div><div class="h4 mb-0">' . $total . '</div></div></div></div>
-    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">Etiquetas geradas</div><div class="h4 mb-0">' . $geradas . '</div></div></div></div>
-    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">Pendentes</div><div class="h4 mb-0">' . $pendentes . '</div></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">' . __('admin.shipment_check.total_orders', 'Total pedidos') . '</div><div class="h4 mb-0">' . $total . '</div></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">' . __('admin.shipment_check.labels_generated', 'Etiquetas geradas') . '</div><div class="h4 mb-0">' . $geradas . '</div></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">' . __('admin.shipment_check.pending', 'Pendentes') . '</div><div class="h4 mb-0">' . $pendentes . '</div></div></div></div>
 </div>
-<div class="card"><div class="card-header d-flex justify-content-between align-items-center"><strong>Pedidos desta janela</strong>
-<button type="button" class="btn btn-sm btn-outline-success" id="btnBaixarMassa" disabled onclick="baixarDocumentosMassa(' . $janelaId . ')"><i class="fas fa-file-archive me-1"></i>Baixar documentos</button>
+<div class="card"><div class="card-header d-flex justify-content-between align-items-center"><strong>' . __('admin.shipment_check.orders_in_window', 'Pedidos desta janela') . '</strong>
+<button type="button" class="btn btn-sm btn-outline-success" id="btnBaixarMassa" disabled onclick="baixarDocumentosMassa(' . $janelaId . ')"><i class="fas fa-file-archive me-1"></i>' . __('admin.shipment_check.download_documents', 'Baixar documentos') . '</button>
 </div><div class="card-body">
 <div class="table-responsive"><table class="table table-hover align-middle table-sm">
-<thead><tr><th style="width:30px"><input type="checkbox" id="checkAll" onclick="toggleAll(this)"></th><th>Pedido</th><th>Data/Hora</th><th>Cliente</th><th>ZIP/CEP</th><th>Qtd</th><th>Etiqueta</th><th>Ações</th></tr></thead><tbody>';
+<thead><tr><th style="width:30px"><input type="checkbox" id="checkAll" onclick="toggleAll(this)"></th><th>' . __('admin.shipment_check.th_order', 'Pedido') . '</th><th>' . __('admin.shipment_check.th_datetime', 'Data/Hora') . '</th><th>' . __('admin.shipment_check.th_customer', 'Cliente') . '</th><th>' . __('admin.shipment_check.th_zip', 'ZIP/CEP') . '</th><th>' . __('admin.shipment_check.th_qty', 'Qtd') . '</th><th>' . __('admin.shipment_check.th_label', 'Etiqueta') . '</th><th>' . __('admin.shipment_check.th_actions', 'Ações') . '</th></tr></thead><tbody>';
 
         if (!$pedidos) {
-            echo '<tr><td colspan="8" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
+            echo '<tr><td colspan="8" class="text-center text-muted">' . __('admin.shipment_check.no_order_in_window', 'Nenhum pedido nesta janela.') . '</td></tr>';
         } else {
             foreach ($pedidos as $p) {
                 $pid = (int)($p['pedido_id'] ?? 0);
@@ -593,7 +593,7 @@ class AdminRemessaConferenciaController extends Controller {
 
                 // Detectar envio de redirecionamento
                 $isRedir = ($pid >= 900000);
-                $clienteNome = (string)($p['cliente_nome'] ?? 'N/A');
+                $clienteNome = (string)($p['cliente_nome'] ?? __('admin.shipment_check.na', 'N/A'));
                 $pedidoLabel = '#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT);
 
                 if ($isRedir) {
@@ -607,7 +607,7 @@ class AdminRemessaConferenciaController extends Controller {
                         $stR->execute([$envioRedirId]);
                         $redir = $stR->fetch(\PDO::FETCH_ASSOC);
                         if ($redir) {
-                            $clienteNome = ($redir['destinatario_nome'] ?: $redir['cli_nome']) ?: 'Redirecionamento';
+                            $clienteNome = ($redir['destinatario_nome'] ?: $redir['cli_nome']) ?: __('admin.shipment_check.redirect', 'Redirecionamento');
                             if (empty($cep)) $cep = (string)($redir['dest_cep'] ?? '');
                             if ($dt === '-' && !empty($redir['created_at'])) $dt = date('d/m/Y H:i', strtotime((string)$redir['created_at']));
                             if ($qtd === '-' && $redir['qtd_produtos'] !== null) $qtd = (int)$redir['qtd_produtos'];
@@ -622,12 +622,12 @@ class AdminRemessaConferenciaController extends Controller {
                     <td>' . htmlspecialchars($clienteNome) . '</td>
                     <td>' . htmlspecialchars($cep !== '' ? $cep : '-') . '</td>
                     <td>' . $qtd . '</td>
-                    <td>' . ($et === 1 ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>');
+                    <td>' . ($et === 1 ? '<span class="badge bg-success">' . __('admin.shipment_check.badge_generated', 'Gerada') . '</span>' : '<span class="badge bg-warning text-dark">' . __('admin.shipment_check.badge_pending', 'Pendente') . '</span>');
                 if ($wxCourier !== '') echo '<br><small class="text-muted">' . htmlspecialchars($wxCourier) . '</small>';
                 elseif ($wxTrack !== '') echo '<br><small class="text-muted">' . htmlspecialchars($wxTrack) . '</small>';
                 echo '</td><td class="text-nowrap">'
-                    . ($labelUrl !== '' ? '<a class="btn btn-sm btn-outline-primary me-1" target="_blank" href="' . htmlspecialchars($labelUrl) . '"><i class="fas fa-tag"></i> Etiqueta</a>' : '')
-                    . '<a class="btn btn-sm btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $janelaId . '/pedido/' . $pid . '"><i class="fas fa-eye"></i> Detalhes</a>'
+                    . ($labelUrl !== '' ? '<a class="btn btn-sm btn-outline-primary me-1" target="_blank" href="' . htmlspecialchars($labelUrl) . '"><i class="fas fa-tag"></i> ' . __('admin.shipment_check.label', 'Etiqueta') . '</a>' : '')
+                    . '<a class="btn btn-sm btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $janelaId . '/pedido/' . $pid . '"><i class="fas fa-eye"></i> ' . __('admin.shipment_check.details', 'Detalhes') . '</a>'
                     . '</td></tr>';
             }
         }
@@ -644,16 +644,16 @@ function updateBtnBaixar() {
     if (btn) {
         btn.disabled = checked.length === 0;
         btn.innerHTML = checked.length > 0
-            ? \'<i class="fas fa-file-archive me-1"></i>Baixar documentos (\' + checked.length + \')\'
-            : \'<i class="fas fa-file-archive me-1"></i>Baixar documentos\';
+            ? \'<i class="fas fa-file-archive me-1"></i>' . htmlspecialchars(__('admin.shipment_check.download_documents_count', 'Baixar documentos ('), ENT_QUOTES, 'UTF-8') . '\' + checked.length + \')\'
+            : \'<i class="fas fa-file-archive me-1"></i>' . htmlspecialchars(__('admin.shipment_check.download_documents', 'Baixar documentos'), ENT_QUOTES, 'UTF-8') . '\';
     }
 }
 function baixarDocumentosMassa(janelaId) {
     const checked = document.querySelectorAll(".pedido-check:checked");
-    if (checked.length === 0) { alert("Selecione ao menos um pedido."); return; }
+    if (checked.length === 0) { alert("' . htmlspecialchars(__('admin.shipment_check.select_one_order', 'Selecione ao menos um pedido.'), ENT_QUOTES, 'UTF-8') . '"); return; }
     const ids = Array.from(checked).map(cb => cb.value).join(",");
     const btn = document.getElementById("btnBaixarMassa");
-    if (btn) { btn.disabled = true; btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...\'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>' . htmlspecialchars(__('admin.shipment_check.generating_zip', 'Gerando ZIP...'), ENT_QUOTES, 'UTF-8') . '\'; }
     window.location.href = "/admin/remessa-conferencia/janela/" + janelaId + "/exportar-documentos?pedidos=" + encodeURIComponent(ids);
     setTimeout(() => { if (btn) { btn.disabled = false; updateBtnBaixar(); } }, 5000);
 }
@@ -681,18 +681,18 @@ function baixarDocumentosMassa(janelaId) {
         $tipo = preg_replace('/[^a-z0-9_]/', '', strtolower((string)$tipo));
         $this->ensureDocumentosTable();
         if (!isset($_FILES['arquivo']) || $_FILES['arquivo']['error'] !== UPLOAD_ERR_OK) {
-            echo json_encode(['success' => false, 'error' => 'Arquivo inválido']); exit;
+            echo json_encode(['success' => false, 'error' => __('admin.shipment_check.invalid_file', 'Arquivo inválido')]); exit;
         }
         $orig = (string)$_FILES['arquivo']['name'];
         $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
         $allowed = ['pdf','jpg','jpeg','png','webp'];
-        if (!in_array($ext, $allowed, true)) { echo json_encode(['success' => false, 'error' => 'Tipo não permitido']); exit; }
+        if (!in_array($ext, $allowed, true)) { echo json_encode(['success' => false, 'error' => __('admin.shipment_check.type_not_allowed', 'Tipo não permitido')]); exit; }
         $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
         $dir = $docRoot . '/uploads/remessa-docs/';
         if (!is_dir($dir)) @mkdir($dir, 0755, true);
         $fname = 'doc_' . $jid . '_' . $pid . '_' . $tipo . '_' . time() . '.' . $ext;
         if (!@move_uploaded_file($_FILES['arquivo']['tmp_name'], $dir . $fname)) {
-            echo json_encode(['success' => false, 'error' => 'Falha ao salvar arquivo']); exit;
+            echo json_encode(['success' => false, 'error' => __('admin.shipment_check.file_save_failed', 'Falha ao salvar arquivo')]); exit;
         }
         $path = '/uploads/remessa-docs/' . $fname;
         try {
@@ -800,18 +800,18 @@ function baixarDocumentosMassa(janelaId) {
         // Status split em português
         $traduzirStatus = function(string $s): string {
             $map = [
-                'approved'      => 'Aprovado',
-                'aprovado'      => 'Aprovado',
-                'pending'       => 'Pendente',
-                'pendente'      => 'Pendente',
-                'paid'          => 'Pago',
-                'pago'          => 'Pago',
-                'cancelled'     => 'Cancelado',
-                'cancelado'     => 'Cancelado',
-                'refunded'      => 'Estornado',
-                'failed'        => 'Falhou',
-                'falhou'        => 'Falhou',
-                'LABEL_CREATED' => 'Etiqueta Gerada',
+                'approved'      => __('admin.shipment_check.status_approved', 'Aprovado'),
+                'aprovado'      => __('admin.shipment_check.status_approved', 'Aprovado'),
+                'pending'       => __('admin.shipment_check.status_pending', 'Pendente'),
+                'pendente'      => __('admin.shipment_check.status_pending', 'Pendente'),
+                'paid'          => __('admin.shipment_check.status_paid', 'Pago'),
+                'pago'          => __('admin.shipment_check.status_paid', 'Pago'),
+                'cancelled'     => __('admin.shipment_check.status_cancelled', 'Cancelado'),
+                'cancelado'     => __('admin.shipment_check.status_cancelled', 'Cancelado'),
+                'refunded'      => __('admin.shipment_check.status_refunded', 'Estornado'),
+                'failed'        => __('admin.shipment_check.status_failed', 'Falhou'),
+                'falhou'        => __('admin.shipment_check.status_failed', 'Falhou'),
+                'LABEL_CREATED' => __('admin.shipment_check.status_label_created', 'Etiqueta Gerada'),
             ];
             return $map[$s] ?? $map[strtolower($s)] ?? $s;
         };
@@ -819,8 +819,8 @@ function baixarDocumentosMassa(janelaId) {
         // Verificar se existe doc medicamento
         $hasMedDoc = !empty($docs['medicamento']['file_path']);
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pedido #' . $pid . ' - Conferência</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>' . __('admin.shipment_check.order_check_title', 'Pedido #{n} - Conferência', ['n' => $pid]) . '</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -829,107 +829,107 @@ function baixarDocumentosMassa(janelaId) {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
 <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom flex-wrap gap-2">
     <div>
-        <h1 class="h3 mb-0">Pedido #' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</h1>
-        <div class="text-muted small">Janela #' . $jid . ' | Etiqueta: <span class="badge bg-' . ($et === 1 ? 'success' : 'warning') . '">' . ($et === 1 ? 'Gerada' : 'Pendente') . '</span></div>
+        <h1 class="h3 mb-0">' . __('admin.shipment_check.order_n', 'Pedido #{n}', ['n' => str_pad((string)$pid, 6, '0', STR_PAD_LEFT)]) . '</h1>
+        <div class="text-muted small">' . __('admin.shipment_check.window_n', 'Janela #{n}', ['n' => $jid]) . ' | ' . __('admin.shipment_check.label', 'Etiqueta') . ': <span class="badge bg-' . ($et === 1 ? 'success' : 'warning') . '">' . ($et === 1 ? __('admin.shipment_check.badge_generated', 'Gerada') : __('admin.shipment_check.badge_pending', 'Pendente')) . '</span></div>
     </div>
     <div class="d-flex gap-2 flex-wrap align-items-center">';
 
         // Confirmar Recebimento
         if ($recebidoConfirmado === 1) {
             $dtRec = $recebidoEm !== '' ? date('d/m/Y H:i', strtotime($recebidoEm)) : '';
-            echo '<span class="badge bg-success fs-6 px-3 py-2"><i class="fas fa-check-circle me-1"></i>Recebimento Confirmado' . ($dtRec !== '' ? ' em ' . $dtRec : '') . '</span>';
+            echo '<span class="badge bg-success fs-6 px-3 py-2"><i class="fas fa-check-circle me-1"></i>' . __('admin.shipment_check.receipt_confirmed', 'Recebimento Confirmado') . ($dtRec !== '' ? ' ' . __('admin.shipment_check.on_date', 'em') . ' ' . $dtRec : '') . '</span>';
         } else {
             echo '<button class="btn btn-success" id="btnConfirmarRecebimento" onclick="confirmarRecebimento()"
-                title="Confirmar que o pedido chegou no Brasil. Muda o status para Aguardando Liberação Aduaneira.">
-                Confirmar Recebimento no Brasil
+                title="' . htmlspecialchars(__('admin.shipment_check.confirm_receipt_title', 'Confirmar que o pedido chegou no Brasil. Muda o status para Aguardando Liberação Aduaneira.'), ENT_QUOTES, 'UTF-8') . '">
+                ' . __('admin.shipment_check.confirm_receipt_br', 'Confirmar Recebimento no Brasil') . '
             </button>
-            <small class="text-muted d-block" style="font-size:0.7rem;max-width:200px">Pedido chegou no BR â†’ muda para Aguardando Liberação Aduaneira</small>';
+            <small class="text-muted d-block" style="font-size:0.7rem;max-width:200px">' . __('admin.shipment_check.arrived_br_hint', 'Pedido chegou no BR → muda para Aguardando Liberação Aduaneira') . '</small>';
         }
 
-        echo '<a class="btn btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>';
-        if ($labelUrl !== '') echo '<a class="btn btn-outline-primary" href="' . $h($labelUrl) . '" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>';
-        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/appmax" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante AppMax</a>';
-        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante Câmbio Real</a>';
-        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal_taxas" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante CR Taxas</a>';
-        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/stripe" target="_blank"><i class="fas fa-credit-card me-1"></i>Comprovante Stripe</a>';
-        echo '<a class="btn btn-outline-dark" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/invoice" target="_blank"><i class="fas fa-file-alt me-1"></i>Invoice</a>';
+        echo '<a class="btn btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $jid . '"><i class="fas fa-arrow-left"></i> ' . __('admin.shipment_check.back', 'Voltar') . '</a>';
+        if ($labelUrl !== '') echo '<a class="btn btn-outline-primary" href="' . $h($labelUrl) . '" target="_blank"><i class="fas fa-download"></i> ' . __('admin.shipment_check.download_label', 'Baixar etiqueta') . '</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/appmax" target="_blank"><i class="fas fa-file-invoice me-1"></i>' . __('admin.shipment_check.receipt_appmax', 'Comprovante AppMax') . '</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal" target="_blank"><i class="fas fa-file-invoice me-1"></i>' . __('admin.shipment_check.receipt_cambioreal', 'Comprovante Câmbio Real') . '</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal_taxas" target="_blank"><i class="fas fa-file-invoice me-1"></i>' . __('admin.shipment_check.receipt_cr_fees', 'Comprovante CR Taxas') . '</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/stripe" target="_blank"><i class="fas fa-credit-card me-1"></i>' . __('admin.shipment_check.receipt_stripe', 'Comprovante Stripe') . '</a>';
+        echo '<a class="btn btn-outline-dark" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/invoice" target="_blank"><i class="fas fa-file-alt me-1"></i>' . __('admin.shipment_check.invoice', 'Invoice') . '</a>';
         if ($hasMedDoc) {
-            echo '<a class="btn btn-outline-warning" href="' . $h($docs['medicamento']['file_path']) . '" target="_blank"><i class="fas fa-pills me-1"></i>Doc. Medicamento</a>';
+            echo '<a class="btn btn-outline-warning" href="' . $h($docs['medicamento']['file_path']) . '" target="_blank"><i class="fas fa-pills me-1"></i>' . __('admin.shipment_check.medication_doc', 'Doc. Medicamento') . '</a>';
         }
         echo '</div></div>';
 
         // Status / Tracking
-        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info-circle me-1"></i>Status e Rastreio</strong></div><div class="card-body">
+        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info-circle me-1"></i>' . __('admin.shipment_check.status_and_tracking', 'Status e Rastreio') . '</strong></div><div class="card-body">
 <div class="row g-2">
-    <div class="col-md-3"><div class="text-muted small">Status do Pedido</div><div>' . $h($pedido['status'] ?? '') . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Data do Pedido</div><div>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Status W-Express</div><div>' . $h($wxStatus !== '' ? $wxStatus : '-') . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Etiqueta</div><div>' . ($et === 1 ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.order_status', 'Status do Pedido') . '</div><div>' . $h($pedido['status'] ?? '') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.order_date', 'Data do Pedido') . '</div><div>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.wexpress_status', 'Status W-Express') . '</div><div>' . $h($wxStatus !== '' ? $wxStatus : '-') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.label', 'Etiqueta') . '</div><div>' . ($et === 1 ? '<span class="badge bg-success">' . __('admin.shipment_check.badge_generated', 'Gerada') . '</span>' : '<span class="badge bg-warning text-dark">' . __('admin.shipment_check.badge_pending', 'Pendente') . '</span>') . '</div></div>
     <div class="col-md-3"><div class="text-muted small">Shipping ID</div><div>' . $h($wxShipId !== '' ? $wxShipId : '-') . '</div></div>
     <div class="col-md-3"><div class="text-muted small">WExpress Tracking</div><div>' . $h($wxTrack !== '' ? $wxTrack : '-') . '</div></div>
     <div class="col-md-3"><div class="text-muted small">Courier Tracking</div><div>' . $h($wxCourier !== '' ? $wxCourier : '-') . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Etiqueta URL</div><div>' . ($labelUrl !== '' ? '<a href="' . $h($labelUrl) . '" target="_blank">Abrir</a>' : '-') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.label_url', 'Etiqueta URL') . '</div><div>' . ($labelUrl !== '' ? '<a href="' . $h($labelUrl) . '" target="_blank">' . __('admin.shipment_check.open', 'Abrir') . '</a>' : '-') . '</div></div>
 </div></div></div>';
 
         // Medicamento
         echo '<div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
-    <strong><i class="fas fa-pills me-1"></i>Medicamento</strong>
+    <strong><i class="fas fa-pills me-1"></i>' . __('admin.shipment_check.medication', 'Medicamento') . '</strong>
     <div class="form-check form-switch mb-0">
         <input class="form-check-input" type="checkbox" id="switchMedicamento" ' . ($medicamentoFlag ? 'checked' : '') . ' onchange="salvarMedicamento(this.checked)">
-        <label class="form-check-label" for="switchMedicamento">É medicamento</label>
+        <label class="form-check-label" for="switchMedicamento">' . __('admin.shipment_check.is_medication', 'É medicamento') . '</label>
     </div>
 </div>
 <div class="card-body" id="medicamentoBlock" ' . (!$medicamentoFlag ? 'style="display:none"' : '') . '>
-    <div class="alert alert-warning py-2 mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Pedido marcado como medicamento. Upload do documento é <strong>obrigatório</strong>.</div>
-    <div class="mb-2"><strong>Documento do medicamento:</strong>
+    <div class="alert alert-warning py-2 mb-3"><i class="fas fa-exclamation-triangle me-1"></i>' . __('admin.shipment_check.medication_required_upload', 'Pedido marcado como medicamento. Upload do documento é <strong>obrigatório</strong>.') . '</div>
+    <div class="mb-2"><strong>' . __('admin.shipment_check.medication_document', 'Documento do medicamento:') . '</strong>
     ' . (!empty($docs['medicamento']['file_path'])
-        ? '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Enviado: ' . $h($docs['medicamento']['original_name'] ?? '') . '</span> <a href="' . $h($docs['medicamento']['file_path']) . '" target="_blank" class="btn btn-sm btn-outline-primary ms-2">Ver</a>'
-        : '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Pendente</span>') . '
+        ? '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' . __('admin.shipment_check.sent', 'Enviado') . ': ' . $h($docs['medicamento']['original_name'] ?? '') . '</span> <a href="' . $h($docs['medicamento']['file_path']) . '" target="_blank" class="btn btn-sm btn-outline-primary ms-2">' . __('admin.shipment_check.view', 'Ver') . '</a>'
+        : '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>' . __('admin.shipment_check.badge_pending', 'Pendente') . '</span>') . '
     </div>
     <div class="mt-2">
-        <label class="form-label">Upload do documento (PDF, JPG, PNG)</label>
+        <label class="form-label">' . __('admin.shipment_check.upload_document_types', 'Upload do documento (PDF, JPG, PNG)') . '</label>
         <input type="file" class="form-control" id="fileMedicamento" accept=".pdf,.jpg,.jpeg,.png,.webp">
-        <button class="btn btn-sm btn-primary mt-2" onclick="uploadDoc(\'medicamento\')"><i class="fas fa-upload me-1"></i>Enviar</button>
+        <button class="btn btn-sm btn-primary mt-2" onclick="uploadDoc(\'medicamento\')"><i class="fas fa-upload me-1"></i>' . __('admin.shipment_check.send', 'Enviar') . '</button>
     </div>
 </div>
 <div class="card-body" id="semMedicamentoBlock" ' . ($medicamentoFlag ? 'style="display:none"' : '') . '>
-    <div class="text-muted small"><i class="fas fa-info-circle me-1"></i>Para pedidos do site, o comprovante de pagamento é exibido nas informações do pedido e não exige upload.</div>
+    <div class="text-muted small"><i class="fas fa-info-circle me-1"></i>' . __('admin.shipment_check.site_orders_no_upload', 'Para pedidos do site, o comprovante de pagamento é exibido nas informações do pedido e não exige upload.') . '</div>
 </div></div>';
 
         // Cliente
-        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-user me-1"></i>Dados do Cliente</strong></div><div class="card-body">
+        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-user me-1"></i>' . __('admin.shipment_check.customer_data', 'Dados do Cliente') . '</strong></div><div class="card-body">
 <div class="row g-2">
-    <div class="col-md-4"><div class="text-muted small">Nome</div><div>' . $h($pedido['cliente_nome'] ?? '') . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">Suíte</div><div>' . $h($pedido['cliente_suite'] ?? '') . '</div></div>
-    <div class="col-md-4"><div class="text-muted small">E-mail</div><div>' . $h($pedido['cliente_email'] ?? '') . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">CPF/Doc</div><div>' . $h($pedido['cliente_cpf'] ?? '') . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Celular</div><div>' . $h($pedido['cliente_telefone'] ?? '') . '</div></div>
+    <div class="col-md-4"><div class="text-muted small">' . __('admin.shipment_check.name', 'Nome') . '</div><div>' . $h($pedido['cliente_nome'] ?? '') . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.suite', 'Suíte') . '</div><div>' . $h($pedido['cliente_suite'] ?? '') . '</div></div>
+    <div class="col-md-4"><div class="text-muted small">' . __('admin.shipment_check.email', 'E-mail') . '</div><div>' . $h($pedido['cliente_email'] ?? '') . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.cpf_doc', 'CPF/Doc') . '</div><div>' . $h($pedido['cliente_cpf'] ?? '') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.mobile', 'Celular') . '</div><div>' . $h($pedido['cliente_telefone'] ?? '') . '</div></div>
     <div class="col-md-3"><div class="text-muted small">IP</div><div>' . $h($pedido['ip_cliente'] ?? ($pedido['customer_ip'] ?? '')) . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Aceita substituição</div><div>' . $h($pedido['aceita_substituicao'] ?? '-') . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Código de rastreio</div><div>' . $h($wxCourier !== '' ? $wxCourier : ($wxTrack !== '' ? $wxTrack : '-')) . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.accepts_substitution', 'Aceita substituição') . '</div><div>' . $h($pedido['aceita_substituicao'] ?? '-') . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.tracking_code', 'Código de rastreio') . '</div><div>' . $h($wxCourier !== '' ? $wxCourier : ($wxTrack !== '' ? $wxTrack : '-')) . '</div></div>
 </div></div></div>';
 
         // Endereço de entrega
-        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-map-marker-alt me-1"></i>Endereço de Entrega</strong></div><div class="card-body">
+        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-map-marker-alt me-1"></i>' . __('admin.shipment_check.delivery_address', 'Endereço de Entrega') . '</strong></div><div class="card-body">
 <div class="row g-2">
-    <div class="col-md-4"><div class="text-muted small">Nome</div><div>' . $h($pedido['cliente_nome'] ?? '') . '</div></div>
-    <div class="col-md-4"><div class="text-muted small">Rua/Logradouro</div><div>' . $h($logr) . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">Número</div><div>' . $h($num) . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">Complemento</div><div>' . $h($compl) . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Bairro</div><div>' . $h($bairro) . '</div></div>
-    <div class="col-md-3"><div class="text-muted small">Cidade</div><div>' . $h($cidade) . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">Estado</div><div>' . $h($estado) . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">CEP</div><div>' . $h($cep) . '</div></div>
-    <div class="col-md-2"><div class="text-muted small">País</div><div>' . $h($pais) . '</div></div>
+    <div class="col-md-4"><div class="text-muted small">' . __('admin.shipment_check.name', 'Nome') . '</div><div>' . $h($pedido['cliente_nome'] ?? '') . '</div></div>
+    <div class="col-md-4"><div class="text-muted small">' . __('admin.shipment_check.street', 'Rua/Logradouro') . '</div><div>' . $h($logr) . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.number', 'Número') . '</div><div>' . $h($num) . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.complement', 'Complemento') . '</div><div>' . $h($compl) . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.district', 'Bairro') . '</div><div>' . $h($bairro) . '</div></div>
+    <div class="col-md-3"><div class="text-muted small">' . __('admin.shipment_check.city', 'Cidade') . '</div><div>' . $h($cidade) . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.state', 'Estado') . '</div><div>' . $h($estado) . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.zip', 'CEP') . '</div><div>' . $h($cep) . '</div></div>
+    <div class="col-md-2"><div class="text-muted small">' . __('admin.shipment_check.country', 'País') . '</div><div>' . $h($pais) . '</div></div>
 </div></div></div>';
 
         // Itens - sem SKU e NCM
         $itens = $pedido['itens'] ?? [];
-        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-box me-1"></i>Itens do Pedido</strong></div><div class="card-body">
+        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-box me-1"></i>' . __('admin.shipment_check.order_items', 'Itens do Pedido') . '</strong></div><div class="card-body">
 <div class="table-responsive"><table class="table table-sm align-middle">
-<thead><tr><th>#</th><th>Imagem</th><th>Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
+<thead><tr><th>#</th><th>' . __('admin.shipment_check.th_image', 'Imagem') . '</th><th>' . __('admin.shipment_check.th_declaration', 'Declaração') . '</th><th>' . __('admin.shipment_check.th_qty', 'Qtd') . '</th><th>' . __('admin.shipment_check.th_unit_price', 'Preço Unit.') . '</th><th>' . __('admin.shipment_check.th_total', 'Total') . '</th></tr></thead><tbody>';
         if (!$itens) {
-            echo '<tr><td colspan="6" class="text-center text-muted">Nenhum item.</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted">' . __('admin.shipment_check.no_item', 'Nenhum item.') . '</td></tr>';
         } else {
             $idx = 1;
             foreach ($itens as $it) {
@@ -957,7 +957,7 @@ function baixarDocumentosMassa(janelaId) {
         // Pagamento - bloco principal + dois cards AppMax / Câmbio Real
         $isPagdev = (strtolower(trim($metodoPagamento)) === 'pagdev');
         echo '<div class="row"><div class="col-md-6">
-<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-credit-card me-1"></i>Pagamento</strong></div><div class="card-body">
+<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-credit-card me-1"></i>' . __('admin.shipment_check.payment', 'Pagamento') . '</strong></div><div class="card-body">
 <table class="table table-sm mb-0">';
         $totalUsd = 0.0;
         foreach ($pagamentos as $pg) {
@@ -967,16 +967,16 @@ function baixarDocumentosMassa(janelaId) {
         // Usar o total do pedido como valor pago (valor real cobrado do cliente)
         $valorPagoExibir = $totalPedido !== null && $totalPedido > 0 ? $totalPedido : null;
         if ($valorPagoExibir !== null) {
-            echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td><strong>' . $fmtMoeda($valorPagoExibir, $moeda) . '</strong></td></tr>';
+            echo '<tr><td class="text-muted">' . __('admin.shipment_check.amount_paid_currency', 'Valor pago ({currency})', ['currency' => $h($moeda)]) . '</td><td><strong>' . $fmtMoeda($valorPagoExibir, $moeda) . '</strong></td></tr>';
         } elseif ($totalUsd > 0 && $totalBrl <= 0) {
-            echo '<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
+            echo '<tr><td class="text-muted">' . __('admin.shipment_check.amount_paid_currency', 'Valor pago ({currency})', ['currency' => 'USD']) . '</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
         } elseif ($totalBrl > 0) {
-            echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl) . '</td></tr>';
+            echo '<tr><td class="text-muted">' . __('admin.shipment_check.amount_paid_currency', 'Valor pago ({currency})', ['currency' => 'BRL']) . '</td><td>' . $fmtBrl($totalBrl) . '</td></tr>';
         } else {
-            echo '<tr><td class="text-muted">Valor pago</td><td>-</td></tr>';
+            echo '<tr><td class="text-muted">' . __('admin.shipment_check.amount_paid', 'Valor pago') . '</td><td>-</td></tr>';
         }
-        echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
-        echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
+        echo '<tr><td class="text-muted">' . __('admin.shipment_check.credit_date', 'Data de crédito') . '</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
+        echo '<tr><td class="text-muted">' . __('admin.shipment_check.method', 'Método') . '</td><td>' . $h($metodoPagamento) . '</td></tr>';
         // Quando não há dados de componentes nos pagamentos, usar valores diretos do pedido
         if ($produtosValor <= 0 && $subtotal !== null && $subtotal > 0) {
             $produtosValor = $subtotal;
@@ -992,10 +992,10 @@ function baixarDocumentosMassa(janelaId) {
         if ($impostoLocal <= 0 && $impLocal !== null && $impLocal > 0) {
             $impostoLocal = $impLocal;
         }
-        echo '<tr><td class="text-muted">Produtos</td><td>' . ($produtosValor > 0 ? $fmtMoeda($produtosValor, $moeda) : ($subtotal !== null ? $fmtMoeda($subtotal, $moeda) : '-')) . '</td></tr>';
-        echo '<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtMoeda($taxaServico > 0 ? $taxaServico : null, $moeda) . '</td></tr>';
-        echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtMoeda($impostoValor > 0 ? $impostoValor : null, $moeda) . '</td></tr>';
-        echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impostoLocal > 0 ? $impostoLocal : null, $moeda) . '</td></tr>';
+        echo '<tr><td class="text-muted">' . __('admin.shipment_check.products', 'Produtos') . '</td><td>' . ($produtosValor > 0 ? $fmtMoeda($produtosValor, $moeda) : ($subtotal !== null ? $fmtMoeda($subtotal, $moeda) : '-')) . '</td></tr>';
+        echo '<tr><td class="text-muted">' . __('admin.shipment_check.service_fee', 'Taxa de serviço') . '</td><td>' . $fmtMoeda($taxaServico > 0 ? $taxaServico : null, $moeda) . '</td></tr>';
+        echo '<tr><td class="text-muted">' . __('admin.shipment_check.tax', 'Imposto') . '</td><td>' . $fmtMoeda($impostoValor > 0 ? $impostoValor : null, $moeda) . '</td></tr>';
+        echo '<tr><td class="text-muted">' . __('admin.shipment_check.local_tax', 'Imposto local') . '</td><td>' . $fmtMoeda($impostoLocal > 0 ? $impostoLocal : null, $moeda) . '</td></tr>';
         echo '</table>';
 
         // Comprovantes de pagamento (pagdev) - buscar da tabela pedidos_pagamento_documentos
@@ -1029,36 +1029,36 @@ function baixarDocumentosMassa(janelaId) {
             $okProd = ($docProdutos && ($docProdutos['status'] ?? '') === 'ok' && !empty($docProdutos['arquivo_path']));
             $okTaxas = ($docTaxas && ($docTaxas['status'] ?? '') === 'ok' && !empty($docTaxas['arquivo_path']));
 
-            echo '<div class="mt-3"><strong>Comprovantes de Pagamento</strong></div>';
+            echo '<div class="mt-3"><strong>' . __('admin.shipment_check.payment_receipts', 'Comprovantes de Pagamento') . '</strong></div>';
             echo '<div class="row mt-2">';
 
             // Comprovante de Produtos
             echo '<div class="col-md-6"><div class="card border-primary mb-2"><div class="card-body py-2">';
-            echo '<div class="fw-semibold small mb-1"><i class="fas fa-file-invoice text-primary me-1"></i>Comprovante de Produtos</div>';
+            echo '<div class="fw-semibold small mb-1"><i class="fas fa-file-invoice text-primary me-1"></i>' . __('admin.shipment_check.products_receipt', 'Comprovante de Produtos') . '</div>';
             if ($okProd) {
                 $atP = !empty($docProdutos['uploaded_at']) ? date('d/m/Y H:i', strtotime($docProdutos['uploaded_at'])) : '';
-                echo '<span class="badge bg-success">Recebido</span>';
-                if ($atP) echo ' <span class="text-muted small">Enviado em ' . $atP . '</span>';
+                echo '<span class="badge bg-success">' . __('admin.shipment_check.received', 'Recebido') . '</span>';
+                if ($atP) echo ' <span class="text-muted small">' . __('admin.shipment_check.sent_on', 'Enviado em') . ' ' . $atP . '</span>';
                 $prodFilePath = '/' . ltrim($docProdutos['arquivo_path'], '/');
-                echo '<div class="mt-1"><a href="' . $prodFilePath . '" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i>Abrir arquivo</a>';
-                echo ' <a href="' . $prodFilePath . '" download class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i>Baixar</a></div>';
+                echo '<div class="mt-1"><a href="' . $prodFilePath . '" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i>' . __('admin.shipment_check.open_file', 'Abrir arquivo') . '</a>';
+                echo ' <a href="' . $prodFilePath . '" download class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i>' . __('admin.shipment_check.download', 'Baixar') . '</a></div>';
             } else {
-                echo '<span class="badge bg-warning text-dark">Pendente</span>';
+                echo '<span class="badge bg-warning text-dark">' . __('admin.shipment_check.badge_pending', 'Pendente') . '</span>';
             }
             echo '</div></div></div>';
 
             // Comprovante de Taxas
             echo '<div class="col-md-6"><div class="card border-warning mb-2"><div class="card-body py-2">';
-            echo '<div class="fw-semibold small mb-1"><i class="fas fa-file-invoice text-warning me-1"></i>Comprovante de Taxas / Impostos</div>';
+            echo '<div class="fw-semibold small mb-1"><i class="fas fa-file-invoice text-warning me-1"></i>' . __('admin.shipment_check.fees_taxes_receipt', 'Comprovante de Taxas / Impostos') . '</div>';
             if ($okTaxas) {
                 $atT = !empty($docTaxas['uploaded_at']) ? date('d/m/Y H:i', strtotime($docTaxas['uploaded_at'])) : '';
-                echo '<span class="badge bg-success">Recebido</span>';
-                if ($atT) echo ' <span class="text-muted small">Enviado em ' . $atT . '</span>';
+                echo '<span class="badge bg-success">' . __('admin.shipment_check.received', 'Recebido') . '</span>';
+                if ($atT) echo ' <span class="text-muted small">' . __('admin.shipment_check.sent_on', 'Enviado em') . ' ' . $atT . '</span>';
                 $taxasFilePath = '/' . ltrim($docTaxas['arquivo_path'], '/');
-                echo '<div class="mt-1"><a href="' . $taxasFilePath . '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="fas fa-external-link-alt me-1"></i>Abrir arquivo</a>';
-                echo ' <a href="' . $taxasFilePath . '" download class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i>Baixar</a></div>';
+                echo '<div class="mt-1"><a href="' . $taxasFilePath . '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="fas fa-external-link-alt me-1"></i>' . __('admin.shipment_check.open_file', 'Abrir arquivo') . '</a>';
+                echo ' <a href="' . $taxasFilePath . '" download class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i>' . __('admin.shipment_check.download', 'Baixar') . '</a></div>';
             } else {
-                echo '<span class="badge bg-warning text-dark">Pendente</span>';
+                echo '<span class="badge bg-warning text-dark">' . __('admin.shipment_check.badge_pending', 'Pendente') . '</span>';
             }
             echo '</div></div></div>';
 
@@ -1077,7 +1077,7 @@ function baixarDocumentosMassa(janelaId) {
         if ($usaAppmax) {
             // Pedido antigo com AppMax
             echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-primary text-white"><strong><i class="fas fa-credit-card me-1"></i>AppMax</strong></div><div class="card-body">';
-            echo '<div class="mb-2"><strong>Valor AppMax (BRL):</strong> ' . $fmtBrl($appmaxValorTotal > 0 ? $appmaxValorTotal : null) . '</div>';
+            echo '<div class="mb-2"><strong>' . __('admin.shipment_check.value_appmax_brl', 'Valor AppMax (BRL):') . '</strong> ' . $fmtBrl($appmaxValorTotal > 0 ? $appmaxValorTotal : null) . '</div>';
             foreach ($appmaxPagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
                 $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
@@ -1100,9 +1100,9 @@ function baixarDocumentosMassa(janelaId) {
             $crTaxasValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $cambioRealTaxasPagamentos));
             echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-warning text-dark"><strong><i class="fas fa-receipt me-1"></i>Câmbio Real Taxas</strong></div><div class="card-body">';
             if (empty($cambioRealTaxasPagamentos)) {
-                echo '<div class="text-muted">Nenhum pagamento Câmbio Real Taxas encontrado.</div>';
+                echo '<div class="text-muted">' . __('admin.shipment_check.no_cr_fees_payment', 'Nenhum pagamento Câmbio Real Taxas encontrado.') . '</div>';
             } else {
-                echo '<div class="mb-2"><strong>Valor CR Taxas (BRL):</strong> ' . $fmtBrl($crTaxasValorTotal > 0 ? $crTaxasValorTotal : null) . '</div>';
+                echo '<div class="mb-2"><strong>' . __('admin.shipment_check.value_cr_fees_brl', 'Valor CR Taxas (BRL):') . '</strong> ' . $fmtBrl($crTaxasValorTotal > 0 ? $crTaxasValorTotal : null) . '</div>';
                 foreach ($cambioRealTaxasPagamentos as $pg) {
                     echo '<hr class="my-2"><table class="table table-sm mb-0">';
                     $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
@@ -1128,12 +1128,12 @@ function baixarDocumentosMassa(janelaId) {
         echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-success text-white"><strong><i class="fas fa-exchange-alt me-1"></i>Câmbio Real</strong></div><div class="card-body">';
         if (empty($cambioRealPagamentos)) {
             if ($pedidoPago && empty($appmaxPagamentos) && !$isPagdev) {
-                echo '<div class="alert alert-warning py-2 small mb-0"><i class="fas fa-exclamation-triangle me-1"></i><strong>Pagamento confirmado</strong> mas dados da transação Câmbio Real não foram sincronizados.<br><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="mt-1 d-inline-block">Abrir pedido → Sincronizar pagamentos</a></div>';
+                echo '<div class="alert alert-warning py-2 small mb-0"><i class="fas fa-exclamation-triangle me-1"></i><strong>' . __('admin.shipment_check.payment_confirmed', 'Pagamento confirmado') . '</strong> ' . __('admin.shipment_check.cr_not_synced', 'mas dados da transação Câmbio Real não foram sincronizados.') . '<br><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="mt-1 d-inline-block">' . __('admin.shipment_check.open_order_sync_payments', 'Abrir pedido → Sincronizar pagamentos') . '</a></div>';
             } else {
-                echo '<div class="text-muted">Nenhum pagamento Câmbio Real encontrado.</div>';
+                echo '<div class="text-muted">' . __('admin.shipment_check.no_cr_payment', 'Nenhum pagamento Câmbio Real encontrado.') . '</div>';
             }
         } else {
-            echo '<div class="mb-2"><strong>Valor Câmbio Real (BRL):</strong> ' . $fmtBrl($cambioRealValorTotal > 0 ? $cambioRealValorTotal : null) . '</div>';
+            echo '<div class="mb-2"><strong>' . __('admin.shipment_check.value_cambioreal_brl', 'Valor Câmbio Real (BRL):') . '</strong> ' . $fmtBrl($cambioRealValorTotal > 0 ? $cambioRealValorTotal : null) . '</div>';
             foreach ($cambioRealPagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
                 $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
@@ -1159,7 +1159,7 @@ function baixarDocumentosMassa(janelaId) {
             $stripeValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $stripePagamentos));
             echo '</div>'; // end row AppMax/CambioReal
             echo '<div class="row mb-3"><div class="col-md-6"><div class="card h-100"><div class="card-header bg-info text-white"><strong><i class="fas fa-credit-card me-1"></i>Stripe</strong></div><div class="card-body">';
-            echo '<div class="mb-2"><strong>Valor Stripe (USD):</strong> ' . $fmtMoeda($stripeValorTotal, 'USD') . '</div>';
+            echo '<div class="mb-2"><strong>' . __('admin.shipment_check.value_stripe_usd', 'Valor Stripe (USD):') . '</strong> ' . $fmtMoeda($stripeValorTotal, 'USD') . '</div>';
             foreach ($stripePagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
                 $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id'];
@@ -1176,9 +1176,9 @@ function baixarDocumentosMassa(janelaId) {
 
         // Split detalhado - sem coluna Link, status em português
         if (!empty($pagamentos)) {
-            echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-code-branch me-1"></i>Split de Pagamento</strong></div><div class="card-body">
+            echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-code-branch me-1"></i>' . __('admin.shipment_check.payment_split', 'Split de Pagamento') . '</strong></div><div class="card-body">
 <div class="table-responsive"><table class="table table-sm">
-<thead><tr><th>Componente</th><th>Gateway</th><th>Método</th><th>Moeda</th><th>Valor</th><th>Status</th></tr></thead><tbody>';
+<thead><tr><th>' . __('admin.shipment_check.th_component', 'Componente') . '</th><th>' . __('admin.shipment_check.th_gateway', 'Gateway') . '</th><th>' . __('admin.shipment_check.th_method', 'Método') . '</th><th>' . __('admin.shipment_check.th_currency', 'Moeda') . '</th><th>' . __('admin.shipment_check.th_value', 'Valor') . '</th><th>' . __('admin.shipment_check.th_status', 'Status') . '</th></tr></thead><tbody>';
             foreach ($pagamentos as $pg) {
                 $gw = strtolower((string)($pg['gateway'] ?? ''));
                 $gwLabel = $gw !== '' ? strtoupper($gw) : '-';
@@ -1203,27 +1203,27 @@ function baixarDocumentosMassa(janelaId) {
         $largura     = (float)($pedido['largura'] ?? 0);
         $comprimento = (float)($pedido['comprimento'] ?? 0);
         if ($pesoTotal > 0 || $altura > 0) {
-            echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-ruler-combined me-1"></i>Medidas e Peso</strong></div><div class="card-body">
+            echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-ruler-combined me-1"></i>' . __('admin.shipment_check.measures_weight', 'Medidas e Peso') . '</strong></div><div class="card-body">
 <div class="row g-2 text-center">
-    <div class="col-3"><div class="fw-bold">' . number_format($pesoTotal, 3) . ' kg</div><div class="text-muted small">Peso</div></div>
-    <div class="col-3"><div class="fw-bold">' . number_format($altura, 2) . ' cm</div><div class="text-muted small">Altura</div></div>
-    <div class="col-3"><div class="fw-bold">' . number_format($largura, 2) . ' cm</div><div class="text-muted small">Largura</div></div>
-    <div class="col-3"><div class="fw-bold">' . number_format($comprimento, 2) . ' cm</div><div class="text-muted small">Comprimento</div></div>
+    <div class="col-3"><div class="fw-bold">' . number_format($pesoTotal, 3) . ' kg</div><div class="text-muted small">' . __('admin.shipment_check.weight', 'Peso') . '</div></div>
+    <div class="col-3"><div class="fw-bold">' . number_format($altura, 2) . ' cm</div><div class="text-muted small">' . __('admin.shipment_check.height', 'Altura') . '</div></div>
+    <div class="col-3"><div class="fw-bold">' . number_format($largura, 2) . ' cm</div><div class="text-muted small">' . __('admin.shipment_check.width', 'Largura') . '</div></div>
+    <div class="col-3"><div class="fw-bold">' . number_format($comprimento, 2) . ' cm</div><div class="text-muted small">' . __('admin.shipment_check.length', 'Comprimento') . '</div></div>
 </div></div></div>';
         }
 
         // Informações Ãšteis - inclui todos os dados de pedido_pagamentos agrupados por gateway
-        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info me-1"></i>Informações Ãšteis</strong></div><div class="card-body">';
+        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info me-1"></i>' . __('admin.shipment_check.useful_info', 'Informações Úteis') . '</strong></div><div class="card-body">';
         $useful = [
-            'Código do pedido'   => $pedido['codigo_pedido'] ?? $pedido['codigo'] ?? '',
-            'Gateway'            => $pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? '',
-            'ID transação'       => $pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '',
-            'Status pagamento'   => $pedido['pagamento_status'] ?? $pedido['payment_status'] ?? '',
-            'Moeda'              => $moeda,
-            'Observação vendedor'=> $pedido['observacao_vendedor'] ?? '',
-            'Observação cliente' => $pedido['observacao_cliente'] ?? ($pedido['customer_note'] ?? ''),
-            'Criado em'          => !empty($pedido['created_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['created_at'])) : '',
-            'Atualizado em'      => !empty($pedido['updated_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['updated_at'])) : '',
+            __('admin.shipment_check.info_order_code', 'Código do pedido')   => $pedido['codigo_pedido'] ?? $pedido['codigo'] ?? '',
+            __('admin.shipment_check.info_gateway', 'Gateway')            => $pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? '',
+            __('admin.shipment_check.info_transaction_id', 'ID transação')       => $pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '',
+            __('admin.shipment_check.info_payment_status', 'Status pagamento')   => $pedido['pagamento_status'] ?? $pedido['payment_status'] ?? '',
+            __('admin.shipment_check.info_currency', 'Moeda')              => $moeda,
+            __('admin.shipment_check.info_seller_note', 'Observação vendedor')=> $pedido['observacao_vendedor'] ?? '',
+            __('admin.shipment_check.info_customer_note', 'Observação cliente') => $pedido['observacao_cliente'] ?? ($pedido['customer_note'] ?? ''),
+            __('admin.shipment_check.info_created_at', 'Criado em')          => !empty($pedido['created_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['created_at'])) : '',
+            __('admin.shipment_check.info_updated_at', 'Atualizado em')      => !empty($pedido['updated_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['updated_at'])) : '',
         ];
         echo '<table class="table table-sm mb-3">';
         foreach ($useful as $k => $v) {
@@ -1243,7 +1243,7 @@ function baixarDocumentosMassa(janelaId) {
             $gwLabel = match($gwKey) { 'appmax' => 'AppMax', 'cambioreal' => 'Câmbio Real', 'cambioreal_taxas' => 'Câmbio Real Taxas', 'stripe' => 'Stripe', default => strtoupper($gwKey) };
             echo '<h6 class="mt-3 mb-2 text-secondary border-bottom pb-1">' . $h($gwLabel) . '</h6>';
             foreach ($pgList as $i => $pg) {
-                if (count($pgList) > 1) echo '<div class="text-muted small mb-1">Registro #' . ($i + 1) . '</div>';
+                if (count($pgList) > 1) echo '<div class="text-muted small mb-1">' . __('admin.shipment_check.record_n', 'Registro #{n}', ['n' => ($i + 1)]) . '</div>';
                 echo '<table class="table table-sm mb-2">';
                 foreach ($allFields as $f) {
                     if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
@@ -1275,26 +1275,26 @@ function salvarMedicamento(val) {
 }
 function uploadDoc(tipo) {
     const input = document.getElementById("file" + tipo.charAt(0).toUpperCase() + tipo.slice(1));
-    if (!input || !input.files[0]) { alert("Selecione um arquivo."); return; }
+    if (!input || !input.files[0]) { alert("' . htmlspecialchars(__('admin.shipment_check.js_select_file', 'Selecione um arquivo.'), ENT_QUOTES, 'UTF-8') . '"); return; }
     const fd = new FormData();
     fd.append("arquivo", input.files[0]);
     fetch("/admin/remessa-conferencia/janela/" + jid + "/pedido/" + pid + "/documento/" + tipo, {
         method: "POST", body: fd
     }).then(r => r.json()).then(d => {
-        if (d.success) { alert("Documento enviado!"); location.reload(); }
-        else alert("Erro: " + (d.error || "Falha"));
-    }).catch(() => alert("Erro ao enviar"));
+        if (d.success) { alert("' . htmlspecialchars(__('admin.shipment_check.js_document_sent', 'Documento enviado!'), ENT_QUOTES, 'UTF-8') . '"); location.reload(); }
+        else alert("' . htmlspecialchars(__('admin.shipment_check.js_error_prefix', 'Erro: '), ENT_QUOTES, 'UTF-8') . '" + (d.error || "' . htmlspecialchars(__('admin.shipment_check.js_failure', 'Falha'), ENT_QUOTES, 'UTF-8') . '"));
+    }).catch(() => alert("' . htmlspecialchars(__('admin.shipment_check.js_send_error', 'Erro ao enviar'), ENT_QUOTES, 'UTF-8') . '"));
 }
 function confirmarRecebimento() {
-    if (!confirm("Confirmar que o pedido chegou no Brasil? O status será alterado para Aguardando Liberação Aduaneira.")) return;
+    if (!confirm("' . htmlspecialchars(__('admin.shipment_check.js_confirm_receipt', 'Confirmar que o pedido chegou no Brasil? O status será alterado para Aguardando Liberação Aduaneira.'), ENT_QUOTES, 'UTF-8') . '")) return;
     const btn = document.getElementById("btnConfirmarRecebimento");
-    if (btn) { btn.disabled = true; btn.textContent = "Confirmando..."; }
+    if (btn) { btn.disabled = true; btn.textContent = "' . htmlspecialchars(__('admin.shipment_check.js_confirming', 'Confirmando...'), ENT_QUOTES, 'UTF-8') . '"; }
     fetch("/admin/remessa-conferencia/janela/" + jid + "/pedido/" + pid + "/confirmar-recebimento", {
         method: "POST", headers: {"Content-Type":"application/x-www-form-urlencoded"}, body: ""
     }).then(r => r.json()).then(d => {
-        if (d.success) { alert("Recebimento confirmado!"); location.reload(); }
-        else { alert("Erro: " + (d.error || "Falha")); if (btn) { btn.disabled = false; btn.textContent = "âœ“ Confirmar Recebimento"; } }
-    }).catch(() => { alert("Erro ao confirmar"); if (btn) { btn.disabled = false; } });
+        if (d.success) { alert("' . htmlspecialchars(__('admin.shipment_check.js_receipt_confirmed', 'Recebimento confirmado!'), ENT_QUOTES, 'UTF-8') . '"); location.reload(); }
+        else { alert("' . htmlspecialchars(__('admin.shipment_check.js_error_prefix', 'Erro: '), ENT_QUOTES, 'UTF-8') . '" + (d.error || "' . htmlspecialchars(__('admin.shipment_check.js_failure', 'Falha'), ENT_QUOTES, 'UTF-8') . '")); if (btn) { btn.disabled = false; btn.textContent = "✓ ' . htmlspecialchars(__('admin.shipment_check.js_confirm_receipt_btn', 'Confirmar Recebimento'), ENT_QUOTES, 'UTF-8') . '"; } }
+    }).catch(() => { alert("' . htmlspecialchars(__('admin.shipment_check.js_confirm_error', 'Erro ao confirmar'), ENT_QUOTES, 'UTF-8') . '"); if (btn) { btn.disabled = false; } });
 }
 </script>
 </body></html>';
@@ -1331,7 +1331,7 @@ function confirmarRecebimento() {
         } else {
             $pedido = $this->getPedidoCompleto($pid);
         }
-        if (!$pedido) { echo '<p>Pedido não encontrado.</p>'; exit; }
+        if (!$pedido) { echo '<p>' . __('admin.shipment_check.order_not_found_html', 'Pedido não encontrado.') . '</p>'; exit; }
 
         $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
         $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
@@ -1347,8 +1347,8 @@ function confirmarRecebimento() {
         $dataHoje = date('d/m/Y H:i');
 
         ob_start();
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Comprovante ' . $h($gwLabel) . ' - Pedido #' . $pid . '</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">
+<title>' . __('admin.shipment_check.receipt_title', 'Comprovante {gw} - Pedido #{n}', ['gw' => $h($gwLabel), 'n' => $pid]) . '</title>
 <style>
 body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
 h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
@@ -1365,20 +1365,20 @@ th{background:#f5f5f5;width:160px}
 .logo{font-size:22px;font-weight:bold;color:#1a5276}
 </style></head><body>
 <div class="header">
-    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div>
-    <div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div>
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">' . __('admin.shipment_check.payment_receipt', 'Comprovante de Pagamento') . '</div></div>
+    <div style="text-align:right"><div><strong>' . __('admin.shipment_check.date', 'Data:') . '</strong> ' . $dataHoje . '</div><div><strong>' . __('admin.shipment_check.gateway', 'Gateway:') . '</strong> ' . $h($gwLabel) . '</div></div>
 </div>
-<h2>Dados do Pedido</h2>
+<h2>' . __('admin.shipment_check.order_data', 'Dados do Pedido') . '</h2>
 <table>
-<tr><th>Pedido</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>Data</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
-<tr><th>Cliente</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
-<tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.th_order', 'Pedido') . '</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>' . __('admin.shipment_check.date_short', 'Data') . '</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.th_customer', 'Cliente') . '</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>' . __('admin.shipment_check.email', 'E-mail') . '</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.th_currency', 'Moeda') . '</th><td>' . $h($moeda) . '</td><th>' . __('admin.shipment_check.th_status', 'Status') . '</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
 </table>
-<h2>Dados do Pagamento - ' . $h($gwLabel) . '</h2>';
+<h2>' . __('admin.shipment_check.payment_data_gw', 'Dados do Pagamento - {gw}', ['gw' => $h($gwLabel)]) . '</h2>';
 
         $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
         foreach ($pagamentos as $i => $pg) {
-            if (count($pagamentos) > 1) echo '<p><strong>Registro #' . ($i + 1) . '</strong></p>';
+            if (count($pagamentos) > 1) echo '<p><strong>' . __('admin.shipment_check.record_n', 'Registro #{n}', ['n' => ($i + 1)]) . '</strong></p>';
             echo '<table>';
             foreach ($allFields as $f) {
                 if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
@@ -1389,7 +1389,7 @@ th{background:#f5f5f5;width:160px}
             echo '</table>';
         }
 
-        echo '<h2>Itens</h2><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit. (USD)</th><th>Total (USD)</th></tr></thead><tbody>';
+        echo '<h2>' . __('admin.shipment_check.items', 'Itens') . '</h2><table class="itens"><thead><tr><th>#</th><th>' . __('admin.shipment_check.th_product', 'Produto') . '</th><th>' . __('admin.shipment_check.th_qty', 'Qtd') . '</th><th>' . __('admin.shipment_check.th_unit_price_usd', 'Preço Unit. (USD)') . '</th><th>' . __('admin.shipment_check.th_total_usd', 'Total (USD)') . '</th></tr></thead><tbody>';
         $idx = 1;
         foreach ($itens as $it) {
             $pu = null;
@@ -1402,8 +1402,8 @@ th{background:#f5f5f5;width:160px}
             $idx++;
         }
         echo '</tbody></table>';
-        echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
-        echo '<h2>Total ' . $h($gwLabel) . '</h2><table>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">' . __('admin.shipment_check.items_usd_note', 'Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ {rate}.', ['rate' => number_format($taxaUsdBrl, 4, ',', '.')]) . '</div>';
+        echo '<h2>' . __('admin.shipment_check.total_gw', 'Total {gw}', ['gw' => $h($gwLabel)]) . '</h2><table>';
 
         // Detectar moeda do pagamento
         $pgMoeda = 'BRL';
@@ -1414,14 +1414,14 @@ th{background:#f5f5f5;width:160px}
 
         if ($pgMoeda === 'USD') {
             $totalBrlEq = $totalGw * $taxaUsdBrl;
-            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_usd', 'Total pago (USD)') . '</th><td><strong>US$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_brl', 'Equivalente (BRL)') . '</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
         } else {
             $totalUsdEq = $taxaUsdBrl > 0 ? ($totalGw / $taxaUsdBrl) : 0.0;
-            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_brl', 'Total pago (BRL)') . '</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_usd', 'Equivalente (USD)') . '</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
         }
-        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.exchange_rate', 'Taxa de câmbio') . '</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
         $html = ob_get_clean();
 
@@ -1435,7 +1435,7 @@ th{background:#f5f5f5;width:160px}
         $jid = (int)$janelaId; $pid = (int)$pedidoId;
 
         $pedido = $this->getPedidoCompleto($pid);
-        if (!$pedido) { echo '<p>Pedido não encontrado.</p>'; exit; }
+        if (!$pedido) { echo '<p>' . __('admin.shipment_check.order_not_found_html', 'Pedido não encontrado.') . '</p>'; exit; }
 
         $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
         $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
@@ -1458,8 +1458,8 @@ th{background:#f5f5f5;width:160px}
         $dataHoje = date('d/m/Y H:i');
 
         ob_start();
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Invoice - Pedido #' . $pid . '</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">
+<title>' . __('admin.shipment_check.invoice_title', 'Invoice - Pedido #{n}', ['n' => $pid]) . '</title>
 <style>
 body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
 h1{font-size:22px;margin-bottom:4px}
@@ -1472,31 +1472,31 @@ th{background:#f5f5f5}
 .totals td:last-child{text-align:right}
 </style></head><body>
 <div class="header">
-    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div>
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">' . __('admin.shipment_check.invoice_subtitle', 'Invoice / Fatura') . '</div></div>
     <div style="text-align:right">
         <div><strong>Invoice #:</strong> ' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</div>
-        <div><strong>Data:</strong> ' . $dataHoje . '</div>
-        <div><strong>Moeda:</strong> ' . $h($moeda) . '</div>
+        <div><strong>' . __('admin.shipment_check.date', 'Data:') . '</strong> ' . $dataHoje . '</div>
+        <div><strong>' . __('admin.shipment_check.currency', 'Moeda:') . '</strong> ' . $h($moeda) . '</div>
     </div>
 </div>
 
-<h2>Dados do Cliente</h2>
+<h2>' . __('admin.shipment_check.customer_data', 'Dados do Cliente') . '</h2>
 <table>
-<tr><th>Nome</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
-<tr><th>CPF/Doc</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>Telefone</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr>
-<tr><th>Suíte</th><td>' . $h($pedido['cliente_suite'] ?? '') . '</td><th>Status pedido</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.name', 'Nome') . '</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>' . __('admin.shipment_check.email', 'E-mail') . '</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.cpf_doc', 'CPF/Doc') . '</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>' . __('admin.shipment_check.phone', 'Telefone') . '</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.suite', 'Suíte') . '</th><td>' . $h($pedido['cliente_suite'] ?? '') . '</td><th>' . __('admin.shipment_check.order_status_short', 'Status pedido') . '</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
 </table>
 
-<h2>Endereço de Entrega</h2>
+<h2>' . __('admin.shipment_check.delivery_address', 'Endereço de Entrega') . '</h2>
 <table>
-<tr><th>Logradouro</th><td>' . $h($logr . ($num !== '' ? ', ' . $num : '') . ($compl !== '' ? ' - ' . $compl : '')) . '</td><th>Bairro</th><td>' . $h($bairro) . '</td></tr>
-<tr><th>Cidade</th><td>' . $h($cidade) . '</td><th>Estado</th><td>' . $h($estado) . '</td></tr>
-<tr><th>CEP</th><td>' . $h($cep) . '</td><th>País</th><td>' . $h($pais) . '</td></tr>
+<tr><th>' . __('admin.shipment_check.street_label', 'Logradouro') . '</th><td>' . $h($logr . ($num !== '' ? ', ' . $num : '') . ($compl !== '' ? ' - ' . $compl : '')) . '</td><th>' . __('admin.shipment_check.district', 'Bairro') . '</th><td>' . $h($bairro) . '</td></tr>
+<tr><th>' . __('admin.shipment_check.city', 'Cidade') . '</th><td>' . $h($cidade) . '</td><th>' . __('admin.shipment_check.state', 'Estado') . '</th><td>' . $h($estado) . '</td></tr>
+<tr><th>' . __('admin.shipment_check.zip', 'CEP') . '</th><td>' . $h($cep) . '</td><th>' . __('admin.shipment_check.country', 'País') . '</th><td>' . $h($pais) . '</td></tr>
 </table>
 
-<h2>Itens</h2>
+<h2>' . __('admin.shipment_check.items', 'Itens') . '</h2>
 <table>
-<thead><tr><th>#</th><th>Produto / Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
+<thead><tr><th>#</th><th>' . __('admin.shipment_check.th_product_declaration', 'Produto / Declaração') . '</th><th>' . __('admin.shipment_check.th_qty', 'Qtd') . '</th><th>' . __('admin.shipment_check.th_unit_price', 'Preço Unit.') . '</th><th>' . __('admin.shipment_check.th_total', 'Total') . '</th></tr></thead>
 <tbody>';
         $idx = 1;
         foreach ($itens as $it) {
@@ -1574,11 +1574,11 @@ th{background:#f5f5f5}
             $qtd = (int)($it['quantidade'] ?? 0);
             return $pu !== null ? $pu * $qtd : 0;
         }, $itens));
-        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">Total</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
+        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">' . __('admin.shipment_check.th_total', 'Total') . '</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
         echo '</tbody></table>';
-        echo '<div style="margin-top:6px;color:#666;font-size:12px">Valores dos itens exibidos em USD. Taxa de câmbio utilizada: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">' . __('admin.shipment_check.items_usd_note2', 'Valores dos itens exibidos em USD. Taxa de câmbio utilizada: 1 USD = R$ {rate}.', ['rate' => number_format($taxaUsdBrl, 4, ',', '.')]) . '</div>';
 
-        echo '<h2>Resumo de Pagamento</h2><table>';
+        echo '<h2>' . __('admin.shipment_check.payment_summary', 'Resumo de Pagamento') . '</h2><table>';
         // Detectar método de pagamento
         $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''))));
         $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
@@ -1618,24 +1618,24 @@ th{background:#f5f5f5}
 
         // Nomes amigáveis dos gateways
         $gwNames = ['cambioreal' => 'Câmbio Real', 'appmax' => 'AppMax', 'stripe' => 'Stripe', 'pagdev' => 'PagDev', 'mercadopago' => 'Mercado Pago', 'asaas' => 'Asaas'];
-        $metodoLabel = $gwNames[$metodoPagamento] ?? ($metodoPagamento !== '' ? ucfirst($metodoPagamento) : 'N/A');
+        $metodoLabel = $gwNames[$metodoPagamento] ?? ($metodoPagamento !== '' ? ucfirst($metodoPagamento) : __('admin.shipment_check.na', 'N/A'));
 
         // Calcular equivalências
         $totalUsdEq = $taxaUsdBrl > 0 ? ($totalBrl / $taxaUsdBrl) : 0.0;
         $totalBrlEq = $totalUsd * $taxaUsdBrl;
 
-        echo '<tr><th>Método</th><td>' . $h($metodoLabel) . '</td></tr>';
-        echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.method', 'Método') . '</th><td>' . $h($metodoLabel) . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.credit_date', 'Data de crédito') . '</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         if ($totalUsd > 0) {
-            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_usd', 'Total pago (USD)') . '</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_brl', 'Equivalente (BRL)') . '</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
         } elseif ($totalBrl > 0) {
-            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_brl', 'Total pago (BRL)') . '</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_usd', 'Equivalente (USD)') . '</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
         } else {
-            echo '<tr><th>Total pago</th><td><strong>-</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid', 'Total pago') . '</th><td><strong>-</strong></td></tr>';
         }
-        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.exchange_rate', 'Taxa de câmbio') . '</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
 
         $html = ob_get_clean();
@@ -1714,8 +1714,8 @@ th{background:#f5f5f5}
         $dataHoje = date('d/m/Y H:i');
 
         ob_start();
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Comprovante ' . $h($gwLabel) . ' - Pedido #' . $pid . '</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">
+<title>' . __('admin.shipment_check.receipt_title', 'Comprovante {gw} - Pedido #{n}', ['gw' => $h($gwLabel), 'n' => $pid]) . '</title>
 <style>
 body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
 h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
@@ -1732,20 +1732,20 @@ th{background:#f5f5f5;width:160px}
 .logo{font-size:22px;font-weight:bold;color:#1a5276}
 </style></head><body>
 <div class="header">
-    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div>
-    <div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div>
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">' . __('admin.shipment_check.payment_receipt', 'Comprovante de Pagamento') . '</div></div>
+    <div style="text-align:right"><div><strong>' . __('admin.shipment_check.date', 'Data:') . '</strong> ' . $dataHoje . '</div><div><strong>' . __('admin.shipment_check.gateway', 'Gateway:') . '</strong> ' . $h($gwLabel) . '</div></div>
 </div>
-<h2>Dados do Pedido</h2>
+<h2>' . __('admin.shipment_check.order_data', 'Dados do Pedido') . '</h2>
 <table>
-<tr><th>Pedido</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>Data</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
-<tr><th>Cliente</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
-<tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.th_order', 'Pedido') . '</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>' . __('admin.shipment_check.date_short', 'Data') . '</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.th_customer', 'Cliente') . '</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>' . __('admin.shipment_check.email', 'E-mail') . '</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.th_currency', 'Moeda') . '</th><td>' . $h($moeda) . '</td><th>' . __('admin.shipment_check.th_status', 'Status') . '</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
 </table>
-<h2>Dados do Pagamento - ' . $h($gwLabel) . '</h2>';
+<h2>' . __('admin.shipment_check.payment_data_gw', 'Dados do Pagamento - {gw}', ['gw' => $h($gwLabel)]) . '</h2>';
 
         $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
         foreach ($pagamentos as $i => $pg) {
-            if (count($pagamentos) > 1) echo '<p><strong>Registro #' . ($i + 1) . '</strong></p>';
+            if (count($pagamentos) > 1) echo '<p><strong>' . __('admin.shipment_check.record_n', 'Registro #{n}', ['n' => ($i + 1)]) . '</strong></p>';
             echo '<table>';
             foreach ($allFields as $f) {
                 if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
@@ -1756,7 +1756,7 @@ th{background:#f5f5f5;width:160px}
             echo '</table>';
         }
 
-        echo '<h2>Itens</h2><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit. (USD)</th><th>Total (USD)</th></tr></thead><tbody>';
+        echo '<h2>' . __('admin.shipment_check.items', 'Itens') . '</h2><table class="itens"><thead><tr><th>#</th><th>' . __('admin.shipment_check.th_product', 'Produto') . '</th><th>' . __('admin.shipment_check.th_qty', 'Qtd') . '</th><th>' . __('admin.shipment_check.th_unit_price_usd', 'Preço Unit. (USD)') . '</th><th>' . __('admin.shipment_check.th_total_usd', 'Total (USD)') . '</th></tr></thead><tbody>';
         $idx = 1;
         foreach ($itens as $it) {
             $pu = null;
@@ -1769,8 +1769,8 @@ th{background:#f5f5f5;width:160px}
             $idx++;
         }
         echo '</tbody></table>';
-        echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
-        echo '<h2>Total ' . $h($gwLabel) . '</h2><table>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">' . __('admin.shipment_check.items_usd_note', 'Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ {rate}.', ['rate' => number_format($taxaUsdBrl, 4, ',', '.')]) . '</div>';
+        echo '<h2>' . __('admin.shipment_check.total_gw', 'Total {gw}', ['gw' => $h($gwLabel)]) . '</h2><table>';
 
         $pgMoeda = 'BRL';
         foreach ($pagamentos as $pg) {
@@ -1780,14 +1780,14 @@ th{background:#f5f5f5;width:160px}
 
         if ($pgMoeda === 'USD') {
             $totalBrlEq = $totalGw * $taxaUsdBrl;
-            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_usd', 'Total pago (USD)') . '</th><td><strong>US$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_brl', 'Equivalente (BRL)') . '</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
         } else {
             $totalUsdEq = $taxaUsdBrl > 0 ? ($totalGw / $taxaUsdBrl) : 0.0;
-            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_brl', 'Total pago (BRL)') . '</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_usd', 'Equivalente (USD)') . '</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
         }
-        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.exchange_rate', 'Taxa de câmbio') . '</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
         return ob_get_clean();
     }
@@ -1826,8 +1826,8 @@ th{background:#f5f5f5;width:160px}
         $dataHoje = date('d/m/Y H:i');
 
         ob_start();
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Invoice - Pedido #' . $pid . '</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">
+<title>' . __('admin.shipment_check.invoice_title', 'Invoice - Pedido #{n}', ['n' => $pid]) . '</title>
 <style>
 body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
 h1{font-size:22px;margin-bottom:4px}
@@ -1840,31 +1840,31 @@ th{background:#f5f5f5}
 .totals td:last-child{text-align:right}
 </style></head><body>
 <div class="header">
-    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div>
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">' . __('admin.shipment_check.invoice_subtitle', 'Invoice / Fatura') . '</div></div>
     <div style="text-align:right">
         <div><strong>Invoice #:</strong> ' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</div>
-        <div><strong>Data:</strong> ' . $dataHoje . '</div>
-        <div><strong>Moeda:</strong> ' . $h($moeda) . '</div>
+        <div><strong>' . __('admin.shipment_check.date', 'Data:') . '</strong> ' . $dataHoje . '</div>
+        <div><strong>' . __('admin.shipment_check.currency', 'Moeda:') . '</strong> ' . $h($moeda) . '</div>
     </div>
 </div>
 
-<h2>Dados do Cliente</h2>
+<h2>' . __('admin.shipment_check.customer_data', 'Dados do Cliente') . '</h2>
 <table>
-<tr><th>Nome</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
-<tr><th>CPF/Doc</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>Telefone</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr>
-<tr><th>Suíte</th><td>' . $h($pedido['cliente_suite'] ?? '') . '</td><th>Status pedido</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.name', 'Nome') . '</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>' . __('admin.shipment_check.email', 'E-mail') . '</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.cpf_doc', 'CPF/Doc') . '</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>' . __('admin.shipment_check.phone', 'Telefone') . '</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr>
+<tr><th>' . __('admin.shipment_check.suite', 'Suíte') . '</th><td>' . $h($pedido['cliente_suite'] ?? '') . '</td><th>' . __('admin.shipment_check.order_status_short', 'Status pedido') . '</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
 </table>
 
-<h2>Endereço de Entrega</h2>
+<h2>' . __('admin.shipment_check.delivery_address', 'Endereço de Entrega') . '</h2>
 <table>
-<tr><th>Logradouro</th><td>' . $h($logr . ($num !== '' ? ', ' . $num : '') . ($compl !== '' ? ' - ' . $compl : '')) . '</td><th>Bairro</th><td>' . $h($bairro) . '</td></tr>
-<tr><th>Cidade</th><td>' . $h($cidade) . '</td><th>Estado</th><td>' . $h($estado) . '</td></tr>
-<tr><th>CEP</th><td>' . $h($cep) . '</td><th>País</th><td>' . $h($pais) . '</td></tr>
+<tr><th>' . __('admin.shipment_check.street_label', 'Logradouro') . '</th><td>' . $h($logr . ($num !== '' ? ', ' . $num : '') . ($compl !== '' ? ' - ' . $compl : '')) . '</td><th>' . __('admin.shipment_check.district', 'Bairro') . '</th><td>' . $h($bairro) . '</td></tr>
+<tr><th>' . __('admin.shipment_check.city', 'Cidade') . '</th><td>' . $h($cidade) . '</td><th>' . __('admin.shipment_check.state', 'Estado') . '</th><td>' . $h($estado) . '</td></tr>
+<tr><th>' . __('admin.shipment_check.zip', 'CEP') . '</th><td>' . $h($cep) . '</td><th>' . __('admin.shipment_check.country', 'País') . '</th><td>' . $h($pais) . '</td></tr>
 </table>
 
-<h2>Itens</h2>
+<h2>' . __('admin.shipment_check.items', 'Itens') . '</h2>
 <table>
-<thead><tr><th>#</th><th>Produto / Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
+<thead><tr><th>#</th><th>' . __('admin.shipment_check.th_product_declaration', 'Produto / Declaração') . '</th><th>' . __('admin.shipment_check.th_qty', 'Qtd') . '</th><th>' . __('admin.shipment_check.th_unit_price', 'Preço Unit.') . '</th><th>' . __('admin.shipment_check.th_total', 'Total') . '</th></tr></thead>
 <tbody>';
         $idx = 1;
         foreach ($itens as $it) {
@@ -1885,11 +1885,11 @@ th{background:#f5f5f5}
             $qtd = (int)($it['quantidade'] ?? 0);
             return $pu !== null ? $pu * $qtd : 0;
         }, $itens));
-        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">Total</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
+        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">' . __('admin.shipment_check.th_total', 'Total') . '</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
         echo '</tbody></table>';
-        echo '<div style="margin-top:6px;color:#666;font-size:12px">Valores dos itens exibidos em USD. Taxa de câmbio utilizada: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">' . __('admin.shipment_check.items_usd_note2', 'Valores dos itens exibidos em USD. Taxa de câmbio utilizada: 1 USD = R$ {rate}.', ['rate' => number_format($taxaUsdBrl, 4, ',', '.')]) . '</div>';
 
-        echo '<h2>Resumo de Pagamento</h2><table>';
+        echo '<h2>' . __('admin.shipment_check.payment_summary', 'Resumo de Pagamento') . '</h2><table>';
         $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''))));
         $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
         $totalBrl = 0.0; $totalUsd = 0.0;
@@ -1906,18 +1906,18 @@ th{background:#f5f5f5}
         $totalUsdEq = $taxaUsdBrl > 0 ? ($totalBrl / $taxaUsdBrl) : 0.0;
         $totalBrlEq = $totalUsd * $taxaUsdBrl;
 
-        echo '<tr><th>Método</th><td>' . $h($metodoLabel) . '</td></tr>';
-        echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.method', 'Método') . '</th><td>' . $h($metodoLabel) . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.credit_date', 'Data de crédito') . '</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         if ($totalUsd > 0) {
-            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_usd', 'Total pago (USD)') . '</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_brl', 'Equivalente (BRL)') . '</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
         } elseif ($totalBrl > 0) {
-            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
-            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid_brl', 'Total pago (BRL)') . '</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.equivalent_usd', 'Equivalente (USD)') . '</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
         } else {
-            echo '<tr><th>Total pago</th><td><strong>-</strong></td></tr>';
+            echo '<tr><th>' . __('admin.shipment_check.total_paid', 'Total pago') . '</th><td><strong>-</strong></td></tr>';
         }
-        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
+        echo '<tr><th>' . __('admin.shipment_check.exchange_rate', 'Taxa de câmbio') . '</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
         return ob_get_clean();
     }
@@ -1942,14 +1942,14 @@ th{background:#f5f5f5}
         $pedidoIds = array_filter(array_map('intval', explode(',', $pedidoIdsRaw)), fn($v) => $v > 0);
 
         if (empty($pedidoIds)) {
-            echo 'Nenhum pedido selecionado.';
+            echo __('admin.shipment_check.no_order_selected', 'Nenhum pedido selecionado.');
             exit;
         }
 
         $zipFile = tempnam(sys_get_temp_dir(), 'remessa_docs_') . '.zip';
         $zip = new \ZipArchive();
         if ($zip->open($zipFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-            echo 'Erro ao criar arquivo ZIP.';
+            echo __('admin.shipment_check.zip_create_error', 'Erro ao criar arquivo ZIP.');
             exit;
         }
 
@@ -2036,7 +2036,7 @@ th{background:#f5f5f5}
         $zip->close();
 
         if (!file_exists($zipFile) || filesize($zipFile) === 0) {
-            echo 'Nenhum documento encontrado para os pedidos selecionados.';
+            echo __('admin.shipment_check.no_documents_found', 'Nenhum documento encontrado para os pedidos selecionados.');
             exit;
         }
 

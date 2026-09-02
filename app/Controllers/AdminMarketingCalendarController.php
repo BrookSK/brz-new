@@ -93,7 +93,7 @@ class AdminMarketingCalendarController extends Controller {
         ob_start();
         require __DIR__ . '/../Views/admin/marketing/calendario.php';
         $content = ob_get_clean();
-        $title = 'Calendário de Marketing';
+        $title = __('admin.marketing_calendar.page_title', 'Calendário de Marketing');
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
@@ -115,7 +115,7 @@ class AdminMarketingCalendarController extends Controller {
         $categoria = trim((string) $request->getParam('categoria', 'comemorativa'));
 
         if ($titulo === '' || $dataEvento === '') {
-            echo json_encode(['ok' => false, 'error' => 'Título e data são obrigatórios']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.title_date_required', 'Título e data são obrigatórios')]);
             exit;
         }
 
@@ -150,7 +150,7 @@ class AdminMarketingCalendarController extends Controller {
 
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.invalid_id', 'ID inválido')]);
             exit;
         }
 
@@ -167,7 +167,7 @@ class AdminMarketingCalendarController extends Controller {
 
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.invalid_id', 'ID inválido')]);
             exit;
         }
 
@@ -186,7 +186,7 @@ class AdminMarketingCalendarController extends Controller {
 
         $apiKey = $this->getChatGPTApiKey();
         if (!$apiKey) {
-            echo json_encode(['ok' => false, 'error' => 'API Key do ChatGPT não configurada. Vá em Configurações > Integrações.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.api_key_missing', 'API Key do ChatGPT não configurada. Vá em Configurações > Integrações.')]);
             exit;
         }
 
@@ -236,7 +236,7 @@ class AdminMarketingCalendarController extends Controller {
         curl_close($ch);
 
         if ($httpCode !== 200 || !$resp) {
-            echo json_encode(['ok' => false, 'error' => 'Erro ao comunicar com a API. HTTP ' . $httpCode]);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.api_error', 'Erro ao comunicar com a API. HTTP {code}', ['code' => $httpCode])]);
             exit;
         }
 
@@ -245,7 +245,7 @@ class AdminMarketingCalendarController extends Controller {
         $data = json_decode($content, true);
 
         if (!$data || !isset($data['eventos'])) {
-            echo json_encode(['ok' => false, 'error' => 'Resposta da IA não contém formato esperado.', 'raw' => $content]);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.ai_bad_format', 'Resposta da IA não contém formato esperado.'), 'raw' => $content]);
             exit;
         }
 

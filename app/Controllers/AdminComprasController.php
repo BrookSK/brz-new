@@ -24,7 +24,7 @@ class AdminComprasController extends Controller {
         unset($_SESSION['message'], $_SESSION['message_type']);
         echo '<div class="alert alert-' . htmlspecialchars($type) . ' alert-dismissible fade show mt-3" role="alert">'
             . htmlspecialchars($msg)
-            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>'
+            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>'
             . '</div>';
     }
 
@@ -379,11 +379,11 @@ class AdminComprasController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Item - Lista de Compras</title>
+    <title>' . __('admin.purchases.new_item_page_title', 'Novo Item - Lista de Compras') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -395,9 +395,9 @@ class AdminComprasController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Novo Item na Lista de Compras</h1>
+                <h1 class="page-title">' . __('admin.purchases.new_item_heading', 'Novo Item na Lista de Compras') . '</h1>
                 <div>
-                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>' . __('admin.purchases.back', 'Voltar') . '</a>
                 </div>
             </div>
 
@@ -412,42 +412,42 @@ class AdminComprasController extends Controller {
                     <form method="POST" action="/admin/estoque/compras/salvar" id="formNovoItem">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Usuário *</label>
+                                <label class="form-label">' . __('admin.purchases.label_user', 'Usuário') . ' *</label>
                                 <select class="form-select" name="usuario_id" id="novo_usuario_id" required>
-                                    <option value="">Selecione...</option>';
+                                    <option value="">' . __('admin.purchases.select_placeholder', 'Selecione...') . '</option>';
 
         foreach ($usuarios as $u) {
             $uid = (int) ($u['id'] ?? 0);
             if ($uid <= 0) continue;
             $nome = (string) ($u['nome'] ?? '');
             $email = (string) ($u['email'] ?? '');
-            $label = trim($nome) !== '' ? $nome : ('Usuário #' . $uid);
+            $label = trim($nome) !== '' ? $nome : (__('admin.purchases.user', 'Usuário') . ' #' . $uid);
             if ($email !== '') $label .= ' - ' . $email;
             echo '<option value="' . $uid . '">' . htmlspecialchars($label) . '</option>';
         }
 
         echo '                 </select>
-                                <div class="form-text">Selecione o usuário para carregar os pedidos.</div>
+                                <div class="form-text">' . __('admin.purchases.help_select_user', 'Selecione o usuário para carregar os pedidos.') . '</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Pedido *</label>
+                                <label class="form-label">' . __('admin.purchases.label_order', 'Pedido') . ' *</label>
                                 <select class="form-select" name="pedido_id" id="novo_pedido_id" required disabled>
-                                    <option value="">Selecione um usuário primeiro...</option>
+                                    <option value="">' . __('admin.purchases.select_user_first', 'Selecione um usuário primeiro...') . '</option>
                                 </select>
-                                <div class="form-text">Ao salvar, se o pedido estiver pendente, o sistema soma o valor pendente ao total do pedido (sem chamar gateway automaticamente).</div>
+                                <div class="form-text">' . __('admin.purchases.help_pending_value', 'Ao salvar, se o pedido estiver pendente, o sistema soma o valor pendente ao total do pedido (sem chamar gateway automaticamente).') . '</div>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Produto *</label>
+                                <label class="form-label">' . __('admin.purchases.label_product', 'Produto') . ' *</label>
                                 <select class="form-select" name="produto_id" required>
-                                    <option value="">Selecione...</option>';
+                                    <option value="">' . __('admin.purchases.select_placeholder', 'Selecione...') . '</option>';
 
         foreach ($produtosSelect as $p) {
             $pid = (int) ($p['produto_id'] ?? 0);
             if ($pid <= 0) continue;
             $pn = (string) ($p['produto_nome'] ?? '');
             $sku = (string) ($p['sku'] ?? '');
-            $label = trim($pn) !== '' ? $pn : ('Produto #' . $pid);
+            $label = trim($pn) !== '' ? $pn : (__('admin.purchases.product', 'Produto') . ' #' . $pid);
             if ($sku !== '') $label .= ' - ' . $sku;
             echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
         }
@@ -456,30 +456,30 @@ class AdminComprasController extends Controller {
                             </div>
 
                             <div class="col-md-3">
-                                <label class="form-label">Quantidade *</label>
+                                <label class="form-label">' . __('admin.purchases.label_quantity', 'Quantidade') . ' *</label>
                                 <input type="number" class="form-control" name="quantidade" min="1" required>
                             </div>
 
                             <div class="col-md-3">
-                                <label class="form-label">Valor pendente (diferença) *</label>
+                                <label class="form-label">' . __('admin.purchases.label_pending_value', 'Valor pendente (diferença)') . ' *</label>
                                 <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" value="0" readonly>
-                                <div class="form-text">Calculado automaticamente ao salvar (regras padrão).</div>
+                                <div class="form-text">' . __('admin.purchases.help_auto_calculated', 'Calculado automaticamente ao salvar (regras padrão).') . '</div>
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label">Prioridade</label>
+                                <label class="form-label">' . __('admin.purchases.label_priority', 'Prioridade') . '</label>
                                 <select class="form-select" name="prioridade">
-                                    <option value="media" selected>Média</option>
-                                    <option value="baixa">Baixa</option>
-                                    <option value="alta">Alta</option>
-                                    <option value="urgente">Urgente</option>
+                                    <option value="media" selected>' . __('admin.purchases.priority_medium', 'Média') . '</option>
+                                    <option value="baixa">' . __('admin.purchases.priority_low', 'Baixa') . '</option>
+                                    <option value="alta">' . __('admin.purchases.priority_high', 'Alta') . '</option>
+                                    <option value="urgente">' . __('admin.purchases.priority_urgent', 'Urgente') . '</option>
                                 </select>
                             </div>
 
                             <div class="col-md-12">
                                 <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i>Salvar</button>
-                                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank">Cancelar</a>
+                                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i>' . __('admin.purchases.save', 'Salvar') . '</button>
+                                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank">' . __('admin.purchases.cancel', 'Cancelar') . '</a>
                                 </div>
                             </div>
                         </div>
@@ -514,7 +514,7 @@ class AdminComprasController extends Controller {
                 var sel = document.getElementById("novo_pedido_id");
                 if (!sel) return;
                 sel.disabled = true;
-                sel.innerHTML = "<option value=\"\">Carregando...</option>";
+                sel.innerHTML = "<option value=\"\">' . htmlspecialchars(__('admin.purchases.js_loading', 'Carregando...'), ENT_QUOTES, 'UTF-8') . '</option>";
 
                 fetch("/admin/estoque/compras/pedidos-usuario?usuario_id=" + encodeURIComponent(String(usuarioId)), {
                     headers: { "Accept": "application/json" }
@@ -522,19 +522,19 @@ class AdminComprasController extends Controller {
                 .then(function(r){ return r.json(); })
                 .then(function(data){
                     if (!data || !data.success) {
-                        sel.innerHTML = "<option value=\"\">Erro ao carregar pedidos</option>";
+                        sel.innerHTML = "<option value=\"\">' . htmlspecialchars(__('admin.purchases.js_error_loading_orders', 'Erro ao carregar pedidos'), ENT_QUOTES, 'UTF-8') . '</option>";
                         return;
                     }
                     var pedidos = data.pedidos || [];
                     if (!pedidos.length) {
-                        sel.innerHTML = "<option value=\"\">Nenhum pedido para este usuário</option>";
+                        sel.innerHTML = "<option value=\"\">' . htmlspecialchars(__('admin.purchases.js_no_orders_for_user', 'Nenhum pedido para este usuário'), ENT_QUOTES, 'UTF-8') . '</option>";
                         return;
                     }
-                    var html = "<option value=\"\">Selecione...</option>";
+                    var html = "<option value=\"\">' . htmlspecialchars(__('admin.purchases.select_placeholder', 'Selecione...'), ENT_QUOTES, 'UTF-8') . '</option>";
                     pedidos.forEach(function(p){
                         var pid = p.id || 0;
                         if (!pid) return;
-                        var label = "Pedido #" + pid;
+                        var label = "' . htmlspecialchars(__('admin.purchases.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') . ' #" + pid;
                         if (p.codigo_pedido) label += " (" + p.codigo_pedido + ")";
                         if (p.status) label += " - " + p.status;
                         if (p.valor_total !== null && p.valor_total !== undefined) label += " - " + formatMoney(p.valor_total);
@@ -544,7 +544,7 @@ class AdminComprasController extends Controller {
                     sel.disabled = false;
                 })
                 .catch(function(){
-                    sel.innerHTML = "<option value=\"\">Erro ao carregar pedidos</option>";
+                    sel.innerHTML = "<option value=\"\">' . htmlspecialchars(__('admin.purchases.js_error_loading_orders', 'Erro ao carregar pedidos'), ENT_QUOTES, 'UTF-8') . '</option>";
                 });
             }
 
@@ -556,7 +556,7 @@ class AdminComprasController extends Controller {
                         var sel = document.getElementById("novo_pedido_id");
                         if (sel) {
                             sel.disabled = true;
-                            sel.innerHTML = "<option value=\"\">Selecione um usuário primeiro...</option>";
+                            sel.innerHTML = "<option value=\"\">' . htmlspecialchars(__('admin.purchases.select_user_first', 'Selecione um usuário primeiro...'), ENT_QUOTES, 'UTF-8') . '</option>";
                         }
                         return;
                     }
@@ -573,7 +573,7 @@ class AdminComprasController extends Controller {
         $usuarioId = (int) $request->getParam('usuario_id', 0);
 
         if ($usuarioId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            echo json_encode(['success' => false, 'message' => __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.')]);
             return;
         }
 
@@ -595,7 +595,7 @@ class AdminComprasController extends Controller {
             echo json_encode(['success' => true, 'pedidos' => $rows]);
             return;
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro ao buscar pedidos do usuário.']);
+            echo json_encode(['success' => false, 'message' => __('admin.purchases.err_fetch_user_orders', 'Erro ao buscar pedidos do usuário.')]);
             return;
         }
     }
@@ -620,7 +620,7 @@ class AdminComprasController extends Controller {
         }
 
         if ($pedidoId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            echo json_encode(['success' => false, 'message' => __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.')]);
             return;
         }
 
@@ -644,7 +644,7 @@ class AdminComprasController extends Controller {
             ]);
             return;
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro ao gerar link: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('admin.purchases.err_generate_link', 'Erro ao gerar link: {e}', ['e' => $e->getMessage()])]);
             return;
         }
     }
@@ -657,7 +657,7 @@ class AdminComprasController extends Controller {
         header('Content-Type: application/json; charset=utf-8');
 
         if ($produtoId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            echo json_encode(['success' => false, 'message' => __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.')]);
             return;
         }
 
@@ -825,7 +825,7 @@ class AdminComprasController extends Controller {
 
             echo json_encode(['success' => true, 'pedidos' => array_values($pedidos)]);
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => __('admin.purchases.err_generic', 'Erro: {e}', ['e' => $e->getMessage()])]);
         }
     }
 
@@ -917,12 +917,12 @@ class AdminComprasController extends Controller {
                 $affected = (int) $stmt2->rowCount();
             }
 
-            $_SESSION['message'] = 'Itens reabertos.';
+            $_SESSION['message'] = __('admin.purchases.flash_items_reopened', 'Itens reabertos.');
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/estoque/compras?status=pendente&somente_reabertos=1' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
             exit;
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao reabrir itens.';
+            $_SESSION['message'] = __('admin.purchases.flash_error_reopen', 'Erro ao reabrir itens.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras?status=concluidas');
             exit;
@@ -951,7 +951,7 @@ class AdminComprasController extends Controller {
         $redirectUrl = '/admin/estoque/compras' . (!empty($redirectParams) ? ('?' . http_build_query($redirectParams)) : '');
 
         if ($produtoId <= 0) {
-            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message'] = __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.');
             $_SESSION['message_type'] = 'danger';
             header('Location: ' . $redirectUrl);
             exit;
@@ -985,16 +985,16 @@ class AdminComprasController extends Controller {
             }
 
             if ($affected > 0) {
-                $_SESSION['message'] = 'Item removido da lista.';
+                $_SESSION['message'] = __('admin.purchases.flash_item_removed', 'Item removido da lista.');
                 $_SESSION['message_type'] = 'success';
             } else {
-                $_SESSION['message'] = 'Nenhum item pendente encontrado para remover.';
+                $_SESSION['message'] = __('admin.purchases.flash_no_pending_item', 'Nenhum item pendente encontrado para remover.');
                 $_SESSION['message_type'] = 'warning';
             }
             header('Location: ' . $redirectUrl);
             exit;
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao remover item.';
+            $_SESSION['message'] = __('admin.purchases.flash_error_remove', 'Erro ao remover item.');
             $_SESSION['message_type'] = 'danger';
             header('Location: ' . $redirectUrl);
             exit;
@@ -1524,7 +1524,7 @@ class AdminComprasController extends Controller {
             if (session_status() !== PHP_SESSION_ACTIVE) {
                 @session_start();
             }
-            $_SESSION['message'] = 'Erro ao carregar lista de compras: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.purchases.flash_error_load_list', 'Erro ao carregar lista de compras: {e}', ['e' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
             $compras = [];
             $estatisticas = ['total_itens' => 0, 'pendentes' => 0, 'comprados' => 0, 'cancelados' => 0];
@@ -1544,11 +1544,11 @@ class AdminComprasController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Compras - Braziliana Admin</title>
+    <title>' . __('admin.purchases.page_title', 'Lista de Compras') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -1574,11 +1574,11 @@ class AdminComprasController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Lista de Compras</h1>
+                    <h1 class="page-title">' . __('admin.purchases.heading', 'Lista de Compras') . '</h1>
                     <div>';
 
         echo '<button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
-                            <i class="fas fa-file-pdf me-1"></i>Gerar PDF
+                            <i class="fas fa-file-pdf me-1"></i>' . __('admin.purchases.generate_pdf', 'Gerar PDF') . '
                         </button>';
 
         if ($statusView !== 'pendente') {
@@ -1586,13 +1586,13 @@ class AdminComprasController extends Controller {
                             <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                             <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                             <button type="button" class="btn btn-secondary me-2" data-bs-toggle="modal" data-bs-target="#modalReabrirCompras">
-                                <i class="fas fa-rotate-left me-1"></i>Reabrir itens
+                                <i class="fas fa-rotate-left me-1"></i>' . __('admin.purchases.reopen_items', 'Reabrir itens') . '
                             </button>
                         </form>';
         }
 
         echo '<button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                            <i class="fas fa-sync me-1"></i>' . __('admin.purchases.refresh', 'Atualizar') . '
                         </button>
                     </div>
                 </div>';
@@ -1600,8 +1600,8 @@ class AdminComprasController extends Controller {
                 $this->renderFlashIfAny();
 
                 echo '<div class="alert alert-info mb-3">'
-                    . '<div><strong>Importante:</strong> as quantidades exibidas na Lista de Compras representam o <strong>faltante</strong> considerando o estoque cadastrado (tela de Estoque), e não necessariamente o total pedido.</div>'
-                    . '<div class="small text-muted mt-1">Pedidos do site (online) e pedidos manuais seguem a mesma regra de cálculo do faltante.</div>'
+                    . '<div><strong>' . __('admin.purchases.important', 'Importante:') . '</strong> ' . __('admin.purchases.important_text', 'as quantidades exibidas na Lista de Compras representam o <strong>faltante</strong> considerando o estoque cadastrado (tela de Estoque), e não necessariamente o total pedido.') . '</div>'
+                    . '<div class="small text-muted mt-1">' . __('admin.purchases.important_text2', 'Pedidos do site (online) e pedidos manuais seguem a mesma regra de cálculo do faltante.') . '</div>'
                     . '</div>';
 
                 $qsLoja = '';
@@ -1614,8 +1614,8 @@ class AdminComprasController extends Controller {
                 }
 
                 echo '<div class="d-flex flex-wrap gap-2 mb-2">'
-                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . '">Pendentes</a>'
-                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">Concluídas</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . '">' . __('admin.purchases.tab_pending', 'Pendentes') . '</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">' . __('admin.purchases.tab_completed', 'Concluídas') . '</a>'
                     . '</div>';
 
                 // Build active lojas array from query string (supports multi-select)
@@ -1631,11 +1631,11 @@ class AdminComprasController extends Controller {
                     $lojasAtivas = $lojasMulti;
                 }
 
-                $dropdownLabel = 'Todas as lojas';
+                $dropdownLabel = __('admin.purchases.all_stores', 'Todas as lojas');
                 if (in_array('sem_loja', $lojasAtivas)) {
-                    $dropdownLabel = 'Sem loja';
+                    $dropdownLabel = __('admin.purchases.no_store', 'Sem loja');
                     if (count($lojasAtivas) > 1) {
-                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                        $dropdownLabel = __('admin.purchases.stores_selected', '{n} lojas selecionadas', ['n' => count($lojasAtivas)]);
                     }
                 } elseif (!empty($lojasAtivas)) {
                     if (count($lojasAtivas) === 1) {
@@ -1646,7 +1646,7 @@ class AdminComprasController extends Controller {
                             }
                         }
                     } else {
-                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                        $dropdownLabel = __('admin.purchases.stores_selected', '{n} lojas selecionadas', ['n' => count($lojasAtivas)]);
                     }
                 }
 
@@ -1659,12 +1659,12 @@ class AdminComprasController extends Controller {
                                 </button>
                                 <div class="dropdown-menu p-3" style="min-width:280px;max-height:320px;overflow-y:auto;" aria-labelledby="lojaDropdownBtn">
                                     <div class="mb-2">
-                                        <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="Buscar loja...">
+                                        <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="' . htmlspecialchars(__('admin.purchases.search_store', 'Buscar loja...'), ENT_QUOTES, 'UTF-8') . '">
                                     </div>
                                     <div style="overflow-y:auto;max-height:240px;">
                                     <div class="form-check mb-1">
                                         <input class="form-check-input loja-check" type="checkbox" value="todas" id="lojaCheck_todas" ' . (empty($lojasAtivas) ? 'checked' : '') . '>
-                                        <label class="form-check-label" for="lojaCheck_todas">Todas</label>
+                                        <label class="form-check-label" for="lojaCheck_todas">' . __('admin.purchases.all', 'Todas') . '</label>
                                     </div>
                                     <hr class="my-1">';
 
@@ -1681,17 +1681,17 @@ class AdminComprasController extends Controller {
                 echo '<hr class="my-1">
                                     <div class="form-check mb-1 loja-item">
                                         <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
-                                        <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
+                                        <label class="form-check-label text-danger" for="lojaCheck_sem">' . __('admin.purchases.no_store', 'Sem loja') . '</label>
                                     </div>
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-primary d-none" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar</button>
+                            <button type="button" class="btn btn-sm btn-primary d-none" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>' . __('admin.purchases.apply', 'Aplicar') . '</button>
                         </div>'
-                    . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">Tipo:</small>'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Online</a>'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Offline</a>'
+                    . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">' . __('admin.purchases.type', 'Tipo:') . '</small>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">' . __('admin.purchases.type_all', 'Todos') . '</a>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">' . __('admin.purchases.type_online', 'Online') . '</a>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">' . __('admin.purchases.type_offline', 'Offline') . '</a>'
                     . '</div>'
                     . '</div>'
                     . '</div>';
@@ -1724,9 +1724,9 @@ class AdminComprasController extends Controller {
                     function updateBtnLabel() {
                         var count = Array.from(lojaChecks).filter(function(c) { return c.checked; }).length;
                         if (todasCheck.checked || count === 0) {
-                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>Aplicar";
+                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>' . htmlspecialchars(__('admin.purchases.apply', 'Aplicar'), ENT_QUOTES, 'UTF-8') . '";
                         } else {
-                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>Aplicar (" + count + " loja" + (count > 1 ? "s" : "") + ")";
+                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>' . htmlspecialchars(__('admin.purchases.apply', 'Aplicar'), ENT_QUOTES, 'UTF-8') . ' (" + count + " ' . htmlspecialchars(__('admin.purchases.store', 'loja'), ENT_QUOTES, 'UTF-8') . '" + (count > 1 ? "s" : "") + ")";
                         }
                         // Mostrar o botão sempre que houver mudança pendente
                         applyBtn.classList.remove("d-none");
@@ -1801,36 +1801,36 @@ class AdminComprasController extends Controller {
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Total Itens</h5>
+                                <h5 class="card-title">' . __('admin.purchases.stat_total_items', 'Total Itens') . '</h5>
                                 <h3>' . number_format($estatisticas['total_itens']) . '</h3>
-                                <small>Na lista de compras</small>
+                                <small>' . __('admin.purchases.stat_in_list', 'Na lista de compras') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-warning text-dark">
                             <div class="card-body">
-                                <h5 class="card-title">Pendentes</h5>
+                                <h5 class="card-title">' . __('admin.purchases.stat_pending', 'Pendentes') . '</h5>
                                 <h3>' . number_format($estatisticas['pendentes']) . '</h3>
-                                <small>Aguardando compra</small>
+                                <small>' . __('admin.purchases.stat_awaiting', 'Aguardando compra') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-success text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Comprados</h5>
+                                <h5 class="card-title">' . __('admin.purchases.stat_purchased', 'Comprados') . '</h5>
                                 <h3>' . number_format($estatisticas['comprados']) . '</h3>
-                                <small>Itens adquiridos</small>
+                                <small>' . __('admin.purchases.stat_acquired', 'Itens adquiridos') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-danger text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Cancelados</h5>
+                                <h5 class="card-title">' . __('admin.purchases.stat_cancelled', 'Cancelados') . '</h5>
                                 <h3>' . number_format($estatisticas['cancelados']) . '</h3>
-                                <small>Itens cancelados</small>
+                                <small>' . __('admin.purchases.stat_cancelled_items', 'Itens cancelados') . '</small>
                             </div>
                         </div>
                     </div>
@@ -1839,17 +1839,17 @@ class AdminComprasController extends Controller {
                 // Tabela de Compras
                 echo '<div class="card">
                     <div class="card-header">
-                        <h5><i class="fas fa-list me-2"></i>Itens da Lista de Compras</h5>
+                        <h5><i class="fas fa-list me-2"></i>' . __('admin.purchases.list_items_title', 'Itens da Lista de Compras') . '</h5>
                     </div>
                     <div class="card-body">
                         <div class="d-flex justify-content-end gap-2 mb-3">';
 
                 if ($semLoja) {
-                    echo '<button type="button" class="btn btn-sm btn-outline-danger" disabled>PDF (Sem loja)</button>';
+                    echo '<button type="button" class="btn btn-sm btn-outline-danger" disabled>' . __('admin.purchases.pdf_no_store', 'PDF (Sem loja)') . '</button>';
                 } elseif ($lojaIdFilter > 0) {
-                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf?loja_id=' . (int) $lojaIdFilter . '\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>PDF desta loja</button>';
+                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf?loja_id=' . (int) $lojaIdFilter . '\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>' . __('admin.purchases.pdf_this_store', 'PDF desta loja') . '</button>';
                 } else {
-                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>PDF (geral)</button>';
+                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>' . __('admin.purchases.pdf_general', 'PDF (geral)') . '</button>';
                 }
 
                 echo '        </div>
@@ -1857,19 +1857,19 @@ class AdminComprasController extends Controller {
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Produto</th>
-                                        <th>Loja</th>
-                                        <th>Quantidade</th>
-                                        <th>Status</th>
-                                        <th>Prioridade</th>
-                                        <th>Data Solicitação</th>
-                                        <th>Ações</th>
+                                        <th>' . __('admin.purchases.th_product', 'Produto') . '</th>
+                                        <th>' . __('admin.purchases.th_store', 'Loja') . '</th>
+                                        <th>' . __('admin.purchases.th_quantity', 'Quantidade') . '</th>
+                                        <th>' . __('admin.purchases.th_status', 'Status') . '</th>
+                                        <th>' . __('admin.purchases.th_priority', 'Prioridade') . '</th>
+                                        <th>' . __('admin.purchases.th_request_date', 'Data Solicitação') . '</th>
+                                        <th>' . __('admin.purchases.th_actions', 'Ações') . '</th>
                                     </tr>
                                 </thead>
                                 <tbody>';
                                 
                                 $__mesAtual = '';
-                                $__meses = ['01'=>'Janeiro','02'=>'Fevereiro','03'=>'Março','04'=>'Abril','05'=>'Maio','06'=>'Junho','07'=>'Julho','08'=>'Agosto','09'=>'Setembro','10'=>'Outubro','11'=>'Novembro','12'=>'Dezembro'];
+                                $__meses = ['01'=>__('admin.purchases.month_01', 'Janeiro'),'02'=>__('admin.purchases.month_02', 'Fevereiro'),'03'=>__('admin.purchases.month_03', 'Março'),'04'=>__('admin.purchases.month_04', 'Abril'),'05'=>__('admin.purchases.month_05', 'Maio'),'06'=>__('admin.purchases.month_06', 'Junho'),'07'=>__('admin.purchases.month_07', 'Julho'),'08'=>__('admin.purchases.month_08', 'Agosto'),'09'=>__('admin.purchases.month_09', 'Setembro'),'10'=>__('admin.purchases.month_10', 'Outubro'),'11'=>__('admin.purchases.month_11', 'Novembro'),'12'=>__('admin.purchases.month_12', 'Dezembro')];
 
                                 foreach ($compras as $item) {
                                     // Separação por mês quando filtro Carnê está ativo
@@ -1880,7 +1880,7 @@ class AdminComprasController extends Controller {
                                             $__mesAtual = $mesItem;
                                             $mesLabel = ($mesItem !== 'sem-data' && strlen($mesItem) >= 7)
                                                 ? ($__meses[substr($mesItem, 5, 2)] ?? substr($mesItem, 5, 2)) . '/' . substr($mesItem, 0, 4)
-                                                : 'Sem data';
+                                                : __('admin.purchases.no_date', 'Sem data');
                                             echo '<tr><td colspan="7" class="bg-light fw-bold text-primary py-2 px-3" style="border-left:4px solid #3b82f6;"><i class="fas fa-calendar me-2"></i>' . htmlspecialchars($mesLabel) . '</td></tr>';
                                         }
                                     }
@@ -1897,7 +1897,7 @@ class AdminComprasController extends Controller {
 
                                     $imgUrl = $this->resolveProdutoImagem($item);
                                     $imgTag = $imgUrl
-                                        ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($imgUrl) . '" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06); cursor:pointer;" title="Clique para ampliar">'
+                                        ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($imgUrl) . '" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06); cursor:pointer;" title="' . htmlspecialchars(__('admin.purchases.click_to_zoom', 'Clique para ampliar'), ENT_QUOTES, 'UTF-8') . '">'
                                         : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
 
                                     $lojaNome = '-';
@@ -1991,10 +1991,10 @@ class AdminComprasController extends Controller {
                                         . '<div class="d-flex gap-2 align-items-center">' . $imgTag . '<div>'
                                         . '<strong>' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '</strong>'
                                         . '<br><small class="text-muted">ID: ' . (int) $item['produto_id'] . '</small>'
-                                        . ((!empty($item['tipo_compra']) && $item['tipo_compra'] === 'carne') ? ' <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>' : '')
+                                        . ((!empty($item['tipo_compra']) && $item['tipo_compra'] === 'carne') ? ' <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-file-invoice-dollar me-1"></i>' . __('admin.purchases.badge_carne', 'Carnê') . '</span>' : '')
                                         . '</div></div>'
                                         . '</td>'
-                                        . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">Sem loja</span>') . '</td>'
+                                        . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">' . __('admin.purchases.no_store', 'Sem loja') . '</span>') . '</td>'
                                         . '<td><span class="badge bg-primary">' . $qf . '</span></td>'
                                         . '<td><span class="badge bg-' . $status_class . '">' . ucfirst((string) $item['status']) . '</span></td>'
                                         . '<td><span class="badge bg-' . $prioridade_class . '">' . ucfirst((string) $item['prioridade']) . '</span></td>'
@@ -2028,7 +2028,7 @@ class AdminComprasController extends Controller {
                             $mPrioClass = $mPrioridade == 'urgente' ? 'danger' : ($mPrioridade == 'alta' ? 'warning' : 'info');
                             $mImgUrl = $this->resolveProdutoImagem($mItem);
                             $mImgTag = $mImgUrl
-                                ? '<img src="' . htmlspecialchars($mImgUrl) . '" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" title="Clique para ampliar">'
+                                ? '<img src="' . htmlspecialchars($mImgUrl) . '" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" title="' . htmlspecialchars(__('admin.purchases.click_to_zoom', 'Clique para ampliar'), ENT_QUOTES, 'UTF-8') . '">'
                                 : '<div style="width:32px;height:32px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;"><i class="fas fa-image text-muted" style="font-size:12px;"></i></div>';
 
                             // Mobile action buttons
@@ -2076,7 +2076,7 @@ class AdminComprasController extends Controller {
                                         <div class="fw-semibold small" style="word-break:break-word;">' . htmlspecialchars($mProdNome) . '</div>
                                         <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:10px;">
                                             <span class="text-muted">ID: ' . (int) $mItem['produto_id'] . '</span>
-                                            <span class="badge bg-primary">' . $mQf . ' un</span>
+                                            <span class="badge bg-primary">' . $mQf . ' ' . __('admin.purchases.unit_abbr', 'un') . '</span>
                                             <span class="badge bg-' . $mStatusClass . '">' . ucfirst($mStatus) . '</span>
                                             <span class="badge bg-' . $mPrioClass . '">' . ucfirst($mPrioridade) . '</span>
                                         </div>
@@ -2095,23 +2095,23 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/definir-loja">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Definir loja do produto</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.modal_set_store_title', 'Definir loja do produto') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="modal_produto_id" value="">
                                         <div class="mb-2 text-muted" id="modal_produto_nome"></div>
-                                        <label class="form-label">Loja *</label>
+                                        <label class="form-label">' . __('admin.purchases.th_store', 'Loja') . ' *</label>
                                         <select class="form-select" name="loja_id" required>
-                                            <option value="">Selecione...</option>';
+                                            <option value="">' . __('admin.purchases.select_placeholder', 'Selecione...') . '</option>';
                 foreach ($lojas as $l) {
                     echo '<option value="' . (int) ($l['id'] ?? 0) . '">' . htmlspecialchars((string) ($l['nome'] ?? '')) . '</option>';
                 }
                 echo '            </select>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-primary">' . __('admin.purchases.save', 'Salvar') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2123,17 +2123,17 @@ class AdminComprasController extends Controller {
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title">Pedidos relacionados</h5>
+                                    <h5 class="modal-title">' . __('admin.purchases.modal_related_orders_title', 'Pedidos relacionados') . '</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-2 text-muted" id="pedidos_produto_nome"></div>
-                                    <div id="pedidos_loading" class="text-muted">Carregando...</div>
-                                    <div id="pedidos_empty" class="alert alert-warning d-none">Nenhum pedido encontrado para este item.</div>
+                                    <div id="pedidos_loading" class="text-muted">' . __('admin.purchases.js_loading', 'Carregando...') . '</div>
+                                    <div id="pedidos_empty" class="alert alert-warning d-none">' . __('admin.purchases.no_orders_for_item', 'Nenhum pedido encontrado para este item.') . '</div>
                                     <div class="accordion" id="accordionPedidos"></div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.close', 'Fechar') . '</button>
                                 </div>
                             </div>
                         </div>
@@ -2178,10 +2178,10 @@ class AdminComprasController extends Controller {
                             var itensHtml = "";
                             if (Array.isArray(p.itens) && p.itens.length > 0) {
                                 itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
-                                itensHtml += "<thead><tr><th>Produto</th><th style=\"width:90px;\">Qtd</th><th style=\"width:120px;\">Preço</th><th style=\"width:120px;\">Subtotal</th></tr></thead><tbody>";
+                                itensHtml += "<thead><tr><th>' . htmlspecialchars(__('admin.purchases.th_product', 'Produto'), ENT_QUOTES, 'UTF-8') . '</th><th style=\"width:90px;\">' . htmlspecialchars(__('admin.purchases.js_qty', 'Qtd'), ENT_QUOTES, 'UTF-8') . '</th><th style=\"width:120px;\">' . htmlspecialchars(__('admin.purchases.js_price', 'Preço'), ENT_QUOTES, 'UTF-8') . '</th><th style=\"width:120px;\">' . htmlspecialchars(__('admin.purchases.js_subtotal', 'Subtotal'), ENT_QUOTES, 'UTF-8') . '</th></tr></thead><tbody>";
                                 p.itens.forEach(function(it){
                                     itensHtml += "<tr>";
-                                    itensHtml += "<td>" + escapeHtml(it.nome_produto || it.nome_produto_sku || ("Produto ID: " + (it.produto_id||""))) + "</td>";
+                                    itensHtml += "<td>" + escapeHtml(it.nome_produto || it.nome_produto_sku || ("' . htmlspecialchars(__('admin.purchases.js_product_id', 'Produto ID:'), ENT_QUOTES, 'UTF-8') . ' " + (it.produto_id||""))) + "</td>";
                                     itensHtml += "<td>" + escapeHtml(it.quantidade || 0) + "</td>";
                                     itensHtml += "<td>" + formatMoney(it.preco_unitario) + "</td>";
                                     itensHtml += "<td>" + formatMoney(it.subtotal) + "</td>";
@@ -2189,15 +2189,15 @@ class AdminComprasController extends Controller {
                                 });
                                 itensHtml += "</tbody></table></div>";
                             } else {
-                                itensHtml = "<div class=\"text-muted\">Itens do pedido não disponíveis.</div>";
+                                itensHtml = "<div class=\"text-muted\">' . htmlspecialchars(__('admin.purchases.js_order_items_unavailable', 'Itens do pedido não disponíveis.'), ENT_QUOTES, 'UTF-8') . '</div>";
                             }
 
                             var html = "";
                             html += "<div class=\"accordion-item\">";
                             html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
                             html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
-                            html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
-                            if (p.is_carne) html += " <span class=\"badge bg-warning text-dark\" style=\"font-size:10px\">🎫 Carnê</span>";
+                            html += "' . htmlspecialchars(__('admin.purchases.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') . ' #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
+                            if (p.is_carne) html += " <span class=\"badge bg-warning text-dark\" style=\"font-size:10px\">🎫 ' . htmlspecialchars(__('admin.purchases.badge_carne', 'Carnê'), ENT_QUOTES, 'UTF-8') . '</span>";
                             html += "</button></h2>";
                             html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionPedidos\">";
                             html += "<div class=\"accordion-body\">";
@@ -2205,33 +2205,33 @@ class AdminComprasController extends Controller {
                             if (p.is_carne && p.carne_info) {
                                 var ci = p.carne_info;
                                 html += "<div class=\"alert alert-warning py-1 px-2 small mb-2\">";
-                                html += "<strong>🎫 Carnê #" + ci.carne_id + "</strong> — ";
-                                html += "Parcelas: " + ci.pagas + "/" + ci.parcelas + " pagas";
-                                html += " — Status: " + escapeHtml(ci.status);
-                                if (ci.compra_liberada) html += " — <span class=\"text-success\">✅ Compra liberada</span>";
-                                else html += " — <span class=\"text-danger\">⏳ Aguardando 1ª parcela</span>";
-                                html += " — <a href=\"/admin/carnes/detalhes/" + ci.carne_id + "\" target=\"_blank\" class=\"text-primary\">Abrir carnê</a>";
+                                html += "<strong>🎫 ' . htmlspecialchars(__('admin.purchases.badge_carne', 'Carnê'), ENT_QUOTES, 'UTF-8') . ' #" + ci.carne_id + "</strong> — ";
+                                html += "' . htmlspecialchars(__('admin.purchases.js_installments', 'Parcelas:'), ENT_QUOTES, 'UTF-8') . ' " + ci.pagas + "/" + ci.parcelas + " ' . htmlspecialchars(__('admin.purchases.js_paid', 'pagas'), ENT_QUOTES, 'UTF-8') . '";
+                                html += " — ' . htmlspecialchars(__('admin.purchases.js_status', 'Status:'), ENT_QUOTES, 'UTF-8') . ' " + escapeHtml(ci.status);
+                                if (ci.compra_liberada) html += " — <span class=\"text-success\">✅ ' . htmlspecialchars(__('admin.purchases.js_purchase_released', 'Compra liberada'), ENT_QUOTES, 'UTF-8') . '</span>";
+                                else html += " — <span class=\"text-danger\">⏳ ' . htmlspecialchars(__('admin.purchases.js_awaiting_first_installment', 'Aguardando 1ª parcela'), ENT_QUOTES, 'UTF-8') . '</span>";
+                                html += " — <a href=\"/admin/carnes/detalhes/" + ci.carne_id + "\" target=\"_blank\" class=\"text-primary\">' . htmlspecialchars(__('admin.purchases.js_open_carne', 'Abrir carnê'), ENT_QUOTES, 'UTF-8') . '</a>";
                                 html += "</div>";
                             }
-                            html += "<div><strong>Cliente:</strong> " + escapeHtml(cliente) + "</div>";
-                            html += "<div><strong>Criado em:</strong> " + criado + "</div>";
-                            if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
+                            html += "<div><strong>' . htmlspecialchars(__('admin.purchases.js_customer', 'Cliente:'), ENT_QUOTES, 'UTF-8') . '</strong> " + escapeHtml(cliente) + "</div>";
+                            html += "<div><strong>' . htmlspecialchars(__('admin.purchases.js_created_at', 'Criado em:'), ENT_QUOTES, 'UTF-8') . '</strong> " + criado + "</div>";
+                            if (pagoEm) html += "<div><strong>' . htmlspecialchars(__('admin.purchases.js_paid_at', 'Pago em:'), ENT_QUOTES, 'UTF-8') . '</strong> " + pagoEm + "</div>";
                             var stLow = String(p.status || "").toLowerCase();
                             var pago = (stLow === "pago" || stLow === "paid" || stLow === "aprovado" || stLow === "approved" || (p.pago_em && String(p.pago_em).trim() !== ""));
 
                             html += "<div class=\"mt-2 d-flex flex-wrap gap-2\">";
-                            html += "<a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a>";
+                            html += "<a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">' . htmlspecialchars(__('admin.purchases.js_open_order', 'Abrir pedido'), ENT_QUOTES, 'UTF-8') . '</a>";
                             var gw = String(p.payment_gateway || p.gateway || "").toLowerCase();
                             var payId = String(p.payment_id || p.asaas_payment_id || "");
                             var temAsaas = (gw === "asaas" && payId.trim() !== "");
                             if (!pago && temAsaas) {
                                 html += "<div class=\"input-group input-group-sm\" style=\"max-width:320px;\">";
                                 html += "<span class=\"input-group-text\">$</span>";
-                                html += "<input type=\"number\" step=\"0.01\" min=\"0\" class=\"form-control\" placeholder=\"Valor da diferença\" id=\"diff_val_" + pid + "\">";
-                                html += "<button type=\"button\" class=\"btn btn-outline-success\" onclick=\"gerarLinkDiferenca(" + pid + ")\">Gerar link</button>";
+                                html += "<input type=\"number\" step=\"0.01\" min=\"0\" class=\"form-control\" placeholder=\"' . htmlspecialchars(__('admin.purchases.js_difference_value', 'Valor da diferença'), ENT_QUOTES, 'UTF-8') . '\" id=\"diff_val_" + pid + "\">";
+                                html += "<button type=\"button\" class=\"btn btn-outline-success\" onclick=\"gerarLinkDiferenca(" + pid + ")\">' . htmlspecialchars(__('admin.purchases.js_generate_link', 'Gerar link'), ENT_QUOTES, 'UTF-8') . '</button>";
                                 html += "</div>";
                             } else if (!pago && !temAsaas) {
-                                html += "<div class=\"text-muted small\">Cobrança de diferença disponível apenas para pedidos Asaas.</div>";
+                                html += "<div class=\"text-muted small\">' . htmlspecialchars(__('admin.purchases.js_difference_only_asaas', 'Cobrança de diferença disponível apenas para pedidos Asaas.'), ENT_QUOTES, 'UTF-8') . '</div>";
                             }
                             html += "</div>";
                             html += "<div class=\"mt-2\" id=\"diff_out_" + pid + "\"></div>";
@@ -2244,7 +2244,7 @@ class AdminComprasController extends Controller {
 
                     function gerarLinkDiferenca(pedidoId){
                         var out = document.getElementById("diff_out_" + pedidoId);
-                        if (out) out.innerHTML = "<div class=\"text-muted\">Gerando link...</div>";
+                        if (out) out.innerHTML = "<div class=\"text-muted\">' . htmlspecialchars(__('admin.purchases.js_generating_link', 'Gerando link...'), ENT_QUOTES, 'UTF-8') . '</div>";
                         var inp = document.getElementById("diff_val_" + pedidoId);
                         var val = inp ? inp.value : "";
                         fetch("/admin/estoque/compras/gerar-link-diferenca", {
@@ -2255,18 +2255,18 @@ class AdminComprasController extends Controller {
                         .then(function(r){ return r.json(); })
                         .then(function(data){
                             if (!data || !data.success) {
-                                if (out) out.innerHTML = "<div class=\"alert alert-danger\">" + escapeHtml((data && data.message) ? data.message : "Erro ao gerar link") + "</div>";
+                                if (out) out.innerHTML = "<div class=\"alert alert-danger\">" + escapeHtml((data && data.message) ? data.message : "' . htmlspecialchars(__('admin.purchases.js_error_generate_link', 'Erro ao gerar link'), ENT_QUOTES, 'UTF-8') . '") + "</div>";
                                 return;
                             }
                             var url = data.invoiceUrl || data.bankSlipUrl || "";
                             if (out) {
                                 out.innerHTML = url
-                                    ? ("<div class=\"alert alert-success\">Link gerado: <a href=\"" + escapeHtml(url) + "\" target=\"_blank\">Abrir cobrança</a></div>")
-                                    : ("<div class=\"alert alert-success\">Link gerado com sucesso.</div>");
+                                    ? ("<div class=\"alert alert-success\">' . htmlspecialchars(__('admin.purchases.js_link_generated', 'Link gerado:'), ENT_QUOTES, 'UTF-8') . ' <a href=\"" + escapeHtml(url) + "\" target=\"_blank\">' . htmlspecialchars(__('admin.purchases.js_open_charge', 'Abrir cobrança'), ENT_QUOTES, 'UTF-8') . '</a></div>")
+                                    : ("<div class=\"alert alert-success\">' . htmlspecialchars(__('admin.purchases.js_link_generated_success', 'Link gerado com sucesso.'), ENT_QUOTES, 'UTF-8') . '</div>");
                             }
                         })
                         .catch(function(){
-                            if (out) out.innerHTML = "<div class=\"alert alert-danger\">Erro ao gerar link</div>";
+                            if (out) out.innerHTML = "<div class=\"alert alert-danger\">' . htmlspecialchars(__('admin.purchases.js_error_generate_link', 'Erro ao gerar link'), ENT_QUOTES, 'UTF-8') . '</div>";
                         });
                     }
 
@@ -2303,7 +2303,7 @@ class AdminComprasController extends Controller {
                                     if (!data || !data.success) {
                                         if (empty) {
                                             empty.classList.remove("d-none");
-                                            empty.textContent = (data && data.message) ? data.message : "Erro ao buscar pedidos.";
+                                            empty.textContent = (data && data.message) ? data.message : "' . htmlspecialchars(__('admin.purchases.js_error_fetch_orders', 'Erro ao buscar pedidos.'), ENT_QUOTES, 'UTF-8') . '";
                                         }
                                         return;
                                     }
@@ -2318,7 +2318,7 @@ class AdminComprasController extends Controller {
                                     if (loading) loading.classList.add("d-none");
                                     if (empty) {
                                         empty.classList.remove("d-none");
-                                        empty.textContent = "Erro ao buscar pedidos.";
+                                        empty.textContent = "' . htmlspecialchars(__('admin.purchases.js_error_fetch_orders', 'Erro ao buscar pedidos.'), ENT_QUOTES, 'UTF-8') . '";
                                     }
                                 });
                         });
@@ -2333,17 +2333,17 @@ class AdminComprasController extends Controller {
                                     <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                                     <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Reabrir itens</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.reopen_items', 'Reabrir itens') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="alert alert-secondary mb-0">
-                                            Deseja voltar para <strong>pendente</strong> todos os itens concluídos deste filtro?
+                                            ' . __('admin.purchases.reopen_all_confirm', 'Deseja voltar para <strong>pendente</strong> todos os itens concluídos deste filtro?') . '
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Reabrir</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-primary">' . __('admin.purchases.reopen', 'Reabrir') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2371,7 +2371,7 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/remover-item">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Remover item da lista</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.modal_remove_title', 'Remover item da lista') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
@@ -2381,12 +2381,12 @@ class AdminComprasController extends Controller {
                                         <input type="hidden" name="redirect_loja_id" id="remover_redirect_loja_id" value="0">
                                         <input type="hidden" name="redirect_sem_loja" id="remover_redirect_sem_loja" value="0">
                                         <div class="alert alert-warning mb-0">
-                                            Tem certeza que deseja remover da lista o item <strong id="remover_produto_nome"></strong>?
+                                            ' . __('admin.purchases.remove_confirm_prefix', 'Tem certeza que deseja remover da lista o item') . ' <strong id="remover_produto_nome"></strong>?
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-danger">Remover</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-danger">' . __('admin.purchases.remove', 'Remover') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2415,19 +2415,19 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/reabrir">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Reabrir item</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.modal_reopen_item_title', 'Reabrir item') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="reabrir_produto_id" value="">
                                         <input type="hidden" name="loja_id" id="reabrir_loja_id" value="0">
                                         <div class="alert alert-secondary mb-0">
-                                            Voltar para <strong>pendente</strong>: <strong id="reabrir_produto_nome"></strong>
+                                            ' . __('admin.purchases.reopen_item_prefix', 'Voltar para <strong>pendente</strong>:') . ' <strong id="reabrir_produto_nome"></strong>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Reabrir</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-primary">' . __('admin.purchases.reopen', 'Reabrir') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2452,7 +2452,7 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/concluir">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Concluir item</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.modal_complete_item_title', 'Concluir item') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
@@ -2462,18 +2462,18 @@ class AdminComprasController extends Controller {
                                         <input type="hidden" name="redirect_sem_loja" id="concluir_redirect_sem_loja" value="0">
                                         <input type="hidden" name="redirect_lojas" id="concluir_redirect_lojas" value="">
                                         <div class="alert alert-success mb-0">
-                                            Concluir compra de: <strong id="concluir_produto_nome"></strong>
+                                            ' . __('admin.purchases.complete_purchase_of', 'Concluir compra de:') . ' <strong id="concluir_produto_nome"></strong>
                                         </div>
                                         <div class="mt-3">
-                                            <label class="form-label">Quantidade comprada (apenas para compra parcial)</label>
+                                            <label class="form-label">' . __('admin.purchases.label_purchased_qty', 'Quantidade comprada (apenas para compra parcial)') . '</label>
                                             <input type="number" class="form-control" name="quantidade_comprada" id="concluir_quantidade_comprada" min="0" max="0" value="0">
-                                            <div class="form-text">Se comprar parcial, informe quantos itens foram comprados. A diferença continuará pendente.</div>
+                                            <div class="form-text">' . __('admin.purchases.help_partial_purchase', 'Se comprar parcial, informe quantos itens foram comprados. A diferença continuará pendente.') . '</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success" name="modo" value="total">Confirmar compra total</button>
-                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">Confirmar parcial</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-success" name="modo" value="total">' . __('admin.purchases.confirm_full_purchase', 'Confirmar compra total') . '</button>
+                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">' . __('admin.purchases.confirm_partial', 'Confirmar parcial') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2512,7 +2512,7 @@ class AdminComprasController extends Controller {
                                 var val = parseInt(inp.value || "0", 10);
                                 if (val > max) {
                                     e.preventDefault();
-                                    alert("O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque ");
+                                    alert("' . htmlspecialchars(__('admin.purchases.js_qty_exceeds', 'O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque '), ENT_QUOTES, 'UTF-8') . '");
                                 }
                             });
                         }
@@ -2527,23 +2527,23 @@ class AdminComprasController extends Controller {
                                     <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                                     <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Concluir compras</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.modal_complete_purchases_title', 'Concluir compras') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="alert alert-success">
-                                            Você pode concluir <strong>total</strong> ou <strong>parcial</strong> os itens pendentes deste filtro.
+                                            ' . __('admin.purchases.complete_all_info', 'Você pode concluir <strong>total</strong> ou <strong>parcial</strong> os itens pendentes deste filtro.') . '
                                         </div>
                                         <div>
-                                            <label class="form-label">Quantidade comprada (apenas para compra parcial)</label>
+                                            <label class="form-label">' . __('admin.purchases.label_purchased_qty', 'Quantidade comprada (apenas para compra parcial)') . '</label>
                                             <input type="number" class="form-control" name="quantidade_comprada" min="0" value="0">
-                                            <div class="form-text">Em compra parcial, o restante continuará pendente.</div>
+                                            <div class="form-text">' . __('admin.purchases.help_partial_remaining', 'Em compra parcial, o restante continuará pendente.') . '</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success" name="modo" value="total">Confirmar compra total</button>
-                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">Confirmar parcial</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.purchases.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-success" name="modo" value="total">' . __('admin.purchases.confirm_full_purchase', 'Confirmar compra total') . '</button>
+                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">' . __('admin.purchases.confirm_partial', 'Confirmar parcial') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2559,8 +2559,8 @@ class AdminComprasController extends Controller {
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content" style="background:transparent;border:none;box-shadow:none;">
                 <div class="modal-body text-center p-0 position-relative">
-                    <button type="button" class="btn-close position-absolute" data-bs-dismiss="modal" aria-label="Fechar" style="top:8px;right:8px;z-index:10;background-color:#fff;border-radius:50%;padding:8px;opacity:1;"></button>
-                    <img id="imgZoomFull" src="" alt="Imagem do produto" style="max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+                    <button type="button" class="btn-close position-absolute" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '" style="top:8px;right:8px;z-index:10;background-color:#fff;border-radius:50%;padding:8px;opacity:1;"></button>
+                    <img id="imgZoomFull" src="" alt="' . htmlspecialchars(__('admin.purchases.product_image_alt', 'Imagem do produto'), ENT_QUOTES, 'UTF-8') . '" style="max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
                 </div>
             </div>
         </div>
@@ -2601,7 +2601,7 @@ class AdminComprasController extends Controller {
         $prioridade = in_array($prioridade, ['baixa', 'media', 'alta', 'urgente'], true) ? $prioridade : 'media';
 
         if ($produtoId <= 0 || $pedidoId <= 0 || $quantidade <= 0) {
-            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message'] = __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
@@ -2623,7 +2623,7 @@ class AdminComprasController extends Controller {
             $pedido = $stmtPedido->fetch(\PDO::FETCH_ASSOC);
             if (!$pedido) {
                 $this->connection->rollBack();
-                $_SESSION['message'] = 'Pedido não encontrado.';
+                $_SESSION['message'] = __('admin.purchases.flash_order_not_found', 'Pedido não encontrado.');
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/estoque/compras');
                 exit;
@@ -2638,7 +2638,7 @@ class AdminComprasController extends Controller {
                     $uPed = (int) ($stmtChk->fetchColumn() ?: 0);
                     if ($uPed > 0 && $uPed !== $usuarioId) {
                         $this->connection->rollBack();
-                        $_SESSION['message'] = 'Pedido não pertence ao usuário selecionado.';
+                        $_SESSION['message'] = __('admin.purchases.flash_order_not_belong_user', 'Pedido não pertence ao usuário selecionado.');
                         $_SESSION['message_type'] = 'danger';
                         header('Location: /admin/estoque/compras/novo');
                         exit;
@@ -2651,7 +2651,7 @@ class AdminComprasController extends Controller {
             $produtoInfo = $this->getProdutoInfo($produtoId);
             if (!$produtoInfo) {
                 $this->connection->rollBack();
-                $_SESSION['message'] = 'Produto não encontrado.';
+                $_SESSION['message'] = __('admin.purchases.flash_product_not_found', 'Produto não encontrado.');
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/estoque/compras/novo');
                 exit;
@@ -2819,10 +2819,10 @@ class AdminComprasController extends Controller {
             $this->connection->commit();
 
             if ($pedidoPago) {
-                $_SESSION['message'] = 'Item inserido no pedido e na lista de compras. Pedido está pago: diferença calculada em $ ' . number_format($valorPendente, 2, '.', ',') . '.';
+                $_SESSION['message'] = __('admin.purchases.flash_item_inserted_paid', 'Item inserido no pedido e na lista de compras. Pedido está pago: diferença calculada em $ {v}.', ['v' => number_format($valorPendente, 2, '.', ',')]);
                 $_SESSION['message_type'] = 'warning';
             } else {
-                $_SESSION['message'] = 'Item inserido no pedido e na lista. Diferença calculada automaticamente: $ ' . number_format($valorPendente, 2, '.', ',') . '.';
+                $_SESSION['message'] = __('admin.purchases.flash_item_inserted', 'Item inserido no pedido e na lista. Diferença calculada automaticamente: $ {v}.', ['v' => number_format($valorPendente, 2, '.', ',')]);
                 $_SESSION['message_type'] = 'success';
             }
             header('Location: /admin/estoque/compras');
@@ -2831,7 +2831,7 @@ class AdminComprasController extends Controller {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
-            $_SESSION['message'] = 'Erro ao salvar novo item: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.purchases.flash_error_save_item', 'Erro ao salvar novo item: {e}', ['e' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
@@ -2846,7 +2846,7 @@ class AdminComprasController extends Controller {
         $prioridade = in_array($prioridade, ['baixa', 'media', 'alta', 'urgente'], true) ? $prioridade : 'media';
 
         if ($produtoId <= 0) {
-            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message'] = __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
@@ -2887,7 +2887,7 @@ class AdminComprasController extends Controller {
             $stmt->execute($insertParams);
 
             $this->connection->commit();
-            $_SESSION['message'] = 'Item atualizado.';
+            $_SESSION['message'] = __('admin.purchases.flash_item_updated', 'Item atualizado.');
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/estoque/compras');
             exit;
@@ -2895,7 +2895,7 @@ class AdminComprasController extends Controller {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
-            $_SESSION['message'] = 'Erro ao atualizar item.';
+            $_SESSION['message'] = __('admin.purchases.flash_error_update_item', 'Erro ao atualizar item.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
@@ -2903,7 +2903,7 @@ class AdminComprasController extends Controller {
     }
 
     public function mudarStatus($request) {
-        echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+        echo json_encode(['success' => false, 'message' => __('admin.purchases.feature_in_development', 'Funcionalidade em desenvolvimento')]);
     }
 
     /**
@@ -3081,7 +3081,7 @@ class AdminComprasController extends Controller {
             // Parcial só faz sentido para concluir UM produto (senão não tem como distribuir quantidade)
             if ($modo === 'parcial' && $produtoId > 0) {
                 if ($quantidadeComprada <= 0) {
-                    $_SESSION['message'] = 'Informe a quantidade comprada para concluir parcialmente.';
+                    $_SESSION['message'] = __('admin.purchases.flash_inform_partial_qty', 'Informe a quantidade comprada para concluir parcialmente.');
                     $_SESSION['message_type'] = 'warning';
                     header('Location: ' . $redirectUrl);
                     exit;
@@ -3132,7 +3132,7 @@ class AdminComprasController extends Controller {
                     if ($need > 0) $totalNeed += $need;
                 }
                 if ($quantidadeComprada > $totalNeed) {
-                    $_SESSION['message'] = 'O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque';
+                    $_SESSION['message'] = __('admin.purchases.flash_qty_exceeds', 'O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque');
                     $_SESSION['message_type'] = 'warning';
                     header('Location: ' . $redirectUrl);
                     exit;
@@ -3161,7 +3161,7 @@ class AdminComprasController extends Controller {
                     }
                 }
 
-                $_SESSION['message'] = 'Compra parcial registrada. O restante continua pendente.';
+                $_SESSION['message'] = __('admin.purchases.flash_partial_registered', 'Compra parcial registrada. O restante continua pendente.');
                 $_SESSION['message_type'] = 'success';
                 $this->atualizarStatusPedidosComprados();
                 header('Location: ' . $redirectUrl);
@@ -3212,17 +3212,17 @@ class AdminComprasController extends Controller {
             }
 
             if ($affected > 0) {
-                $_SESSION['message'] = 'Compras concluídas.';
+                $_SESSION['message'] = __('admin.purchases.flash_purchases_completed', 'Compras concluídas.');
                 $_SESSION['message_type'] = 'success';
                 $this->atualizarStatusPedidosComprados();
             } else {
-                $_SESSION['message'] = 'Nenhum item pendente encontrado para concluir.';
+                $_SESSION['message'] = __('admin.purchases.flash_no_pending_complete', 'Nenhum item pendente encontrado para concluir.');
                 $_SESSION['message_type'] = 'warning';
             }
             header('Location: ' . $redirectUrl);
             exit;
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao concluir compras.';
+            $_SESSION['message'] = __('admin.purchases.flash_error_complete', 'Erro ao concluir compras.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
@@ -3312,7 +3312,7 @@ class AdminComprasController extends Controller {
             }
         }
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lista de Compras</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="utf-8"><title>' . __('admin.purchases.page_title', 'Lista de Compras') . '</title>
         <style>
             body{font-family:Arial,sans-serif;color:#111;margin:18px;font-size:12px;}
             h1{font-size:18px;margin:0 0 4px;}
@@ -3327,18 +3327,18 @@ class AdminComprasController extends Controller {
             @media print{.no-print{display:none;} h2{break-before:auto;}}
         </style></head><body>';
 
-        echo '<h1>Lista de Compras</h1><div class="meta">Gerado em: ' . date('d/m/Y H:i') . '</div>';
+        echo '<h1>' . __('admin.purchases.page_title', 'Lista de Compras') . '</h1><div class="meta">' . __('admin.purchases.generated_at', 'Gerado em:') . ' ' . date('d/m/Y H:i') . '</div>';
 
         foreach ($porLoja as $lid => $items) {
-            $nomeLoja = ($lid > 0 && isset($lojaNames[$lid])) ? $lojaNames[$lid] : 'Sem Loja Definida';
-            echo '<h2>' . htmlspecialchars($nomeLoja) . ' (' . count($items) . ' itens)</h2>';
+            $nomeLoja = ($lid > 0 && isset($lojaNames[$lid])) ? $lojaNames[$lid] : __('admin.purchases.no_store_defined', 'Sem Loja Definida');
+            echo '<h2>' . htmlspecialchars($nomeLoja) . ' (' . count($items) . ' ' . __('admin.purchases.items', 'itens') . ')</h2>';
             echo '<table><thead><tr>'
-                . '<th style="width:30px;">Ok</th>'
-                . '<th style="width:50px;">Foto</th>'
-                . '<th>Produto</th>'
-                . '<th style="width:55px;">Qtd</th>'
-                . '<th style="width:70px;">Qtd Comprada</th>'
-                . ($temObsVendedor ? '<th>Obs. Pedido</th>' : '')
+                . '<th style="width:30px;">' . __('admin.purchases.pdf_ok', 'Ok') . '</th>'
+                . '<th style="width:50px;">' . __('admin.purchases.pdf_photo', 'Foto') . '</th>'
+                . '<th>' . __('admin.purchases.th_product', 'Produto') . '</th>'
+                . '<th style="width:55px;">' . __('admin.purchases.pdf_qty', 'Qtd') . '</th>'
+                . '<th style="width:70px;">' . __('admin.purchases.pdf_qty_purchased', 'Qtd Comprada') . '</th>'
+                . ($temObsVendedor ? '<th>' . __('admin.purchases.pdf_order_notes', 'Obs. Pedido') . '</th>' : '')
                 . '</tr></thead><tbody>';
 
             foreach ($items as $r) {
@@ -3362,7 +3362,7 @@ class AdminComprasController extends Controller {
             echo '</tbody></table>';
         }
 
-        echo '<div class="no-print" style="margin-top:14px;"><button onclick="window.print()">Imprimir / Salvar como PDF</button></div>';
+        echo '<div class="no-print" style="margin-top:14px;"><button onclick="window.print()">' . __('admin.purchases.print_save_pdf', 'Imprimir / Salvar como PDF') . '</button></div>';
         echo '</body></html>';
         exit;
     }
@@ -3372,7 +3372,7 @@ class AdminComprasController extends Controller {
             $produtoId = (int) $request->getParam('produto_id');
             $lojaId = (int) $request->getParam('loja_id');
             if ($produtoId <= 0 || $lojaId <= 0) {
-                $_SESSION['message'] = 'Parâmetros inválidos.';
+                $_SESSION['message'] = __('admin.purchases.err_invalid_params', 'Parâmetros inválidos.');
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/estoque/compras?sem_loja=1');
                 exit;
@@ -3416,12 +3416,12 @@ class AdminComprasController extends Controller {
                 $stmtLC->execute([':loja_id' => $lojaId, ':produto_id' => $produtoId]);
             }
 
-            $_SESSION['message'] = 'Loja configurada e aplicada às compras pendentes.';
+            $_SESSION['message'] = __('admin.purchases.flash_store_configured', 'Loja configurada e aplicada às compras pendentes.');
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/estoque/compras');
             exit;
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao definir loja.';
+            $_SESSION['message'] = __('admin.purchases.flash_error_set_store', 'Erro ao definir loja.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras?sem_loja=1');
             exit;
@@ -3430,6 +3430,6 @@ class AdminComprasController extends Controller {
 
     public function verificarEstoque($request) {
         $produto_id = $request->getParam('produto_id');
-        echo json_encode(['success' => true, 'message' => 'Verificação de estoque para produto ID: ' . $produto_id]);
+        echo json_encode(['success' => true, 'message' => __('admin.purchases.stock_check_for_product', 'Verificação de estoque para produto ID: {id}', ['id' => $produto_id])]);
     }
 }

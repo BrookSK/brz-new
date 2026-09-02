@@ -47,7 +47,7 @@ class AdminLivesController {
 
         $quota = $this->shoppingService->checkQuota();
         $activePage = 'lives';
-        $title = 'Lives';
+        $title = __('admin.lives.page_title', 'Lives');
         $sidebarActive = 'lives';
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -65,7 +65,7 @@ class AdminLivesController {
         $products = [];
         $eligibleProducts = $this->getEligibleProducts();
         $activePage = 'lives';
-        $title = 'Nova Live';
+        $title = __('admin.lives.new_live', 'Nova Live');
         $sidebarActive = 'lives';
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -89,7 +89,7 @@ class AdminLivesController {
         ];
 
         if (empty($data['title'])) {
-            $this->jsonResponse(['error' => 'Título é obrigatório'], 422);
+            $this->jsonResponse(['error' => __('admin.lives.title_required', 'Título é obrigatório')], 422);
             return;
         }
 
@@ -123,14 +123,14 @@ class AdminLivesController {
         $live = $this->liveModel->find($id);
         if (!$live) {
             http_response_code(404);
-            echo 'Live não encontrada';
+            echo htmlspecialchars(__('admin.lives.not_found', 'Live não encontrada'), ENT_QUOTES, 'UTF-8');
             return;
         }
 
         $products = $this->liveProductModel->getByLiveId($id);
         $eligibleProducts = $this->getEligibleProducts();
         $activePage = 'lives';
-        $title = 'Editar Live';
+        $title = __('admin.lives.edit_live', 'Editar Live');
         $sidebarActive = 'lives';
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -146,7 +146,7 @@ class AdminLivesController {
     public function update(Request $request, $id) {
         $live = $this->liveModel->find($id);
         if (!$live) {
-            $this->jsonResponse(['error' => 'Live não encontrada'], 404);
+            $this->jsonResponse(['error' => __('admin.lives.not_found', 'Live não encontrada')], 404);
             return;
         }
 
@@ -175,12 +175,12 @@ class AdminLivesController {
     public function destroy(Request $request, $id) {
         $live = $this->liveModel->find($id);
         if (!$live) {
-            $this->jsonResponse(['error' => 'Live não encontrada'], 404);
+            $this->jsonResponse(['error' => __('admin.lives.not_found', 'Live não encontrada')], 404);
             return;
         }
 
         if ($live['status'] === 'live') {
-            $this->jsonResponse(['error' => 'Não é possível excluir uma live em andamento'], 422);
+            $this->jsonResponse(['error' => __('admin.lives.cannot_delete_live', 'Não é possível excluir uma live em andamento')], 422);
             return;
         }
 
@@ -204,7 +204,7 @@ class AdminLivesController {
         $live = $this->liveModel->find($id);
         if (!$live) {
             http_response_code(404);
-            echo 'Live não encontrada';
+            echo htmlspecialchars(__('admin.lives.not_found', 'Live não encontrada'), ENT_QUOTES, 'UTF-8');
             return;
         }
 
@@ -215,7 +215,7 @@ class AdminLivesController {
         $chatMessages = $chatModel->getRecent((int)$id, 20);
 
         $activePage = 'lives';
-        $title = 'Estúdio - ' . $live['title'];
+        $title = __('admin.lives.studio_title', 'Estúdio - {title}', ['title' => $live['title']]);
 
         // Estúdio é full-screen, não usa layout admin
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -229,26 +229,26 @@ class AdminLivesController {
         try {
             $live = $this->liveModel->find($id);
             if (!$live) {
-                $this->jsonResponse(['error' => 'Live não encontrada'], 404);
+                $this->jsonResponse(['error' => __('admin.lives.not_found', 'Live não encontrada')], 404);
                 return;
             }
 
             if ($live['status'] === 'live') {
-                $this->jsonResponse(['error' => 'Live já está em andamento'], 422);
+                $this->jsonResponse(['error' => __('admin.lives.already_running', 'Live já está em andamento')], 422);
                 return;
             }
 
             // Verificar cota
             $quota = $this->shoppingService->checkQuota();
             if (!$quota['can_stream']) {
-                $this->jsonResponse(['error' => 'Cota mensal de streaming excedida'], 403);
+                $this->jsonResponse(['error' => __('admin.lives.quota_exceeded', 'Cota mensal de streaming excedida')], 403);
                 return;
             }
 
             // Criar live input no Cloudflare
             $cfResult = $this->streamService->createLiveInput($id, $live['title']);
             if (!$cfResult || empty($cfResult['uid'])) {
-                $this->jsonResponse(['error' => 'Erro ao criar transmissão no Cloudflare. Verifique as credenciais.'], 500);
+                $this->jsonResponse(['error' => __('admin.lives.cf_create_error', 'Erro ao criar transmissão no Cloudflare. Verifique as credenciais.')], 500);
                 return;
             }
 
@@ -284,7 +284,7 @@ class AdminLivesController {
                 'playback_url' => $playbackUrl,
             ]);
         } catch (\Exception $e) {
-            $this->jsonResponse(['error' => 'Erro interno: ' . $e->getMessage()], 500);
+            $this->jsonResponse(['error' => __('admin.lives.internal_error', 'Erro interno: {msg}', ['msg' => $e->getMessage()])], 500);
         }
     }
 
@@ -294,12 +294,12 @@ class AdminLivesController {
     public function stop(Request $request, $id) {
         $live = $this->liveModel->find($id);
         if (!$live) {
-            $this->jsonResponse(['error' => 'Live não encontrada'], 404);
+            $this->jsonResponse(['error' => __('admin.lives.not_found', 'Live não encontrada')], 404);
             return;
         }
 
         if ($live['status'] !== 'live') {
-            $this->jsonResponse(['error' => 'Live não está em andamento'], 422);
+            $this->jsonResponse(['error' => __('admin.lives.not_running', 'Live não está em andamento')], 422);
             return;
         }
 
@@ -379,7 +379,7 @@ class AdminLivesController {
         $orders = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         $activePage = 'live-orders';
-        $title = 'Pedidos da Live';
+        $title = __('admin.lives.orders_title', 'Pedidos da Live');
         $sidebarActive = 'live-orders';
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -405,7 +405,7 @@ class AdminLivesController {
         $live = $this->liveModel->find($id);
         if (!$live) {
             http_response_code(404);
-            echo 'Live não encontrada';
+            echo htmlspecialchars(__('admin.lives.not_found', 'Live não encontrada'), ENT_QUOTES, 'UTF-8');
             return;
         }
 
@@ -413,7 +413,7 @@ class AdminLivesController {
         $conversion = $this->liveOrderModel->getConversionReport($id);
         $featuredHistory = $this->featuredEventModel->getHistory($id);
         $activePage = 'lives';
-        $title = 'Relatório - ' . $live['title'];
+        $title = __('admin.lives.report_title', 'Relatório - {title}', ['title' => $live['title']]);
         $sidebarActive = 'lives';
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -429,7 +429,7 @@ class AdminLivesController {
     public function addProduct(Request $request, $id) {
         $productId = (int) $request->getParam('product_id');
         if ($productId <= 0) {
-            $this->jsonResponse(['error' => 'Produto inválido'], 422);
+            $this->jsonResponse(['error' => __('admin.lives.invalid_product', 'Produto inválido')], 422);
             return;
         }
 
@@ -445,7 +445,7 @@ class AdminLivesController {
             ]);
             $this->jsonResponse(['success' => true, 'id' => $lpId]);
         } catch (\Exception $e) {
-            $this->jsonResponse(['error' => 'Produto já está nesta live'], 422);
+            $this->jsonResponse(['error' => __('admin.lives.product_already_added', 'Produto já está nesta live')], 422);
         }
     }
 

@@ -1,7 +1,7 @@
 <!-- Mini Carrinho Lateral -->
 <div id="mini-cart" class="mini-cart">
     <div class="mini-cart-header">
-        <h5><i class="fas fa-shopping-cart"></i> Carrinho</h5>
+        <h5><i class="fas fa-shopping-cart"></i> <?= __('layout.mini_cart.title', 'Carrinho') ?></h5>
         <button class="close-cart" onclick="toggleMiniCart()">
             <i class="fas fa-times"></i>
         </button>
@@ -12,7 +12,7 @@
             <!-- Itens do carrinho serão inseridos aqui via JavaScript -->
             <div class="text-center py-4">
                 <i class="fas fa-shopping-bag fa-3x text-muted mb-3"></i>
-                <p class="text-muted">Seu carrinho está vazio</p>
+                <p class="text-muted"><?= __('layout.mini_cart.empty', 'Seu carrinho está vazio') ?></p>
             </div>
         </div>
     </div>
@@ -20,20 +20,20 @@
     <div class="mini-cart-footer">
         <div class="mini-cart-summary">
             <div class="d-flex justify-content-between mb-2">
-                <span>Subtotal:</span>
+                <span><?= __('layout.mini_cart.subtotal', 'Subtotal:') ?></span>
                 <span id="mini-cart-subtotal">R$ 0,00</span>
             </div>
             <div class="d-flex justify-content-between mb-3">
-                <span>Total:</span>
+                <span><?= __('layout.mini_cart.total', 'Total:') ?></span>
                 <span id="mini-cart-total" class="fw-bold">R$ 0,00</span>
             </div>
         </div>
         <div class="mini-cart-actions">
             <a href="/carrinho" class="btn btn-outline-primary btn-sm w-100 mb-2">
-                <i class="fas fa-shopping-cart me-2"></i> Ver Carrinho
+                <i class="fas fa-shopping-cart me-2"></i> <?= __('layout.mini_cart.view_cart', 'Ver Carrinho') ?>
             </a>
             <a href="/checkout" class="btn btn-primary btn-sm w-100">
-                <i class="fas fa-credit-card me-2"></i> Finalizar Compra
+                <i class="fas fa-credit-card me-2"></i> <?= __('layout.mini_cart.checkout', 'Finalizar Compra') ?>
             </a>
         </div>
     </div>
@@ -395,7 +395,7 @@ function updateCartItemQuantity(productId, variacaoId, change) {
 // Função para remover item
 function removeFromMiniCart(productId, variacaoId) {
     const vid = variacaoId ? parseInt(variacaoId) : 0;
-    if (confirm('Tem certeza que deseja remover este item?')) {
+    if (confirm('<?= htmlspecialchars(__('layout.mini_cart.confirm_remove', 'Tem certeza que deseja remover este item?'), ENT_QUOTES, 'UTF-8') ?>')) {
         fetch('/api/carrinho/remover', {
             method: 'POST',
             headers: {
@@ -421,7 +421,7 @@ function removeFromMiniCart(productId, variacaoId) {
                     itemsContainer.innerHTML = `
                         <div class="text-center py-4">
                             <i class="fas fa-shopping-bag fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">Seu carrinho está vazio</p>
+                            <p class="text-muted"><?= htmlspecialchars(__('layout.mini_cart.empty', 'Seu carrinho está vazio'), ENT_QUOTES, 'UTF-8') ?></p>
                         </div>
                     `;
                 }

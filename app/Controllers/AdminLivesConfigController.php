@@ -25,7 +25,7 @@ class AdminLivesConfigController {
         $credentials = $this->streamService->getCredentials();
         $quota = $this->shoppingService->checkQuota();
         $activePage = 'lives-config';
-        $title = 'Configurações - Lives';
+        $title = __('admin.lives_config.page_title', 'Configurações - Lives');
         $sidebarActive = 'lives-config';
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';

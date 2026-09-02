@@ -71,7 +71,7 @@ class AdminRedirecionamentoController extends Controller {
 
         // 3) Se não achou vínculo, retorna um placeholder para esconder o campo
         //    (o redirecionador existe mas ainda não foi vinculado — não deve ver o select)
-        return ['id' => 0, 'nome' => $_SESSION['usuario_nome'] ?? 'Você'];
+        return ['id' => 0, 'nome' => $_SESSION['usuario_nome'] ?? __('admin.redirect.you', 'Você')];
     }
     private function migrarColunas(\PDO $db, string $tabela, array $colunas): void {
         try {
@@ -647,10 +647,10 @@ class AdminRedirecionamentoController extends Controller {
         $tel   = trim((string)$request->getParam('telefone',''));
         $suite = trim((string)$request->getParam('suite',''));
         $status= in_array($request->getParam('status','ativo'),['ativo','bloqueado'],'ativo') ? $request->getParam('status') : 'ativo';
-        if ($nome===''||$email==='') { $_SESSION['message']='Nome e e-mail são obrigatórios.'; $_SESSION['message_type']='danger'; $this->redirect('/admin/redirecionamento/redirecionadores/novo'); return; }
+        if ($nome===''||$email==='') { $_SESSION['message']=__('admin.redirect.name_email_required', 'Nome e e-mail são obrigatórios.'); $_SESSION['message_type']='danger'; $this->redirect('/admin/redirecionamento/redirecionadores/novo'); return; }
         if ($suite==='') { $suite = 'BR-'.strtoupper(substr(md5($email.time()),0,6)); }
         $db->prepare("INSERT INTO redirecionadores (nome,email,telefone,suite,status) VALUES (?,?,?,?,?)")->execute([$nome,$email,$tel,$suite,$status]);
-        $_SESSION['message']='Redirecionador criado com sucesso.'; $_SESSION['message_type']='success';
+        $_SESSION['message']=__('admin.redirect.redirector_created', 'Redirecionador criado com sucesso.'); $_SESSION['message_type']='success';
         $this->redirect('/admin/redirecionamento/redirecionadores');
     }
 
@@ -672,7 +672,7 @@ class AdminRedirecionamentoController extends Controller {
         $suite = trim((string)$request->getParam('suite',''));
         $status= in_array($request->getParam('status','ativo'),['ativo','bloqueado']) ? $request->getParam('status') : 'ativo';
         $this->pdo()->prepare("UPDATE redirecionadores SET nome=?,email=?,telefone=?,suite=?,status=? WHERE id=?")->execute([$nome,$email,$tel,$suite,$status,$id]);
-        $_SESSION['message']='Redirecionador atualizado.'; $_SESSION['message_type']='success';
+        $_SESSION['message']=__('admin.redirect.redirector_updated', 'Redirecionador atualizado.'); $_SESSION['message_type']='success';
         $this->redirect('/admin/redirecionamento/redirecionadores');
     }
 
@@ -710,7 +710,7 @@ class AdminRedirecionamentoController extends Controller {
         $email = trim((string)$request->getParam('email',''));
         $tel   = trim((string)$request->getParam('telefone',''));
         $nasc  = trim((string)$request->getParam('data_nascimento','')) ?: null;
-        if ($nome==='') { $this->json(['ok'=>false,'msg'=>'Nome obrigatório.']); return; }
+        if ($nome==='') { $this->json(['ok'=>false,'msg'=>__('admin.redirect.name_required_dot', 'Nome obrigatório.')]); return; }
         $db->prepare("INSERT INTO redirecionamento_clientes (redirecionador_id,nome,cpf,email,telefone,data_nascimento) VALUES (?,?,?,?,?,?)")->execute([$redId,$nome,$cpf,$email,$tel,$nasc]);
         $clienteId = (int)$db->lastInsertId();
         // Endereço
@@ -737,13 +737,13 @@ class AdminRedirecionamentoController extends Controller {
     public function clienteAtualizar(Request $request) {
         $this->auth(); $this->migrar();
         $id = (int)$request->getParam('id',0);
-        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_id', 'ID inválido')]); return; }
         $nome = trim((string)$request->getParam('nome',''));
         $cpf = trim((string)$request->getParam('cpf',''));
         $email = trim((string)$request->getParam('email',''));
         $tel = trim((string)$request->getParam('telefone',''));
         $nasc = trim((string)$request->getParam('data_nascimento','')) ?: null;
-        if ($nome === '') { $this->json(['ok'=>false,'msg'=>'Nome obrigatório']); return; }
+        if ($nome === '') { $this->json(['ok'=>false,'msg'=>__('admin.redirect.name_required', 'Nome obrigatório')]); return; }
         $this->pdo()->prepare("UPDATE redirecionamento_clientes SET nome=?,cpf=?,email=?,telefone=?,data_nascimento=? WHERE id=?")
             ->execute([$nome,$cpf,$email,$tel,$nasc,$id]);
         $this->json(['ok'=>true]);
@@ -752,13 +752,13 @@ class AdminRedirecionamentoController extends Controller {
     public function clienteExcluir(Request $request) {
         $this->auth(); $this->migrar();
         $id = (int)$request->getParam('id',0);
-        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_id', 'ID inválido')]); return; }
         $db = $this->pdo();
         // Verificar se tem envios vinculados
         $st = $db->prepare("SELECT COUNT(*) FROM redirecionamento_envios WHERE cliente_id=?");
         $st->execute([$id]);
         if ((int)$st->fetchColumn() > 0) {
-            $this->json(['ok'=>false,'msg'=>'Não é possível excluir: cliente tem envios vinculados.']);
+            $this->json(['ok'=>false,'msg'=>__('admin.redirect.cannot_delete_client_has_shipments', 'Não é possível excluir: cliente tem envios vinculados.')]);
             return;
         }
         $db->prepare("DELETE FROM redirecionamento_enderecos WHERE cliente_id=?")->execute([$id]);
@@ -899,7 +899,7 @@ class AdminRedirecionamentoController extends Controller {
         $db=$this->pdo();
         $st=$db->prepare("SELECT valor_cobrado_usd FROM redirecionamento_envios WHERE id=? LIMIT 1"); $st->execute([$id]);
         $envio=$st->fetch(\PDO::FETCH_ASSOC);
-        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.shipment_not_found', 'Envio não encontrado')]); return; }
         $calc=$this->calcularValor($pesoReal);
         $valorCorreto=$calc?$calc['valor_usd']:(float)$envio['valor_cobrado_usd'];
         $diferenca=round($valorCorreto-(float)$envio['valor_cobrado_usd'],2);
@@ -923,7 +923,7 @@ class AdminRedirecionamentoController extends Controller {
     public function envioMarcarPago(Request $request) {
         $this->adminOnly(); $this->migrar();
         $envioId = (int) $request->getParam('envio_id', 0);
-        if ($envioId <= 0) { $this->json(['ok'=>false,'msg'=>'Envio inválido']); return; }
+        if ($envioId <= 0) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_shipment', 'Envio inválido')]); return; }
         $db = $this->pdo();
         $db->prepare("UPDATE redirecionamento_envios SET status_pagamento='pago', status='pago' WHERE id=?")->execute([$envioId]);
         $db->prepare("INSERT INTO redirecionamento_pagamentos (envio_id, tipo, valor_usd, status, pago_em) SELECT id, 'envio', valor_cobrado_usd, 'pago', NOW() FROM redirecionamento_envios WHERE id=?")
@@ -950,7 +950,7 @@ class AdminRedirecionamentoController extends Controller {
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
             $ext = strtolower(pathinfo($_FILES['etiqueta_file']['name'], PATHINFO_EXTENSION));
             if (!in_array($ext, ['pdf','jpg','jpeg','png'], true)) {
-                $this->json(['ok'=>false,'msg'=>'Formato inválido. Use PDF, JPG ou PNG.']); return;
+                $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_format_pdf_jpg_png', 'Formato inválido. Use PDF, JPG ou PNG.')]); return;
             }
             $filename = 'etiqueta_' . $id . '_' . time() . '.' . $ext;
             move_uploaded_file($_FILES['etiqueta_file']['tmp_name'], $uploadDir . $filename);
@@ -987,11 +987,11 @@ class AdminRedirecionamentoController extends Controller {
         $db=$this->pdo();
         $st=$db->prepare("SELECT * FROM redirecionamento_envios WHERE id=? LIMIT 1"); $st->execute([$envioId]);
         $envio=$st->fetch(\PDO::FETCH_ASSOC);
-        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.shipment_not_found', 'Envio não encontrado')]); return; }
         $valorUsd=(float)($envio['valor_cobrado_usd']??0);
-        if ($valorUsd<=0) { $this->json(['ok'=>false,'msg'=>'Valor inválido']); return; }
+        if ($valorUsd<=0) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_value', 'Valor inválido')]); return; }
         $keys=$this->getStripeKeys();
-        if (empty($keys['secret'])) { $this->json(['ok'=>false,'msg'=>'Stripe não configurado']); return; }
+        if (empty($keys['secret'])) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.stripe_not_configured', 'Stripe não configurado')]); return; }
         try {
             $ch=curl_init('https://api.stripe.com/v1/payment_intents');
             curl_setopt_array($ch,[
@@ -1013,7 +1013,7 @@ class AdminRedirecionamentoController extends Controller {
                    ->execute([$envioId,'envio',$valorUsd,$data['id'],$data['client_secret'],'pendente']);
                 $this->json(['ok'=>true,'client_secret'=>$data['client_secret'],'payment_intent_id'=>$data['id']]);
             } else {
-                $this->json(['ok'=>false,'msg'=>$data['error']['message']??'Erro Stripe']);
+                $this->json(['ok'=>false,'msg'=>$data['error']['message']??__('admin.redirect.stripe_error', 'Erro Stripe')]);
             }
         } catch (\Exception $e) { $this->json(['ok'=>false,'msg'=>$e->getMessage()]); }
     }
@@ -1053,9 +1053,9 @@ class AdminRedirecionamentoController extends Controller {
         $this->auth(); $this->migrar();
         $envioId=(int)$request->getParam('envio_id',0);
         $tipo=in_array($request->getParam('tipo','envio'),['envio','diferenca','reembolso'])?$request->getParam('tipo'):'envio';
-        if (empty($_FILES['comprovante']['tmp_name'])) { $this->json(['ok'=>false,'msg'=>'Arquivo não enviado']); return; }
+        if (empty($_FILES['comprovante']['tmp_name'])) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.file_not_uploaded', 'Arquivo não enviado')]); return; }
         $ext=strtolower(pathinfo($_FILES['comprovante']['name'],PATHINFO_EXTENSION));
-        if (!in_array($ext,['jpg','jpeg','png','pdf'])) { $this->json(['ok'=>false,'msg'=>'Formato inválido']); return; }
+        if (!in_array($ext,['jpg','jpeg','png','pdf'])) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_format', 'Formato inválido')]); return; }
         $dir=__DIR__.'/../../public/uploads/comprovantes/';
         if (!is_dir($dir)) mkdir($dir,0755,true);
         $fname='comp_'.$envioId.'_'.$tipo.'_'.time().'.'.$ext;
@@ -1089,9 +1089,9 @@ class AdminRedirecionamentoController extends Controller {
         $db=$this->pdo();
         $st=$db->prepare("SELECT * FROM redirecionamento_pagamentos WHERE id=? LIMIT 1"); $st->execute([$pagId]);
         $pag=$st->fetch(\PDO::FETCH_ASSOC);
-        if (!$pag) { $this->json(['ok'=>false,'msg'=>'Pagamento não encontrado']); return; }
+        if (!$pag) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.payment_not_found', 'Pagamento não encontrado')]); return; }
         $keys=$this->getStripeKeys();
-        if (empty($keys['secret'])) { $this->json(['ok'=>false,'msg'=>'Stripe não configurado']); return; }
+        if (empty($keys['secret'])) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.stripe_not_configured', 'Stripe não configurado')]); return; }
         try {
             $ch=curl_init('https://api.stripe.com/v1/payment_intents');
             curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_USERPWD=>$keys['secret'].':',
@@ -1101,7 +1101,7 @@ class AdminRedirecionamentoController extends Controller {
             if (!empty($data['client_secret'])) {
                 $db->prepare("UPDATE redirecionamento_pagamentos SET stripe_payment_intent=?,stripe_client_secret=? WHERE id=?")->execute([$data['id'],$data['client_secret'],$pagId]);
                 $this->json(['ok'=>true,'client_secret'=>$data['client_secret']]);
-            } else { $this->json(['ok'=>false,'msg'=>$data['error']['message']??'Erro Stripe']); }
+            } else { $this->json(['ok'=>false,'msg'=>$data['error']['message']??__('admin.redirect.stripe_error', 'Erro Stripe')]); }
         } catch (\Exception $e) { $this->json(['ok'=>false,'msg'=>$e->getMessage()]); }
     }
 
@@ -1115,11 +1115,11 @@ class AdminRedirecionamentoController extends Controller {
         $st = $db->prepare("SELECT p.*, e.id AS envio_id FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id = p.envio_id WHERE p.id = ? LIMIT 1");
         $st->execute([$pagId]);
         $pag = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$pag) { $this->json(['ok' => false, 'msg' => 'Pagamento não encontrado']); return; }
-        if (strtolower($pag['status'] ?? '') === 'pago') { $this->json(['ok' => false, 'msg' => 'Já foi pago']); return; }
+        if (!$pag) { $this->json(['ok' => false, 'msg' => __('admin.redirect.payment_not_found', 'Pagamento não encontrado')]); return; }
+        if (strtolower($pag['status'] ?? '') === 'pago') { $this->json(['ok' => false, 'msg' => __('admin.redirect.already_paid', 'Já foi pago')]); return; }
 
         $keys = $this->getStripeKeys();
-        if (empty($keys['secret'])) { $this->json(['ok' => false, 'msg' => 'Stripe não configurado']); return; }
+        if (empty($keys['secret'])) { $this->json(['ok' => false, 'msg' => __('admin.redirect.stripe_not_configured', 'Stripe não configurado')]); return; }
 
         $valorCentavos = (int) round((float) $pag['valor_usd'] * 100);
         $envioId = (int) ($pag['envio_id'] ?? 0);
@@ -1154,7 +1154,7 @@ class AdminRedirecionamentoController extends Controller {
                     ->execute([$data['id'] ?? '', $pagId]);
                 $this->json(['ok' => true, 'checkout_url' => $data['url']]);
             } else {
-                $this->json(['ok' => false, 'msg' => $data['error']['message'] ?? 'Erro ao criar checkout Stripe']);
+                $this->json(['ok' => false, 'msg' => $data['error']['message'] ?? __('admin.redirect.stripe_checkout_error', 'Erro ao criar checkout Stripe')]);
             }
         } catch (\Exception $e) {
             $this->json(['ok' => false, 'msg' => $e->getMessage()]);
@@ -1194,7 +1194,7 @@ class AdminRedirecionamentoController extends Controller {
         $this->adminOnly(); $this->migrar();
         $peso=(float)str_replace(',','.',$request->getParam('peso_ate_kg','0'));
         $valor=(float)str_replace(',','.',$request->getParam('valor_usd','0'));
-        if ($peso<=0||$valor<=0) { $this->json(['ok'=>false,'msg'=>'Valores inválidos']); return; }
+        if ($peso<=0||$valor<=0) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_values', 'Valores inválidos')]); return; }
         $this->pdo()->prepare("INSERT INTO redirecionamento_tabela_pesos (peso_ate_kg,valor_usd) VALUES (?,?) ON DUPLICATE KEY UPDATE valor_usd=VALUES(valor_usd)")->execute([$peso,$valor]);
         $this->json(['ok'=>true]);
     }
@@ -1204,7 +1204,7 @@ class AdminRedirecionamentoController extends Controller {
         $chave = trim((string) $request->getParam('chave', ''));
         $valor = trim((string) $request->getParam('valor', ''));
         $chavesPermitidas = ['redirecionamento_provedor_etiqueta', 'redirecionamento_emails_coleta'];
-        if (!in_array($chave, $chavesPermitidas, true)) { $this->json(['ok'=>false,'msg'=>'Chave não permitida']); return; }
+        if (!in_array($chave, $chavesPermitidas, true)) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.key_not_allowed', 'Chave não permitida')]); return; }
         $db = $this->pdo();
 
         // Primeiro tentar UPDATE direto (mais confiável que ON DUPLICATE KEY)
@@ -1241,7 +1241,7 @@ class AdminRedirecionamentoController extends Controller {
         $this->auth(); $this->migrar();
         $peso=(float)str_replace(',','.',$request->getParam('peso','0'));
         $calc=$this->calcularValor($peso);
-        $this->json($calc?['ok'=>true,'faixa'=>$calc['faixa'],'valor_usd'=>$calc['valor_usd']]:['ok'=>false,'msg'=>'Fora da tabela']);
+        $this->json($calc?['ok'=>true,'faixa'=>$calc['faixa'],'valor_usd'=>$calc['valor_usd']]:['ok'=>false,'msg'=>__('admin.redirect.out_of_table', 'Fora da tabela')]);
     }
 
     // ─── PAGAMENTOS (listagem) ────────────────────────────────────────────────
@@ -1301,11 +1301,11 @@ class AdminRedirecionamentoController extends Controller {
         $data=trim((string)$request->getParam('data_agendada',''));
         $hora=trim((string)$request->getParam('horario',''));
         $obs =trim((string)$request->getParam('observacoes',''));
-        if (!$envioId||!$data||!$hora) { $this->json(['ok'=>false,'msg'=>'Dados incompletos']); return; }
+        if (!$envioId||!$data||!$hora) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.incomplete_data', 'Dados incompletos')]); return; }
         $db=$this->pdo();
         $stE=$db->prepare("SELECT redirecionador_id FROM redirecionamento_envios WHERE id=? LIMIT 1"); $stE->execute([$envioId]);
         $envio=$stE->fetch(\PDO::FETCH_ASSOC);
-        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.shipment_not_found', 'Envio não encontrado')]); return; }
         $db->prepare("INSERT INTO redirecionamento_coletas (envio_id,redirecionador_id,data_agendada,horario,observacoes) VALUES (?,?,?,?,?)")->execute([$envioId,$envio['redirecionador_id'],$data,$hora,$obs]);
 
         // Notificar emails configurados (admin)
@@ -1357,7 +1357,7 @@ class AdminRedirecionamentoController extends Controller {
     public function coletaCancelar(Request $request) {
         $this->auth(); $this->migrar();
         $id = (int) $request->getParam('id', 0);
-        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.invalid_id', 'ID inválido')]); return; }
         $db = $this->pdo();
 
         // Verificar se a coleta pertence ao redirecionador logado (segurança)
@@ -1365,7 +1365,7 @@ class AdminRedirecionamentoController extends Controller {
         if ($redFixo && (int)($redFixo['id'] ?? 0) > 0) {
             $st = $db->prepare("SELECT id FROM redirecionamento_coletas WHERE id = ? AND redirecionador_id = ? AND status = 'agendado' LIMIT 1");
             $st->execute([$id, (int)$redFixo['id']]);
-            if (!$st->fetchColumn()) { $this->json(['ok'=>false,'msg'=>'Coleta não encontrada ou não pode ser cancelada']); return; }
+            if (!$st->fetchColumn()) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.pickup_not_found_or_cannot_cancel', 'Coleta não encontrada ou não pode ser cancelada')]); return; }
         }
 
         $db->prepare("UPDATE redirecionamento_coletas SET status = 'cancelado' WHERE id = ? AND status = 'agendado'")->execute([$id]);
@@ -1404,7 +1404,7 @@ class AdminRedirecionamentoController extends Controller {
         $id=(int)$request->getParam('id',0);
         $data=trim((string)$request->getParam('data_agendada',''));
         $hora=trim((string)$request->getParam('horario',''));
-        if (!$id || !$data || !$hora) { $this->json(['ok'=>false,'msg'=>'Dados incompletos']); return; }
+        if (!$id || !$data || !$hora) { $this->json(['ok'=>false,'msg'=>__('admin.redirect.incomplete_data', 'Dados incompletos')]); return; }
         $db = $this->pdo();
         $db->prepare("UPDATE redirecionamento_coletas SET data_agendada=?,horario=?,status='agendado' WHERE id=?")->execute([$data,$hora,$id]);
 
@@ -1454,7 +1454,7 @@ class AdminRedirecionamentoController extends Controller {
     public function gerarEtiqueta(Request $request) {
         $this->auth(); $this->migrar();
         $envioId = (int) $request->getParam('envio_id', 0);
-        if ($envioId <= 0) { $this->json(['ok' => false, 'msg' => 'Envio inválido']); return; }
+        if ($envioId <= 0) { $this->json(['ok' => false, 'msg' => __('admin.redirect.invalid_shipment', 'Envio inválido')]); return; }
 
         $db = $this->pdo();
 
@@ -1465,11 +1465,11 @@ class AdminRedirecionamentoController extends Controller {
             WHERE e.id = ? LIMIT 1");
         $st->execute([$envioId]);
         $envio = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$envio) { $this->json(['ok' => false, 'msg' => 'Envio não encontrado']); return; }
+        if (!$envio) { $this->json(['ok' => false, 'msg' => __('admin.redirect.shipment_not_found', 'Envio não encontrado')]); return; }
 
         // Verificar se pagamento foi feito
         if (strtolower(trim($envio['status_pagamento'] ?? '')) !== 'pago') {
-            $this->json(['ok' => false, 'msg' => 'Pagamento ainda não confirmado. Pague antes de gerar a etiqueta.']); return;
+            $this->json(['ok' => false, 'msg' => __('admin.redirect.payment_not_confirmed', 'Pagamento ainda não confirmado. Pague antes de gerar a etiqueta.')]); return;
         }
 
         // Verificar se já tem etiqueta — permitir regerar
@@ -1510,7 +1510,7 @@ class AdminRedirecionamentoController extends Controller {
         $svc = new \App\Services\WExpressService();
         $sender = $svc->getSender();
         if (!is_array($sender) || empty($sender)) {
-            return ['ok' => false, 'msg' => 'W-Express: Sender não configurado. Peça ao admin para configurar em Configurações > Entrega.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.wexpress_sender_not_configured', 'W-Express: Sender não configurado. Peça ao admin para configurar em Configurações > Entrega.')];
         }
 
         // Montar dados do destinatário
@@ -1535,7 +1535,7 @@ class AdminRedirecionamentoController extends Controller {
 
             $ncm = preg_replace('/\D+/', '', (string) ($p['ncm'] ?? ''));
             if ($ncm === '') {
-                return ['ok' => false, 'msg' => 'Produto "' . ($p['descricao'] ?? '') . '" não tem NCM cadastrado. Adicione o NCM antes de gerar a etiqueta.'];
+                return ['ok' => false, 'msg' => __('admin.redirect.product_no_ncm', 'Produto "{p}" não tem NCM cadastrado. Adicione o NCM antes de gerar a etiqueta.', ['p' => ($p['descricao'] ?? '')])];
             }
 
             $items[] = [
@@ -1548,7 +1548,7 @@ class AdminRedirecionamentoController extends Controller {
         }
 
         if (empty($items)) {
-            return ['ok' => false, 'msg' => 'Nenhum produto no envio. Adicione produtos antes de gerar a etiqueta.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.no_products_in_shipment', 'Nenhum produto no envio. Adicione produtos antes de gerar a etiqueta.')];
         }
 
         $pesoKg = (float) ($envio['peso_kg'] ?? 0);
@@ -1622,7 +1622,7 @@ class AdminRedirecionamentoController extends Controller {
         } catch (\Exception $e) {
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='wexpress', etiqueta_request_json=?, etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($payload), json_encode(['error' => $e->getMessage()]), $envioId]);
-            return ['ok' => false, 'msg' => 'Erro W-Express: ' . $e->getMessage()];
+            return ['ok' => false, 'msg' => __('admin.redirect.wexpress_error', 'Erro W-Express:') . ' ' . $e->getMessage()];
         }
 
         $wxStatus = is_array($resp) ? (string) ($resp['shipping_status'] ?? '') : '';
@@ -1665,7 +1665,7 @@ class AdminRedirecionamentoController extends Controller {
             ]);
 
         if (!$etiquetaGerada) {
-            return ['ok' => false, 'msg' => 'W-Express retornou status: ' . ($wxStatus ?: 'desconhecido') . '. Verifique os dados e tente novamente.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.wexpress_returned_status', 'W-Express retornou status: {s}. Verifique os dados e tente novamente.', ['s' => ($wxStatus ?: __('admin.redirect.unknown', 'desconhecido'))])];
         }
 
         // Inserir na janela ativa de remessa (para aparecer na conferência)
@@ -1689,7 +1689,7 @@ class AdminRedirecionamentoController extends Controller {
             'tracking' => $trackingFinal,
             'label_url' => $labelUrl,
             'shipping_id' => $wxShipId,
-            'msg' => 'Etiqueta gerada com sucesso!',
+            'msg' => __('admin.redirect.label_generated', 'Etiqueta gerada com sucesso!'),
         ];
     }
 
@@ -1721,11 +1721,11 @@ class AdminRedirecionamentoController extends Controller {
             } catch (\Exception $e) {}
 
             if ($token === '') {
-                return ['ok' => false, 'msg' => 'Correios Pré-Postagem não configurado (token ausente).'];
+                return ['ok' => false, 'msg' => __('admin.redirect.correios_not_configured_token', 'Correios Pré-Postagem não configurado (token ausente).')];
             }
 
             if ($codigoServico === '') {
-                return ['ok' => false, 'msg' => 'Correios Pré-Postagem: código do serviço não configurado. Vá em Configurações > Entrega e preencha o campo "Código do serviço (Pré-Postagem)" ou "Código do Serviço no Contrato".'];
+                return ['ok' => false, 'msg' => __('admin.redirect.correios_service_code_missing', 'Correios Pré-Postagem: código do serviço não configurado. Vá em Configurações > Entrega e preencha o campo "Código do serviço (Pré-Postagem)" ou "Código do Serviço no Contrato".')];
             }
 
             $baseUrl = ($ambiente === 'producao' || $ambiente === 'production')
@@ -1734,7 +1734,7 @@ class AdminRedirecionamentoController extends Controller {
 
             $svc = new \App\Services\CorreiosPrepostagemService($baseUrl, $token);
         } catch (\Exception $e) {
-            return ['ok' => false, 'msg' => 'Correios não configurado: ' . $e->getMessage()];
+            return ['ok' => false, 'msg' => __('admin.redirect.correios_not_configured', 'Correios não configurado:') . ' ' . $e->getMessage()];
         }
 
         // Remetente (JSON configurado no admin)
@@ -1749,7 +1749,7 @@ class AdminRedirecionamentoController extends Controller {
             }
         }
         if (empty($sender)) {
-            return ['ok' => false, 'msg' => 'Correios Pré-Postagem: remetente não configurado. Vá em Configurações > Entrega e preencha o JSON do remetente.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.correios_sender_missing', 'Correios Pré-Postagem: remetente não configurado. Vá em Configurações > Entrega e preencha o JSON do remetente.')];
         }
 
         // Montar dados do destinatário
@@ -1852,7 +1852,7 @@ class AdminRedirecionamentoController extends Controller {
         } catch (\Exception $e) {
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios', etiqueta_request_json=?, etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($payload), json_encode(['error' => $e->getMessage()]), $envioId]);
-            return ['ok' => false, 'msg' => 'Erro Correios: ' . $e->getMessage()];
+            return ['ok' => false, 'msg' => __('admin.redirect.correios_error', 'Erro Correios:') . ' ' . $e->getMessage()];
         }
 
         // Salvar request para debug
@@ -1861,10 +1861,10 @@ class AdminRedirecionamentoController extends Controller {
 
         // Verificar se a API retornou sucesso
         if (!($result['success'] ?? false)) {
-            $errorMsg = (string) ($result['error'] ?? 'Erro desconhecido');
+            $errorMsg = (string) ($result['error'] ?? __('admin.redirect.unknown_error', 'Erro desconhecido'));
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($result), $envioId]);
-            return ['ok' => false, 'msg' => 'Erro Correios: ' . $errorMsg];
+            return ['ok' => false, 'msg' => __('admin.redirect.correios_error', 'Erro Correios:') . ' ' . $errorMsg];
         }
 
         $data = $result['data'] ?? $result;
@@ -1880,7 +1880,7 @@ class AdminRedirecionamentoController extends Controller {
         if ($tracking === '') {
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($result), $envioId]);
-            return ['ok' => false, 'msg' => 'Correios não retornou código de rastreio. Resposta: ' . json_encode($data)];
+            return ['ok' => false, 'msg' => __('admin.redirect.correios_no_tracking', 'Correios não retornou código de rastreio. Resposta:') . ' ' . json_encode($data)];
         }
 
         $db->prepare("UPDATE redirecionamento_envios SET
@@ -1906,7 +1906,7 @@ class AdminRedirecionamentoController extends Controller {
             'ok' => true,
             'tracking' => $tracking,
             'label_url' => $labelUrl,
-            'msg' => 'Etiqueta gerada com sucesso! Código: ' . $tracking,
+            'msg' => __('admin.redirect.label_generated_code', 'Etiqueta gerada com sucesso! Código: {code}', ['code' => $tracking]),
         ];
     }
 
@@ -1931,13 +1931,13 @@ class AdminRedirecionamentoController extends Controller {
 
         // Validações básicas
         if ($nome === '') {
-            return ['ok' => false, 'msg' => 'Destinatário sem nome.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.recipient_no_name', 'Destinatário sem nome.')];
         }
         if (strlen($cep) !== 8) {
-            return ['ok' => false, 'msg' => 'CEP inválido (deve ter 8 dígitos).'];
+            return ['ok' => false, 'msg' => __('admin.redirect.invalid_cep_8', 'CEP inválido (deve ter 8 dígitos).')];
         }
         if ($cpf === '' || !in_array(strlen($cpf), [11, 14], true)) {
-            return ['ok' => false, 'msg' => 'CPF/CNPJ do destinatário inválido.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.invalid_recipient_document', 'CPF/CNPJ do destinatário inválido.')];
         }
 
         $docType = strlen($cpf) === 14 ? 'CNPJ' : 'CPF';
@@ -1969,7 +1969,7 @@ class AdminRedirecionamentoController extends Controller {
             $desc = trim((string) ($p['descricao'] ?? 'Item ' . ($idx + 1)));
             $ncm = preg_replace('/\D+/', '', (string) ($p['ncm'] ?? ''));
             if ($ncm === '' || strlen($ncm) < 6) {
-                return ['ok' => false, 'msg' => 'Produto "' . $desc . '" não tem NCM válido (mínimo 6 dígitos).'];
+                return ['ok' => false, 'msg' => __('admin.redirect.product_invalid_ncm', 'Produto "{p}" não tem NCM válido (mínimo 6 dígitos).', ['p' => $desc])];
             }
             $hsCode = strlen($ncm) >= 8 ? substr($ncm, 0, 8) : substr($ncm, 0, 6);
             $valor = (float) ($p['preco_usd'] ?? 0);
@@ -1985,7 +1985,7 @@ class AdminRedirecionamentoController extends Controller {
         }
 
         if (empty($items)) {
-            return ['ok' => false, 'msg' => 'Nenhum produto no envio. Adicione produtos antes de gerar a etiqueta.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.no_products_in_shipment', 'Nenhum produto no envio. Adicione produtos antes de gerar a etiqueta.')];
         }
 
         // Frete declarado
@@ -2028,7 +2028,7 @@ class AdminRedirecionamentoController extends Controller {
         } catch (\Exception $e) {
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios_wordpress', etiqueta_request_json=?, etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($payload), json_encode(['error' => $e->getMessage()]), $envioId]);
-            return ['ok' => false, 'msg' => 'Erro WordPress Etiquetas: ' . $e->getMessage()];
+            return ['ok' => false, 'msg' => __('admin.redirect.wordpress_labels_error', 'Erro WordPress Etiquetas:') . ' ' . $e->getMessage()];
         }
 
         // Salvar request para debug
@@ -2037,10 +2037,10 @@ class AdminRedirecionamentoController extends Controller {
 
         // Verificar resposta
         if (empty($resp['success'])) {
-            $errorMsg = (string) ($resp['error'] ?? 'Erro desconhecido do WordPress');
+            $errorMsg = (string) ($resp['error'] ?? __('admin.redirect.unknown_wordpress_error', 'Erro desconhecido do WordPress'));
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($resp), $envioId]);
-            return ['ok' => false, 'msg' => 'Erro WordPress: ' . $errorMsg];
+            return ['ok' => false, 'msg' => __('admin.redirect.wordpress_error', 'Erro WordPress:') . ' ' . $errorMsg];
         }
 
         $tracking = (string) ($resp['tracking_number'] ?? '');
@@ -2049,7 +2049,7 @@ class AdminRedirecionamentoController extends Controller {
         if ($tracking === '') {
             $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
                 ->execute([json_encode($resp), $envioId]);
-            return ['ok' => false, 'msg' => 'WordPress não retornou código de rastreio.'];
+            return ['ok' => false, 'msg' => __('admin.redirect.wordpress_no_tracking', 'WordPress não retornou código de rastreio.')];
         }
 
         // Montar URL do PDF da etiqueta
@@ -2104,7 +2104,7 @@ class AdminRedirecionamentoController extends Controller {
             'tracking' => $tracking,
             'label_url' => $labelUrl,
             'wp_post_id' => $wpPostId,
-            'msg' => 'Etiqueta PACKET gerada com sucesso! Rastreio: ' . $tracking,
+            'msg' => __('admin.redirect.label_packet_generated', 'Etiqueta PACKET gerada com sucesso! Rastreio: {code}', ['code' => $tracking]),
         ];
     }
 
@@ -2118,7 +2118,7 @@ class AdminRedirecionamentoController extends Controller {
         $st = $db->prepare("SELECT etiqueta_provedor, wexpress_shipping_id, wexpress_label_url, etiqueta_url, tracking_code, wp_post_id_etiqueta FROM redirecionamento_envios WHERE id = ? LIMIT 1");
         $st->execute([$envioId]);
         $envio = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$envio) { $this->json(['ok' => false, 'msg' => 'Envio não encontrado']); return; }
+        if (!$envio) { $this->json(['ok' => false, 'msg' => __('admin.redirect.shipment_not_found', 'Envio não encontrado')]); return; }
 
         $provedor = trim((string) ($envio['etiqueta_provedor'] ?? ''));
 
@@ -2136,18 +2136,18 @@ class AdminRedirecionamentoController extends Controller {
                     exit;
                 }
                 // Se retornou array, é erro
-                $errorMsg = is_array($pdfContent) ? ($pdfContent['error'] ?? 'Erro ao baixar PDF') : 'Resposta inválida';
+                $errorMsg = is_array($pdfContent) ? ($pdfContent['error'] ?? __('admin.redirect.error_downloading_pdf', 'Erro ao baixar PDF')) : __('admin.redirect.invalid_response', 'Resposta inválida');
                 $this->json(['ok' => false, 'msg' => $errorMsg]);
                 return;
             } catch (\Exception $e) {
-                $this->json(['ok' => false, 'msg' => 'Erro ao baixar etiqueta: ' . $e->getMessage()]);
+                $this->json(['ok' => false, 'msg' => __('admin.redirect.error_downloading_label', 'Erro ao baixar etiqueta:') . ' ' . $e->getMessage()]);
                 return;
             }
         }
 
         $url = trim((string) ($envio['wexpress_label_url'] ?? ($envio['etiqueta_url'] ?? '')));
         if ($url === '') {
-            $this->json(['ok' => false, 'msg' => 'Etiqueta não disponível. Gere a etiqueta primeiro.']); return;
+            $this->json(['ok' => false, 'msg' => __('admin.redirect.label_not_available', 'Etiqueta não disponível. Gere a etiqueta primeiro.')]); return;
         }
 
         $this->json(['ok' => true, 'url' => $url, 'provedor' => $provedor]);

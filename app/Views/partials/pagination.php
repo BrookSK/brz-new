@@ -19,10 +19,10 @@ $pWindow = 2; // páginas ao redor da atual
 $pStart = max(1, $pCurrent - $pWindow);
 $pEnd = min($pTotal, $pCurrent + $pWindow);
 ?>
-<nav aria-label="Paginação" class="mt-3">
+<nav aria-label="<?= htmlspecialchars(__('admin.pagination.aria', 'Paginação'), ENT_QUOTES, 'UTF-8') ?>" class="mt-3">
     <ul class="pagination justify-content-center flex-wrap mb-0">
         <li class="page-item <?= $pCurrent <= 1 ? 'disabled' : '' ?>">
-            <a class="page-link" href="<?= $pCurrent > 1 ? htmlspecialchars($pUrl($pCurrent - 1)) : '#' ?>" tabindex="-1">Anterior</a>
+            <a class="page-link" href="<?= $pCurrent > 1 ? htmlspecialchars($pUrl($pCurrent - 1)) : '#' ?>" tabindex="-1"><?= __('common.previous', 'Anterior') ?></a>
         </li>
 
         <?php if ($pStart > 1): ?>
@@ -46,7 +46,7 @@ $pEnd = min($pTotal, $pCurrent + $pWindow);
         <?php endif; ?>
 
         <li class="page-item <?= $pCurrent >= $pTotal ? 'disabled' : '' ?>">
-            <a class="page-link" href="<?= $pCurrent < $pTotal ? htmlspecialchars($pUrl($pCurrent + 1)) : '#' ?>">Próxima</a>
+            <a class="page-link" href="<?= $pCurrent < $pTotal ? htmlspecialchars($pUrl($pCurrent + 1)) : '#' ?>"><?= __('common.next', 'Próxima') ?></a>
         </li>
     </ul>
 </nav>

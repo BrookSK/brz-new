@@ -75,7 +75,7 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
             </a>
             <button type="button" class="btn btn-outline-danger" id="btnRegerarEtiquetaWexpress" onclick="regerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">
                 <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true" id="wxReSpinner"></span>
-                <span id="wxReBtnText">Regerar etiqueta</span>
+                <span id="wxReBtnText"><?= __('admin.orders_wp.details.regenerate_label', 'Regerar etiqueta') ?></span>
             </button>
         <?php else: ?>
             <button type="button" class="btn btn-primary" id="btnGerarEtiquetaWexpress" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">
@@ -91,19 +91,19 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
 <?php endif; ?>
 
 <div class="card mb-3">
-    <div class="card-header"><strong>Itens gerais do pedido</strong></div>
+    <div class="card-header"><strong><?= __('admin.orders_wp.details.general_items', 'Itens gerais do pedido') ?></strong></div>
     <div class="card-body">
         <div class="row g-3">
             <div class="col-md-4">
-                <div class="text-muted small">Peso total dos itens (kg)</div>
+                <div class="text-muted small"><?= __('admin.orders_wp.details.total_items_weight', 'Peso total dos itens (kg)') ?></div>
                 <div class="fw-semibold"><?= $pesoTotalItensKg > 0 ? htmlspecialchars(number_format((float) $pesoTotalItensKg, 3, ',', '.')) : '-' ?></div>
             </div>
             <div class="col-md-4">
-                <div class="text-muted small">Declaração total</div>
+                <div class="text-muted small"><?= __('admin.orders_wp.details.total_declaration', 'Declaração total') ?></div>
                 <div class="fw-semibold"><?= $declaracaoTotal > 0 ? htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, 'USD')) : '-' ?></div>
             </div>
             <div class="col-md-4">
-                <div class="text-muted small">Quantidade total de itens</div>
+                <div class="text-muted small"><?= __('admin.orders_wp.details.total_qty_items', 'Quantidade total de itens') ?></div>
                 <div class="fw-semibold"><?= (int) $qtdTotalItens ?></div>
             </div>
         </div>
@@ -122,8 +122,8 @@ window.ADMIN_ORDERS_WP_DETAILS_I18N = {
 window.ADMIN_ORDERS_WP_DETAILS_SOURCE = <?= json_encode($source, JSON_UNESCAPED_UNICODE) ?>;
 window.ADMIN_ORDERS_WP_DETAILS_DEFAULT_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express'), JSON_UNESCAPED_UNICODE) ?>;
 window.ADMIN_ORDERS_WP_DETAILS_LOADING_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.generating_wexpress_label', 'Gerando...'), JSON_UNESCAPED_UNICODE) ?>;
-window.ADMIN_ORDERS_WP_DETAILS_RE_DEFAULT_BTN_TEXT = <?= json_encode('Regerar etiqueta', JSON_UNESCAPED_UNICODE) ?>;
-window.ADMIN_ORDERS_WP_DETAILS_RE_LOADING_BTN_TEXT = <?= json_encode('Regerando...', JSON_UNESCAPED_UNICODE) ?>;
+window.ADMIN_ORDERS_WP_DETAILS_RE_DEFAULT_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.regenerate_label', 'Regerar etiqueta'), JSON_UNESCAPED_UNICODE) ?>;
+window.ADMIN_ORDERS_WP_DETAILS_RE_LOADING_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.js.regenerating', 'Regerando...'), JSON_UNESCAPED_UNICODE) ?>;
 
 function gerarEtiquetaWexpressWp(orderId, source) {
     if (!orderId) {
@@ -161,7 +161,7 @@ function gerarEtiquetaWexpressWp(orderId, source) {
             const w = window.open(labelUrl, '_blank');
             if (!w) {
                 // Popup bloqueado: não navega para fora do admin. Mostra a URL para abrir manualmente.
-                var msg = 'Popup bloqueado. Copie e abra a etiqueta em uma nova aba:\n' + labelUrl;
+                var msg = '<?= htmlspecialchars(__('admin.orders_wp.details.js.popup_blocked', 'Popup bloqueado. Copie e abra a etiqueta em uma nova aba:'), ENT_QUOTES, 'UTF-8') ?>\n' + labelUrl;
                 try {
                     window.prompt(msg, labelUrl);
                 } catch (e) {
@@ -191,7 +191,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
         return;
     }
     source = (source || window.ADMIN_ORDERS_WP_DETAILS_SOURCE || 'br').toString().toLowerCase();
-    if (!confirm('Deseja regerar a etiqueta da W-Express para este pedido? Isso irá substituir a etiqueta atual.')) return;
+    if (!confirm('<?= htmlspecialchars(__('admin.orders_wp.details.js.confirm_regenerate_label', 'Deseja regerar a etiqueta da W-Express para este pedido? Isso irá substituir a etiqueta atual.'), ENT_QUOTES, 'UTF-8') ?>')) return;
 
     var btn = document.getElementById('btnRegerarEtiquetaWexpress');
     var sp = document.getElementById('wxReSpinner');
@@ -220,7 +220,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
         if (labelUrl) {
             const w = window.open(labelUrl, '_blank');
             if (!w) {
-                var msg = 'Popup bloqueado. Copie e abra a etiqueta em uma nova aba:\n' + labelUrl;
+                var msg = '<?= htmlspecialchars(__('admin.orders_wp.details.js.popup_blocked', 'Popup bloqueado. Copie e abra a etiqueta em uma nova aba:'), ENT_QUOTES, 'UTF-8') ?>\n' + labelUrl;
                 try {
                     window.prompt(msg, labelUrl);
                 } catch (e) {
@@ -269,7 +269,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                 <div><strong><?= __('common.date', 'Data') ?>:</strong> <?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) ($pedido['post_date'] ?? $pedido['created_at'] ?? 'now')))) ?></div>
                 <div><strong><?= __('common.total', 'Total') ?>:</strong> <?= htmlspecialchars(wpFormatMoney2($total, $currency)) ?></div>
                 <?php if ($source === 'red' && isset($declaracaoTotal) && is_numeric($declaracaoTotal) && (float) $declaracaoTotal > 0): ?>
-                    <div><strong>Declaração:</strong> <?= htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, 'USD')) ?></div>
+                    <div><strong><?= __('admin.orders_wp.details.declaration', 'Declaração') ?>:</strong> <?= htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, 'USD')) ?></div>
                 <?php endif; ?>
                 <div><strong><?= __('admin.orders_wp.details.currency', 'Moeda') ?>:</strong> <?= htmlspecialchars($currency ?: '-') ?></div>
             </div>

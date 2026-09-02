@@ -60,12 +60,12 @@ class AdminProdutosController extends Controller {
 
         if (!isset($_FILES['produtos_import_csv']) || empty($_FILES['produtos_import_csv']['tmp_name'])) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não enviado.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_csv_not_sent', 'Arquivo CSV não enviado.')]);
             exit;
         }
         if (!empty($_FILES['produtos_import_csv']['error']) && $_FILES['produtos_import_csv']['error'] !== UPLOAD_ERR_OK) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Falha no upload do CSV.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_csv_upload', 'Falha no upload do CSV.')]);
             exit;
         }
 
@@ -77,7 +77,7 @@ class AdminProdutosController extends Controller {
         if (!@move_uploaded_file($tmpUpload, $csvPath)) {
             if (!@copy($tmpUpload, $csvPath)) {
                 http_response_code(500);
-                echo json_encode(['ok' => false, 'error' => 'Não foi possível salvar o arquivo no servidor.']);
+                echo json_encode(['ok' => false, 'error' => __('admin.products.err_save_file', 'Não foi possível salvar o arquivo no servidor.')]);
                 exit;
             }
         }
@@ -85,7 +85,7 @@ class AdminProdutosController extends Controller {
         $scan = $this->scanProdutosCsv($csvPath);
         if (!($scan['ok'] ?? false)) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => (string) ($scan['error'] ?? 'CSV inválido')]);
+            echo json_encode(['ok' => false, 'error' => (string) ($scan['error'] ?? __('admin.products.err_csv_invalid', 'CSV inválido'))]);
             exit;
         }
 
@@ -133,14 +133,14 @@ class AdminProdutosController extends Controller {
 
         if ($token === '' || !preg_match('/^[a-f0-9]{32}$/', $token)) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Token inválido.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_invalid_token', 'Token inválido.')]);
             exit;
         }
 
         $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'produtos_import_' . $token . '.json';
         if (!is_file($statePath)) {
             http_response_code(404);
-            echo json_encode(['ok' => false, 'error' => 'Importação não encontrada (expirada).']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_import_not_found', 'Importação não encontrada (expirada).')]);
             exit;
         }
 
@@ -148,7 +148,7 @@ class AdminProdutosController extends Controller {
         $state = is_string($stateRaw) ? json_decode($stateRaw, true) : null;
         if (!is_array($state)) {
             http_response_code(500);
-            echo json_encode(['ok' => false, 'error' => 'Estado da importação corrompido.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_import_corrupted', 'Estado da importação corrompido.')]);
             exit;
         }
 
@@ -168,7 +168,7 @@ class AdminProdutosController extends Controller {
         $csvPath = (string) ($state['csv'] ?? '');
         if ($csvPath === '' || !is_file($csvPath)) {
             http_response_code(404);
-            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não encontrado no servidor.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_csv_not_found', 'Arquivo CSV não encontrado no servidor.')]);
             exit;
         }
 
@@ -209,7 +209,7 @@ class AdminProdutosController extends Controller {
     private function scanProdutosCsv(string $csvPath): array {
         $fh = @fopen($csvPath, 'r');
         if (!$fh) {
-            return ['ok' => false, 'error' => 'Não foi possível ler o CSV.'];
+            return ['ok' => false, 'error' => __('admin.products.err_csv_read', 'Não foi possível ler o CSV.')];
         }
 
         $candidates = [',', ';', "\t"];
@@ -1345,7 +1345,7 @@ class AdminProdutosController extends Controller {
             header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/representante/produtos'));
             exit;
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -1645,7 +1645,7 @@ class AdminProdutosController extends Controller {
 
         $nome = trim((string) ($request->getParam('nome') ?? ''));
         if ($nome === '') {
-            echo json_encode(['ok' => false, 'error' => 'Nome é obrigatório.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_name_required', 'Nome é obrigatório.')]);
             exit;
         }
 
@@ -1658,7 +1658,7 @@ class AdminProdutosController extends Controller {
             $st = $pdo->prepare("SELECT id FROM categorias WHERE LOWER({$nomeCol}) = LOWER(?) LIMIT 1");
             $st->execute([$nome]);
             if ($st->fetchColumn()) {
-                echo json_encode(['ok' => false, 'error' => 'Categoria já existe.']);
+                echo json_encode(['ok' => false, 'error' => __('admin.products.err_category_exists', 'Categoria já existe.')]);
                 exit;
             }
 
@@ -1677,7 +1677,7 @@ class AdminProdutosController extends Controller {
             $id = (int) $pdo->lastInsertId();
             echo json_encode(['ok' => true, 'categoria' => ['id' => $id, 'nome' => $nome]]);
         } catch (\Exception $e) {
-            echo json_encode(['ok' => false, 'error' => 'Erro ao criar: ' . $e->getMessage()]);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_create', 'Erro ao criar: {e}', ['e' => $e->getMessage()])]);
         }
         exit;
     }
@@ -1689,12 +1689,12 @@ class AdminProdutosController extends Controller {
 
         $apiKey = $this->getChatGPTApiKey();
         if (!$apiKey) {
-            echo json_encode(['ok' => false, 'error' => 'API Key do ChatGPT não configurada. Vá em Configurações.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_no_api_key_config', 'API Key do ChatGPT não configurada. Vá em Configurações.')]);
             exit;
         }
 
         if (empty($_FILES['audio']) || $_FILES['audio']['error'] !== UPLOAD_ERR_OK) {
-            echo json_encode(['ok' => false, 'error' => 'Nenhum áudio recebido.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_no_audio', 'Nenhum áudio recebido.')]);
             exit;
         }
 
@@ -1723,7 +1723,7 @@ class AdminProdutosController extends Controller {
 
         if ($httpCode !== 200) {
             $err = json_decode($resp, true);
-            echo json_encode(['ok' => false, 'error' => 'Erro na transcrição: ' . ($err['error']['message'] ?? 'HTTP ' . $httpCode)]);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_transcription', 'Erro na transcrição: {e}', ['e' => ($err['error']['message'] ?? 'HTTP ' . $httpCode)])]);
             exit;
         }
 
@@ -1739,7 +1739,7 @@ class AdminProdutosController extends Controller {
 
         $apiKey = $this->getChatGPTApiKey();
         if (!$apiKey) {
-            echo json_encode(['ok' => false, 'error' => 'API Key do ChatGPT não configurada.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_no_api_key', 'API Key do ChatGPT não configurada.')]);
             exit;
         }
 
@@ -1750,7 +1750,7 @@ class AdminProdutosController extends Controller {
         $grupo = trim((string) ($request->getParam('grupo') ?? ''));
 
         if ($nome === '' && $transcricao === '') {
-            echo json_encode(['ok' => false, 'error' => 'Informe o nome ou a transcrição do produto.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_name_or_transcription', 'Informe o nome ou a transcrição do produto.')]);
             exit;
         }
 
@@ -1806,7 +1806,7 @@ class AdminProdutosController extends Controller {
 
         if ($httpCode !== 200) {
             $err = json_decode($resp, true);
-            echo json_encode(['ok' => false, 'error' => 'Erro ChatGPT: ' . ($err['error']['message'] ?? 'HTTP ' . $httpCode)]);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_chatgpt', 'Erro ChatGPT: {e}', ['e' => ($err['error']['message'] ?? 'HTTP ' . $httpCode)])]);
             exit;
         }
 
@@ -1821,7 +1821,7 @@ class AdminProdutosController extends Controller {
         }
 
         if (!is_array($parsed)) {
-            echo json_encode(['ok' => false, 'error' => 'Resposta inválida da IA.', 'raw' => $content]);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_invalid_ai_response', 'Resposta inválida da IA.'), 'raw' => $content]);
             exit;
         }
 
@@ -1897,7 +1897,7 @@ class AdminProdutosController extends Controller {
             session_start();
         }
         if (empty($_SESSION['cadastro_rapido_autorizado'])) {
-            echo json_encode(['ok' => false, 'error' => 'Não autorizado.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.products.err_not_authorized', 'Não autorizado.')]);
             exit;
         }
 
@@ -2118,14 +2118,14 @@ class AdminProdutosController extends Controller {
             $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
             $successHtml = '<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius:14px;">'
                 . '<i class="fas fa-check-circle mt-1"></i>'
-                . '<div><div class="fw-bold">Produto salvo com sucesso.</div></div>'
+                . '<div><div class="fw-bold">' . __('admin.products.js_product_saved_success', 'Produto salvo com sucesso.') . '</div></div>'
                 . '</div>'
                 . '<div class="card border-0 shadow-sm mb-3" style="border-radius:18px;overflow:hidden;">'
                 . '<div class="row g-0"><div class="col-4"><img src="' . $fotoEsc . '" alt="' . $nome . '" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>'
                 . '<div class="col-8"><div class="card-body py-3"><div class="fw-bold">' . $nome . '</div>'
                 . '<div class="d-grid gap-2 mt-2">'
-                . '<a class="btn btn-outline-primary btn-sm" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-1"></i>Abrir produto</a>'
-                . '<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a>'
+                . '<a class="btn btn-outline-primary btn-sm" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-1"></i>' . __('admin.products.js_open_product', 'Abrir produto') . '</a>'
+                . '<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>' . __('admin.products.js_new_product', 'Novo produto') . '</a>'
                 . '</div></div></div></div></div>';
         }
 
@@ -2199,11 +2199,11 @@ class AdminProdutosController extends Controller {
         $successHtmlJs = json_encode($successHtml);
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cadastro Rápido</title>
+    <title>' . __('admin.products.quick_add_title', 'Cadastro Rápido') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -2234,8 +2234,8 @@ class AdminProdutosController extends Controller {
         <div class="d-flex align-items-center justify-content-between">
             <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm" style="border-radius:999px;"><i class="fas fa-arrow-left"></i></a>
             <div class="text-center">
-                <div class="page-title">Cadastro rápido</div>
-                <div class="small subtle" id="stepSubtitle">Selecione ou crie um grupo</div>
+                <div class="page-title">' . __('admin.products.quick_add', 'Cadastro rápido') . '</div>
+                <div class="small subtle" id="stepSubtitle">' . __('admin.products.select_or_create_group', 'Selecione ou crie um grupo') . '</div>
             </div>
             <span style="width:40px;"></span>
         </div>
@@ -2254,19 +2254,19 @@ class AdminProdutosController extends Controller {
     <div class="step active" id="step1">
         <div class="glass p-3 mb-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="fw-semibold">Grupo de Compras</div>
-                <button class="btn btn-sm btn-primary" id="btnAbrirGrupo"><i class="fas fa-plus me-1"></i>Abrir Grupo</button>
+                <div class="fw-semibold">' . __('admin.products.purchase_group', 'Grupo de Compras') . '</div>
+                <button class="btn btn-sm btn-primary" id="btnAbrirGrupo"><i class="fas fa-plus me-1"></i>' . __('admin.products.open_group', 'Abrir Grupo') . '</button>
             </div>
             <div id="listaGrupos" class="row g-2"></div>
-            <div id="emptyGrupos" class="text-center text-muted py-3 small" style="display:none">Nenhum grupo cadastrado. Crie o primeiro!</div>
+            <div id="emptyGrupos" class="text-center text-muted py-3 small" style="display:none">' . __('admin.products.no_group', 'Nenhum grupo cadastrado. Crie o primeiro!') . '</div>
         </div>
         <!-- Opção: Produto para o Site (sem grupo) -->
         <div class="glass p-3 mb-3">
             <div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" id="btnProdutoSite" style="cursor:pointer;border:2px solid transparent;">
                 <i class="fas fa-globe fa-lg text-success"></i>
                 <div class="flex-fill">
-                    <div class="fw-semibold">Produto para o Site</div>
-                    <div class="small text-muted">Cadastrar produto avulso (sem grupo de compras)</div>
+                    <div class="fw-semibold">' . __('admin.products.product_for_site', 'Produto para o Site') . '</div>
+                    <div class="small text-muted">' . __('admin.products.product_for_site_desc', 'Cadastrar produto avulso (sem grupo de compras)') . '</div>
                 </div>
                 <i class="fas fa-chevron-right text-muted"></i>
             </div>
@@ -2276,37 +2276,37 @@ class AdminProdutosController extends Controller {
             <div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" id="btnDesapego" style="cursor:pointer;border:2px solid transparent;">
                 <i class="fas fa-hand-holding-heart fa-lg text-info"></i>
                 <div class="flex-fill">
-                    <div class="fw-semibold">Desapego Braziliana</div>
-                    <div class="small text-muted">Produto de desapego (venda somente para EUA)</div>
+                    <div class="fw-semibold">' . __('admin.products.desapego', 'Desapego Braziliana') . '</div>
+                    <div class="small text-muted">' . __('admin.products.desapego_desc', 'Produto de desapego (venda somente para EUA)') . '</div>
                 </div>
                 <i class="fas fa-chevron-right text-muted"></i>
             </div>
         </div>
         <!-- Form novo grupo (inline) -->
         <div class="glass p-3" id="formNovoGrupo" style="display:none">
-            <div class="fw-semibold mb-3">Novo grupo de compras</div>
-            <div class="mb-3"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ngNome" placeholder="Ex: Walmart"></div>
-            <div class="mb-3"><label class="form-label">Descrição</label><textarea class="form-control" id="ngDesc" rows="2" placeholder="Opcional"></textarea></div>
+            <div class="fw-semibold mb-3">' . __('admin.products.new_purchase_group', 'Novo grupo de compras') . '</div>
+            <div class="mb-3"><label class="form-label">' . __('admin.products.name', 'Nome') . ' <span class="text-danger">*</span></label><input class="form-control" type="text" id="ngNome" placeholder="' . htmlspecialchars(__('admin.products.eg_walmart', 'Ex: Walmart'), ENT_QUOTES, 'UTF-8') . '"></div>
+            <div class="mb-3"><label class="form-label">' . __('admin.products.description', 'Descrição') . '</label><textarea class="form-control" id="ngDesc" rows="2" placeholder="' . htmlspecialchars(__('admin.products.optional', 'Opcional'), ENT_QUOTES, 'UTF-8') . '"></textarea></div>
             <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" id="ngImposto" role="switch">
-                <label class="form-check-label" for="ngImposto">Cobrar imposto local</label>
+                <label class="form-check-label" for="ngImposto">' . __('admin.products.charge_local_tax', 'Cobrar imposto local') . '</label>
             </div>
             <div class="mb-3" id="ngImpostoPercentWrap" style="display:none">
-                <label class="form-label">Percentual (%)</label>
-                <input class="form-control" type="number" id="ngImpostoPercent" step="0.1" min="0" max="99" value="8" placeholder="Ex: 8">
+                <label class="form-label">' . __('admin.products.percentage', 'Percentual (%)') . '</label>
+                <input class="form-control" type="number" id="ngImpostoPercent" step="0.1" min="0" max="99" value="8" placeholder="' . htmlspecialchars(__('admin.products.eg_8', 'Ex: 8'), ENT_QUOTES, 'UTF-8') . '">
             </div>
             <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" id="ngClubeOnly" role="switch">
-                <label class="form-check-label" for="ngClubeOnly">Exclusivo do Clube Braziliana</label>
+                <label class="form-check-label" for="ngClubeOnly">' . __('admin.products.club_exclusive', 'Exclusivo do Clube Braziliana') . '</label>
             </div>
             <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" id="ngAtivo" role="switch" checked>
-                <label class="form-check-label" for="ngAtivo">Grupo ativo</label>
+                <label class="form-check-label" for="ngAtivo">' . __('admin.products.group_active', 'Grupo ativo') . '</label>
             </div>
             <div id="msgNovoGrupo" class="mb-2"></div>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary flex-fill" id="btnCancelarGrupo">Cancelar</button>
-                <button class="btn btn-primary flex-fill" id="btnSalvarNovoGrupo"><i class="fas fa-check me-1"></i>Criar grupo</button>
+                <button class="btn btn-outline-secondary flex-fill" id="btnCancelarGrupo">' . __('admin.products.cancel', 'Cancelar') . '</button>
+                <button class="btn btn-primary flex-fill" id="btnSalvarNovoGrupo"><i class="fas fa-check me-1"></i>' . __('admin.products.create_group', 'Criar grupo') . '</button>
             </div>
         </div>
     </div>
@@ -2314,121 +2314,121 @@ class AdminProdutosController extends Controller {
     <!-- STEP 2: Tipo de cadastro -->
     <div class="step" id="step2">
         <div class="glass p-3">
-            <div class="fw-semibold mb-1">Grupo selecionado: <span id="grupoSelecionadoNome" class="text-primary"></span></div>
-            <div class="small subtle mb-4">Como deseja cadastrar os produtos?</div>
+            <div class="fw-semibold mb-1">' . __('admin.products.selected_group', 'Grupo selecionado:') . ' <span id="grupoSelecionadoNome" class="text-primary"></span></div>
+            <div class="small subtle mb-4">' . __('admin.products.how_to_register', 'Como deseja cadastrar os produtos?') . '</div>
             <div class="d-grid gap-3">
-                <button class="btn btn-primary btn-lg" id="btnNovoProduto"><i class="fas fa-plus me-2"></i>Novo produto</button>
-                <button class="btn btn-outline-primary btn-lg" id="btnEmLote"><i class="fas fa-layer-group me-2"></i>Em lote (variantes)</button>
+                <button class="btn btn-primary btn-lg" id="btnNovoProduto"><i class="fas fa-plus me-2"></i>' . __('admin.products.new_product', 'Novo produto') . '</button>
+                <button class="btn btn-outline-primary btn-lg" id="btnEmLote"><i class="fas fa-layer-group me-2"></i>' . __('admin.products.batch_variants', 'Em lote (variantes)') . '</button>
             </div>
-            <div class="mt-3 text-center"><button class="btn btn-link btn-sm text-muted" id="btnVoltarStep1">← Voltar</button></div>
+            <div class="mt-3 text-center"><button class="btn btn-link btn-sm text-muted" id="btnVoltarStep1">← ' . __('admin.products.back', 'Voltar') . '</button></div>
         </div>
     </div>
 
     <!-- STEP 3: Formulário produto -->
     <div class="step" id="step3">
         <div class="glass p-3 p-sm-4">
-            <div class="fw-semibold mb-3">Novo produto — <span id="grupoNomeProduto" class="text-primary"></span></div>
+            <div class="fw-semibold mb-3">' . __('admin.products.new_product', 'Novo produto') . ' — <span id="grupoNomeProduto" class="text-primary"></span></div>
             <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data" id="formProduto">
                 <input type="hidden" name="grupo_compras_id" id="inputGrupoId">
                 <input type="hidden" name="desapego" id="inputDesapego" value="0">
                 <div class="mb-3" id="desapeguistaFieldSingle" style="display:none">
-                    <label class="form-label fw-semibold">Desapeguista <span class="text-muted fw-normal small">Opcional</span></label>
+                    <label class="form-label fw-semibold">' . __('admin.products.desapeguista', 'Desapeguista') . ' <span class="text-muted fw-normal small">' . __('admin.products.optional', 'Opcional') . '</span></label>
                     <select class="form-select" name="desapeguista_id" id="desapeguistaSelectSingle">
-                        <option value="">Nenhum (produto próprio)</option>
+                        <option value="">' . __('admin.products.none_own_product', 'Nenhum (produto próprio)') . '</option>
                     </select>
-                    <small class="text-muted">Selecione o desapeguista dono deste produto (se houver).</small>
+                    <small class="text-muted">' . __('admin.products.desapeguista_help', 'Selecione o desapeguista dono deste produto (se houver).') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Foto do produto</label>
+                    <label class="form-label fw-semibold">' . __('admin.products.product_photo', 'Foto do produto') . '</label>
                     <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
                     <div id="capaPreview" class="mt-2"></div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
+                    <label class="form-label fw-semibold">' . __('admin.products.name', 'Nome') . ' <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="' . htmlspecialchars(__('admin.products.eg_iphone', 'Ex: iPhone 15 Pro'), ENT_QUOTES, 'UTF-8') . '">
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Valor (USD)</label>
+                        <label class="form-label fw-semibold">' . __('admin.products.value_usd', 'Valor (USD)') . '</label>
                         <div class="input-group input-group-lg"><span class="input-group-text">$</span><input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00"></div>
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Peso (kg)</label>
+                        <label class="form-label fw-semibold">' . __('admin.products.weight_kg', 'Peso (kg)') . '</label>
                         <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Valor Promocional (USD) <span class="text-muted fw-normal small">Opcional</span></label>
-                    <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção"></div>
-                    <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
+                    <label class="form-label fw-semibold">' . __('admin.products.sale_price_usd', 'Valor Promocional (USD)') . ' <span class="text-muted fw-normal small">' . __('admin.products.optional', 'Opcional') . '</span></label>
+                    <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="' . htmlspecialchars(__('admin.products.leave_empty_no_promo', 'Deixe vazio se não houver promoção'), ENT_QUOTES, 'UTF-8') . '"></div>
+                    <small class="text-muted">' . __('admin.products.sale_price_help', 'Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Data Limite da Promoção <span class="text-muted fw-normal small">Opcional</span></label>
-                    <input type="datetime-local" class="form-control" name="sale_price_expires" placeholder="Deixe vazio para promoção sem prazo">
-                    <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
+                    <label class="form-label fw-semibold">' . __('admin.products.promo_deadline', 'Data Limite da Promoção') . ' <span class="text-muted fw-normal small">' . __('admin.products.optional', 'Opcional') . '</span></label>
+                    <input type="datetime-local" class="form-control" name="sale_price_expires" placeholder="' . htmlspecialchars(__('admin.products.leave_empty_no_deadline', 'Deixe vazio para promoção sem prazo'), ENT_QUOTES, 'UTF-8') . '">
+                    <small class="text-muted">' . __('admin.products.promo_deadline_help', 'Após essa data, o preço volta ao valor normal automaticamente.') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Estoque</label>
+                    <label class="form-label fw-semibold">' . __('admin.products.stock', 'Estoque') . '</label>
                     <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
                 </div>
                 <div class="mb-3" id="lojaFieldSingle" style="display:none">
-                    <label class="form-label fw-semibold">Loja <span class="text-danger">*</span></label>
+                    <label class="form-label fw-semibold">' . __('admin.products.store', 'Loja') . ' <span class="text-danger">*</span></label>
                     <div class="d-flex gap-2 align-items-start">
                         <div class="flex-fill">
-                            <input type="text" class="form-control" id="lojaSearchSingle" placeholder="Pesquisar loja..." autocomplete="off">
+                            <input type="text" class="form-control" id="lojaSearchSingle" placeholder="' . htmlspecialchars(__('admin.products.search_store', 'Pesquisar loja...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
                             <select class="form-select mt-2" name="loja_id" id="lojaSelectSingle">
-                                <option value="">Selecione a loja...</option>
+                                <option value="">' . __('admin.products.select_store', 'Selecione a loja...') . '</option>
                             </select>
                         </div>
-                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaLojaSingle" title="Nova loja" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
+                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaLojaSingle" title="' . htmlspecialchars(__('admin.products.new_store', 'Nova loja'), ENT_QUOTES, 'UTF-8') . '" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
                     </div>
                     <div id="novaLojaFormSingle" style="display:none" class="mt-2 p-2 border rounded">
                         <div class="input-group input-group-sm">
-                            <input type="text" class="form-control" id="novaLojaNomeSingle" placeholder="Nome da nova loja">
+                            <input type="text" class="form-control" id="novaLojaNomeSingle" placeholder="' . htmlspecialchars(__('admin.products.new_store_name', 'Nome da nova loja'), ENT_QUOTES, 'UTF-8') . '">
                             <button type="button" class="btn btn-primary btn-sm" id="btnSalvarLojaSingle"><i class="fas fa-check"></i></button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelarLojaSingle"><i class="fas fa-times"></i></button>
                         </div>
                         <div id="novaLojaMsgSingle" class="small mt-1"></div>
                     </div>
-                    <small class="text-muted">Obrigatório para produtos do site (sem grupo de compras).</small>
+                    <small class="text-muted">' . __('admin.products.store_required_site', 'Obrigatório para produtos do site (sem grupo de compras).') . '</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">NCM</label>
-                    <input type="text" class="form-control" id="ncmSearchSingle" placeholder="Pesquisar NCM (código ou descrição)..." autocomplete="off">
+                    <input type="text" class="form-control" id="ncmSearchSingle" placeholder="' . htmlspecialchars(__('admin.products.search_ncm', 'Pesquisar NCM (código ou descrição)...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
                     <select class="form-select mt-2" name="ncm" id="ncmSelectSingle">
-                        <option value="">Selecione...</option>
+                        <option value="">' . __('admin.products.select', 'Selecione...') . '</option>
                     </select>
-                    <small class="text-muted">Opcional</small>
+                    <small class="text-muted">' . __('admin.products.optional', 'Opcional') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Categoria</label>
+                    <label class="form-label fw-semibold">' . __('admin.products.category', 'Categoria') . '</label>
                     <div class="d-flex gap-2 align-items-start">
                         <div class="flex-fill">
-                            <input type="text" class="form-control" id="catSearchSingle" placeholder="Pesquisar categoria..." autocomplete="off">
+                            <input type="text" class="form-control" id="catSearchSingle" placeholder="' . htmlspecialchars(__('admin.products.search_category', 'Pesquisar categoria...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
                             <select class="form-select mt-2" name="categoria_id" id="catSelectSingle">
-                                <option value="">Selecione...</option>
+                                <option value="">' . __('admin.products.select', 'Selecione...') . '</option>
                             </select>
                         </div>
-                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaCatSingle" title="Nova categoria" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
+                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaCatSingle" title="' . htmlspecialchars(__('admin.products.new_category', 'Nova categoria'), ENT_QUOTES, 'UTF-8') . '" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
                     </div>
                     <div id="novaCatFormSingle" style="display:none" class="mt-2 p-2 border rounded" style="border-radius:12px;">
                         <div class="input-group input-group-sm">
-                            <input type="text" class="form-control" id="novaCatNomeSingle" placeholder="Nome da nova categoria">
+                            <input type="text" class="form-control" id="novaCatNomeSingle" placeholder="' . htmlspecialchars(__('admin.products.new_category_name', 'Nome da nova categoria'), ENT_QUOTES, 'UTF-8') . '">
                             <button type="button" class="btn btn-primary btn-sm" id="btnSalvarCatSingle"><i class="fas fa-check"></i></button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelarCatSingle"><i class="fas fa-times"></i></button>
                         </div>
                         <div id="novaCatMsgSingle" class="small mt-1"></div>
                     </div>
-                    <small class="text-muted">Opcional</small>
+                    <small class="text-muted">' . __('admin.products.optional', 'Opcional') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold"><i class="fas fa-microphone me-1"></i>Descrição por voz (IA)</label>
+                    <label class="form-label fw-semibold"><i class="fas fa-microphone me-1"></i>' . __('admin.products.voice_description', 'Descrição por voz (IA)') . '</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="transcricaoSingle" placeholder="Clique no microfone e descreva o produto..." readonly>
-                        <button type="button" class="btn btn-outline-danger" id="btnMicSingle" title="Gravar áudio"><i class="fas fa-microphone"></i></button>
+                        <input type="text" class="form-control" id="transcricaoSingle" placeholder="' . htmlspecialchars(__('admin.products.mic_placeholder', 'Clique no microfone e descreva o produto...'), ENT_QUOTES, 'UTF-8') . '" readonly>
+                        <button type="button" class="btn btn-outline-danger" id="btnMicSingle" title="' . htmlspecialchars(__('admin.products.record_audio', 'Gravar áudio'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-microphone"></i></button>
                     </div>
                     <div id="micStatusSingle" class="small text-muted mt-1"></div>
-                    <small class="text-muted">Grave um áudio descrevendo o produto. A IA vai transcrever e usar para preencher os campos automaticamente.</small>
+                    <small class="text-muted">' . __('admin.products.voice_help', 'Grave um áudio descrevendo o produto. A IA vai transcrever e usar para preencher os campos automaticamente.') . '</small>
                     <input type="hidden" name="ia_descricao" id="iaDescricaoSingle">
                     <input type="hidden" name="ia_marca" id="iaMarcaSingle">
                     <input type="hidden" name="ia_especificacoes" id="iaEspecificacoesSingle">
@@ -2436,154 +2436,154 @@ class AdminProdutosController extends Controller {
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
-                    <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
+                    <label class="form-check-label fw-semibold" for="featuredSwitch">' . __('admin.products.featured', 'Destaque (aparece na Home)') . '</label>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitch" name="oculto" value="1">
-                    <label class="form-check-label fw-semibold" for="ocultoSwitch">Ocultar em todo o site</label>
-                    <div class="small text-muted">Se marcado, o produto só aparece para admin/vendedor no pedido manual.</div>
+                    <label class="form-check-label fw-semibold" for="ocultoSwitch">' . __('admin.products.hide_from_site', 'Ocultar em todo o site') . '</label>
+                    <div class="small text-muted">' . __('admin.products.hide_help', 'Se marcado, o produto só aparece para admin/vendedor no pedido manual.') . '</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="outletSwitch" name="outlet" value="1">
-                    <label class="form-check-label fw-semibold" for="outletSwitch">Braziliana Outlet</label>
-                    <div class="small text-muted">Se marcado, o produto aparece na página Braziliana Outlet.</div>
+                    <label class="form-check-label fw-semibold" for="outletSwitch">' . __('admin.products.outlet', 'Braziliana Outlet') . '</label>
+                    <div class="small text-muted">' . __('admin.products.outlet_help', 'Se marcado, o produto aparece na página Braziliana Outlet.') . '</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitch" name="custo_igual_preco" value="1" checked>
-                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitch">Custo = Valor do produto</label>
-                    <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
+                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitch">' . __('admin.products.cost_equals_price', 'Custo = Valor do produto') . '</label>
+                    <div class="small text-muted">' . __('admin.products.cost_equals_price_help', 'Se ativado, o custo será preenchido com o valor de venda.') . '</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="manterDadosSwitch">
-                    <label class="form-check-label fw-semibold" for="manterDadosSwitch">Manter dados após salvar</label>
+                    <label class="form-check-label fw-semibold" for="manterDadosSwitch">' . __('admin.products.keep_data_after_save', 'Manter dados após salvar') . '</label>
                 </div>
                 <div id="produtoMsg" class="mb-2"></div>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2">← Voltar</button>
-                    <button type="submit" class="btn btn-primary flex-fill btn-lg" id="btnSalvarProduto"><i class="fas fa-bolt me-2"></i>Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2">← ' . __('admin.products.back', 'Voltar') . '</button>
+                    <button type="submit" class="btn btn-primary flex-fill btn-lg" id="btnSalvarProduto"><i class="fas fa-bolt me-2"></i>' . __('admin.products.save', 'Salvar') . '</button>
                 </div>
             </form>
         </div>
         <!-- Lote (variantes) -->
         <div class="glass p-3 p-sm-4 mt-3" id="loteArea" style="display:none">
-            <div class="fw-semibold mb-2">Cadastro em lote — <span id="grupoNomeLote" class="text-primary"></span></div>
-            <div class="small text-muted mb-3">Mesma foto, peso, preço e estoque para todos. Só muda a descrição.</div>
+            <div class="fw-semibold mb-2">' . __('admin.products.batch_registration', 'Cadastro em lote') . ' — <span id="grupoNomeLote" class="text-primary"></span></div>
+            <div class="small text-muted mb-3">' . __('admin.products.batch_same_data_help', 'Mesma foto, peso, preço e estoque para todos. Só muda a descrição.') . '</div>
             <form id="formLote" enctype="multipart/form-data">
                 <input type="hidden" name="grupo_compras_id" id="inputGrupoIdLote">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Foto do produto</label>
+                    <label class="form-label fw-semibold">' . __('admin.products.product_photo', 'Foto do produto') . '</label>
                     <input type="file" class="form-control" name="capa" accept="image/*" id="capaInputLote">
                     <div id="capaPreviewLote" class="mt-2"></div>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Valor (USD)</label>
+                        <label class="form-label fw-semibold">' . __('admin.products.value_usd', 'Valor (USD)') . '</label>
                         <div class="input-group input-group-lg"><span class="input-group-text">$</span><input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00" id="lotePriceInput"></div>
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Peso (kg)</label>
+                        <label class="form-label fw-semibold">' . __('admin.products.weight_kg', 'Peso (kg)') . '</label>
                         <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000" id="loteWeightInput">
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Valor Promocional (USD) <span class="text-muted fw-normal small">Opcional</span></label>
-                    <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção" id="loteSalePriceInput"></div>
-                    <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
+                    <label class="form-label fw-semibold">' . __('admin.products.sale_price_usd', 'Valor Promocional (USD)') . ' <span class="text-muted fw-normal small">' . __('admin.products.optional', 'Opcional') . '</span></label>
+                    <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="' . htmlspecialchars(__('admin.products.leave_empty_no_promo', 'Deixe vazio se não houver promoção'), ENT_QUOTES, 'UTF-8') . '" id="loteSalePriceInput"></div>
+                    <small class="text-muted">' . __('admin.products.sale_price_help', 'Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Data Limite da Promoção <span class="text-muted fw-normal small">Opcional</span></label>
-                    <input type="datetime-local" class="form-control" name="sale_price_expires" placeholder="Deixe vazio para promoção sem prazo" id="loteSalePriceExpiresInput">
-                    <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
+                    <label class="form-label fw-semibold">' . __('admin.products.sale_price_expires', 'Data Limite da Promoção') . ' <span class="text-muted fw-normal small">' . __('admin.products.optional', 'Opcional') . '</span></label>
+                    <input type="datetime-local" class="form-control" name="sale_price_expires" placeholder="' . htmlspecialchars(__('admin.products.leave_empty_no_deadline', 'Deixe vazio para promoção sem prazo'), ENT_QUOTES, 'UTF-8') . '" id="loteSalePriceExpiresInput">
+                    <small class="text-muted">' . __('admin.products.sale_price_expires_help', 'Após essa data, o preço volta ao valor normal automaticamente.') . '</small>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Estoque</label>
+                        <label class="form-label fw-semibold">' . __('admin.products.stock', 'Estoque') . '</label>
                         <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0" id="loteStockInput">
                     </div>
                     <div class="col-6 d-flex align-items-end">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" role="switch" id="loteFeaturedSwitch" name="featured" value="1" checked>
-                            <label class="form-check-label fw-semibold" for="loteFeaturedSwitch">Destaque</label>
+                            <label class="form-check-label fw-semibold" for="loteFeaturedSwitch">' . __('admin.products.featured', 'Destaque') . '</label>
                         </div>
                     </div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitchLote" name="oculto" value="1">
-                    <label class="form-check-label fw-semibold" for="ocultoSwitchLote">Ocultar em todo o site</label>
-                    <div class="small text-muted">Se marcado, os produtos só aparecem para admin/vendedor no pedido manual.</div>
+                    <label class="form-check-label fw-semibold" for="ocultoSwitchLote">' . __('admin.products.hide_from_site', 'Ocultar em todo o site') . '</label>
+                    <div class="small text-muted">' . __('admin.products.hide_help_batch', 'Se marcado, os produtos só aparecem para admin/vendedor no pedido manual.') . '</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="outletSwitchLote" name="outlet" value="1">
-                    <label class="form-check-label fw-semibold" for="outletSwitchLote">Braziliana Outlet</label>
-                    <div class="small text-muted">Se marcado, os produtos aparecem na página Braziliana Outlet.</div>
+                    <label class="form-check-label fw-semibold" for="outletSwitchLote">' . __('admin.products.outlet', 'Braziliana Outlet') . '</label>
+                    <div class="small text-muted">' . __('admin.products.outlet_help_batch', 'Se marcado, os produtos aparecem na página Braziliana Outlet.') . '</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitchLote" name="custo_igual_preco" value="1" checked>
-                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitchLote">Custo = Valor do produto</label>
-                    <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
+                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitchLote">' . __('admin.products.cost_equals_price', 'Custo = Valor do produto') . '</label>
+                    <div class="small text-muted">' . __('admin.products.cost_equals_price_help', 'Se ativado, o custo será preenchido com o valor de venda.') . '</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">NCM</label>
-                    <input type="text" class="form-control" id="ncmSearchLote" placeholder="Pesquisar NCM (código ou descrição)..." autocomplete="off">
+                    <input type="text" class="form-control" id="ncmSearchLote" placeholder="' . htmlspecialchars(__('admin.products.search_ncm', 'Pesquisar NCM (código ou descrição)...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
                     <select class="form-select mt-2" name="ncm" id="ncmSelectLote">
-                        <option value="">Selecione...</option>
+                        <option value="">' . __('admin.products.select_placeholder', 'Selecione...') . '</option>
                     </select>
-                    <small class="text-muted">Opcional — aplicado a todos os itens do lote</small>
+                    <small class="text-muted">' . __('admin.products.optional_applied_all_batch', 'Opcional — aplicado a todos os itens do lote') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Categoria</label>
+                    <label class="form-label fw-semibold">' . __('admin.products.category', 'Categoria') . '</label>
                     <div class="d-flex gap-2 align-items-start">
                         <div class="flex-fill">
-                            <input type="text" class="form-control" id="catSearchLote" placeholder="Pesquisar categoria..." autocomplete="off">
+                            <input type="text" class="form-control" id="catSearchLote" placeholder="' . htmlspecialchars(__('admin.products.search_category', 'Pesquisar categoria...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
                             <select class="form-select mt-2" name="categoria_id" id="catSelectLote">
-                                <option value="">Selecione...</option>
+                                <option value="">' . __('admin.products.select_placeholder', 'Selecione...') . '</option>
                             </select>
                         </div>
-                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaCatLote" title="Nova categoria" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
+                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaCatLote" title="' . htmlspecialchars(__('admin.products.new_category', 'Nova categoria'), ENT_QUOTES, 'UTF-8') . '" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
                     </div>
                     <div id="novaCatFormLote" style="display:none" class="mt-2 p-2 border rounded" style="border-radius:12px;">
                         <div class="input-group input-group-sm">
-                            <input type="text" class="form-control" id="novaCatNomeLote" placeholder="Nome da nova categoria">
+                            <input type="text" class="form-control" id="novaCatNomeLote" placeholder="' . htmlspecialchars(__('admin.products.new_category_name', 'Nome da nova categoria'), ENT_QUOTES, 'UTF-8') . '">
                             <button type="button" class="btn btn-primary btn-sm" id="btnSalvarCatLote"><i class="fas fa-check"></i></button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelarCatLote"><i class="fas fa-times"></i></button>
                         </div>
                         <div id="novaCatMsgLote" class="small mt-1"></div>
                     </div>
-                    <small class="text-muted">Opcional — aplicada a todos os itens do lote</small>
+                    <small class="text-muted">' . __('admin.products.optional_applied_all_batch_f', 'Opcional — aplicada a todos os itens do lote') . '</small>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold"><i class="fas fa-microphone me-1"></i>Descrição por voz (IA)</label>
+                    <label class="form-label fw-semibold"><i class="fas fa-microphone me-1"></i>' . __('admin.products.voice_description_ai', 'Descrição por voz (IA)') . '</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="transcricaoLote" placeholder="Clique no microfone e descreva o produto..." readonly>
-                        <button type="button" class="btn btn-outline-danger" id="btnMicLote" title="Gravar áudio"><i class="fas fa-microphone"></i></button>
+                        <input type="text" class="form-control" id="transcricaoLote" placeholder="' . htmlspecialchars(__('admin.products.click_mic_describe', 'Clique no microfone e descreva o produto...'), ENT_QUOTES, 'UTF-8') . '" readonly>
+                        <button type="button" class="btn btn-outline-danger" id="btnMicLote" title="' . htmlspecialchars(__('admin.products.record_audio', 'Gravar áudio'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-microphone"></i></button>
                     </div>
                     <div id="micStatusLote" class="small text-muted mt-1"></div>
-                    <small class="text-muted">Grave um áudio descrevendo o produto. A IA vai preencher os campos automaticamente.</small>
+                    <small class="text-muted">' . __('admin.products.voice_description_help', 'Grave um áudio descrevendo o produto. A IA vai preencher os campos automaticamente.') . '</small>
                     <input type="hidden" name="ia_descricao" id="iaDescricaoLote">
                     <input type="hidden" name="ia_marca" id="iaMarcaLote">
                     <input type="hidden" name="ia_especificacoes" id="iaEspecificacoesLote">
                     <input type="hidden" name="ia_tags" id="iaTagsLote">
                 </div>
                 <hr>
-                <div class="fw-semibold mb-2"><i class="fas fa-list me-1"></i>Descrições (variantes)</div>
-                <div class="small text-muted mb-3">Adicione uma descrição para cada variante do produto.</div>
+                <div class="fw-semibold mb-2"><i class="fas fa-list me-1"></i>' . __('admin.products.descriptions_variants', 'Descrições (variantes)') . '</div>
+                <div class="small text-muted mb-3">' . __('admin.products.add_description_per_variant', 'Adicione uma descrição para cada variante do produto.') . '</div>
                 <div id="loteDescricoes">
                     <div class="input-group mb-2 lote-desc-row">
                         <span class="input-group-text" style="border-top-right-radius:0;border-bottom-right-radius:0;min-width:36px;justify-content:center;">1</span>
-                        <input type="text" class="form-control" name="descricoes[]" required placeholder="Ex: iPhone 15 Pro - Azul 128GB" autocomplete="off">
+                        <input type="text" class="form-control" name="descricoes[]" required placeholder="' . htmlspecialchars(__('admin.products.eg_iphone_variant', 'Ex: iPhone 15 Pro - Azul 128GB'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
                     </div>
                 </div>
-                <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="btnAddDescricao"><i class="fas fa-plus me-1"></i>Adicionar descrição</button>
+                <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="btnAddDescricao"><i class="fas fa-plus me-1"></i>' . __('admin.products.add_description', 'Adicionar descrição') . '</button>
                 <div id="loteMsg"></div>
                 <div id="loteProgress" style="display:none" class="mb-3">
                     <div class="progress" style="height:24px;border-radius:12px;">
                         <div class="progress-bar" id="loteProgressBar" role="progressbar" style="width:0%">0%</div>
                     </div>
-                    <div class="small text-muted mt-1" id="loteProgressLabel">Salvando...</div>
+                    <div class="small text-muted mt-1" id="loteProgressLabel">' . __('admin.products.saving', 'Salvando...') . '</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2Lote">← Voltar</button>
-                    <button type="submit" class="btn btn-primary flex-fill btn-lg" id="btnSalvarLote"><i class="fas fa-bolt me-2"></i>Salvar todos</button>
+                    <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2Lote">← ' . __('admin.products.back', 'Voltar') . '</button>
+                    <button type="submit" class="btn btn-primary flex-fill btn-lg" id="btnSalvarLote"><i class="fas fa-bolt me-2"></i>' . __('admin.products.save_all', 'Salvar todos') . '</button>
                 </div>
             </form>
         </div>
@@ -2702,8 +2702,8 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
     const btn = document.getElementById("btnSalvarNovoGrupo");
     const msg = document.getElementById("msgNovoGrupo");
     const nome = document.getElementById("ngNome").value.trim();
-    if (!nome) { msg.innerHTML = \'<div class="alert alert-danger py-1 small">Nome obrigatório.</div>\'; return; }
-    btn.disabled = true; btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Criando...\';
+    if (!nome) { msg.innerHTML = \'<div class="alert alert-danger py-1 small">' . htmlspecialchars(__('admin.products.js_name_required', 'Nome obrigatório.'), ENT_QUOTES, 'UTF-8') . '</div>\'; return; }
+    btn.disabled = true; btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>' . htmlspecialchars(__('admin.products.js_creating', 'Criando...'), ENT_QUOTES, 'UTF-8') . '\';
     const fd = new FormData();
     fd.append("nome", nome);
     fd.append("descricao", document.getElementById("ngDesc").value);
@@ -2719,7 +2719,7 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
     fd.append("ativo", document.getElementById("ngAtivo").checked ? "1" : "0");
     const r = await fetch("/admin/grupos-compras/salvar", {method:"POST", body:fd});
     const j = await r.json();
-    btn.disabled = false; btn.innerHTML = \'<i class="fas fa-check me-1"></i>Criar grupo\';
+    btn.disabled = false; btn.innerHTML = \'<i class="fas fa-check me-1"></i>' . htmlspecialchars(__('admin.products.js_create_group', 'Criar grupo'), ENT_QUOTES, 'UTF-8') . '\';
     if (j.ok) {
         GRUPOS.push(j.grupo);
         renderGrupos();
@@ -2732,7 +2732,7 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
         document.getElementById("ngImpostoPercent").value = "7";
         document.getElementById("ngClubeOnly").checked = false;
         selecionarGrupo(j.grupo);
-    } else { msg.innerHTML = \'<div class="alert alert-danger py-1 small">\' + (j.msg||"Erro") + \'</div>\'; }
+    } else { msg.innerHTML = \'<div class="alert alert-danger py-1 small">\' + (j.msg||"' . htmlspecialchars(__('admin.products.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '") + \'</div>\'; }
 });
 
 // Tipo de cadastro
@@ -2805,7 +2805,7 @@ function criarLinhaDescricao() {
     const div = document.createElement("div");
     div.className = "input-group mb-2 lote-desc-row";
     div.innerHTML = \'<span class="input-group-text" style="border-top-right-radius:0;border-bottom-right-radius:0;min-width:36px;justify-content:center;">\' + descCount + \'</span>\'
-        + \'<input type="text" class="form-control" name="descricoes[]" required placeholder="Descrição da variante" autocomplete="off">\'
+        + \'<input type="text" class="form-control" name="descricoes[]" required placeholder="' . htmlspecialchars(__('admin.products.variant_description', 'Descrição da variante'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off">\'
         + \'<button type="button" class="btn btn-outline-danger btn-remove-desc" style="border-top-left-radius:0;border-bottom-left-radius:0;"><i class="fas fa-times"></i></button>\';
     div.querySelector(".btn-remove-desc").addEventListener("click", () => {
         div.remove();
@@ -2832,14 +2832,14 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
     descInputs.forEach(inp => { const v = inp.value.trim(); if (v) descricoes.push(v); });
 
     if (!descricoes.length) {
-        msg.innerHTML = \'<div class="alert alert-danger py-1 small">Adicione pelo menos uma descrição.</div>\';
+        msg.innerHTML = \'<div class="alert alert-danger py-1 small">' . htmlspecialchars(__('admin.products.js_add_at_least_one_desc', 'Adicione pelo menos uma descrição.'), ENT_QUOTES, 'UTF-8') . '</div>\';
         return;
     }
 
     const price = document.getElementById("lotePriceInput").value.trim();
     const weight = document.getElementById("loteWeightInput").value.trim();
     if (!price || !weight) {
-        msg.innerHTML = \'<div class="alert alert-danger py-1 small">Preencha valor e peso.</div>\';
+        msg.innerHTML = \'<div class="alert alert-danger py-1 small">' . htmlspecialchars(__('admin.products.js_fill_value_weight', 'Preencha valor e peso.'), ENT_QUOTES, 'UTF-8') . '</div>\';
         return;
     }
 
@@ -2848,7 +2848,7 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
     progress.style.display = "";
     bar.style.width = "0%";
     bar.textContent = "0%";
-    label.textContent = "Salvando 0 de " + descricoes.length + "...";
+    label.textContent = "' . htmlspecialchars(__('admin.products.js_saving_x_of', 'Salvando'), ENT_QUOTES, 'UTF-8') . ' 0 ' . htmlspecialchars(__('admin.products.js_of', 'de'), ENT_QUOTES, 'UTF-8') . ' " + descricoes.length + "...";
 
     let okCount = 0;
     let failCount = 0;
@@ -2911,19 +2911,19 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         const pct = Math.round(((i + 1) / total) * 100);
         bar.style.width = pct + "%";
         bar.textContent = pct + "%";
-        label.textContent = "Salvando " + (i + 1) + " de " + total + "...";
+        label.textContent = "' . htmlspecialchars(__('admin.products.js_saving_x_of', 'Salvando'), ENT_QUOTES, 'UTF-8') . ' " + (i + 1) + " ' . htmlspecialchars(__('admin.products.js_of', 'de'), ENT_QUOTES, 'UTF-8') . ' " + total + "...";
     }
 
     progress.style.display = "none";
     btn.disabled = false;
 
     if (okCount > 0 && failCount === 0) {
-        msg.innerHTML = \'<div class="alert alert-success" style="border-radius:14px;"><i class="fas fa-check-circle me-2"></i>\' + okCount + \' produto(s) cadastrado(s) com sucesso.</div>\'
-            + \'<div class="d-grid gap-2 mt-2"><a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo cadastro</a></div>\';
+        msg.innerHTML = \'<div class="alert alert-success" style="border-radius:14px;"><i class="fas fa-check-circle me-2"></i>\' + okCount + \' ' . htmlspecialchars(__('admin.products.js_products_saved_success', 'produto(s) cadastrado(s) com sucesso.'), ENT_QUOTES, 'UTF-8') . '</div>\'
+            + \'<div class="d-grid gap-2 mt-2"><a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>' . htmlspecialchars(__('admin.products.js_new_registration', 'Novo cadastro'), ENT_QUOTES, 'UTF-8') . '</a></div>\';
     } else if (okCount > 0) {
-        msg.innerHTML = \'<div class="alert alert-warning" style="border-radius:14px;"><i class="fas fa-exclamation-triangle me-2"></i>\' + okCount + \' salvo(s), \' + failCount + \' com falha.</div>\';
+        msg.innerHTML = \'<div class="alert alert-warning" style="border-radius:14px;"><i class="fas fa-exclamation-triangle me-2"></i>\' + okCount + \' ' . htmlspecialchars(__('admin.products.js_saved_partial_1', 'salvo(s),'), ENT_QUOTES, 'UTF-8') . ' \' + failCount + \' ' . htmlspecialchars(__('admin.products.js_saved_partial_2', 'com falha.'), ENT_QUOTES, 'UTF-8') . '</div>\';
     } else {
-        msg.innerHTML = \'<div class="alert alert-danger" style="border-radius:14px;"><i class="fas fa-times-circle me-2"></i>Nenhum produto foi salvo. Verifique os dados.</div>\';
+        msg.innerHTML = \'<div class="alert alert-danger" style="border-radius:14px;"><i class="fas fa-times-circle me-2"></i>' . htmlspecialchars(__('admin.products.js_no_product_saved', 'Nenhum produto foi salvo. Verifique os dados.'), ENT_QUOTES, 'UTF-8') . '</div>\';
     }
 });
 
@@ -2935,7 +2935,7 @@ document.getElementById("formProduto").addEventListener("submit", async function
     const manterDados = document.getElementById("manterDadosSwitch").checked;
 
     btn.disabled = true;
-    btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-2"></i>Salvando...\';
+    btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-2"></i>' . htmlspecialchars(__('admin.products.js_saving', 'Salvando...'), ENT_QUOTES, 'UTF-8') . '\';
     msg.innerHTML = "";
 
     const fd = new FormData(this);
@@ -2959,7 +2959,7 @@ document.getElementById("formProduto").addEventListener("submit", async function
                     reutilizarInput.value = fotoPath;
                 }
                 document.getElementById("capaInput").value = "";
-                msg.innerHTML = \'<div class="alert alert-success py-2 small" style="border-radius:12px;"><i class="fas fa-check-circle me-1"></i>Produto salvo! Dados mantidos para o próximo.</div>\';
+                msg.innerHTML = \'<div class="alert alert-success py-2 small" style="border-radius:12px;"><i class="fas fa-check-circle me-1"></i>' . htmlspecialchars(__('admin.products.js_product_saved_kept', 'Produto salvo! Dados mantidos para o próximo.'), ENT_QUOTES, 'UTF-8') . '</div>\';
                 this.querySelector(\'input[name="name"]\').value = "";
                 this.querySelector(\'input[name="name"]\').focus();
             } else {
@@ -2970,14 +2970,14 @@ document.getElementById("formProduto").addEventListener("submit", async function
                 const plink = "/produto/detalhes/" + pid;
                 const cardHtml = \'<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius:14px;">\'
                     + \'<i class="fas fa-check-circle mt-1"></i>\'
-                    + \'<div><div class="fw-bold">Produto salvo com sucesso.</div></div>\'
+                    + \'<div><div class="fw-bold">' . htmlspecialchars(__('admin.products.js_product_saved_success', 'Produto salvo com sucesso.'), ENT_QUOTES, 'UTF-8') . '</div></div>\'
                     + \'</div>\'
                     + \'<div class="card border-0 shadow-sm mb-3" style="border-radius:18px;overflow:hidden;">\'
                     + \'<div class="row g-0"><div class="col-4"><img src="\' + pfoto + \'" alt="\' + pnome + \'" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>\'
                     + \'<div class="col-8"><div class="card-body py-3"><div class="fw-bold">\' + pnome + \'</div>\'
                     + \'<div class="d-grid gap-2 mt-2">\'
-                    + \'<a class="btn btn-outline-primary btn-sm" href="\' + plink + \'" target="_blank"><i class="fas fa-external-link-alt me-1"></i>Abrir produto</a>\'
-                    + \'<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a>\'
+                    + \'<a class="btn btn-outline-primary btn-sm" href="\' + plink + \'" target="_blank"><i class="fas fa-external-link-alt me-1"></i>' . htmlspecialchars(__('admin.products.js_open_product', 'Abrir produto'), ENT_QUOTES, 'UTF-8') . '</a>\'
+                    + \'<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>' . htmlspecialchars(__('admin.products.js_new_product', 'Novo produto'), ENT_QUOTES, 'UTF-8') . '</a>\'
                     + \'</div></div></div></div></div>\';
                 if (successArea) {
                     successArea.innerHTML = cardHtml;
@@ -2989,14 +2989,14 @@ document.getElementById("formProduto").addEventListener("submit", async function
                 document.getElementById("capaPreview").innerHTML = "";
             }
         } else {
-            msg.innerHTML = \'<div class="alert alert-danger py-2 small" style="border-radius:12px;"><i class="fas fa-times-circle me-1"></i>\' + (json.error || json.msg || "Erro ao salvar.") + \'</div>\';
+            msg.innerHTML = \'<div class="alert alert-danger py-2 small" style="border-radius:12px;"><i class="fas fa-times-circle me-1"></i>\' + (json.error || json.msg || "' . htmlspecialchars(__('admin.products.js_error_saving', 'Erro ao salvar.'), ENT_QUOTES, 'UTF-8') . '") + \'</div>\';
         }
     } catch (err) {
-        msg.innerHTML = \'<div class="alert alert-danger py-2 small" style="border-radius:12px;"><i class="fas fa-times-circle me-1"></i>Erro de conexão. Tente novamente.</div>\';
+        msg.innerHTML = \'<div class="alert alert-danger py-2 small" style="border-radius:12px;"><i class="fas fa-times-circle me-1"></i>' . htmlspecialchars(__('admin.products.js_connection_error', 'Erro de conexão. Tente novamente.'), ENT_QUOTES, 'UTF-8') . '</div>\';
     }
 
     btn.disabled = false;
-    btn.innerHTML = \'<i class="fas fa-bolt me-2"></i>Salvar\';
+    btn.innerHTML = \'<i class="fas fa-bolt me-2"></i>' . htmlspecialchars(__('admin.products.save', 'Salvar'), ENT_QUOTES, 'UTF-8') . '\';
 });
 
 renderGrupos();
@@ -3020,8 +3020,8 @@ document.getElementById("btnProdutoSite").addEventListener("click", function() {
     grupoSelecionado = null;
     document.getElementById("inputGrupoId").value = "";
     document.getElementById("inputDesapego").value = "0";
-    document.getElementById("grupoNomeProduto").textContent = "Produto para o Site";
-    document.getElementById("grupoSelecionadoNome").textContent = "Produto para o Site";
+    document.getElementById("grupoNomeProduto").textContent = "' . htmlspecialchars(__('admin.products.product_for_site', 'Produto para o Site'), ENT_QUOTES, 'UTF-8') . '";
+    document.getElementById("grupoSelecionadoNome").textContent = "' . htmlspecialchars(__('admin.products.product_for_site', 'Produto para o Site'), ENT_QUOTES, 'UTF-8') . '";
     document.getElementById("lojaFieldSingle").style.display = "";
     document.getElementById("desapeguistaFieldSingle").style.display = "none";
     document.getElementById("loteArea").style.display = "none";
@@ -3036,8 +3036,8 @@ document.getElementById("btnDesapego").addEventListener("click", function() {
     grupoSelecionado = null;
     document.getElementById("inputGrupoId").value = "";
     document.getElementById("inputDesapego").value = "1";
-    document.getElementById("grupoNomeProduto").textContent = "Desapego Braziliana";
-    document.getElementById("grupoSelecionadoNome").textContent = "Desapego Braziliana";
+    document.getElementById("grupoNomeProduto").textContent = "' . htmlspecialchars(__('admin.products.desapego', 'Desapego Braziliana'), ENT_QUOTES, 'UTF-8') . '";
+    document.getElementById("grupoSelecionadoNome").textContent = "' . htmlspecialchars(__('admin.products.desapego', 'Desapego Braziliana'), ENT_QUOTES, 'UTF-8') . '";
     document.getElementById("lojaFieldSingle").style.display = "none";
     document.getElementById("desapeguistaFieldSingle").style.display = "";
     populateDesapeguistaSelect("desapeguistaSelectSingle");
@@ -3050,7 +3050,7 @@ document.getElementById("btnDesapego").addEventListener("click", function() {
 function populateLojaSelect(selectId) {
     var sel = document.getElementById(selectId);
     if (!sel) return;
-    sel.innerHTML = \'<option value="">Selecione a loja...</option>\';
+    sel.innerHTML = \'<option value="">' . htmlspecialchars(__('admin.products.select_store', 'Selecione a loja...'), ENT_QUOTES, 'UTF-8') . '</option>\';
     LOJAS.forEach(function(l) {
         var opt = document.createElement("option");
         opt.value = l.id;
@@ -3064,7 +3064,7 @@ populateLojaSelect("lojaSelectSingle");
 function populateDesapeguistaSelect(selectId) {
     var sel = document.getElementById(selectId);
     if (!sel) return;
-    sel.innerHTML = \'<option value="">Nenhum (produto próprio)</option>\';
+    sel.innerHTML = \'<option value="">' . htmlspecialchars(__('admin.products.none_own_product', 'Nenhum (produto próprio)'), ENT_QUOTES, 'UTF-8') . '</option>\';
     DESAPEGUISTAS.forEach(function(d) {
         var opt = document.createElement("option");
         opt.value = d.id;
@@ -3103,7 +3103,7 @@ function populateDesapeguistaSelect(selectId) {
     btnCancelar.addEventListener("click", function() { form.style.display = "none"; });
     btnSalvar.addEventListener("click", async function() {
         var nome = input.value.trim();
-        if (!nome) { msg.innerHTML = \'<span class="text-danger">Nome obrigatório.</span>\'; return; }
+        if (!nome) { msg.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_name_required', 'Nome obrigatório.'), ENT_QUOTES, 'UTF-8') . '</span>\'; return; }
         btnSalvar.disabled = true; msg.innerHTML = \'<i class="fas fa-spinner fa-spin"></i>\';
         try {
             var fd = new FormData(); fd.append("nome", nome);
@@ -3115,8 +3115,8 @@ function populateDesapeguistaSelect(selectId) {
                 populateLojaSelect("lojaSelectSingle");
                 document.getElementById("lojaSelectSingle").value = novaLoja.id;
                 form.style.display = "none"; msg.innerHTML = "";
-            } else { msg.innerHTML = \'<span class="text-danger">\' + (j.error || j.message || "Erro") + \'</span>\'; }
-        } catch(e) { msg.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\'; }
+            } else { msg.innerHTML = \'<span class="text-danger">\' + (j.error || j.message || "' . htmlspecialchars(__('admin.products.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '") + \'</span>\'; }
+        } catch(e) { msg.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_connection_error_short', 'Erro de conexão.'), ENT_QUOTES, 'UTF-8') . '</span>\'; }
         btnSalvar.disabled = false;
     });
     input.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); btnSalvar.click(); } });
@@ -3136,7 +3136,7 @@ async function loadCategorias() {
 function populateCatSelect(id) {
     const sel = document.getElementById(id);
     if (!sel) return;
-    sel.innerHTML = \'<option value="">Selecione...</option>\';
+    sel.innerHTML = \'<option value="">' . htmlspecialchars(__('admin.products.select_placeholder', 'Selecione...'), ENT_QUOTES, 'UTF-8') . '</option>\';
     CATEGORIAS.forEach(c => {
         const opt = document.createElement("option");
         opt.value = c.id;
@@ -3177,7 +3177,7 @@ function setupNovaCat(btnId, formId, inputId, btnSalvarId, btnCancelarId, msgId,
     btnCancelar.addEventListener("click", () => { form.style.display = "none"; });
     btnSalvar.addEventListener("click", async () => {
         const nome = input.value.trim();
-        if (!nome) { msg.innerHTML = \'<span class="text-danger">Nome obrigatório.</span>\'; return; }
+        if (!nome) { msg.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_name_required', 'Nome obrigatório.'), ENT_QUOTES, 'UTF-8') . '</span>\'; return; }
         btnSalvar.disabled = true;
         msg.innerHTML = \'<i class="fas fa-spinner fa-spin"></i>\';
         try {
@@ -3191,8 +3191,8 @@ function setupNovaCat(btnId, formId, inputId, btnSalvarId, btnCancelarId, msgId,
                 document.getElementById(selectId).value = j.categoria.id;
                 form.style.display = "none";
                 msg.innerHTML = "";
-            } else { msg.innerHTML = \'<span class="text-danger">\' + (j.error || "Erro") + \'</span>\'; }
-        } catch(e) { msg.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\'; }
+            } else { msg.innerHTML = \'<span class="text-danger">\' + (j.error || "' . htmlspecialchars(__('admin.products.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '") + \'</span>\'; }
+        } catch(e) { msg.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_connection_error_short', 'Erro de conexão.'), ENT_QUOTES, 'UTF-8') . '</span>\'; }
         btnSalvar.disabled = false;
     });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); btnSalvar.click(); } });
@@ -3212,7 +3212,7 @@ function bloquearForm(prefix) {
             const ov = document.createElement("div");
             ov.id = "iaOverlay" + prefix;
             ov.style.cssText = "position:absolute;inset:0;background:rgba(255,255,255,0.85);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:18px;";
-            ov.innerHTML = \'<div class="text-center"><div class="mb-3"><i class="fas fa-robot fa-3x text-primary fa-bounce"></i></div><div class="fw-bold fs-5 mb-1">IA preenchendo os campos...</div><div class="text-muted">Aguarde, isso leva alguns segundos.</div></div>\';
+            ov.innerHTML = \'<div class="text-center"><div class="mb-3"><i class="fas fa-robot fa-3x text-primary fa-bounce"></i></div><div class="fw-bold fs-5 mb-1">' . htmlspecialchars(__('admin.products.js_ai_filling_fields', 'IA preenchendo os campos...'), ENT_QUOTES, 'UTF-8') . '</div><div class="text-muted">' . htmlspecialchars(__('admin.products.js_wait_few_seconds', 'Aguarde, isso leva alguns segundos.'), ENT_QUOTES, 'UTF-8') . '</div></div>\';
             container.appendChild(ov);
         }
     } else { overlay.style.display = "flex"; }
@@ -3248,7 +3248,7 @@ function setupMic(btnId, statusId, transcricaoId, iaPrefix, getNome, getPreco, g
                 btn.innerHTML = \'<i class="fas fa-microphone"></i>\';
                 btn.classList.remove("btn-danger"); btn.classList.add("btn-outline-danger");
                 bloquearForm(iaPrefix);
-                status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Transcrevendo...\';
+                status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>' . htmlspecialchars(__('admin.products.js_transcribing', 'Transcrevendo...'), ENT_QUOTES, 'UTF-8') . '\';
                 const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
                 const fd = new FormData(); fd.append("audio", blob, "audio.webm");
                 try {
@@ -3256,22 +3256,22 @@ function setupMic(btnId, statusId, transcricaoId, iaPrefix, getNome, getPreco, g
                     const j = await r.json();
                     if (j.ok && j.text) {
                         transcricaoInput.value = j.text; transcricaoInput.removeAttribute("readonly");
-                        status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Transcrito! Enviando para IA...\';
+                        status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>' . htmlspecialchars(__('admin.products.js_transcribed_sending_ai', 'Transcrito! Enviando para IA...'), ENT_QUOTES, 'UTF-8') . '\';
                         await enriquecerIA(iaPrefix, getNome(), j.text, getPreco(), getPeso());
                     } else {
-                        status.innerHTML = \'<span class="text-danger">\' + (j.error || "Erro") + \'</span>\';
+                        status.innerHTML = \'<span class="text-danger">\' + (j.error || "' . htmlspecialchars(__('admin.products.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '") + \'</span>\';
                         desbloquearForm(iaPrefix);
                     }
                 } catch(e) {
-                    status.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\';
+                    status.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_connection_error_short', 'Erro de conexão.'), ENT_QUOTES, 'UTF-8') . '</span>\';
                     desbloquearForm(iaPrefix);
                 }
             };
             mediaRecorder.start(); recording = true;
             btn.innerHTML = \'<i class="fas fa-stop"></i>\';
             btn.classList.remove("btn-outline-danger"); btn.classList.add("btn-danger");
-            status.innerHTML = \'<i class="fas fa-circle text-danger me-1"></i>Gravando... clique para parar\';
-        } catch(e) { status.innerHTML = \'<span class="text-danger">Permissão de microfone negada.</span>\'; }
+            status.innerHTML = \'<i class="fas fa-circle text-danger me-1"></i>' . htmlspecialchars(__('admin.products.js_recording_click_stop', 'Gravando... clique para parar'), ENT_QUOTES, 'UTF-8') . '\';
+        } catch(e) { status.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_mic_permission_denied', 'Permissão de microfone negada.'), ENT_QUOTES, 'UTF-8') . '</span>\'; }
     });
 }
 async function enriquecerIA(prefix, nome, transcricao, preco, peso) {
@@ -3289,9 +3289,9 @@ async function enriquecerIA(prefix, nome, transcricao, preco, peso) {
             document.getElementById("iaMarca" + prefix).value = d.marca || "";
             document.getElementById("iaEspecificacoes" + prefix).value = d.especificacoes || "";
             document.getElementById("iaTags" + prefix).value = d.tags || "";
-            if (status) status.innerHTML = \'<span class="text-success"><i class="fas fa-magic me-1"></i>Campos preenchidos pela IA!</span>\';
-        } else { if (status) status.innerHTML = \'<span class="text-warning">\' + (j.error || "IA sem dados") + \'</span>\'; }
-    } catch(e) { if (status) status.innerHTML = \'<span class="text-danger">Erro ao enriquecer.</span>\'; }
+            if (status) status.innerHTML = \'<span class="text-success"><i class="fas fa-magic me-1"></i>' . htmlspecialchars(__('admin.products.js_fields_filled_ai', 'Campos preenchidos pela IA!'), ENT_QUOTES, 'UTF-8') . '</span>\';
+        } else { if (status) status.innerHTML = \'<span class="text-warning">\' + (j.error || "' . htmlspecialchars(__('admin.products.js_ai_no_data', 'IA sem dados'), ENT_QUOTES, 'UTF-8') . '") + \'</span>\'; }
+    } catch(e) { if (status) status.innerHTML = \'<span class="text-danger">' . htmlspecialchars(__('admin.products.js_error_enriching', 'Erro ao enriquecer.'), ENT_QUOTES, 'UTF-8') . '</span>\'; }
     desbloquearForm(prefix);
 }
 setupMic("btnMicSingle", "micStatusSingle", "transcricaoSingle", "Single",
@@ -3777,7 +3777,7 @@ HTML;
             $valor = htmlspecialchars((string) ($created['price'] ?? ''), ENT_QUOTES, 'UTF-8');
             $peso = htmlspecialchars((string) ($created['weight'] ?? ''), ENT_QUOTES, 'UTF-8');
             $estoque = htmlspecialchars((string) ($created['stock'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $destaque = !empty($created['featured']) ? 'Sim' : 'Não';
+            $destaque = !empty($created['featured']) ? __('admin.products.yes', 'Sim') : __('admin.products.no', 'Não');
             if ($foto === '') {
                 $foto = '/uploads/produtos/placeholder.jpg';
             }
@@ -3787,23 +3787,23 @@ HTML;
 
             $successHtml = '<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius: 14px;">'
                 . '<i class="fas fa-check-circle mt-1"></i>'
-                . '<div><div class="fw-bold">Produto salvo com sucesso.</div><div class="small">Se estiver como destaque, ele deve aparecer na Home.</div></div>'
+                . '<div><div class="fw-bold">' . __('admin.products.js_product_saved_success', 'Produto salvo com sucesso.') . '</div><div class="small">' . __('admin.products.saved_appears_home', 'Se estiver como destaque, ele deve aparecer na Home.') . '</div></div>'
                 . '</div>'
                 . '<div class="card border-0 shadow-sm mb-3" style="border-radius: 18px; overflow: hidden;">'
                 . '<div class="row g-0">'
                 . '<div class="col-4" style="min-height: 92px;"><img src="' . $fotoEsc . '" alt="' . $nome . '" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>'
                 . '<div class="col-8"><div class="card-body py-3">'
                 . '<div class="fw-bold" style="line-height:1.2">' . $nome . '</div>'
-                . '<div class="small text-muted">Link do produto</div>'
+                . '<div class="small text-muted">' . __('admin.products.product_link', 'Link do produto') . '</div>'
                 . '<div class="small" style="word-break: break-all;"><a href="' . $linkEsc . '" target="_blank">' . $linkEsc . '</a></div>'
-                . '<div class="small text-muted mt-2">Detalhes</div>'
-                . '<div class="small">Valor (USD): <span class="fw-semibold">$ ' . $valor . '</span></div>'
-                . '<div class="small">Peso (kg): <span class="fw-semibold">' . $peso . '</span></div>'
-                . '<div class="small">Estoque: <span class="fw-semibold">' . $estoque . '</span></div>'
-                . '<div class="small">Destaque: <span class="fw-semibold">' . htmlspecialchars($destaque, ENT_QUOTES, 'UTF-8') . '</span></div>'
+                . '<div class="small text-muted mt-2">' . __('admin.products.details', 'Detalhes') . '</div>'
+                . '<div class="small">' . __('admin.products.value_usd', 'Valor (USD)') . ': <span class="fw-semibold">$ ' . $valor . '</span></div>'
+                . '<div class="small">' . __('admin.products.weight_kg', 'Peso (kg)') . ': <span class="fw-semibold">' . $peso . '</span></div>'
+                . '<div class="small">' . __('admin.products.stock', 'Estoque') . ': <span class="fw-semibold">' . $estoque . '</span></div>'
+                . '<div class="small">' . __('admin.products.featured_label', 'Destaque') . ': <span class="fw-semibold">' . htmlspecialchars($destaque, ENT_QUOTES, 'UTF-8') . '</span></div>'
                 . '<div class="d-grid gap-2 mt-2">'
-                . '<a class="btn btn-outline-primary" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-2"></i>Abrir produto</a>'
-                . '<a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-2"></i>Novo envio</a>'
+                . '<a class="btn btn-outline-primary" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-2"></i>' . __('admin.products.js_open_product', 'Abrir produto') . '</a>'
+                . '<a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-2"></i>' . __('admin.products.new_submission', 'Novo envio') . '</a>'
                 . '</div>'
                 . '</div></div>'
                 . '</div>'
@@ -4157,7 +4157,7 @@ HTML;
             unset($_p);
 
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
 
@@ -4170,21 +4170,21 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="page-title">Produtos (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">' . __('admin.products.products', 'Produtos') . ' (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> Arquivados</a>'
-            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
-            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> ' . __('admin.products.archived', 'Arquivados') . '</a>'
+            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> ' . __('admin.products.quick_add', 'Cadastro rápido') . '</a>'
+            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> ' . __('admin.products.new', 'Novo') . '</a>'
             . '</div>'
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
             . '<div class="col-md-4">'
-            . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '<input type="text" class="form-control" name="busca" placeholder="' . htmlspecialchars(__('admin.products.search_product', 'Buscar produto...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="loja_filtro">'
-            . '<option value="">Todas as lojas</option>';
+            . '<option value="">' . __('admin.products.all_stores', 'Todas as lojas') . '</option>';
         foreach ($lojaMap as $_lid => $_lnome) {
             $selLoja = ((string) $lojaFiltro === (string) $_lid) ? ' selected' : '';
             echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
@@ -4194,17 +4194,17 @@ HTML;
             . '<div class="col-md-1">'
             . '<select class="form-select" name="outlet_filtro">'
             . '<option value="">Outlet</option>'
-            . '<option value="1"' . ((isset($outletFiltro) && $outletFiltro === '1') ? ' selected' : '') . '>Sim</option>'
+            . '<option value="1"' . ((isset($outletFiltro) && $outletFiltro === '1') ? ' selected' : '') . '>' . __('admin.products.yes', 'Sim') . '</option>'
             . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
-            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
-            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
+            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>' . __('admin.products.name', 'Nome') . '</option>'
+            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>' . __('admin.products.registration', 'Cadastro') . '</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
-            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
-            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>Loja</option>'
-            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
+            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>' . __('admin.products.weight', 'Peso') . '</option>'
+            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>' . __('admin.products.store', 'Loja') . '</option>'
+            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>' . __('admin.products.price', 'Preço') . '</option>'
             . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
             . '</select>'
@@ -4223,20 +4223,20 @@ HTML;
         echo '<div class="table-responsive">'
             . '<form id="formMassa" method="POST" action="/admin/produtos/acoes-massa">'
             . '<div id="barraMassa" class="d-none mb-3 p-3 rounded-3 d-flex align-items-center gap-3 flex-wrap" style="background:rgba(11,31,58,0.06);border:1px solid rgba(11,31,58,0.14);">'
-            . '<span class="fw-semibold text-primary"><span id="qtdSelecionados">0</span> produto(s) selecionado(s)</span>'
-            . '<button type="button" class="btn btn-sm btn-primary" onclick="abrirModalMassa()"><i class="fas fa-edit me-1"></i>Editar em massa</button>'
-            . '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()"><i class="fas fa-times me-1"></i>Desmarcar todos</button>'
+            . '<span class="fw-semibold text-primary"><span id="qtdSelecionados">0</span> ' . __('admin.products.products_selected', 'produto(s) selecionado(s)') . '</span>'
+            . '<button type="button" class="btn btn-sm btn-primary" onclick="abrirModalMassa()"><i class="fas fa-edit me-1"></i>' . __('admin.products.mass_edit', 'Editar em massa') . '</button>'
+            . '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()"><i class="fas fa-times me-1"></i>' . __('admin.products.deselect_all', 'Desmarcar todos') . '</button>'
             . '</div>'
             . '<table class="table table-hover align-middle">'
             . '<thead><tr>'
-            . '<th style="width:40px"><input type="checkbox" id="checkTodos" class="form-check-input" title="Selecionar todos"></th>'
-            . '<th style="width:72px">Imagem</th>'
-            . '<th>Nome</th>'
-            . '<th style="width:130px">Loja</th>'
-            . '<th style="width:120px">Peso (kg)</th>'
-            . '<th style="width:140px">Preço</th>'
+            . '<th style="width:40px"><input type="checkbox" id="checkTodos" class="form-check-input" title="' . htmlspecialchars(__('admin.products.select_all', 'Selecionar todos'), ENT_QUOTES, 'UTF-8') . '"></th>'
+            . '<th style="width:72px">' . __('admin.products.image', 'Imagem') . '</th>'
+            . '<th>' . __('admin.products.name', 'Nome') . '</th>'
+            . '<th style="width:130px">' . __('admin.products.store', 'Loja') . '</th>'
+            . '<th style="width:120px">' . __('admin.products.weight_kg', 'Peso (kg)') . '</th>'
+            . '<th style="width:140px">' . __('admin.products.price', 'Preço') . '</th>'
             . '<th style="width:110px">Status</th>'
-            . '<th style="width:150px">Ações</th>'
+            . '<th style="width:150px">' . __('admin.products.actions', 'Ações') . '</th>'
             . '</tr></thead><tbody>';
 
         foreach ($produtos as $produto) {
@@ -4249,7 +4249,7 @@ HTML;
             $peso = number_format((float) $pesoRaw, 3, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
-            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+            $label = ((int) $produto['active'] ? __('admin.products.active', 'Ativo') : __('admin.products.inactive', 'Inativo'));
 
             echo '<tr>'
                 . '<td><input type="checkbox" name="ids[]" value="' . (int) $produto['id'] . '" class="form-check-input check-produto"></td>'
@@ -4261,8 +4261,8 @@ HTML;
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
                 . '<td>'
                 . '<div class="btn-group btn-group-sm" role="group">'
-                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
-                . '<a href="/admin/produtos/excluir/' . (int) $produto['id'] . '" class="btn btn-outline-danger" title="Excluir" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')"><i class="fas fa-trash"></i></a>'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-warning" title="' . htmlspecialchars(__('admin.products.edit', 'Editar'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-edit"></i></a>'
+                . '<a href="/admin/produtos/excluir/' . (int) $produto['id'] . '" class="btn btn-outline-danger" title="' . htmlspecialchars(__('admin.products.delete', 'Excluir'), ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'' . htmlspecialchars(__('admin.products.confirm_delete_product', 'Tem certeza que deseja excluir este produto?'), ENT_QUOTES, 'UTF-8') . '\')"><i class="fas fa-trash"></i></a>'
                 . '</div>'
                 . '</td>'
                 . '</tr>';
@@ -4307,11 +4307,11 @@ HTML;
         } catch (\Exception $e) {}
 
         // Gerar options HTML
-        $optCategorias = '<option value="">— Não alterar —</option>';
+        $optCategorias = '<option value="">— ' . __('admin.products.do_not_change', 'Não alterar') . ' —</option>';
         foreach ($categoriasSelect as $c) {
             $optCategorias .= '<option value="' . (int)$c['id'] . '">' . htmlspecialchars((string)$c['nome'], ENT_QUOTES, 'UTF-8') . '</option>';
         }
-        $optGrupos = '<option value="">— Não alterar —</option>';
+        $optGrupos = '<option value="">— ' . __('admin.products.do_not_change', 'Não alterar') . ' —</option>';
         foreach ($gruposSelect as $g) {
             $optGrupos .= '<option value="' . (int)$g['id'] . '">' . htmlspecialchars((string)$g['nome'], ENT_QUOTES, 'UTF-8') . '</option>';
         }
@@ -4321,56 +4321,56 @@ HTML;
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="modalMassaLabel"><i class="fas fa-edit me-2"></i>Edição em Massa</h5>
+        <h5 class="modal-title" id="modalMassaLabel"><i class="fas fa-edit me-2"></i>' . __('admin.products.mass_edit_title', 'Edição em Massa') . '</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p class="text-muted small mb-4">Preencha apenas os campos que deseja alterar. Campos em branco serão ignorados.</p>
+        <p class="text-muted small mb-4">' . __('admin.products.mass_edit_help', 'Preencha apenas os campos que deseja alterar. Campos em branco serão ignorados.') . '</p>
         <form id="formMassaModal">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Preço (USD)</label>
+              <label class="form-label fw-semibold">' . __('admin.products.price_usd', 'Preço (USD)') . '</label>
               <input type="number" step="0.01" min="0" class="form-control" name="massa_preco" placeholder="Ex: 9.99">
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Peso (kg)</label>
+              <label class="form-label fw-semibold">' . __('admin.products.weight_kg', 'Peso (kg)') . '</label>
               <input type="number" step="0.001" min="0" class="form-control" name="massa_peso" placeholder="Ex: 0.500">
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Estoque</label>
+              <label class="form-label fw-semibold">' . __('admin.products.stock', 'Estoque') . '</label>
               <input type="number" step="1" min="0" class="form-control" name="massa_estoque" placeholder="Ex: 100">
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Status</label>
               <select class="form-select" name="massa_status">
-                <option value="">— Não alterar —</option>
-                <option value="1">Ativo</option>
-                <option value="0">Inativo</option>
+                <option value="">— ' . __('admin.products.do_not_change', 'Não alterar') . ' —</option>
+                <option value="1">' . __('admin.products.active', 'Ativo') . '</option>
+                <option value="0">' . __('admin.products.inactive', 'Inativo') . '</option>
               </select>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Categoria</label>
+              <label class="form-label fw-semibold">' . __('admin.products.category', 'Categoria') . '</label>
               <select class="form-select" name="massa_categoria_id">' . $optCategorias . '</select>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Grupo de Compras</label>
+              <label class="form-label fw-semibold">' . __('admin.products.purchase_group', 'Grupo de Compras') . '</label>
               <select class="form-select" name="massa_grupo_id">' . $optGrupos . '</select>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Braziliana Outlet</label>
               <select class="form-select" name="massa_outlet">
-                <option value="">— Não alterar —</option>
-                <option value="1">Sim</option>
-                <option value="0">Não</option>
+                <option value="">— ' . __('admin.products.do_not_change', 'Não alterar') . ' —</option>
+                <option value="1">' . __('admin.products.yes', 'Sim') . '</option>
+                <option value="0">' . __('admin.products.no', 'Não') . '</option>
               </select>
             </div>
           </div>
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.products.cancel', 'Cancelar') . '</button>
         <button type="button" class="btn btn-primary" onclick="confirmarMassa()">
-          <i class="fas fa-save me-1"></i>Salvar para todos selecionados
+          <i class="fas fa-save me-1"></i>' . __('admin.products.save_all_selected', 'Salvar para todos selecionados') . '
         </button>
       </div>
     </div>
@@ -4418,7 +4418,7 @@ HTML;
     window.abrirModalMassa = function() {
         const n = document.querySelectorAll(".check-produto:checked").length;
         if (n === 0) return;
-        document.getElementById("modalMassaLabel").innerHTML = \'<i class="fas fa-edit me-2"></i>Edição em Massa — \' + n + \' produto(s)\';
+        document.getElementById("modalMassaLabel").innerHTML = \'<i class="fas fa-edit me-2"></i>' . htmlspecialchars(__('admin.products.mass_edit_title', 'Edição em Massa'), ENT_QUOTES, 'UTF-8') . ' — \' + n + \' ' . htmlspecialchars(__('admin.products.products_count', 'produto(s)'), ENT_QUOTES, 'UTF-8') . '\';
         // Limpar campos do modal
         document.getElementById("formMassaModal").reset();
         new bootstrap.Modal(document.getElementById("modalMassa")).show();
@@ -4437,7 +4437,7 @@ HTML;
             if (v !== "") { temAlgo = true; break; }
         }
         if (!temAlgo) {
-            alert("Preencha pelo menos um campo para alterar.");
+            alert("' . htmlspecialchars(__('admin.products.js_fill_at_least_one', 'Preencha pelo menos um campo para alterar.'), ENT_QUOTES, 'UTF-8') . '");
             return;
         }
 
@@ -4449,7 +4449,7 @@ HTML;
 
         const btn = document.querySelector("#modalMassa .btn-primary");
         btn.disabled = true;
-        btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Salvando...\';
+        btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>' . htmlspecialchars(__('admin.products.js_saving', 'Salvando...'), ENT_QUOTES, 'UTF-8') . '\';
 
         fetch("/admin/produtos/acoes-massa", {
             method: "POST",
@@ -4466,15 +4466,15 @@ HTML;
                 document.body.appendChild(toast);
                 setTimeout(() => { toast.remove(); location.reload(); }, 2000);
             } else {
-                alert("Erro: " + (res.error || "Falha ao salvar."));
+                alert("' . htmlspecialchars(__('admin.products.js_error_label', 'Erro:'), ENT_QUOTES, 'UTF-8') . ' " + (res.error || "' . htmlspecialchars(__('admin.products.js_save_failed', 'Falha ao salvar.'), ENT_QUOTES, 'UTF-8') . '"));
                 btn.disabled = false;
-                btn.innerHTML = \'<i class="fas fa-save me-1"></i>Salvar para todos selecionados\';
+                btn.innerHTML = \'<i class="fas fa-save me-1"></i>' . htmlspecialchars(__('admin.products.save_all_selected', 'Salvar para todos selecionados'), ENT_QUOTES, 'UTF-8') . '\';
             }
         })
         .catch(() => {
-            alert("Erro de comunicação com o servidor.");
+            alert("' . htmlspecialchars(__('admin.products.js_server_comm_error', 'Erro de comunicação com o servidor.'), ENT_QUOTES, 'UTF-8') . '");
             btn.disabled = false;
-            btn.innerHTML = \'<i class="fas fa-save me-1"></i>Salvar para todos selecionados\';
+            btn.innerHTML = \'<i class="fas fa-save me-1"></i>' . htmlspecialchars(__('admin.products.save_all_selected', 'Salvar para todos selecionados'), ENT_QUOTES, 'UTF-8') . '\';
         });
     };
 })();
@@ -4519,7 +4519,7 @@ HTML;
             $prev = max(1, $pagina - 1);
             $prevDisabled = ($pagina <= 1);
             echo '<li class="page-item ' . ($prevDisabled ? 'disabled' : '') . '">' 
-                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">Anterior</a>'
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">' . __('admin.products.previous', 'Anterior') . '</a>'
                 . '</li>';
 
             for ($i = $start; $i <= $end; $i++) {
@@ -4531,7 +4531,7 @@ HTML;
             $next = min($totalPaginas, $pagina + 1);
             $nextDisabled = ($pagina >= $totalPaginas);
             echo '<li class="page-item ' . ($nextDisabled ? 'disabled' : '') . '">' 
-                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">Próximo</a>'
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">' . __('admin.products.next', 'Próximo') . '</a>'
                 . '</li>';
 
             echo '</ul></nav>';
@@ -4540,7 +4540,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Produtos - Braziliana Admin';
+        $title = __('admin.products.products_page_title', 'Produtos') . ' - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -4554,12 +4554,12 @@ HTML;
         // Usar $_POST diretamente para garantir arrays corretos
         $ids = $_POST['ids'] ?? [];
         if (!is_array($ids) || empty($ids)) {
-            echo json_encode(['success' => false, 'error' => 'Nenhum produto selecionado.']);
+            echo json_encode(['success' => false, 'error' => __('admin.products.err_no_product_selected', 'Nenhum produto selecionado.')]);
             exit;
         }
         $ids = array_values(array_filter(array_map('intval', $ids), fn($id) => $id > 0));
         if (empty($ids)) {
-            echo json_encode(['success' => false, 'error' => 'IDs inválidos.']);
+            echo json_encode(['success' => false, 'error' => __('admin.products.err_invalid_ids', 'IDs inválidos.')]);
             exit;
         }
 
@@ -4609,7 +4609,7 @@ HTML;
         }
 
         if (empty($campos)) {
-            echo json_encode(['success' => false, 'error' => 'Nenhum campo para atualizar.']);
+            echo json_encode(['success' => false, 'error' => __('admin.products.err_no_field_update', 'Nenhum campo para atualizar.')]);
             exit;
         }
 
@@ -4622,7 +4622,7 @@ HTML;
             $allParams = array_merge($params, $ids);
             $stmt->execute($allParams);
             $affected = $stmt->rowCount();
-            echo json_encode(['success' => true, 'message' => $affected . ' produto(s) atualizado(s) com sucesso.']);
+            echo json_encode(['success' => true, 'message' => __('admin.products.msg_products_updated', '{n} produto(s) atualizado(s) com sucesso.', ['n' => $affected])]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -4788,7 +4788,7 @@ HTML;
             }
             unset($_p);
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
 
@@ -4801,21 +4801,21 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="page-title">Arquivados (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">' . __('admin.products.archived', 'Arquivados') . ' (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>'
-            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
-            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> ' . __('admin.products.back', 'Voltar') . '</a>'
+            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> ' . __('admin.products.quick_add', 'Cadastro rápido') . '</a>'
+            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> ' . __('admin.products.new', 'Novo') . '</a>'
             . '</div>'
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
             . '<div class="col-md-5">'
-            . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '<input type="text" class="form-control" name="busca" placeholder="' . htmlspecialchars(__('admin.products.search_product', 'Buscar produto...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="loja_filtro">'
-            . '<option value="">Todas as lojas</option>';
+            . '<option value="">' . __('admin.products.all_stores', 'Todas as lojas') . '</option>';
         foreach ($lojaMap as $_lid => $_lnome) {
             $selLoja = ((string) $lojaFiltro === (string) $_lid) ? ' selected' : '';
             echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
@@ -4824,12 +4824,12 @@ HTML;
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
-            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
-            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
+            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>' . __('admin.products.name', 'Nome') . '</option>'
+            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>' . __('admin.products.registration', 'Cadastro') . '</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
-            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
-            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>Loja</option>'
-            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
+            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>' . __('admin.products.weight', 'Peso') . '</option>'
+            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>' . __('admin.products.store', 'Loja') . '</option>'
+            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>' . __('admin.products.price', 'Preço') . '</option>'
             . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
             . '</select>'
@@ -4848,13 +4848,13 @@ HTML;
         echo '<div class="table-responsive">'
             . '<table class="table table-hover align-middle">'
             . '<thead><tr>'
-            . '<th style="width:72px">Imagem</th>'
-            . '<th>Nome</th>'
-            . '<th style="width:130px">Loja</th>'
-            . '<th style="width:120px">Peso (kg)</th>'
-            . '<th style="width:140px">Preço</th>'
+            . '<th style="width:72px">' . __('admin.products.image', 'Imagem') . '</th>'
+            . '<th>' . __('admin.products.name', 'Nome') . '</th>'
+            . '<th style="width:130px">' . __('admin.products.store', 'Loja') . '</th>'
+            . '<th style="width:120px">' . __('admin.products.weight_kg', 'Peso (kg)') . '</th>'
+            . '<th style="width:140px">' . __('admin.products.price', 'Preço') . '</th>'
             . '<th style="width:110px">Status</th>'
-            . '<th style="width:90px">Ações</th>'
+            . '<th style="width:90px">' . __('admin.products.actions', 'Ações') . '</th>'
             . '</tr></thead><tbody>';
 
         foreach ($produtos as $produto) {
@@ -4867,7 +4867,7 @@ HTML;
             $peso = number_format((float) $pesoRaw, 3, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
-            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+            $label = ((int) $produto['active'] ? __('admin.products.active', 'Ativo') : __('admin.products.inactive', 'Inativo'));
 
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
@@ -4877,7 +4877,7 @@ HTML;
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
                 . '<td>'
-                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning" title="' . htmlspecialchars(__('admin.products.edit', 'Editar'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-edit"></i></a>'
                 . '</td>'
                 . '</tr>';
         }
@@ -4918,7 +4918,7 @@ HTML;
             $prev = max(1, $pagina - 1);
             $prevDisabled = ($pagina <= 1);
             echo '<li class="page-item ' . ($prevDisabled ? 'disabled' : '') . '">' 
-                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">Anterior</a>'
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">' . __('admin.products.previous', 'Anterior') . '</a>'
                 . '</li>';
 
             for ($i = $start; $i <= $end; $i++) {
@@ -4930,7 +4930,7 @@ HTML;
             $next = min($totalPaginas, $pagina + 1);
             $nextDisabled = ($pagina >= $totalPaginas);
             echo '<li class="page-item ' . ($nextDisabled ? 'disabled' : '') . '">' 
-                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">Próximo</a>'
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">' . __('admin.products.next', 'Próximo') . '</a>'
                 . '</li>';
 
             echo '</ul></nav>';
@@ -4939,7 +4939,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Produtos Arquivados - Braziliana Admin';
+        $title = __('admin.products.archived_page_title', 'Produtos Arquivados') . ' - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -5564,7 +5564,7 @@ HTML;
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -5639,7 +5639,7 @@ HTML;
                 }
             }
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
 
@@ -6825,7 +6825,7 @@ HTMLSCRIPT;
             
         } catch (\Exception $e) {
             if (isset($pdo)) $pdo->rollBack();
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -6851,7 +6851,7 @@ HTMLSCRIPT;
 
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_atributos')) {
-                $_SESSION['message'] = 'Tabelas de variações não encontradas. Rode a migration 061.';
+                $_SESSION['message'] = __('admin.products.flash_variation_tables_not_found', 'Tabelas de variações não encontradas. Rode a migration 061.');
                 $_SESSION['message_type'] = 'warning';
                 header('Location: /admin/produtos/editar/' . $produtoId);
                 exit;
@@ -6888,11 +6888,11 @@ HTMLSCRIPT;
             }
 
             $pdo->commit();
-            $_SESSION['message'] = 'Atributos/Opções salvos.';
+            $_SESSION['message'] = __('admin.products.flash_attributes_saved', 'Atributos/Opções salvos.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
-            $_SESSION['message'] = 'Erro ao salvar atributos.';
+            $_SESSION['message'] = __('admin.products.flash_error_save_attributes', 'Erro ao salvar atributos.');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -6965,11 +6965,11 @@ HTMLSCRIPT;
             }
 
             $pdo->commit();
-            $_SESSION['message'] = 'Variações atualizadas.';
+            $_SESSION['message'] = __('admin.products.flash_variations_updated', 'Variações atualizadas.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
-            $_SESSION['message'] = 'Erro ao atualizar variações.';
+            $_SESSION['message'] = __('admin.products.flash_error_update_variations', 'Erro ao atualizar variações.');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -7007,7 +7007,7 @@ HTMLSCRIPT;
             $stmtDel->execute([':pid' => $produtoId]);
 
             $pdo->commit();
-            $_SESSION['message'] = 'Variações removidas.';
+            $_SESSION['message'] = __('admin.products.flash_variations_removed', 'Variações removidas.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
@@ -7387,7 +7387,7 @@ HTMLSCRIPT;
                 exit;
             }
 
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -7461,7 +7461,7 @@ HTMLSCRIPT;
                 exit;
             }
 
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -7550,7 +7550,7 @@ HTMLSCRIPT;
                 exit;
             }
 
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -7584,7 +7584,7 @@ HTMLSCRIPT;
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }
@@ -7654,7 +7654,7 @@ HTMLSCRIPT;
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 exit;
             }
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
             exit;
         }
     }

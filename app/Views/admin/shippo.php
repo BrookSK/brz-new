@@ -1,10 +1,10 @@
 <?php ob_start(); ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Shippo - Etiquetas Internacionais</h1>
+        <h1 class="page-title"><?= __('admin.shippo.title','Shippo - Etiquetas Internacionais') ?></h1>
         <div class="d-flex gap-2 align-items-center">
             <div class="input-group input-group-sm" style="width:280px">
-                <input type="text" class="form-control" id="buscarShippo" placeholder="Buscar por pedido, cliente, tracking..." onkeydown="if(event.key==='Enter'){filtrarShippo();event.preventDefault();}">
+                <input type="text" class="form-control" id="buscarShippo" placeholder="<?= htmlspecialchars(__('admin.shippo.search_placeholder','Buscar por pedido, cliente, tracking...'), ENT_QUOTES, 'UTF-8') ?>" onkeydown="if(event.key==='Enter'){filtrarShippo();event.preventDefault();}">
                 <button class="btn btn-outline-primary" type="button" onclick="filtrarShippo()"><i class="fas fa-search"></i></button>
             </div>
         </div>
@@ -12,7 +12,7 @@
 
     <div class="alert alert-info small mb-3">
         <i class="fas fa-globe me-1"></i>
-        Envios internacionais via Shippo para o mundo todo, <strong>exceto Brasil</strong>. Entregas para o Brasil devem usar o <a href="/admin/etiquetas-wp">Correio Internacional</a>.
+        <?= __('admin.shippo.info_intl','Envios internacionais via Shippo para o mundo todo,') ?> <strong><?= __('admin.shippo.info_except_brazil','exceto Brasil') ?></strong>. <?= __('admin.shippo.info_brazil_use','Entregas para o Brasil devem usar o') ?> <a href="/admin/etiquetas-wp"><?= __('admin.shippo.info_intl_mail','Correio Internacional') ?></a>.
     </div>
 
     <div class="alert alert-danger" id="shippo_error" style="display:none;"></div>
@@ -20,9 +20,9 @@
     <!-- Pedidos internacionais (todos exceto Brasil) -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Pedidos internacionais (todos, exceto Brasil)</strong>
+            <strong><?= __('admin.shippo.intl_orders','Pedidos internacionais (todos, exceto Brasil)') ?></strong>
             <?php if (!empty($pedidos)): ?>
-                <button class="btn btn-sm btn-success" id="btnGerarShippo" style="display:none;" onclick="gerarEtiquetasShippoSelecionadas()"><i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">Gerar Etiquetas</span></button>
+                <button class="btn btn-sm btn-success" id="btnGerarShippo" style="display:none;" onclick="gerarEtiquetasShippoSelecionadas()"><i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText"><?= __('admin.shippo.generate_labels','Gerar Etiquetas') ?></span></button>
             <?php endif; ?>
         </div>
         <div class="card-body">
@@ -32,16 +32,16 @@
                     <thead>
                         <tr>
                             <th style="width:30px;"><input type="checkbox" class="form-check-input" id="checkAllPedidos" onclick="toggleAllPedidosShippo(this)"></th>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Peso</th>
-                            <th>Medidas</th>
+                            <th><?= __('admin.shippo.col_order','Pedido') ?></th>
+                            <th><?= __('admin.shippo.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.shippo.col_weight','Peso') ?></th>
+                            <th><?= __('admin.shippo.col_dimensions','Medidas') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $pedidos = isset($pedidos) && is_array($pedidos) ? $pedidos : []; ?>
                         <?php if (empty($pedidos)): ?>
-                            <tr><td colspan="5" class="text-muted">Nenhum pedido aguardando etiqueta.</td></tr>
+                            <tr><td colspan="5" class="text-muted"><?= __('admin.shippo.no_pending_orders','Nenhum pedido aguardando etiqueta.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($pedidos as $p): ?>
                                 <?php
@@ -81,7 +81,7 @@
             <!-- Mobile: Cards -->
             <div class="d-md-none">
                 <?php if (empty($pedidos)): ?>
-                    <div class="text-muted small py-3">Nenhum pedido aguardando etiqueta.</div>
+                    <div class="text-muted small py-3"><?= __('admin.shippo.no_pending_orders','Nenhum pedido aguardando etiqueta.') ?></div>
                 <?php else: ?>
                     <?php foreach ($pedidos as $p): ?>
                         <?php
@@ -113,7 +113,7 @@
     <!-- Etiquetas geradas -->
     <div class="card border-0 shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Pacotes gerados (com etiqueta)</strong>
+            <strong><?= __('admin.shippo.generated_packages','Pacotes gerados (com etiqueta)') ?></strong>
         </div>
         <div class="card-body">
             <!-- Desktop: Table -->
@@ -121,19 +121,19 @@
                 <table class="table table-sm align-middle" id="tabelaEtiquetas">
                     <thead>
                         <tr>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Tracking</th>
-                            <th>Carrier</th>
-                            <th>Peso</th>
-                            <th>PDF</th>
-                            <th>Ações</th>
+                            <th><?= __('admin.shippo.col_order','Pedido') ?></th>
+                            <th><?= __('admin.shippo.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.shippo.col_tracking','Tracking') ?></th>
+                            <th><?= __('admin.shippo.col_carrier','Carrier') ?></th>
+                            <th><?= __('admin.shippo.col_weight','Peso') ?></th>
+                            <th><?= __('admin.shippo.col_pdf','PDF') ?></th>
+                            <th><?= __('admin.shippo.col_actions','Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $etiquetas = isset($etiquetas) && is_array($etiquetas) ? $etiquetas : []; ?>
                         <?php if (empty($etiquetas)): ?>
-                            <tr><td colspan="7" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
+                            <tr><td colspan="7" class="text-muted"><?= __('admin.shippo.no_labels','Nenhuma etiqueta gerada.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($etiquetas as $e): ?>
                                 <?php
@@ -186,7 +186,7 @@
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-warning" onclick="regerarShippo(<?= $pid ?>)" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>
+                                        <button class="btn btn-sm btn-warning" onclick="regerarShippo(<?= $pid ?>)" title="<?= htmlspecialchars(__('admin.shippo.regenerate_label','Regerar etiqueta'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-redo"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -198,7 +198,7 @@
             <!-- Mobile: Cards -->
             <div class="d-md-none">
                 <?php if (empty($etiquetas)): ?>
-                    <div class="text-muted small py-3">Nenhuma etiqueta gerada.</div>
+                    <div class="text-muted small py-3"><?= __('admin.shippo.no_labels','Nenhuma etiqueta gerada.') ?></div>
                 <?php else: ?>
                     <?php foreach ($etiquetas as $e): ?>
                         <?php
@@ -248,7 +248,7 @@ function updateBtnGerarShippo() {
     var btn = document.getElementById('btnGerarShippo');
     var txt = document.getElementById('btnGerarShippoText');
     if (btn) btn.style.display = checked > 0 ? '' : 'none';
-    if (txt) txt.textContent = 'Gerar ' + checked + ' Etiqueta(s)';
+    if (txt) txt.textContent = <?= json_encode(__('admin.shippo.generate_n_labels','Gerar {n} Etiqueta(s)')) ?>.replace('{n}', checked);
 }
 
 // Adicionar listener nos checkboxes
@@ -260,16 +260,16 @@ async function gerarEtiquetasShippoSelecionadas() {
     var checks = document.querySelectorAll('.pedido-check:checked');
     if (checks.length === 0) return;
     var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
-    if (!confirm('Gerar etiquetas Shippo para ' + ids.length + ' pedido(s) selecionados?\n\nO frete será gerado conforme configuração em Configurações > Entrega > Shippo.')) return;
+    if (!confirm(<?= json_encode(__('admin.shippo.confirm_generate','Gerar etiquetas Shippo para {n} pedido(s) selecionados?\n\nO frete será gerado conforme configuração em Configurações > Entrega > Shippo.')) ?>.replace('{n}', ids.length))) return;
 
     var btn = document.getElementById('btnGerarShippo');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + <?= json_encode(__('admin.shippo.generating','Gerando...')) ?>; }
 
     // Overlay
     var overlay = document.createElement('div');
     overlay.id = 'massaOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div style="font-size:1.1rem;font-weight:600;color:#333;">Gerando etiquetas via Shippo...</div><div class="text-muted small mt-2">Não feche esta página</div></div>';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div style="font-size:1.1rem;font-weight:600;color:#333;">' + <?= json_encode(__('admin.shippo.generating_via_shippo','Gerando etiquetas via Shippo...')) ?> + '</div><div class="text-muted small mt-2">' + <?= json_encode(__('admin.shippo.do_not_close','Não feche esta página')) ?> + '</div></div>';
     document.body.appendChild(overlay);
 
     try {
@@ -289,27 +289,27 @@ async function gerarEtiquetasShippoSelecionadas() {
                 if (res.success) {
                     ok++;
                 } else {
-                    erros.push('#' + res.pedido_id + ': ' + (res.error || 'erro'));
+                    erros.push('#' + res.pedido_id + ': ' + (res.error || <?= json_encode(__('admin.shippo.error_generic','erro')) ?>));
                 }
             });
 
-            var msg = ok + ' etiqueta(s) gerada(s) com sucesso.';
-            if (erros.length > 0) msg += '\n\nErros (' + erros.length + '):\n' + erros.slice(0, 10).join('\n');
+            var msg = <?= json_encode(__('admin.shippo.labels_generated_success','{n} etiqueta(s) gerada(s) com sucesso.')) ?>.replace('{n}', ok);
+            if (erros.length > 0) msg += '\n\n' + <?= json_encode(__('admin.shippo.errors_count','Erros ({n}):')) ?>.replace('{n}', erros.length) + '\n' + erros.slice(0, 10).join('\n');
             alert(msg);
             if (ok > 0) setTimeout(function() { location.reload(); }, 1000);
         } else {
-            alert('Erro: ' + ((data && data.error) || 'Resposta inesperada'));
+            alert(<?= json_encode(__('admin.shippo.error_prefix','Erro:')) ?> + ' ' + ((data && data.error) || <?= json_encode(__('admin.shippo.unexpected_response','Resposta inesperada')) ?>));
         }
     } catch (e) {
         var ov = document.getElementById('massaOverlay');
         if (ov) ov.remove();
-        alert('Erro de rede: ' + e.message);
+        alert(<?= json_encode(__('admin.shippo.network_error','Erro de rede:')) ?> + ' ' + e.message);
     }
 
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">Gerar Etiquetas</span>'; updateBtnGerarShippo(); }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">' + <?= json_encode(__('admin.shippo.generate_labels','Gerar Etiquetas')) ?> + '</span>'; updateBtnGerarShippo(); }
 }
 async function regerarShippo(pedidoId) {
-    if (!confirm('Remover etiqueta do pedido #' + pedidoId + '? Você poderá gerar uma nova em seguida.')) return;
+    if (!confirm(<?= json_encode(__('admin.shippo.confirm_remove_label','Remover etiqueta do pedido #{n}? Você poderá gerar uma nova em seguida.')) ?>.replace('{n}', pedidoId))) return;
     try {
         const r = await fetch('/admin/shippo/pedido/' + pedidoId + '/regerar', {
             method: 'POST',
@@ -317,13 +317,13 @@ async function regerarShippo(pedidoId) {
         });
         const data = await r.json();
         if (data && data.success) {
-            alert('Etiqueta removida. Recarregando...');
+            alert(<?= json_encode(__('admin.shippo.label_removed','Etiqueta removida. Recarregando...')) ?>);
             location.reload();
         } else {
-            alert('Erro: ' + (data.error || 'Falha ao regerar'));
+            alert(<?= json_encode(__('admin.shippo.error_prefix','Erro:')) ?> + ' ' + (data.error || <?= json_encode(__('admin.shippo.regenerate_failed','Falha ao regerar')) ?>));
         }
     } catch (e) {
-        alert('Erro de rede: ' + e.message);
+        alert(<?= json_encode(__('admin.shippo.network_error','Erro de rede:')) ?> + ' ' + e.message);
     }
 }
 
@@ -332,7 +332,7 @@ async function regerarShippo(pedidoId) {
 
 <?php
 $content = ob_get_clean();
-$title = 'Shippo - Etiquetas Internacionais';
+$title = __('admin.shippo.title','Shippo - Etiquetas Internacionais');
 $sidebarActive = $sidebarActive ?? 'shippo';
 require __DIR__ . '/../layouts/admin.php';
 ?>

@@ -326,7 +326,7 @@ class AdminNotificacoesController extends Controller {
 
         $evento = (string) $request->getParam('evento', '');
         if ($evento === '') {
-            $this->json(['success' => false, 'error' => 'Evento é obrigatório'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_event_required', 'Evento é obrigatório')], 400);
         }
 
         try {
@@ -692,7 +692,7 @@ class AdminNotificacoesController extends Controller {
         $retries = (string) $request->getParam('webhook_retries', '1');
 
         if ($evento === '' || $url === '') {
-            $this->json(['success' => false, 'error' => 'Evento e URL são obrigatórios'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_event_url_required', 'Evento e URL são obrigatórios')], 400);
         }
 
         $metodo = strtoupper($metodo);
@@ -707,7 +707,7 @@ class AdminNotificacoesController extends Controller {
         if (trim($headers) !== '') {
             $decodedHeaders = json_decode($headers, true);
             if (json_last_error() !== JSON_ERROR_NONE || !is_array($decodedHeaders)) {
-                $this->json(['success' => false, 'error' => 'Headers inválidos (JSON)'], 400);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_invalid_headers', 'Headers inválidos (JSON)')], 400);
             }
             $headersJson = json_encode($decodedHeaders);
         }
@@ -716,7 +716,7 @@ class AdminNotificacoesController extends Controller {
         if (trim($campos) !== '') {
             $decodedCampos = json_decode($campos, true);
             if (json_last_error() !== JSON_ERROR_NONE || !is_array($decodedCampos)) {
-                $this->json(['success' => false, 'error' => 'Campos personalizados inválidos (JSON)'], 400);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_invalid_custom_fields', 'Campos personalizados inválidos (JSON)')], 400);
             }
             $camposJson = json_encode($decodedCampos);
         }
@@ -830,7 +830,7 @@ class AdminNotificacoesController extends Controller {
 
         $id = (int) $logId;
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'ID inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_invalid_id', 'ID inválido')], 400);
         }
 
         try {
@@ -871,7 +871,7 @@ class AdminNotificacoesController extends Controller {
 
         $id = (int) $logId;
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'ID inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_invalid_id', 'ID inválido')], 400);
         }
 
         try {
@@ -886,7 +886,7 @@ class AdminNotificacoesController extends Controller {
             $st->execute([$id]);
             $row = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$row) {
-                $this->json(['success' => false, 'error' => 'Log não encontrado'], 404);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_log_not_found', 'Log não encontrado')], 404);
             }
 
             $this->json(['success' => true, 'log' => $row]);
@@ -904,7 +904,7 @@ class AdminNotificacoesController extends Controller {
 
         $to = (string) ($_SESSION['usuario_email'] ?? '');
         if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-            $this->json(['success' => false, 'error' => 'Email do admin não encontrado na sessão'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_admin_email_not_found', 'Email do admin não encontrado na sessão')], 400);
         }
 
         $fromEmail = (string) $request->getParam('email_remetente', '');
@@ -922,12 +922,12 @@ class AdminNotificacoesController extends Controller {
         $headers[] = 'Content-Type: text/html; charset=UTF-8';
         $headers[] = 'From: =?UTF-8?B?' . base64_encode($fromName) . '?= <' . $fromEmail . '>';
 
-        $subject = 'Teste de e-mail';
-        $html = 'Teste de e-mail enviado em ' . date('Y-m-d H:i:s');
+        $subject = __('admin.notifications.test_email_subject', 'Teste de e-mail');
+        $html = __('admin.notifications.test_email_body', 'Teste de e-mail enviado em {n}', ['n'=>date('Y-m-d H:i:s')]);
 
         $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
         if (!$ok) {
-            $this->json(['success' => false, 'error' => 'Falha ao enviar e-mail (mail())'], 500);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_mail_send_failed', 'Falha ao enviar e-mail (mail())')], 500);
         }
 
         $this->json(['success' => true]);
@@ -938,7 +938,7 @@ class AdminNotificacoesController extends Controller {
 
         $evento = (string) $request->getParam('evento', '');
         if ($evento === '') {
-            $this->json(['success' => false, 'error' => 'Evento é obrigatório'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_event_required', 'Evento é obrigatório')], 400);
         }
 
         try {
@@ -955,7 +955,7 @@ class AdminNotificacoesController extends Controller {
             $webhook = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
             if (empty($webhook['id']) || empty($webhook['url'])) {
-                $this->json(['success' => false, 'error' => 'Webhook não configurado para este evento. Salve a URL primeiro.'], 404);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_webhook_not_configured', 'Webhook não configurado para este evento. Salve a URL primeiro.')], 404);
             }
 
             $url = (string) $webhook['url'];
@@ -1000,7 +1000,7 @@ class AdminNotificacoesController extends Controller {
                 'channel' => 'whatsapp',
                 'evento' => $evento,
                 'to' => '5511999999999',
-                'message' => $template !== '' ? $template : 'Teste de webhook do evento ' . $evento,
+                'message' => $template !== '' ? $template : __('admin.notifications.webhook_test_message', 'Teste de webhook do evento {n}', ['n'=>$evento]),
                 'vars' => [
                     'evento' => $evento,
                     'pedido_id' => 'TEST-123',
@@ -1119,7 +1119,7 @@ class AdminNotificacoesController extends Controller {
         $ativo = (string) $request->getParam('ativo', '1');
 
         if ($evento === '' || trim($assunto) === '' || trim($corpoHtml) === '') {
-            $this->json(['success' => false, 'error' => 'Evento, assunto e conteúdo são obrigatórios'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_event_subject_content_required', 'Evento, assunto e conteúdo são obrigatórios')], 400);
         }
 
         $ativoBool = ($ativo === '1' || $ativo === 1 || $ativo === true) ? 1 : 0;
@@ -1200,7 +1200,7 @@ class AdminNotificacoesController extends Controller {
         $evento = (string) $request->getParam('evento', '');
 
         if ($id <= 0 && $evento === '') {
-            $this->json(['success' => false, 'error' => 'Informe id ou evento'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_provide_id_or_event', 'Informe id ou evento')], 400);
         }
 
         try {
@@ -1221,7 +1221,7 @@ class AdminNotificacoesController extends Controller {
 
             $row = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$row) {
-                $this->json(['success' => false, 'error' => 'Template não encontrado'], 404);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_template_not_found', 'Template não encontrado')], 404);
             }
 
             $this->json(['success' => true, 'template' => $row]);
@@ -1241,7 +1241,7 @@ class AdminNotificacoesController extends Controller {
 
         $evento = (string) $request->getParam('evento', '');
         if ($evento === '') {
-            $this->json(['success' => false, 'error' => 'Evento é obrigatório'], 400);
+            $this->json(['success' => false, 'error' => __('admin.notifications.err_event_required', 'Evento é obrigatório')], 400);
         }
 
         try {
@@ -1261,7 +1261,7 @@ class AdminNotificacoesController extends Controller {
                 $to = $sessionEmail;
             }
             if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-                $this->json(['success' => false, 'error' => 'Informe um email válido para teste (campo Email de teste para), ou configure email_test_to'], 400);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_valid_test_email', 'Informe um email válido para teste (campo Email de teste para), ou configure email_test_to')], 400);
             }
 
             $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
@@ -1270,10 +1270,10 @@ class AdminNotificacoesController extends Controller {
             $tpl = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
             if (empty($tpl['id'])) {
-                $this->json(['success' => false, 'error' => 'Template não encontrado para este evento'], 404);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_template_not_found_for_event', 'Template não encontrado para este evento')], 404);
             }
             if ((string) ($tpl['ativo'] ?? '1') === '0') {
-                $this->json(['success' => false, 'error' => 'Template está desativado'], 400);
+                $this->json(['success' => false, 'error' => __('admin.notifications.err_template_disabled', 'Template está desativado')], 400);
             }
 
             $vars = $this->getEmailVarsTeste($evento);
@@ -1300,7 +1300,7 @@ class AdminNotificacoesController extends Controller {
             } else {
                 $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
                 if (!$ok) {
-                    $this->json(['success' => false, 'error' => 'Falha ao enviar e-mail (mail())'], 500);
+                    $this->json(['success' => false, 'error' => __('admin.notifications.err_mail_send_failed', 'Falha ao enviar e-mail (mail())')], 500);
                 }
             }
 

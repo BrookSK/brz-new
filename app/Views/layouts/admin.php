@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="<?= \App\Core\I18n::getLocaleHtml() ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -286,30 +286,30 @@
             <div class="modal-content" style="border-radius:16px;overflow:hidden;">
                 <div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:32px 24px;text-align:center;">
                     <div style="font-size:48px;margin-bottom:12px;">👋</div>
-                    <h4 style="color:#fff;font-weight:700;margin-bottom:4px;">Bem-vindo ao Painel!</h4>
-                    <p style="color:rgba(255,255,255,.7);font-size:14px;margin:0;">Configure suas preferências para uma melhor experiência.</p>
+                    <h4 style="color:#fff;font-weight:700;margin-bottom:4px;"><?= __('admin.sidebar.welcome_title', 'Bem-vindo ao Painel!') ?></h4>
+                    <p style="color:rgba(255,255,255,.7);font-size:14px;margin:0;"><?= __('admin.sidebar.welcome_subtitle', 'Configure suas preferências para uma melhor experiência.') ?></p>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-4">
-                        <label class="form-label fw-bold"><i class="fas fa-globe me-2 text-primary"></i>Idioma de exibição</label>
+                        <label class="form-label fw-bold"><i class="fas fa-globe me-2 text-primary"></i><?= __('admin.sidebar.display_language', 'Idioma de exibição') ?></label>
                         <select id="wizard_idioma" class="form-select form-select-lg">
                             <option value="pt-BR">Português (Brasil)</option>
                             <option value="en">English</option>
                         </select>
-                        <div class="form-text">Define o idioma dos textos e labels do painel.</div>
+                        <div class="form-text"><?= __('admin.sidebar.language_help', 'Define o idioma dos textos e labels do painel.') ?></div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold"><i class="fas fa-coins me-2 text-success"></i>Moeda padrão de exibição</label>
+                        <label class="form-label fw-bold"><i class="fas fa-coins me-2 text-success"></i><?= __('admin.sidebar.default_display_currency', 'Moeda padrão de exibição') ?></label>
                         <select id="wizard_moeda" class="form-select form-select-lg">
                             <option value="USD">USD — Dólar Americano ($)</option>
                             <option value="BRL">BRL — Real Brasileiro (R$)</option>
                         </select>
-                        <div class="form-text">Define como os valores financeiros serão exibidos por padrão.</div>
+                        <div class="form-text"><?= __('admin.sidebar.currency_help', 'Define como os valores financeiros serão exibidos por padrão.') ?></div>
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center border-0 pb-4">
                     <button type="button" class="btn btn-dark btn-lg px-5" onclick="salvarWizardPrefs()">
-                        <i class="fas fa-check me-2"></i>Confirmar e Entrar
+                        <i class="fas fa-check me-2"></i><?= __('admin.sidebar.confirm_enter', 'Confirmar e Entrar') ?>
                     </button>
                 </div>
             </div>
@@ -332,10 +332,10 @@
                     bootstrap.Modal.getInstance(document.getElementById('wizardPrefsModal')).hide();
                     location.reload();
                 } else {
-                    alert(d.error || 'Erro ao salvar');
+                    alert(d.error || '<?= htmlspecialchars(__('admin.save_error', 'Erro ao salvar'), ENT_QUOTES, 'UTF-8') ?>');
                 }
             })
-            .catch(function(e) { alert('Erro: ' + e.message); });
+            .catch(function(e) { alert('<?= htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') ?>: ' + e.message); });
     }
     </script>
     <?php endif; ?>

@@ -41,7 +41,7 @@ class AdminPreferencesController extends Controller {
         if (session_status() === PHP_SESSION_NONE) session_start();
         $uid = (int) ($_SESSION['usuario_id'] ?? 0);
         if ($uid <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'Não autenticado']);
+            echo json_encode(['ok' => false, 'error' => __('admin.preferences.not_authenticated', 'Não autenticado')]);
             exit;
         }
 

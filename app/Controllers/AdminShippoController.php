@@ -464,38 +464,38 @@ class AdminShippoController extends Controller {
 
         $id = (int) $request->param('id');
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'ID do pedido inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.invalid_order_id', 'ID do pedido inválido.')], 400);
             return;
         }
 
         if (!$this->svc->isConfigured()) {
-            $this->json(['success' => false, 'error' => 'Shippo não configurado. Adicione o token em Configurações.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.not_configured_add_token', 'Shippo não configurado. Adicione o token em Configurações.')], 400);
             return;
         }
 
         $pedido = $this->getPedidoCompleto($id);
         if (!$pedido) {
-            $this->json(['success' => false, 'error' => 'Pedido não encontrado.'], 404);
+            $this->json(['success' => false, 'error' => __('admin.shippo.order_not_found', 'Pedido não encontrado.')], 404);
             return;
         }
 
         // País destino não pode ser Brasil
         $pais = strtoupper(trim((string) ($pedido['_pais'] ?? '')));
         if (in_array($pais, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
-            $this->json(['success' => false, 'error' => 'Shippo não atende envios para o Brasil. Use Correio Internacional.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.no_brazil_shipping', 'Shippo não atende envios para o Brasil. Use Correio Internacional.')], 400);
             return;
         }
 
         // Validar endereço mínimo exigido pela Shippo (evita erro genérico "incomplete address").
         $faltando = [];
-        if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = 'endereço/rua';
-        if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = 'cidade';
-        if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = 'CEP/ZIP';
-        if ($pais === '')                                        $faltando[] = 'país';
+        if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = __('admin.shippo.field_address_street', 'endereço/rua');
+        if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = __('admin.shippo.field_city', 'cidade');
+        if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = __('admin.shippo.field_zip', 'CEP/ZIP');
+        if ($pais === '')                                        $faltando[] = __('admin.shippo.field_country', 'país');
         if (!empty($faltando)) {
             $this->json([
                 'success' => false,
-                'error' => 'Endereço incompleto para envio internacional. Preencha: ' . implode(', ', $faltando) . '. Edite o endereço do pedido e tente novamente.',
+                'error' => __('admin.shippo.incomplete_address', 'Endereço incompleto para envio internacional. Preencha: {fields}. Edite o endereço do pedido e tente novamente.', ['fields' => implode(', ', $faltando)]),
             ], 400);
             return;
         }
@@ -551,7 +551,7 @@ class AdminShippoController extends Controller {
         $result = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customsDeclaration);
 
         if (!$result['success']) {
-            $this->json(['success' => false, 'error' => $result['error'] ?? 'Falha ao criar shipment.'], 400);
+            $this->json(['success' => false, 'error' => $result['error'] ?? __('admin.shippo.create_shipment_failed', 'Falha ao criar shipment.')], 400);
             return;
         }
 
@@ -579,7 +579,7 @@ class AdminShippoController extends Controller {
         $rateId = (string) ($body['rate_id'] ?? '');
 
         if ($id <= 0 || $rateId === '') {
-            $this->json(['success' => false, 'error' => 'Pedido ou rate inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.invalid_order_or_rate', 'Pedido ou rate inválido.')], 400);
             return;
         }
 
@@ -587,7 +587,7 @@ class AdminShippoController extends Controller {
         $result = $this->svc->purchaseLabel($rateId, 'PDF_4x6');
 
         if (!$result['success']) {
-            $this->json(['success' => false, 'error' => $result['error'] ?? 'Falha ao comprar etiqueta.'], 400);
+            $this->json(['success' => false, 'error' => $result['error'] ?? __('admin.shippo.purchase_label_failed', 'Falha ao comprar etiqueta.')], 400);
             return;
         }
 
@@ -631,7 +631,7 @@ class AdminShippoController extends Controller {
                 json_encode($result['data'] ?? []),
             ]);
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => 'Etiqueta gerada mas falhou ao salvar: ' . $e->getMessage()], 500);
+            $this->json(['success' => false, 'error' => __('admin.shippo.label_saved_failed', 'Etiqueta gerada mas falhou ao salvar: ') . $e->getMessage()], 500);
             return;
         }
 
@@ -652,7 +652,7 @@ class AdminShippoController extends Controller {
 
         $id = (int) $request->param('id');
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'ID inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.invalid_id', 'ID inválido.')], 400);
             return;
         }
 
@@ -663,7 +663,7 @@ class AdminShippoController extends Controller {
             $st->execute([$id]);
         } catch (\Exception $e) {}
 
-        $this->json(['success' => true, 'message' => 'Etiqueta removida. Gere uma nova.']);
+        $this->json(['success' => true, 'message' => __('admin.shippo.label_removed_generate_new', 'Etiqueta removida. Gere uma nova.')]);
     }
 
     /**
@@ -677,12 +677,12 @@ class AdminShippoController extends Controller {
         $pedidoIds = $body['pedido_ids'] ?? [];
 
         if (!is_array($pedidoIds) || empty($pedidoIds)) {
-            $this->json(['success' => false, 'error' => 'Nenhum pedido selecionado.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.no_order_selected', 'Nenhum pedido selecionado.')], 400);
             return;
         }
 
         if (!$this->svc->isConfigured()) {
-            $this->json(['success' => false, 'error' => 'Shippo não configurado.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.not_configured', 'Shippo não configurado.')], 400);
             return;
         }
 
@@ -693,27 +693,27 @@ class AdminShippoController extends Controller {
 
             $pedido = $this->getPedidoCompleto($pid);
             if (!$pedido) {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Pedido não encontrado.'];
+                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.order_not_found', 'Pedido não encontrado.')];
                 continue;
             }
 
             $pais = strtoupper(trim((string) ($pedido['_pais'] ?? '')));
             if (in_array($pais, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Destino Brasil não permitido na Shippo.'];
+                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.brazil_not_allowed_shippo', 'Destino Brasil não permitido na Shippo.')];
                 continue;
             }
 
             // Validar endereço mínimo exigido pela Shippo (evita erro genérico "incomplete address").
             $faltando = [];
-            if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = 'endereço/rua';
-            if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = 'cidade';
-            if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = 'CEP/ZIP';
-            if ($pais === '')                                        $faltando[] = 'país';
+            if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = __('admin.shippo.field_address_street', 'endereço/rua');
+            if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = __('admin.shippo.field_city', 'cidade');
+            if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = __('admin.shippo.field_zip', 'CEP/ZIP');
+            if ($pais === '')                                        $faltando[] = __('admin.shippo.field_country', 'país');
             if (!empty($faltando)) {
                 $results[] = [
                     'pedido_id' => $pid,
                     'success' => false,
-                    'error' => 'Endereço incompleto para envio internacional. Preencha: ' . implode(', ', $faltando) . '. Edite o endereço do pedido e tente novamente.',
+                    'error' => __('admin.shippo.incomplete_address', 'Endereço incompleto para envio internacional. Preencha: {fields}. Edite o endereço do pedido e tente novamente.', ['fields' => implode(', ', $faltando)]),
                 ];
                 continue;
             }
@@ -765,7 +765,7 @@ class AdminShippoController extends Controller {
                 // Fluxo 2 etapas com carrier/service pré-definido: cria shipment (PURCHASE) → filtra rate pelo service level → compra
                 $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
                 if (!$shipResult['success']) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? 'Falha no shipment.'];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? __('admin.shippo.shipment_failed', 'Falha no shipment.')];
                     continue;
                 }
 
@@ -795,19 +795,19 @@ class AdminShippoController extends Controller {
                 }
 
                 if (!$matchedRate) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Nenhuma rate disponível para o carrier/serviço configurado.'];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.no_rate_for_carrier', 'Nenhuma rate disponível para o carrier/serviço configurado.')];
                     continue;
                 }
 
                 $rateId = $matchedRate['object_id'] ?? '';
                 if ($rateId === '') {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Rate sem ID.'];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.rate_no_id', 'Rate sem ID.')];
                     continue;
                 }
 
                 $labelResult = $this->svc->purchaseLabel($rateId, $labelFileType ?: 'PDF_4x6');
                 if (!$labelResult['success']) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? 'Falha ao gerar etiqueta.'];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? __('admin.shippo.label_generation_failed', 'Falha ao gerar etiqueta.')];
                     continue;
                 }
 
@@ -843,19 +843,19 @@ class AdminShippoController extends Controller {
                         'label_url' => $labelResult['label_url'] ?? '',
                     ];
                 } catch (\Exception $e) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Falha ao salvar: ' . $e->getMessage()];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.save_failed', 'Falha ao salvar: ') . $e->getMessage()];
                 }
             } else {
                 // Modo cotação: cria shipment, pega rates, escolhe o mais barato
                 $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
                 if (!$shipResult['success']) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? 'Falha no shipment.'];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? __('admin.shippo.shipment_failed', 'Falha no shipment.')];
                     continue;
                 }
 
                 $rates = $shipResult['rates'] ?? [];
                 if (empty($rates)) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Nenhuma rate disponível.'];
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.no_rate_available', 'Nenhuma rate disponível.')];
                     continue;
                 }
 
@@ -866,14 +866,14 @@ class AdminShippoController extends Controller {
             $rateId = $cheapestRate['object_id'] ?? '';
 
             if ($rateId === '') {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Rate sem ID.'];
+                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.rate_no_id', 'Rate sem ID.')];
                 continue;
             }
 
             // Comprar etiqueta
             $labelResult = $this->svc->purchaseLabel($rateId, $labelFileType ?: 'PDF_4x6');
             if (!$labelResult['success']) {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? 'Falha ao gerar etiqueta.'];
+                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? __('admin.shippo.label_generation_failed', 'Falha ao gerar etiqueta.')];
                 continue;
             }
 
@@ -909,7 +909,7 @@ class AdminShippoController extends Controller {
                     'label_url' => $labelResult['label_url'] ?? '',
                 ];
             } catch (\Exception $e) {
-                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => 'Falha ao salvar: ' . $e->getMessage()];
+                $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.save_failed', 'Falha ao salvar: ') . $e->getMessage()];
             }
             } // fim else (modo cotação)
         }
@@ -926,20 +926,20 @@ class AdminShippoController extends Controller {
 
         $id = (int) $request->param('id');
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'ID inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.invalid_id', 'ID inválido.')], 400);
             return;
         }
 
         // Chamar o mesmo fluxo de gerarEtiqueta que retorna rates
         $pedido = $this->getPedidoCompleto($id);
         if (!$pedido) {
-            $this->json(['success' => false, 'error' => 'Pedido não encontrado.'], 404);
+            $this->json(['success' => false, 'error' => __('admin.shippo.order_not_found', 'Pedido não encontrado.')], 404);
             return;
         }
 
         $pais = strtoupper(trim((string) ($pedido['_pais'] ?? '')));
         if (in_array($pais, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
-            $this->json(['success' => false, 'error' => 'Destino Brasil não permitido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.shippo.brazil_not_allowed', 'Destino Brasil não permitido.')], 400);
             return;
         }
 
@@ -982,7 +982,7 @@ class AdminShippoController extends Controller {
         $result = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
 
         if (!$result['success']) {
-            $this->json(['success' => false, 'error' => $result['error'] ?? 'Falha.'], 400);
+            $this->json(['success' => false, 'error' => $result['error'] ?? __('admin.shippo.failure', 'Falha.')], 400);
             return;
         }
 

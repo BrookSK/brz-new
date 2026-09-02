@@ -356,7 +356,7 @@ class AdminMigrationsController extends Controller {
     private function executarArquivo(\PDO $db, string $path): array {
         $sql = file_get_contents($path);
         if ($sql === false) {
-            return [false, 'Não foi possível ler o arquivo', 0];
+            return [false, __('admin.migrations.file_read_error', 'Não foi possível ler o arquivo'), 0];
         }
 
         $statements = $this->splitStatements($sql);
@@ -414,40 +414,39 @@ class AdminMigrationsController extends Controller {
         }
 
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">'
            . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
-           . '<title>Migrations - Braziliana Admin</title>'
+           . '<title>' . htmlspecialchars(__('admin.migrations.page_title', 'Migrations - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>'
            . '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">'
            . '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">'
            . '</head><body class="bg-light"><div class="container py-4">';
 
-        echo '<h1 class="h3 mb-3"><i class="fas fa-database me-2"></i>Migrations do Banco</h1>';
-        echo '<p class="text-muted">Roda todos os SQL de <code>database/migrations/</code> pendentes, em ordem, de forma idempotente. '
-           . 'Arquivos com comandos destrutivos (DROP DATABASE, TRUNCATE, DELETE/UPDATE sem WHERE, GRANT...) são <strong>bloqueados</strong> por segurança e precisam ser rodados manualmente.</p>';
+        echo '<h1 class="h3 mb-3"><i class="fas fa-database me-2"></i>' . __('admin.migrations.heading', 'Migrations do Banco') . '</h1>';
+        echo '<p class="text-muted">' . __('admin.migrations.intro', 'Roda todos os SQL de <code>database/migrations/</code> pendentes, em ordem, de forma idempotente. Arquivos com comandos destrutivos (DROP DATABASE, TRUNCATE, DELETE/UPDATE sem WHERE, GRANT...) são <strong>bloqueados</strong> por segurança e precisam ser rodados manualmente.') . '</p>';
 
         echo '<div class="d-flex gap-3 mb-3 flex-wrap">'
-           . '<span class="badge bg-secondary fs-6">Total: ' . count($arquivos) . '</span>'
-           . '<span class="badge bg-success fs-6">Aplicadas: ' . $aplicadasCount . '</span>'
-           . '<span class="badge bg-warning text-dark fs-6">Pendentes: ' . $pendentes . '</span>'
-           . '<span class="badge bg-danger fs-6">Bloqueadas: ' . $bloqueados . '</span>'
+           . '<span class="badge bg-secondary fs-6">' . __('admin.migrations.total', 'Total: {n}', ['n' => count($arquivos)]) . '</span>'
+           . '<span class="badge bg-success fs-6">' . __('admin.migrations.applied', 'Aplicadas: {n}', ['n' => $aplicadasCount]) . '</span>'
+           . '<span class="badge bg-warning text-dark fs-6">' . __('admin.migrations.pending', 'Pendentes: {n}', ['n' => $pendentes]) . '</span>'
+           . '<span class="badge bg-danger fs-6">' . __('admin.migrations.blocked', 'Bloqueadas: {n}', ['n' => $bloqueados]) . '</span>'
            . '</div>';
 
-        echo '<form method="POST" action="/admin/migrations/run" onsubmit="this.querySelector(\'button\').disabled=true;this.querySelector(\'button\').innerHTML=\'<span class=\\\'spinner-border spinner-border-sm me-2\\\'></span>Rodando...\';">'
+        echo '<form method="POST" action="/admin/migrations/run" onsubmit="this.querySelector(\'button\').disabled=true;this.querySelector(\'button\').innerHTML=\'<span class=\\\'spinner-border spinner-border-sm me-2\\\'></span>' . htmlspecialchars(__('admin.migrations.running', 'Rodando...'), ENT_QUOTES, 'UTF-8') . '\';">'
            . '<button type="submit" class="btn btn-primary mb-4"' . ($pendentes === 0 ? ' disabled' : '') . '>'
-           . '<i class="fas fa-play me-1"></i>Rodar ' . $pendentes . ' migration(s) pendente(s)</button></form>';
+           . '<i class="fas fa-play me-1"></i>' . __('admin.migrations.run_pending', 'Rodar {n} migration(s) pendente(s)', ['n' => $pendentes]) . '</button></form>';
 
         echo '<div class="table-responsive"><table class="table table-sm table-striped align-middle">'
-           . '<thead><tr><th>#</th><th>Arquivo</th><th>Status</th><th>Observação</th></tr></thead><tbody>';
+           . '<thead><tr><th>#</th><th>' . __('admin.migrations.col_file', 'Arquivo') . '</th><th>' . __('admin.migrations.col_status', 'Status') . '</th><th>' . __('admin.migrations.col_note', 'Observação') . '</th></tr></thead><tbody>';
         $i = 1;
         foreach ($arquivos as $a) {
             if ($a['bloqueado']) {
-                $badge = '<span class="badge bg-danger">Bloqueada</span>';
+                $badge = '<span class="badge bg-danger">' . __('admin.migrations.status_blocked', 'Bloqueada') . '</span>';
                 $obs = htmlspecialchars(implode(', ', $a['motivos']), ENT_QUOTES, 'UTF-8');
             } elseif (!empty($aplicadas[$a['name']])) {
-                $badge = '<span class="badge bg-success">Aplicada</span>';
+                $badge = '<span class="badge bg-success">' . __('admin.migrations.status_applied', 'Aplicada') . '</span>';
                 $obs = '';
             } else {
-                $badge = '<span class="badge bg-warning text-dark">Pendente</span>';
+                $badge = '<span class="badge bg-warning text-dark">' . __('admin.migrations.status_pending', 'Pendente') . '</span>';
                 $obs = '';
             }
             echo '<tr><td>' . ($i++) . '</td><td><code>' . htmlspecialchars($a['name'], ENT_QUOTES, 'UTF-8') . '</code></td><td>' . $badge . '</td><td class="small text-danger">' . $obs . '</td></tr>';
@@ -492,7 +491,7 @@ class AdminMigrationsController extends Controller {
             // Bloqueadas por segurança: nunca executa, apenas reporta
             if ($a['bloqueado']) {
                 $bloqueadas++;
-                $resultados[] = ['name' => $a['name'], 'status' => 'bloqueada', 'msg' => 'Não executada — ' . implode(', ', $a['motivos'])];
+                $resultados[] = ['name' => $a['name'], 'status' => 'bloqueada', 'msg' => __('admin.migrations.not_executed', 'Não executada — {reasons}', ['reasons' => implode(', ', $a['motivos'])])];
                 continue;
             }
 
@@ -506,7 +505,7 @@ class AdminMigrationsController extends Controller {
             if ($ok) {
                 $stMark->execute([$a['name']]);
                 $rodadas++;
-                $resultados[] = ['name' => $a['name'], 'status' => 'ok', 'msg' => $count . ' statement(s)'];
+                $resultados[] = ['name' => $a['name'], 'status' => 'ok', 'msg' => __('admin.migrations.statements_count', '{n} statement(s)', ['n' => $count])];
             } else {
                 $falhas++;
                 $resultados[] = ['name' => $a['name'], 'status' => 'erro', 'msg' => $erro];
@@ -516,36 +515,35 @@ class AdminMigrationsController extends Controller {
         }
 
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
-           . '<title>Migrations - Resultado</title>'
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">'
+           . '<title>' . htmlspecialchars(__('admin.migrations.result_page_title', 'Migrations - Resultado'), ENT_QUOTES, 'UTF-8') . '</title>'
            . '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">'
            . '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">'
            . '</head><body class="bg-light"><div class="container py-4">';
 
-        echo '<h1 class="h3 mb-3"><i class="fas fa-database me-2"></i>Resultado das Migrations</h1>';
+        echo '<h1 class="h3 mb-3"><i class="fas fa-database me-2"></i>' . __('admin.migrations.result_heading', 'Resultado das Migrations') . '</h1>';
         echo '<div class="d-flex gap-3 mb-3 flex-wrap">'
-           . '<span class="badge bg-success fs-6">Rodadas: ' . $rodadas . '</span>'
-           . '<span class="badge bg-secondary fs-6">Já aplicadas: ' . $puladas . '</span>'
-           . '<span class="badge bg-danger fs-6">Bloqueadas: ' . $bloqueadas . '</span>'
-           . '<span class="badge bg-dark fs-6">Falhas: ' . $falhas . '</span>'
+           . '<span class="badge bg-success fs-6">' . __('admin.migrations.ran', 'Rodadas: {n}', ['n' => $rodadas]) . '</span>'
+           . '<span class="badge bg-secondary fs-6">' . __('admin.migrations.already_applied', 'Já aplicadas: {n}', ['n' => $puladas]) . '</span>'
+           . '<span class="badge bg-danger fs-6">' . __('admin.migrations.blocked', 'Bloqueadas: {n}', ['n' => $bloqueadas]) . '</span>'
+           . '<span class="badge bg-dark fs-6">' . __('admin.migrations.failures', 'Falhas: {n}', ['n' => $falhas]) . '</span>'
            . '</div>';
 
         if ($falhas > 0) {
-            echo '<div class="alert alert-danger">Parei na primeira falha. Corrija o erro abaixo e rode novamente '
-               . '(as que já passaram não vão repetir).</div>';
+            echo '<div class="alert alert-danger">' . __('admin.migrations.stopped_on_failure', 'Parei na primeira falha. Corrija o erro abaixo e rode novamente (as que já passaram não vão repetir).') . '</div>';
         } else {
-            echo '<div class="alert alert-success">Migrations pendentes aplicadas. '
-               . ($bloqueadas > 0 ? 'As bloqueadas por segurança precisam ser revisadas e rodadas manualmente.' : '') . '</div>';
+            echo '<div class="alert alert-success">' . __('admin.migrations.pending_applied', 'Migrations pendentes aplicadas.') . ' '
+               . ($bloqueadas > 0 ? __('admin.migrations.blocked_need_manual', 'As bloqueadas por segurança precisam ser revisadas e rodadas manualmente.') : '') . '</div>';
         }
 
         if (!empty($resultados)) {
             echo '<div class="table-responsive"><table class="table table-sm align-middle">'
-               . '<thead><tr><th>Arquivo</th><th>Status</th><th>Detalhe</th></tr></thead><tbody>';
+               . '<thead><tr><th>' . __('admin.migrations.col_file', 'Arquivo') . '</th><th>' . __('admin.migrations.col_status', 'Status') . '</th><th>' . __('admin.migrations.col_detail', 'Detalhe') . '</th></tr></thead><tbody>';
             foreach ($resultados as $r) {
                 switch ($r['status']) {
-                    case 'ok':        $badge = '<span class="badge bg-success">OK</span>'; break;
-                    case 'bloqueada': $badge = '<span class="badge bg-danger">BLOQUEADA</span>'; break;
-                    default:          $badge = '<span class="badge bg-dark">ERRO</span>'; break;
+                    case 'ok':        $badge = '<span class="badge bg-success">' . __('admin.migrations.badge_ok', 'OK') . '</span>'; break;
+                    case 'bloqueada': $badge = '<span class="badge bg-danger">' . __('admin.migrations.badge_blocked', 'BLOQUEADA') . '</span>'; break;
+                    default:          $badge = '<span class="badge bg-dark">' . __('admin.migrations.badge_error', 'ERRO') . '</span>'; break;
                 }
                 echo '<tr><td><code>' . htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8') . '</code></td>'
                    . '<td>' . $badge . '</td>'
@@ -553,10 +551,10 @@ class AdminMigrationsController extends Controller {
             }
             echo '</tbody></table></div>';
         } else {
-            echo '<p class="text-muted">Nenhuma migration pendente.</p>';
+            echo '<p class="text-muted">' . __('admin.migrations.no_pending', 'Nenhuma migration pendente.') . '</p>';
         }
 
-        echo '<a href="/admin/migrations" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>';
+        echo '<a href="/admin/migrations" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('admin.migrations.back', 'Voltar') . '</a>';
         echo '</div></body></html>';
         exit;
     }

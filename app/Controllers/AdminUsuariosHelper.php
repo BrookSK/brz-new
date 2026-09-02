@@ -286,7 +286,7 @@ class AdminUsuariosHelper {
             }
             $allowMissingDocumento = !empty($dados['_allow_missing_documento']);
             if (in_array('documento', $colunas) && empty($documento) && !$allowMissingDocumento) {
-                throw new \Exception('Documento é obrigatório');
+                throw new \Exception(__('admin.users.document_required', 'Documento é obrigatório'));
             }
 
             $insertCols = [];
@@ -339,7 +339,7 @@ class AdminUsuariosHelper {
             }
 
             if (empty($insertCols)) {
-                throw new \Exception('Nenhuma coluna válida encontrada para criar usuário');
+                throw new \Exception(__('admin.users.no_valid_columns_create', 'Nenhuma coluna válida encontrada para criar usuário'));
             }
 
             $sql = 'INSERT INTO usuarios (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $placeholders) . ')';
@@ -362,7 +362,7 @@ class AdminUsuariosHelper {
             return $usuarioId;
             
         } catch (\Exception $e) {
-            throw new \Exception('Erro ao criar usuário: ' . $e->getMessage());
+            throw new \Exception(__('admin.users.create_error', 'Erro ao criar usuário:') . ' ' . $e->getMessage());
         }
     }
     
@@ -429,7 +429,7 @@ class AdminUsuariosHelper {
             }
 
             if (empty($setParts)) {
-                throw new \Exception('Nenhuma coluna válida encontrada para atualizar usuário');
+                throw new \Exception(__('admin.users.no_valid_columns_update', 'Nenhuma coluna válida encontrada para atualizar usuário'));
             }
 
             $sql = 'UPDATE usuarios SET ' . implode(', ', $setParts) . ' WHERE id = ?';
@@ -440,7 +440,7 @@ class AdminUsuariosHelper {
             return $stmt->rowCount() > 0;
             
         } catch (\Exception $e) {
-            throw new \Exception('Erro ao atualizar usuário: ' . $e->getMessage());
+            throw new \Exception(__('admin.users.update_error', 'Erro ao atualizar usuário:') . ' ' . $e->getMessage());
         }
     }
 
@@ -499,7 +499,7 @@ class AdminUsuariosHelper {
             
         } catch (\Exception $e) {
             $this->pdo->rollBack();
-            throw new \Exception('Erro ao excluir usuário: ' . $e->getMessage());
+            throw new \Exception(__('admin.users.delete_error', 'Erro ao excluir usuário:') . ' ' . $e->getMessage());
         }
     }
     

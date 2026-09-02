@@ -14,7 +14,7 @@ class AdminCopilotoController extends Controller {
         $configs = $this->carregarConfigs($pdo);
         $stats = $this->carregarEstatisticas($pdo);
 
-        $title = 'Co-Piloto Braziliana — Configurações';
+        $title = __('admin.copilot.config_title', 'Co-Piloto Braziliana — Configurações');
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -56,7 +56,7 @@ class AdminCopilotoController extends Controller {
             $this->salvarConfig($pdo, $chave, $valor);
         }
 
-        $_SESSION['flash_success'] = 'Configurações do Co-Piloto salvas com sucesso.';
+        $_SESSION['flash_success'] = __('admin.copilot.config_saved', 'Configurações do Co-Piloto salvas com sucesso.');
         header('Location: /admin/copiloto');
         exit;
     }
@@ -93,7 +93,7 @@ class AdminCopilotoController extends Controller {
             $contadores[$row['status']] = (int) $row['total'];
         }
 
-        $title = 'Co-Piloto — Aprendizado da IA';
+        $title = __('admin.copilot.learning_title', 'Co-Piloto — Aprendizado da IA');
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -108,7 +108,7 @@ class AdminCopilotoController extends Controller {
     public function aceitarPendencia(Request $request) {
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            $_SESSION['flash_error'] = 'ID inválido.';
+            $_SESSION['flash_error'] = __('admin.copilot.invalid_id', 'ID inválido.');
             header('Location: /admin/copiloto/aprendizado');
             exit;
         }
@@ -117,7 +117,7 @@ class AdminCopilotoController extends Controller {
         $st = $pdo->prepare("UPDATE copiloto_aprendizado SET status = 'aceita', atualizado_em = NOW() WHERE id = ?");
         $st->execute([$id]);
 
-        $_SESSION['flash_success'] = 'Pendência aceita com sucesso.';
+        $_SESSION['flash_success'] = __('admin.copilot.pending_accepted', 'Pendência aceita com sucesso.');
         header('Location: /admin/copiloto/aprendizado');
         exit;
     }
@@ -128,7 +128,7 @@ class AdminCopilotoController extends Controller {
     public function recusarPendencia(Request $request) {
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            $_SESSION['flash_error'] = 'ID inválido.';
+            $_SESSION['flash_error'] = __('admin.copilot.invalid_id', 'ID inválido.');
             header('Location: /admin/copiloto/aprendizado');
             exit;
         }
@@ -137,7 +137,7 @@ class AdminCopilotoController extends Controller {
         $st = $pdo->prepare("UPDATE copiloto_aprendizado SET status = 'recusada', atualizado_em = NOW() WHERE id = ?");
         $st->execute([$id]);
 
-        $_SESSION['flash_success'] = 'Pendência recusada.';
+        $_SESSION['flash_success'] = __('admin.copilot.pending_rejected', 'Pendência recusada.');
         header('Location: /admin/copiloto/aprendizado');
         exit;
     }
@@ -152,7 +152,7 @@ class AdminCopilotoController extends Controller {
         $st = $pdo->query("SELECT * FROM copiloto_conteudo ORDER BY criado_em DESC");
         $arquivos = $st->fetchAll(\PDO::FETCH_ASSOC);
 
-        $title = 'Co-Piloto — Conteúdo de Referência';
+        $title = __('admin.copilot.content_title', 'Co-Piloto — Conteúdo de Referência');
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -169,7 +169,7 @@ class AdminCopilotoController extends Controller {
         $this->garantirTabela($pdo, 'copiloto_conteudo');
 
         if (empty($_FILES['arquivo']) || $_FILES['arquivo']['error'] !== UPLOAD_ERR_OK) {
-            $_SESSION['flash_error'] = 'Erro no upload do arquivo.';
+            $_SESSION['flash_error'] = __('admin.copilot.upload_error', 'Erro no upload do arquivo.');
             header('Location: /admin/copiloto/conteudo');
             exit;
         }
@@ -179,13 +179,13 @@ class AdminCopilotoController extends Controller {
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
         if (!in_array($ext, $extensoesPermitidas)) {
-            $_SESSION['flash_error'] = 'Formato não suportado. Use: PDF, DOCX, TXT ou MD.';
+            $_SESSION['flash_error'] = __('admin.copilot.unsupported_format', 'Formato não suportado. Use: PDF, DOCX, TXT ou MD.');
             header('Location: /admin/copiloto/conteudo');
             exit;
         }
 
         if ($file['size'] > 50 * 1024 * 1024) {
-            $_SESSION['flash_error'] = 'Arquivo excede o limite de 50MB.';
+            $_SESSION['flash_error'] = __('admin.copilot.file_too_large', 'Arquivo excede o limite de 50MB.');
             header('Location: /admin/copiloto/conteudo');
             exit;
         }
@@ -218,7 +218,7 @@ class AdminCopilotoController extends Controller {
             $ativarImediatamente
         ]);
 
-        $_SESSION['flash_success'] = 'Arquivo enviado. O processamento será feito pelo backend do Co-Piloto.';
+        $_SESSION['flash_success'] = __('admin.copilot.file_uploaded', 'Arquivo enviado. O processamento será feito pelo backend do Co-Piloto.');
         header('Location: /admin/copiloto/conteudo');
         exit;
     }
@@ -229,7 +229,7 @@ class AdminCopilotoController extends Controller {
     public function conteudoRemover(Request $request) {
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            $_SESSION['flash_error'] = 'ID inválido.';
+            $_SESSION['flash_error'] = __('admin.copilot.invalid_id', 'ID inválido.');
             header('Location: /admin/copiloto/conteudo');
             exit;
         }
@@ -249,7 +249,7 @@ class AdminCopilotoController extends Controller {
 
         $pdo->prepare("DELETE FROM copiloto_conteudo WHERE id = ?")->execute([$id]);
 
-        $_SESSION['flash_success'] = 'Conteúdo removido.';
+        $_SESSION['flash_success'] = __('admin.copilot.content_removed', 'Conteúdo removido.');
         header('Location: /admin/copiloto/conteudo');
         exit;
     }
@@ -260,7 +260,7 @@ class AdminCopilotoController extends Controller {
     public function conteudoToggle(Request $request) {
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            $_SESSION['flash_error'] = 'ID inválido.';
+            $_SESSION['flash_error'] = __('admin.copilot.invalid_id', 'ID inválido.');
             header('Location: /admin/copiloto/conteudo');
             exit;
         }
@@ -268,7 +268,7 @@ class AdminCopilotoController extends Controller {
         $pdo = Database::getConnection();
         $pdo->prepare("UPDATE copiloto_conteudo SET ativo = NOT ativo, atualizado_em = NOW() WHERE id = ?")->execute([$id]);
 
-        $_SESSION['flash_success'] = 'Status atualizado.';
+        $_SESSION['flash_success'] = __('admin.copilot.status_updated', 'Status atualizado.');
         header('Location: /admin/copiloto/conteudo');
         exit;
     }
@@ -294,7 +294,7 @@ class AdminCopilotoController extends Controller {
             $contadores[$row['status']] = (int) $row['total'];
         }
 
-        $title = 'Co-Piloto — Cancelamentos';
+        $title = __('admin.copilot.cancellations_title', 'Co-Piloto — Cancelamentos');
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -313,7 +313,7 @@ class AdminCopilotoController extends Controller {
         $st = $pdo->prepare("UPDATE copiloto_cancelamentos SET status = 'autorizado', processado_em = NOW() WHERE id = ? AND status = 'aguardando_revisao'");
         $st->execute([$id]);
 
-        $_SESSION['flash_success'] = 'Cancelamento autorizado. O reembolso será processado pelo backend.';
+        $_SESSION['flash_success'] = __('admin.copilot.cancellation_authorized', 'Cancelamento autorizado. O reembolso será processado pelo backend.');
         header('Location: /admin/copiloto/cancelamentos');
         exit;
     }
@@ -329,7 +329,7 @@ class AdminCopilotoController extends Controller {
         $st = $pdo->prepare("UPDATE copiloto_cancelamentos SET status = 'recusado', motivo_recusa = ?, processado_em = NOW() WHERE id = ? AND status = 'aguardando_revisao'");
         $st->execute([$motivo ?: null, $id]);
 
-        $_SESSION['flash_success'] = 'Cancelamento recusado.';
+        $_SESSION['flash_success'] = __('admin.copilot.cancellation_rejected', 'Cancelamento recusado.');
         header('Location: /admin/copiloto/cancelamentos');
         exit;
     }
@@ -598,7 +598,7 @@ class AdminCopilotoController extends Controller {
             $perguntas_frequentes = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $title = 'Co-Piloto — Analytics';
+        $title = __('admin.copilot.analytics_title', 'Co-Piloto — Analytics');
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -697,7 +697,7 @@ class AdminCopilotoController extends Controller {
 
         $totalPaginas = ceil($total / $porPagina);
 
-        $title = 'Co-Piloto — Conversas';
+        $title = __('admin.copilot.conversations_title', 'Co-Piloto — Conversas');
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -725,7 +725,7 @@ class AdminCopilotoController extends Controller {
         $sessao = $st->fetch(\PDO::FETCH_ASSOC);
 
         if (!$sessao) {
-            $_SESSION['flash_error'] = 'Sessão não encontrada.';
+            $_SESSION['flash_error'] = __('admin.copilot.session_not_found', 'Sessão não encontrada.');
             header('Location: /admin/copiloto/conversas');
             exit;
         }
@@ -735,7 +735,7 @@ class AdminCopilotoController extends Controller {
         $stM->execute([$sessaoId]);
         $mensagens = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        $title = 'Conversa — ' . ($sessao['usuario_nome'] ?: 'Visitante');
+        $title = __('admin.copilot.conversation_title', 'Conversa — {name}', ['name' => ($sessao['usuario_nome'] ?: __('admin.copilot.visitor', 'Visitante'))]);
         $sidebarActive = 'copiloto';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();

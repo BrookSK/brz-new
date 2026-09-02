@@ -37,7 +37,7 @@ class AdminBackupController extends Controller {
         $tipo = strtolower(trim((string) $tipo));
         if ($tipo !== 'db' && $tipo !== 'files') {
             http_response_code(400);
-            echo 'Tipo inválido';
+            echo htmlspecialchars(__('admin.backup.invalid_type', 'Tipo inválido'), ENT_QUOTES, 'UTF-8');
             exit;
         }
 
@@ -51,13 +51,13 @@ class AdminBackupController extends Controller {
 
             if ($path === '' || !file_exists($path) || !is_file($path)) {
                 http_response_code(404);
-                echo 'Arquivo não encontrado';
+                echo htmlspecialchars(__('admin.backup.file_not_found', 'Arquivo não encontrado'), ENT_QUOTES, 'UTF-8');
                 exit;
             }
 
             if (!$this->isPathInside($backupDir, $path)) {
                 http_response_code(403);
-                echo 'Acesso negado';
+                echo htmlspecialchars(__('admin.backup.access_denied', 'Acesso negado'), ENT_QUOTES, 'UTF-8');
                 exit;
             }
 
@@ -82,7 +82,7 @@ class AdminBackupController extends Controller {
             $fh = fopen($path, 'rb');
             if ($fh === false) {
                 http_response_code(500);
-                echo 'Erro ao abrir arquivo';
+                echo htmlspecialchars(__('admin.backup.file_open_error', 'Erro ao abrir arquivo'), ENT_QUOTES, 'UTF-8');
                 exit;
             }
             fpassthru($fh);
@@ -90,7 +90,7 @@ class AdminBackupController extends Controller {
             exit;
         } catch (\Throwable $e) {
             http_response_code(500);
-            echo 'Erro ao preparar download: ' . $e->getMessage();
+            echo htmlspecialchars(__('admin.backup.download_prepare_error', 'Erro ao preparar download: {msg}', ['msg' => $e->getMessage()]), ENT_QUOTES, 'UTF-8');
             exit;
         }
     }
@@ -118,11 +118,11 @@ class AdminBackupController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backup - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.backup.page_title', 'Backup - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -144,61 +144,61 @@ class AdminBackupController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Backup do Sistema</h1>
+                <h1 class="page-title">' . __('admin.backup.heading', 'Backup do Sistema') . '</h1>
             </div>';
 
         echo '<div class="alert alert-info">
-            <div class="fw-semibold mb-1">Restauração de arquivos do sistema</div>
-            <div>Os arquivos do sistema são versionados via GitHub/Git. Para restaurar arquivos, utilize o fluxo de revert/rollback no repositório. Este módulo restaura apenas o banco de dados.</div>
+            <div class="fw-semibold mb-1">' . __('admin.backup.restore_files_title', 'Restauração de arquivos do sistema') . '</div>
+            <div>' . __('admin.backup.restore_files_desc', 'Os arquivos do sistema são versionados via GitHub/Git. Para restaurar arquivos, utilize o fluxo de revert/rollback no repositório. Este módulo restaura apenas o banco de dados.') . '</div>
         </div>';
 
         echo '<div class="row g-4">
             <div class="col-lg-6">
                 <div class="card">
                     <div class="card-header d-flex align-items-center justify-content-between">
-                        <div class="fw-semibold"><i class="fas fa-sliders-h me-2"></i>Configurações</div>
+                        <div class="fw-semibold"><i class="fas fa-sliders-h me-2"></i>' . __('admin.backup.settings', 'Configurações') . '</div>
                     </div>
                     <div class="card-body">
                         <form method="POST" action="/admin/backup/salvar">
                             <div class="mb-3">
-                                <label class="form-label">Recorrência</label>
+                                <label class="form-label">' . __('admin.backup.recurrence', 'Recorrência') . '</label>
                                 <select class="form-select" name="recorrencia">
-                                    <option value="diaria" ' . ($rec === 'diaria' ? 'selected' : '') . '>Diária</option>
-                                    <option value="semanal" ' . ($rec === 'semanal' ? 'selected' : '') . '>Semanal</option>
-                                    <option value="mensal" ' . ($rec === 'mensal' ? 'selected' : '') . '>Mensal</option>
+                                    <option value="diaria" ' . ($rec === 'diaria' ? 'selected' : '') . '>' . __('admin.backup.recurrence_daily', 'Diária') . '</option>
+                                    <option value="semanal" ' . ($rec === 'semanal' ? 'selected' : '') . '>' . __('admin.backup.recurrence_weekly', 'Semanal') . '</option>
+                                    <option value="mensal" ' . ($rec === 'mensal' ? 'selected' : '') . '>' . __('admin.backup.recurrence_monthly', 'Mensal') . '</option>
                                 </select>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Horário do backup</label>
+                                <label class="form-label">' . __('admin.backup.schedule_time', 'Horário do backup') . '</label>
                                 <input class="form-control" type="time" name="horario" value="' . htmlspecialchars(substr($horario, 0, 5), ENT_QUOTES, 'UTF-8') . '">
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Quantos backups reter</label>
+                                <label class="form-label">' . __('admin.backup.retain_count', 'Quantos backups reter') . '</label>
                                 <input class="form-control" type="number" min="1" max="365" name="reter_quantidade" value="' . (int) $reter . '">
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Token do CRON</label>
+                                <label class="form-label">' . __('admin.backup.cron_token', 'Token do CRON') . '</label>
                                 <input class="form-control" type="text" name="cron_token" value="' . $token . '">
-                                <div class="form-text">Use esse token no agendamento para chamar a URL do cron com segurança.</div>
+                                <div class="form-text">' . __('admin.backup.cron_token_help', 'Use esse token no agendamento para chamar a URL do cron com segurança.') . '</div>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Pasta onde salva</label>
+                                <label class="form-label">' . __('admin.backup.save_folder', 'Pasta onde salva') . '</label>
                                 <input class="form-control" type="text" name="pasta_backup" value="' . $pasta . '">
-                                <div class="form-text">A pasta será criada automaticamente (se possível).</div>
+                                <div class="form-text">' . __('admin.backup.save_folder_help', 'A pasta será criada automaticamente (se possível).') . '</div>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">URL do CRON</label>
+                                <label class="form-label">' . __('admin.backup.cron_url', 'URL do CRON') . '</label>
                                 <input class="form-control" type="text" readonly value="' . $cronUrlEsc . '">
                             </div>
 
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar</button>
-                                <a class="btn btn-outline-secondary" href="/admin/backup"><i class="fas fa-rotate me-1"></i>Recarregar</a>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>' . __('admin.backup.save', 'Salvar') . '</button>
+                                <a class="btn btn-outline-secondary" href="/admin/backup"><i class="fas fa-rotate me-1"></i>' . __('admin.backup.reload', 'Recarregar') . '</a>
                             </div>
                         </form>
                     </div>
@@ -208,16 +208,16 @@ class AdminBackupController extends Controller {
             <div class="col-lg-6">
                 <div class="card">
                     <div class="card-header d-flex align-items-center justify-content-between">
-                        <div class="fw-semibold"><i class="fas fa-bolt me-2"></i>Ações</div>
+                        <div class="fw-semibold"><i class="fas fa-bolt me-2"></i>' . __('admin.backup.actions', 'Ações') . '</div>
                     </div>
                     <div class="card-body">
                         <form method="POST" action="/admin/backup/agora" class="mb-3" id="backupNowForm">
                             <button type="submit" class="btn btn-success" id="backupNowBtn">
-                                <span class="backup-now-idle"><i class="fas fa-play me-1"></i>Fazer backup agora</span>
-                                <span class="backup-now-loading" style="display:none;"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Fazendo backup...</span>
+                                <span class="backup-now-idle"><i class="fas fa-play me-1"></i>' . __('admin.backup.run_now', 'Fazer backup agora') . '</span>
+                                <span class="backup-now-loading" style="display:none;"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' . __('admin.backup.running', 'Fazendo backup...') . '</span>
                             </button>
                         </form>
-                        <div class="text-muted small">O backup cria um dump do banco (.sql) e um .zip dos arquivos (somente referência). A restauração atua apenas no banco.</div>
+                        <div class="text-muted small">' . __('admin.backup.actions_help', 'O backup cria um dump do banco (.sql) e um .zip dos arquivos (somente referência). A restauração atua apenas no banco.') . '</div>
                     </div>
                 </div>
             </div>
@@ -225,23 +225,23 @@ class AdminBackupController extends Controller {
 
         echo '<div class="card mt-4">
             <div class="card-header d-flex align-items-center justify-content-between">
-                <div class="fw-semibold"><i class="fas fa-clock-rotate-left me-2"></i>Backups realizados</div>
+                <div class="fw-semibold"><i class="fas fa-clock-rotate-left me-2"></i>' . __('admin.backup.completed_backups', 'Backups realizados') . '</div>
             </div>
             <div class="card-body">';
 
         if (empty($runs)) {
-            echo '<div class="text-muted">Nenhum backup registrado.</div>';
+            echo '<div class="text-muted">' . __('admin.backup.no_backups', 'Nenhum backup registrado.') . '</div>';
         } else {
             echo '<div class="table-responsive">
                 <table class="table table-striped align-middle">
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Data/Hora</th>
-                            <th>DB</th>
-                            <th>Arquivos (referência)</th>
-                            <th>Status</th>
-                            <th class="text-end">Ações</th>
+                            <th>' . __('admin.backup.col_id', 'ID') . '</th>
+                            <th>' . __('admin.backup.col_datetime', 'Data/Hora') . '</th>
+                            <th>' . __('admin.backup.col_db', 'DB') . '</th>
+                            <th>' . __('admin.backup.col_files', 'Arquivos (referência)') . '</th>
+                            <th>' . __('admin.backup.col_status', 'Status') . '</th>
+                            <th class="text-end">' . __('admin.backup.col_actions', 'Ações') . '</th>
                         </tr>
                     </thead>
                     <tbody>';
@@ -260,16 +260,16 @@ class AdminBackupController extends Controller {
 
                 $createdFmt = $created !== '' ? date('d/m/Y H:i', strtotime($created)) : '-';
                 $statusBadge = $status === 'ok'
-                    ? '<span class="badge bg-success">OK</span>'
-                    : '<span class="badge bg-danger">Erro</span>';
+                    ? '<span class="badge bg-success">' . __('admin.backup.status_ok', 'OK') . '</span>'
+                    : '<span class="badge bg-danger">' . __('admin.backup.status_error', 'Erro') . '</span>';
 
                 $dbDownload = '';
                 if ($dbPath !== '' && file_exists($dbPath) && is_file($dbPath)) {
-                    $dbDownload = '<a class="ms-2 text-decoration-none" href="/admin/backup/download/' . $id . '/db" title="Download DB"><i class="fas fa-download"></i></a>';
+                    $dbDownload = '<a class="ms-2 text-decoration-none" href="/admin/backup/download/' . $id . '/db" title="' . htmlspecialchars(__('admin.backup.download_db', 'Download DB'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download"></i></a>';
                 }
                 $zipDownload = '';
                 if ($zipPath !== '' && file_exists($zipPath) && is_file($zipPath)) {
-                    $zipDownload = '<a class="ms-2 text-decoration-none" href="/admin/backup/download/' . $id . '/files" title="Download arquivos"><i class="fas fa-download"></i></a>';
+                    $zipDownload = '<a class="ms-2 text-decoration-none" href="/admin/backup/download/' . $id . '/files" title="' . htmlspecialchars(__('admin.backup.download_files', 'Download arquivos'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download"></i></a>';
                 }
 
                 echo '<tr>
@@ -288,18 +288,18 @@ class AdminBackupController extends Controller {
                         <form method="POST" action="/admin/backup/restaurar/' . $id . '" style="display:inline-block" class="restoreForm" data-backup-id="' . $id . '">
                             <input type="hidden" name="tipo" value="db">
                             <div class="input-group input-group-sm" style="width: 260px; display:inline-flex;">
-                                <select class="form-select" name="tipo_select" aria-label="Tipo de restauração">
-                                    <option value="db" selected>Restaurar banco</option>
-                                    <option value="files">Restaurar arquivos</option>
+                                <select class="form-select" name="tipo_select" aria-label="' . htmlspecialchars(__('admin.backup.restore_type', 'Tipo de restauração'), ENT_QUOTES, 'UTF-8') . '">
+                                    <option value="db" selected>' . __('admin.backup.restore_db', 'Restaurar banco') . '</option>
+                                    <option value="files">' . __('admin.backup.restore_files', 'Restaurar arquivos') . '</option>
                                 </select>
                                 <button type="submit" class="btn btn-warning"><i class="fas fa-rotate-left"></i></button>
                             </div>
                         </form>
-                        <form method="POST" action="/admin/backup/excluir/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Excluir backup #' . $id . '?\')">
-                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i> Excluir</button>
+                        <form method="POST" action="/admin/backup/excluir/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.backup.confirm_delete', 'Excluir backup #{id}?', ['id' => $id]), ENT_QUOTES, 'UTF-8') . '\')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i> ' . __('admin.backup.delete', 'Excluir') . '</button>
                         </form>
-                        <form method="POST" action="/admin/backup/enviar-externo/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Enviar backup #' . $id . ' para servidor externo?\')">
-                            <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-cloud-upload-alt"></i> Enviar</button>
+                        <form method="POST" action="/admin/backup/enviar-externo/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.backup.confirm_send_external', 'Enviar backup #{id} para servidor externo?', ['id' => $id]), ENT_QUOTES, 'UTF-8') . '\')">
+                            <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-cloud-upload-alt"></i> ' . __('admin.backup.send', 'Enviar') . '</button>
                         </form>
                     </td>
                 </tr>';
@@ -342,12 +342,12 @@ class AdminBackupController extends Controller {
 
                         if (v === "files") {
                             e.preventDefault();
-                            alert("Restauração de arquivos do sistema\n\nOs arquivos são versionados via GitHub/Git. Para restaurar/rollback de arquivos, use revert/rollback no repositório (Git). Este módulo restaura apenas o banco de dados.");
+                            alert("' . htmlspecialchars(__('admin.backup.js_restore_files_alert', 'Restauração de arquivos do sistema\\n\\nOs arquivos são versionados via GitHub/Git. Para restaurar/rollback de arquivos, use revert/rollback no repositório (Git). Este módulo restaura apenas o banco de dados.'), ENT_QUOTES, 'UTF-8') . '");
                             return false;
                         }
 
                         var bid = f.getAttribute("data-backup-id") || "";
-                        return confirm("Confirmar restauração do banco a partir do backup #" + bid + "?");
+                        return confirm("' . htmlspecialchars(__('admin.backup.js_confirm_restore', 'Confirmar restauração do banco a partir do backup #'), ENT_QUOTES, 'UTF-8') . '" + bid + "?");
                     } catch(err) {
                         return true;
                     }
@@ -378,13 +378,13 @@ class AdminBackupController extends Controller {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Configurações de backup salvas.';
+            $_SESSION['message'] = __('admin.backup.config_saved', 'Configurações de backup salvas.');
             $_SESSION['message_type'] = 'success';
         } catch (\Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Erro ao salvar configurações: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.backup.config_save_error', 'Erro ao salvar configurações: {msg}', ['msg' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -402,13 +402,13 @@ class AdminBackupController extends Controller {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Backup criado com sucesso (#' . $id . ').';
+            $_SESSION['message'] = __('admin.backup.created_success', 'Backup criado com sucesso (#{id}).', ['id' => $id]);
             $_SESSION['message_type'] = 'success';
         } catch (\Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Erro ao criar backup: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.backup.create_error', 'Erro ao criar backup: {msg}', ['msg' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -426,13 +426,13 @@ class AdminBackupController extends Controller {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Backup excluído.';
+            $_SESSION['message'] = __('admin.backup.deleted_success', 'Backup excluído.');
             $_SESSION['message_type'] = 'success';
         } catch (\Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Erro ao excluir: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.backup.delete_error', 'Erro ao excluir: {msg}', ['msg' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -451,7 +451,7 @@ class AdminBackupController extends Controller {
                 if (session_status() === PHP_SESSION_NONE) {
                     session_start();
                 }
-                $_SESSION['message'] = 'Restauração de arquivos: utilize rollback/revert via GitHub/Git. Este módulo restaura apenas o banco de dados.';
+                $_SESSION['message'] = __('admin.backup.restore_files_info', 'Restauração de arquivos: utilize rollback/revert via GitHub/Git. Este módulo restaura apenas o banco de dados.');
                 $_SESSION['message_type'] = 'info';
                 header('Location: /admin/backup');
                 exit;
@@ -460,13 +460,13 @@ class AdminBackupController extends Controller {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Banco restaurado a partir do backup #' . (int) $id . '.';
+            $_SESSION['message'] = __('admin.backup.restored_success', 'Banco restaurado a partir do backup #{id}.', ['id' => (int) $id]);
             $_SESSION['message_type'] = 'success';
         } catch (\Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['message'] = 'Erro ao restaurar: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.backup.restore_error', 'Erro ao restaurar: {msg}', ['msg' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -491,12 +491,12 @@ class AdminBackupController extends Controller {
             $backup = $service->getBackupRun((int) $id);
 
             if (empty($backup)) {
-                throw new \Exception('Backup não encontrado.');
+                throw new \Exception(__('admin.backup.backup_not_found', 'Backup não encontrado.'));
             }
 
             $dbPath = (string) ($backup['db_sql_path'] ?? '');
             if ($dbPath === '' || !file_exists($dbPath)) {
-                throw new \Exception('Arquivo de banco de dados não encontrado: ' . $dbPath);
+                throw new \Exception(__('admin.backup.db_file_not_found', 'Arquivo de banco de dados não encontrado: {path}', ['path' => $dbPath]));
             }
 
             // Chamar o método de envio diretamente (via reflection para acessar método privado)
@@ -504,10 +504,10 @@ class AdminBackupController extends Controller {
             $ref->setAccessible(true);
             $ref->invoke($service, $dbPath);
 
-            $_SESSION['message'] = 'Envio para servidor externo executado. Verifique os logs para detalhes.';
+            $_SESSION['message'] = __('admin.backup.external_send_done', 'Envio para servidor externo executado. Verifique os logs para detalhes.');
             $_SESSION['message_type'] = 'success';
         } catch (\Throwable $e) {
-            $_SESSION['message'] = 'Erro ao enviar: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.backup.send_error', 'Erro ao enviar: {msg}', ['msg' => $e->getMessage()]);
             $_SESSION['message_type'] = 'danger';
         }
 

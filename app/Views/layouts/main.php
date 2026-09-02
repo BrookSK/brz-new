@@ -47,7 +47,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- meta tag de verificação temporária (remover após validação) -->
-    <title><?= $title ?? 'Braziliana - E-commerce Internacional' ?></title>
+    <title><?= $title ?? __('layout.site_title', 'Braziliana - E-commerce Internacional') ?></title>
     <?php
     $siteFavicon = '';
     try {
@@ -898,9 +898,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <?php if ($impActive): ?>
         <div style="position: fixed; right: 16px; bottom: 16px; z-index: 2147483646; max-width: 360px;">
             <div style="background: rgba(11, 31, 58, 0.95); color: #fff; border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 36px rgba(0,0,0,0.25);">
-                <div style="font-weight: 700; margin-bottom: 6px;">Você está logado como cliente</div>
-                <div style="font-size: 13px; opacity: 0.92; margin-bottom: 10px;">Voltar para: <?= htmlspecialchars($impAdminName, ENT_QUOTES, 'UTF-8') ?></div>
-                <a href="/impersonacao/sair" style="display: inline-block; background: #fff; color: #0b1f3a; text-decoration: none; padding: 8px 12px; border-radius: 10px; font-weight: 700;">Voltar para meu perfil</a>
+                <div style="font-weight: 700; margin-bottom: 6px;"><?= __('layout.impersonation_logged_as_client', 'Você está logado como cliente') ?></div>
+                <div style="font-size: 13px; opacity: 0.92; margin-bottom: 10px;"><?= __('layout.impersonation_return_to', 'Voltar para:') ?> <?= htmlspecialchars($impAdminName, ENT_QUOTES, 'UTF-8') ?></div>
+                <a href="/impersonacao/sair" style="display: inline-block; background: #fff; color: #0b1f3a; text-decoration: none; padding: 8px 12px; border-radius: 10px; font-weight: 700;"><?= __('layout.impersonation_back_to_profile', 'Voltar para meu perfil') ?></a>
             </div>
         </div>
     <?php endif; ?>
@@ -1006,7 +1006,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         <a class="nav-link" href="/outlet"><i class="fas fa-tags"></i> Outlet</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/grupos-compras"><i class="fas fa-store"></i> Grupos de Compras</a>
+                        <a class="nav-link" href="/grupos-compras"><i class="fas fa-store"></i> <?= __('layout.purchase_groups', 'Grupos de Compras') ?></a>
                     </li>
                     <!-- Como Funciona: oculto -->
                     <!--
@@ -1332,11 +1332,11 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 
                 <div class="col-lg-3 mb-4">
                     <h6 class="mb-3">Newsletter</h6>
-                    <p class="text-muted small">Receba ofertas exclusivas e novidades</p>
+                    <p class="text-muted small"><?= __('layout.newsletter_text', 'Receba ofertas exclusivas e novidades') ?></p>
                     <form class="mt-3">
                         <div class="input-group">
-                            <input type="email" class="form-control" placeholder="Seu e-mail">
-                            <button class="btn btn-primary" type="submit">Assinar</button>
+                            <input type="email" class="form-control" placeholder="<?= htmlspecialchars(__('layout.newsletter_email_placeholder', 'Seu e-mail'), ENT_QUOTES, 'UTF-8') ?>">
+                            <button class="btn btn-primary" type="submit"><?= __('layout.newsletter_subscribe', 'Assinar') ?></button>
                         </div>
                     </form>
                 </div>
@@ -1346,11 +1346,11 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <p class="text-muted small mb-0">&copy; 2026 Braziliana. Todos os direitos reservados.</p>
+                    <p class="text-muted small mb-0">&copy; 2026 Braziliana. <?= __('layout.all_rights_reserved', 'Todos os direitos reservados.') ?></p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <a href="/politica-privacidade" class="footer-link small me-3">Política de Privacidade</a>
-                    <a href="/termos-uso" class="footer-link small">Termos de Uso</a>
+                    <a href="/politica-privacidade" class="footer-link small me-3"><?= __('layout.privacy_policy', 'Política de Privacidade') ?></a>
+                    <a href="/termos-uso" class="footer-link small"><?= __('layout.terms_of_use', 'Termos de Uso') ?></a>
                 </div>
             </div>
         </div>
@@ -1558,9 +1558,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                     const isFrete = (element.classList.contains('frete-value') || element.id === 'frete');
 
                     // Se já está grátis, não sobrescreve.
+                    const __freeShippingLabel = '<?= htmlspecialchars(__('layout.free_shipping', 'Frete grátis'), ENT_QUOTES, 'UTF-8') ?>';
                     const currentText = String(element.textContent || '').trim().toLowerCase();
-                    if (isFrete && (currentText === 'frete grátis' || currentText === 'frete gratis')) {
-                        element.textContent = 'Frete grátis';
+                    if (isFrete && (currentText === 'frete grátis' || currentText === 'frete gratis' || currentText === __freeShippingLabel.toLowerCase())) {
+                        element.textContent = __freeShippingLabel;
                         return;
                     }
 
@@ -1571,7 +1572,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
 
                     if (!isNaN(originalValue)) {
                         if (isFrete && originalValue <= 0) {
-                            element.textContent = 'Frete grátis';
+                            element.textContent = __freeShippingLabel;
                             return;
                         }
                         const convertedValue = originalValue * rate;
@@ -1591,7 +1592,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             },
             
             showNotification: function(currency) {
-                const name = currency === 'BRL' ? 'Real Brasileiro' : 'Dólar Americano';
+                const name = currency === 'BRL' ? '<?= htmlspecialchars(__('layout.currency_brl_name', 'Real Brasileiro'), ENT_QUOTES, 'UTF-8') ?>' : '<?= htmlspecialchars(__('layout.currency_usd_name', 'Dólar Americano'), ENT_QUOTES, 'UTF-8') ?>';
                 console.log('Moeda alterada para:', name);
                 
                 // Criar notificação
@@ -1600,7 +1601,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 notification.style.cssText = 'top: 70px; right: 20px; z-index: 9999; min-width: 250px;';
                 notification.innerHTML = `
                     <i class="fas fa-coins me-2"></i>
-                    Moeda alterada para ${name}
+                    <?= htmlspecialchars(__('layout.currency_changed_to', 'Moeda alterada para'), ENT_QUOTES, 'UTF-8') ?> ${name}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
                 
@@ -1770,24 +1771,24 @@ $popupLogo = !empty($siteLogo) ? $siteLogo : '';
 <?php if ($welcomePopupEnabled === '1'): ?>
 <div id="welcomePopupOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99999; align-items:center; justify-content:center;">
     <div style="background:#fff; border-radius:16px; max-width:520px; width:92%; padding:40px 32px 32px; text-align:center; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.25); animation: welcomePopIn 0.35s ease-out;">
-        <button onclick="fecharWelcomePopup()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; color:#999; cursor:pointer; line-height:1;" aria-label="Fechar">&times;</button>
+        <button onclick="fecharWelcomePopup()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; color:#999; cursor:pointer; line-height:1;" aria-label="<?= htmlspecialchars(__('layout.close', 'Fechar'), ENT_QUOTES, 'UTF-8') ?>">&times;</button>
         <?php if (!empty($popupLogo)): ?>
             <img src="<?= htmlspecialchars($popupLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height:54px; width:auto; margin-bottom:20px;">
         <?php else: ?>
             <div style="font-size:36px; color:#0d6efd; margin-bottom:16px;"><i class="fas fa-globe-americas"></i></div>
         <?php endif; ?>
-        <h4 style="margin:0 0 12px; font-weight:700; color:#1a1a2e;">Bem-vindo à Braziliana!</h4>
+        <h4 style="margin:0 0 12px; font-weight:700; color:#1a1a2e;"><?= __('layout.welcome_popup_title', 'Bem-vindo à Braziliana!') ?></h4>
         <p style="color:#555; font-size:15px; line-height:1.65; margin:0 0 10px;">
-            A Braziliana está de cara nova! Repaginamos toda a nossa plataforma para oferecer uma experiência mais moderna, rápida e completa para você.
+            <?= __('layout.welcome_popup_p1', 'A Braziliana está de cara nova! Repaginamos toda a nossa plataforma para oferecer uma experiência mais moderna, rápida e completa para você.') ?>
         </p>
         <p style="color:#555; font-size:15px; line-height:1.65; margin:0 0 10px;">
-            Agora você encontra tudo em um só lugar: compras, redirecionamento, acompanhamento de pedidos, carteira digital e muito mais — tudo centralizado e pensado para facilitar o seu dia a dia.
+            <?= __('layout.welcome_popup_p2', 'Agora você encontra tudo em um só lugar: compras, redirecionamento, acompanhamento de pedidos, carteira digital e muito mais — tudo centralizado e pensado para facilitar o seu dia a dia.') ?>
         </p>
         <p style="color:#555; font-size:14px; line-height:1.6; margin:0 0 22px;">
-            Explore o novo sistema e aproveite todas as novidades. Estamos sempre evoluindo para atender você cada vez melhor.
+            <?= __('layout.welcome_popup_p3', 'Explore o novo sistema e aproveite todas as novidades. Estamos sempre evoluindo para atender você cada vez melhor.') ?>
         </p>
         <button onclick="fecharWelcomePopup()" style="background:#0d6efd; color:#fff; border:none; border-radius:8px; padding:10px 36px; font-size:15px; font-weight:600; cursor:pointer; transition:background 0.2s;">
-            Explorar agora
+            <?= __('layout.welcome_popup_cta', 'Explorar agora') ?>
         </button>
     </div>
 </div>
@@ -1848,7 +1849,7 @@ if ($__copilotoMostrar):
 <!-- WhatsApp Floating Button -->
 <a href="https://wa.me/13053638204" target="_blank" rel="noopener noreferrer"
    id="whatsapp-float"
-   aria-label="Falar no WhatsApp"
+   aria-label="<?= htmlspecialchars(__('layout.whatsapp_aria', 'Falar no WhatsApp'), ENT_QUOTES, 'UTF-8') ?>"
    style="position:fixed;bottom:30px;right:30px;z-index:9998;width:58px;height:58px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(37,211,102,0.45);text-decoration:none;transition:transform 0.2s ease,box-shadow 0.2s ease;">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#fff" width="30" height="30">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>

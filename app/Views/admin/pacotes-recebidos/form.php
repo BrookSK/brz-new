@@ -4,10 +4,10 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">
             <i class="fas fa-box me-2"></i>
-            <?= $pacote ? 'Editar Pacote #' . $pacote['id'] : 'Novo Pacote Recebido' ?>
+            <?= $pacote ? __('admin.received_packages.edit_package_num', 'Editar Pacote #{id}', ['id' => $pacote['id']]) : __('admin.received_packages.new_received_package', 'Novo Pacote Recebido') ?>
         </h1>
         <a href="/admin/pacotes-recebidos" class="btn btn-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Voltar
+            <i class="fas fa-arrow-left me-2"></i><?= __('admin.received_packages.back', 'Voltar') ?>
         </a>
     </div>
 
@@ -22,7 +22,7 @@
 
     <?php if ($pacote && !$editavel): ?>
         <div class="alert alert-warning">
-            <i class="fas fa-lock me-2"></i>Este pacote não pode mais ser editado pois já saiu do status "Pendente".
+            <i class="fas fa-lock me-2"></i><?= __('admin.received_packages.cannot_edit_left_pending', 'Este pacote não pode mais ser editado pois já saiu do status "Pendente".') ?>
         </div>
     <?php endif; ?>
 
@@ -37,24 +37,24 @@
                 <div class="row g-3">
                     <!-- Suite / Nome -->
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Suite ou Nome do Cliente *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.suite_or_client_name', 'Suite ou Nome do Cliente') ?> *</label>
                         <div class="input-group">
                             <input type="text" name="numero_suite" id="numero_suite" class="form-control" 
                                    value="<?= htmlspecialchars($pacote['numero_suite'] ?? '') ?>" 
-                                   placeholder="Suite ou nome..."
+                                   placeholder="<?= htmlspecialchars(__('admin.received_packages.suite_or_name_placeholder', 'Suite ou nome...'), ENT_QUOTES, 'UTF-8') ?>"
                                    required <?= !$editavel ? 'readonly' : '' ?>>
                             <button type="button" class="btn btn-outline-primary" id="btnBuscarSuite" <?= !$editavel ? 'disabled' : '' ?>>
-                                <i class="fas fa-search"></i> Buscar
+                                <i class="fas fa-search"></i> <?= __('admin.received_packages.search', 'Buscar') ?>
                             </button>
                         </div>
                         <div id="suiteInfo" class="form-text text-success" style="display:none;"></div>
                         <div id="suiteErro" class="form-text text-danger" style="display:none;"></div>
-                        <small class="form-text text-muted">Digite o número da suite ou o nome do cliente.</small>
+                        <small class="form-text text-muted"><?= __('admin.received_packages.enter_suite_or_client_name', 'Digite o número da suite ou o nome do cliente.') ?></small>
                     </div>
 
                     <!-- Nome do Produto -->
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Nome do Produto *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.product_name', 'Nome do Produto') ?> *</label>
                         <input type="text" name="nome" class="form-control" 
                                value="<?= htmlspecialchars($pacote['nome'] ?? '') ?>" 
                                required <?= !$editavel ? 'readonly' : '' ?>>
@@ -62,7 +62,7 @@
 
                     <!-- Fornecedor -->
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Fornecedor/Loja *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.supplier_store', 'Fornecedor/Loja') ?> *</label>
                         <input type="text" name="fornecedor" class="form-control" 
                                value="<?= htmlspecialchars($pacote['fornecedor'] ?? '') ?>" 
                                required <?= !$editavel ? 'readonly' : '' ?>>
@@ -70,18 +70,18 @@
 
                     <!-- NCM -->
                     <div class="col-md-5">
-                        <label class="form-label fw-bold">NCM (Código Fiscal) *</label>
-                        <input type="text" id="ncm_search" class="form-control" placeholder="Digite para filtrar (ex: celular, bolsa, 8517...)"
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.ncm_fiscal_code', 'NCM (Código Fiscal)') ?> *</label>
+                        <input type="text" id="ncm_search" class="form-control" placeholder="<?= htmlspecialchars(__('admin.received_packages.ncm_filter_placeholder', 'Digite para filtrar (ex: celular, bolsa, 8517...)'), ENT_QUOTES, 'UTF-8') ?>"
                                autocomplete="off" <?= !$editavel ? 'readonly' : '' ?>
                                value="<?= isset($pacote['ncm']) && $pacote['ncm'] ? $pacote['ncm'] . ' - ' . ($ncmOptions[$pacote['ncm']] ?? '') : '' ?>">
                         <input type="hidden" name="ncm" id="ncm_value" value="<?= htmlspecialchars($pacote['ncm'] ?? '') ?>" required>
                         <div id="ncm_dropdown" class="list-group position-absolute shadow-sm" style="z-index:1050;max-height:250px;overflow-y:auto;display:none;width:calc(100% - 24px);"></div>
-                        <small class="form-text text-muted">Comece a digitar o nome ou código NCM.</small>
+                        <small class="form-text text-muted"><?= __('admin.received_packages.ncm_start_typing', 'Comece a digitar o nome ou código NCM.') ?></small>
                     </div>
 
                     <!-- Data Recebimento -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">Data de Recebimento *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.receipt_date', 'Data de Recebimento') ?> *</label>
                         <input type="date" name="data_recebimento" class="form-control" 
                                value="<?= htmlspecialchars($pacote['data_recebimento'] ?? date('Y-m-d')) ?>" 
                                required <?= !$editavel ? 'readonly' : '' ?>>
@@ -89,7 +89,7 @@
 
                     <!-- Peso -->
                     <div class="col-md-2">
-                        <label class="form-label fw-bold">Peso (kg) *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.weight_kg', 'Peso (kg)') ?> *</label>
                         <input type="number" name="peso_kg" class="form-control" step="0.001" min="0.001"
                                value="<?= htmlspecialchars($pacote['peso_kg'] ?? '') ?>" 
                                required <?= !$editavel ? 'readonly' : '' ?>>
@@ -97,7 +97,7 @@
 
                     <!-- Quantidade -->
                     <div class="col-md-2">
-                        <label class="form-label fw-bold">Quantidade *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.quantity', 'Quantidade') ?> *</label>
                         <input type="number" name="quantidade" class="form-control" min="1"
                                value="<?= htmlspecialchars($pacote['quantidade'] ?? '1') ?>" 
                                required <?= !$editavel ? 'readonly' : '' ?>>
@@ -105,22 +105,22 @@
 
                     <!-- Descrição -->
                     <div class="col-12">
-                        <label class="form-label">Descrição / Observações</label>
+                        <label class="form-label"><?= __('admin.received_packages.description_notes', 'Descrição / Observações') ?></label>
                         <textarea name="descricao" class="form-control" rows="3" <?= !$editavel ? 'readonly' : '' ?>><?= htmlspecialchars($pacote['descricao'] ?? '') ?></textarea>
                     </div>
 
                     <!-- Foto -->
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">Foto do Produto *</label>
+                        <label class="form-label fw-bold"><?= __('admin.received_packages.product_photo', 'Foto do Produto') ?> *</label>
                         <input type="file" name="foto" class="form-control" accept="image/*" <?= !$editavel ? 'disabled' : '' ?> <?= !$pacote ? 'required' : '' ?>>
-                        <small class="form-text text-muted">JPG, PNG, WebP ou GIF. Max 5MB.</small>
+                        <small class="form-text text-muted"><?= __('admin.received_packages.photo_formats_max', 'JPG, PNG, WebP ou GIF. Max 5MB.') ?></small>
                     </div>
 
                     <!-- Foto existente -->
                     <?php if (!empty($pacote['foto_url'])): ?>
                     <div class="col-md-6">
-                        <label class="form-label">Foto Atual</label><br>
-                        <img src="<?= htmlspecialchars($pacote['foto_url']) ?>" alt="Foto do pacote" 
+                        <label class="form-label"><?= __('admin.received_packages.current_photo', 'Foto Atual') ?></label><br>
+                        <img src="<?= htmlspecialchars($pacote['foto_url']) ?>" alt="<?= htmlspecialchars(__('admin.received_packages.package_photo_alt', 'Foto do pacote'), ENT_QUOTES, 'UTF-8') ?>" 
                              style="max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
                     </div>
                     <?php endif; ?>
@@ -128,18 +128,18 @@
                     <!-- Status (somente leitura quando editando) -->
                     <?php if ($pacote): ?>
                     <div class="col-md-4">
-                        <label class="form-label">Status Atual</label>
+                        <label class="form-label"><?= __('admin.received_packages.current_status', 'Status Atual') ?></label>
                         <input type="text" class="form-control" value="<?= \App\Controllers\AdminPacotesRecebidosController::getStatusList()[$pacote['status']] ?? $pacote['status'] ?>" readonly>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Dias de Armazenamento</label>
+                        <label class="form-label"><?= __('admin.received_packages.storage_days', 'Dias de Armazenamento') ?></label>
                         <input type="text" class="form-control" value="<?= (int)$pacote['dias_armazenamento'] ?>" readonly>
                     </div>
                     <?php if (!empty($pacote['pedido_id'])): ?>
                     <div class="col-md-4">
-                        <label class="form-label">Pedido Vinculado</label>
+                        <label class="form-label"><?= __('admin.received_packages.linked_order', 'Pedido Vinculado') ?></label>
                         <a href="/admin/pedidos/<?= $pacote['pedido_id'] ?>" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-external-link-alt me-1"></i>Pedido #<?= $pacote['pedido_id'] ?>
+                            <i class="fas fa-external-link-alt me-1"></i><?= __('admin.received_packages.order_num', 'Pedido #{id}', ['id' => $pacote['pedido_id']]) ?>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -149,9 +149,9 @@
                 <?php if ($editavel): ?>
                 <hr class="my-4">
                 <div class="d-flex justify-content-end gap-2">
-                    <a href="/admin/pacotes-recebidos" class="btn btn-secondary">Cancelar</a>
+                    <a href="/admin/pacotes-recebidos" class="btn btn-secondary"><?= __('admin.received_packages.cancel', 'Cancelar') ?></a>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i><?= $pacote ? 'Salvar Alterações' : 'Cadastrar Pacote' ?>
+                        <i class="fas fa-save me-2"></i><?= $pacote ? __('admin.received_packages.save_changes', 'Salvar Alterações') : __('admin.received_packages.register_package', 'Cadastrar Pacote') ?>
                     </button>
                 </div>
                 <?php endif; ?>
@@ -198,7 +198,7 @@
         if (count === 0) {
             const empty = document.createElement('div');
             empty.className = 'list-group-item text-muted small py-1';
-            empty.textContent = 'Nenhum NCM encontrado.';
+            empty.textContent = '<?= htmlspecialchars(__('admin.received_packages.no_ncm_found', 'Nenhum NCM encontrado.'), ENT_QUOTES, 'UTF-8') ?>';
             dropdown.appendChild(empty);
         }
 
@@ -236,7 +236,7 @@ document.getElementById('btnBuscarSuite')?.addEventListener('click', function() 
     erroEl.style.display = 'none';
 
     if (!termo) {
-        erroEl.textContent = 'Informe um número de suite ou nome.';
+        erroEl.textContent = '<?= htmlspecialchars(__('admin.received_packages.enter_suite_or_name', 'Informe um número de suite ou nome.'), ENT_QUOTES, 'UTF-8') ?>';
         erroEl.style.display = 'block';
         return;
     }
@@ -247,15 +247,15 @@ document.getElementById('btnBuscarSuite')?.addEventListener('click', function() 
             if (data.success) {
                 // Preencher o campo com a suite real encontrada
                 document.getElementById('numero_suite').value = data.usuario.suite;
-                infoEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>' + data.usuario.nome + ' (' + data.usuario.email + ') - Suite: ' + data.usuario.suite;
+                infoEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>' + data.usuario.nome + ' (' + data.usuario.email + ') - <?= htmlspecialchars(__('admin.received_packages.suite_label', 'Suite:'), ENT_QUOTES, 'UTF-8') ?> ' + data.usuario.suite;
                 infoEl.style.display = 'block';
             } else {
-                erroEl.textContent = data.message || 'Nenhum cliente encontrado.';
+                erroEl.textContent = data.message || '<?= htmlspecialchars(__('admin.received_packages.no_client_found_dot', 'Nenhum cliente encontrado.'), ENT_QUOTES, 'UTF-8') ?>';
                 erroEl.style.display = 'block';
             }
         })
         .catch(() => {
-            erroEl.textContent = 'Erro ao buscar. Tente novamente.';
+            erroEl.textContent = '<?= htmlspecialchars(__('admin.received_packages.search_error_try_again', 'Erro ao buscar. Tente novamente.'), ENT_QUOTES, 'UTF-8') ?>';
             erroEl.style.display = 'block';
         });
 });
@@ -270,6 +270,6 @@ document.getElementById('numero_suite')?.addEventListener('blur', function() {
 
 <?php
 $content = ob_get_clean();
-$title = ($pacote ? 'Editar Pacote #' . $pacote['id'] : 'Novo Pacote') . ' - Admin';
+$title = ($pacote ? __('admin.received_packages.edit_package_num', 'Editar Pacote #{id}', ['id' => $pacote['id']]) : __('admin.received_packages.new_package', 'Novo Pacote')) . ' - ' . __('admin.received_packages.admin_suffix', 'Admin');
 include __DIR__ . '/../../layouts/admin.php';
 ?>

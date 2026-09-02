@@ -1,11 +1,11 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h1 class="page-title">Compras Carnê — Mensal</h1>
-        <p class="page-subtitle">Lista de compras de carnê separada por mês</p>
+        <h1 class="page-title"><?= __('admin.installment.monthly_purchases_title', 'Compras Carnê — Mensal') ?></h1>
+        <p class="page-subtitle"><?= __('admin.installment.monthly_purchases_subtitle', 'Lista de compras de carnê separada por mês') ?></p>
     </div>
     <div class="d-flex gap-2">
-        <a href="/admin/carnes/compras-internas" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>Lista Completa</a>
-        <a href="/admin/carnes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <a href="/admin/carnes/compras-internas" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i><?= __('admin.installment.full_list', 'Lista Completa') ?></a>
+        <a href="/admin/carnes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i><?= __('admin.installment.back', 'Voltar') ?></a>
     </div>
 </div>
 
@@ -14,17 +14,17 @@
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
             <div class="col-md-3">
-                <label class="form-label small">Status</label>
+                <label class="form-label small"><?= __('admin.installment.col_status', 'Status') ?></label>
                 <select name="status" class="form-select form-select-sm">
-                    <option value="">Todos</option>
-                    <option value="aguardando_compra" <?= ($_GET['status'] ?? '') === 'aguardando_compra' ? 'selected' : '' ?>>Aguardando Compra</option>
-                    <option value="comprado" <?= ($_GET['status'] ?? '') === 'comprado' ? 'selected' : '' ?>>Comprado</option>
-                    <option value="recebido" <?= ($_GET['status'] ?? '') === 'recebido' ? 'selected' : '' ?>>Recebido</option>
-                    <option value="produto_indisponivel" <?= ($_GET['status'] ?? '') === 'produto_indisponivel' ? 'selected' : '' ?>>Indisponível</option>
+                    <option value=""><?= __('admin.installment.filter_all', 'Todos') ?></option>
+                    <option value="aguardando_compra" <?= ($_GET['status'] ?? '') === 'aguardando_compra' ? 'selected' : '' ?>><?= __('admin.installment.awaiting_purchase', 'Aguardando Compra') ?></option>
+                    <option value="comprado" <?= ($_GET['status'] ?? '') === 'comprado' ? 'selected' : '' ?>><?= __('admin.installment.purchased', 'Comprado') ?></option>
+                    <option value="recebido" <?= ($_GET['status'] ?? '') === 'recebido' ? 'selected' : '' ?>><?= __('admin.installment.received', 'Recebido') ?></option>
+                    <option value="produto_indisponivel" <?= ($_GET['status'] ?? '') === 'produto_indisponivel' ? 'selected' : '' ?>><?= __('admin.installment.unavailable', 'Indisponível') ?></option>
                 </select>
             </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i><?= __('admin.installment.filter', 'Filtrar') ?></button>
             </div>
         </form>
     </div>
@@ -35,7 +35,7 @@
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center text-muted py-5">
             <i class="fas fa-inbox fs-2 mb-2 d-block"></i>
-            Nenhuma compra de carnê encontrada.
+            <?= __('admin.installment.no_purchases_found', 'Nenhuma compra de carnê encontrada.') ?>
         </div>
     </div>
 <?php else: ?>
@@ -43,7 +43,7 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body pb-0">
             <div class="d-flex flex-wrap gap-2 mb-3">
-                <?php $meses = ['01'=>'Jan','02'=>'Fev','03'=>'Mar','04'=>'Abr','05'=>'Mai','06'=>'Jun','07'=>'Jul','08'=>'Ago','09'=>'Set','10'=>'Out','11'=>'Nov','12'=>'Dez']; ?>
+                <?php $meses = ['01'=>__('admin.installment.month_jan','Jan'),'02'=>__('admin.installment.month_feb','Fev'),'03'=>__('admin.installment.month_mar','Mar'),'04'=>__('admin.installment.month_apr','Abr'),'05'=>__('admin.installment.month_may','Mai'),'06'=>__('admin.installment.month_jun','Jun'),'07'=>__('admin.installment.month_jul','Jul'),'08'=>__('admin.installment.month_aug','Ago'),'09'=>__('admin.installment.month_sep','Set'),'10'=>__('admin.installment.month_oct','Out'),'11'=>__('admin.installment.month_nov','Nov'),'12'=>__('admin.installment.month_dec','Dez')]; ?>
                 <?php foreach ($porMes as $mesKey => $itens): ?>
                     <?php
                         $parts = explode('-', $mesKey);
@@ -55,7 +55,7 @@
                         <?= $mesLabel ?>
                         <span class="badge bg-light text-dark ms-1"><?= $totalItens ?></span>
                         <?php if ($pendentes > 0): ?>
-                            <span class="badge bg-warning text-dark ms-1"><?= $pendentes ?> pend.</span>
+                            <span class="badge bg-warning text-dark ms-1"><?= __('admin.installment.pending_short', '{n} pend.', ['n' => $pendentes]) ?></span>
                         <?php endif; ?>
                     </a>
                 <?php endforeach; ?>
@@ -75,14 +75,14 @@
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <div class="fw-semibold">
                 <i class="fas fa-calendar me-2"></i><?= $mesLabel ?>
-                <span class="badge bg-light text-dark ms-2"><?= $totalMes ?> itens</span>
+                <span class="badge bg-light text-dark ms-2"><?= __('admin.installment.items_count', '{n} itens', ['n' => $totalMes]) ?></span>
             </div>
             <div class="d-flex gap-2">
                 <?php if ($pendMes > 0): ?>
-                    <span class="badge bg-warning text-dark"><?= $pendMes ?> aguardando</span>
+                    <span class="badge bg-warning text-dark"><?= __('admin.installment.awaiting_count', '{n} aguardando', ['n' => $pendMes]) ?></span>
                 <?php endif; ?>
                 <?php if ($compradoMes > 0): ?>
-                    <span class="badge bg-success"><?= $compradoMes ?> comprados</span>
+                    <span class="badge bg-success"><?= __('admin.installment.purchased_count', '{n} comprados', ['n' => $compradoMes]) ?></span>
                 <?php endif; ?>
             </div>
         </div>
@@ -91,15 +91,15 @@
                 <table class="table table-hover table-sm mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Total Carnê</th>
-                            <th>Parcelas</th>
-                            <th>Status Carnê</th>
-                            <th>1ª Parcela</th>
-                            <th>Status Compra</th>
-                            <th>Data</th>
-                            <th>Ações</th>
+                            <th><?= __('admin.installment.order', 'Pedido') ?></th>
+                            <th><?= __('admin.installment.col_customer', 'Cliente') ?></th>
+                            <th><?= __('admin.installment.total_plan', 'Total Carnê') ?></th>
+                            <th><?= __('admin.installment.installments', 'Parcelas') ?></th>
+                            <th><?= __('admin.installment.col_plan_status', 'Status Carnê') ?></th>
+                            <th><?= __('admin.installment.first_installment', '1ª Parcela') ?></th>
+                            <th><?= __('admin.installment.purchase_status', 'Status Compra') ?></th>
+                            <th><?= __('admin.installment.col_date', 'Data') ?></th>
+                            <th><?= __('admin.installment.col_actions', 'Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -115,10 +115,10 @@
                             <td class="small text-muted"><?= date('d/m/Y', strtotime($ci['created_at'] ?? '')) ?></td>
                             <td>
                                 <div class="d-flex gap-1">
-                                    <a href="/admin/carnes/detalhes/<?= (int) ($ci['carne_id'] ?? 0) ?>" class="btn btn-outline-primary btn-sm" title="Ver carnê"><i class="fas fa-eye"></i></a>
+                                    <a href="/admin/carnes/detalhes/<?= (int) ($ci['carne_id'] ?? 0) ?>" class="btn btn-outline-primary btn-sm" title="<?= htmlspecialchars(__('admin.installment.view_plan', 'Ver carnê'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-eye"></i></a>
                                     <?php if (($ci['status'] ?? '') === 'aguardando_compra'): ?>
                                         <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $ci['id'] ?>" class="d-inline">
-                                            <button type="submit" class="btn btn-success btn-sm" title="Marcar comprado"><i class="fas fa-check"></i></button>
+                                            <button type="submit" class="btn btn-success btn-sm" title="<?= htmlspecialchars(__('admin.installment.mark_purchased', 'Marcar comprado'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-check"></i></button>
                                         </form>
                                     <?php endif; ?>
                                 </div>

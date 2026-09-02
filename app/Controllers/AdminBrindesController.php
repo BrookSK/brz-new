@@ -93,7 +93,7 @@ class AdminBrindesController extends Controller {
         ob_start();
         require __DIR__ . '/../Views/admin/brindes/index.php';
         $content = ob_get_clean();
-        $title = 'Histórico de Brindes';
+        $title = __('admin.gifts.history_title', 'Histórico de Brindes');
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 

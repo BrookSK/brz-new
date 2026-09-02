@@ -303,7 +303,7 @@ class AdminTicketsController extends Controller {
         ob_start();
         include __DIR__ . '/../Views/admin/tickets.php';
         $content = ob_get_clean();
-        $title = 'Tickets';
+        $title = __('admin.tickets.page_title', 'Tickets');
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -332,7 +332,7 @@ class AdminTicketsController extends Controller {
         $st->execute([$id]);
         $ticket = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$ticket) {
-            echo '<div class="alert alert-danger">Ticket não encontrado.</div>';
+            echo '<div class="alert alert-danger">' . __('admin.tickets.ticket_not_found', 'Ticket não encontrado.') . '</div>';
             exit;
         }
 
@@ -565,7 +565,7 @@ class AdminTicketsController extends Controller {
         ob_start();
         include __DIR__ . '/../Views/admin/ticket.php';
         $content = ob_get_clean();
-        $title = 'Ticket #' . $id;
+        $title = __('admin.tickets.ticket_number', 'Ticket #{n}', ['n'=>$id]);
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -644,7 +644,7 @@ class AdminTicketsController extends Controller {
             $adminNome = '';
         }
         $stamp = date('Y-m-d H:i:s');
-        $log = "[CONTATO VENDEDOR] {$stamp} | por: {$adminNome} (#{$adminUid}) | para: {$vendNome} (#{$vendedorId}) {$vendEmail}\n{$msg}\n";
+        $log = "[" . __('admin.tickets.contact_vendor_tag', 'CONTATO VENDEDOR') . "] {$stamp} | " . __('admin.tickets.log_by', 'por:') . " {$adminNome} (#{$adminUid}) | " . __('admin.tickets.log_to', 'para:') . " {$vendNome} (#{$vendedorId}) {$vendEmail}\n{$msg}\n";
 
         // gravar chat interno por vendedor, quando a tabela existir
         $vendorMessageId = 0;
@@ -922,11 +922,11 @@ class AdminTicketsController extends Controller {
                 $cliData = $stCli->fetch(\PDO::FETCH_ASSOC);
                 if ($cliData && !empty($cliData['email'])) {
                     $adminNome = '';
-                    try { $stAdm = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $stAdm->execute([$adminUid]); $adminNome = (string)($stAdm->fetchColumn() ?: 'Equipe Braziliana'); } catch (\Exception $e) { $adminNome = 'Equipe Braziliana'; }
+                    try { $stAdm = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $stAdm->execute([$adminUid]); $adminNome = (string)($stAdm->fetchColumn() ?: __('admin.tickets.braziliana_team', 'Equipe Braziliana')); } catch (\Exception $e) { $adminNome = __('admin.tickets.braziliana_team', 'Equipe Braziliana'); }
                     SupportTicketNotificationService::enviarEmailTicket(
                         (string)$cliData['email'],
-                        'Nova resposta no Ticket #' . $id . ' - Braziliana',
-                        (string)($cliData['nome'] ?? 'Cliente'),
+                        __('admin.tickets.email_new_reply_subject', 'Nova resposta no Ticket #{n} - Braziliana', ['n'=>$id]),
+                        (string)($cliData['nome'] ?? __('admin.tickets.customer', 'Cliente')),
                         (int)$id,
                         $msg,
                         $adminNome,
@@ -1041,7 +1041,7 @@ class AdminTicketsController extends Controller {
             if ($hasMsg && $decision !== '') {
                 $adminUid = (int) $this->getLoggedUserId();
                 $stMsg = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
-                $stMsg->execute([(int) $id, 'admin', (int) $adminUid, (string) ('Encerramento do ticket: ' . $decision)]);
+                $stMsg->execute([(int) $id, 'admin', (int) $adminUid, (string) (__('admin.tickets.ticket_closure', 'Encerramento do ticket:') . ' ' . $decision)]);
             }
         } catch (\Exception $e) {
         }

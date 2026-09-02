@@ -2,11 +2,11 @@
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h1 class="page-title">Promoções Agendadas</h1>
-        <p class="page-subtitle">Agende campanhas de desconto com início e fim automáticos</p>
+        <h1 class="page-title"><?= __('admin.scheduled_promos.title', 'Promoções Agendadas') ?></h1>
+        <p class="page-subtitle"><?= __('admin.scheduled_promos.subtitle', 'Agende campanhas de desconto com início e fim automáticos') ?></p>
     </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaPromo">
-        <i class="fas fa-plus me-1"></i>Nova Promoção
+        <i class="fas fa-plus me-1"></i><?= __('admin.scheduled_promos.new_promo', 'Nova Promoção') ?>
     </button>
 </div>
 
@@ -21,7 +21,7 @@
 
 <!-- Calendário (desktop only) -->
 <div class="card border-0 shadow-sm mb-4 d-none d-md-block">
-    <div class="card-header bg-white fw-semibold">Visualização em Calendário</div>
+    <div class="card-header bg-white fw-semibold"><?= __('admin.scheduled_promos.calendar_view', 'Visualização em Calendário') ?></div>
     <div class="card-body">
         <div id="calendario" style="min-height:500px;"></div>
     </div>
@@ -29,24 +29,24 @@
 
 <!-- Lista de Promoções -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white fw-semibold">Todas as Promoções</div>
+    <div class="card-header bg-white fw-semibold"><?= __('admin.scheduled_promos.all_promos', 'Todas as Promoções') ?></div>
     <div class="card-body">
         <?php if (empty($promocoes)): ?>
-            <div class="text-muted text-center py-4">Nenhuma promoção agendada ainda.</div>
+            <div class="text-muted text-center py-4"><?= __('admin.scheduled_promos.empty', 'Nenhuma promoção agendada ainda.') ?></div>
         <?php else: ?>
             <!-- Desktop: Table -->
             <div class="table-responsive d-none d-md-block">
                 <table class="table table-sm table-hover align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>Nome</th>
-                            <th>Desconto</th>
-                            <th>Início</th>
-                            <th>Fim</th>
-                            <th>Produtos</th>
-                            <th>Status</th>
-                            <th>Criado por</th>
-                            <th class="text-end">Ações</th>
+                            <th><?= __('admin.scheduled_promos.col_name', 'Nome') ?></th>
+                            <th><?= __('admin.scheduled_promos.col_discount', 'Desconto') ?></th>
+                            <th><?= __('admin.scheduled_promos.col_start', 'Início') ?></th>
+                            <th><?= __('admin.scheduled_promos.col_end', 'Fim') ?></th>
+                            <th><?= __('admin.scheduled_promos.col_products', 'Produtos') ?></th>
+                            <th><?= __('admin.scheduled_promos.col_status', 'Status') ?></th>
+                            <th><?= __('admin.scheduled_promos.col_created_by', 'Criado por') ?></th>
+                            <th class="text-end"><?= __('admin.scheduled_promos.col_actions', 'Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -66,12 +66,12 @@
                             </td>
                             <td class="small"><?= date('d/m/Y H:i', strtotime($p['inicio'])) ?></td>
                             <td class="small"><?= date('d/m/Y H:i', strtotime($p['fim'])) ?></td>
-                            <td><span class="badge bg-light text-dark"><?= (int) $p['total_produtos'] ?> produtos</span></td>
+                            <td><span class="badge bg-light text-dark"><?= __('admin.scheduled_promos.products_count', '{n} produtos', ['n' => (int) $p['total_produtos']]) ?></span></td>
                             <td><span class="badge bg-<?= $statusCor ?>"><?= ucfirst($p['status']) ?></span></td>
                             <td class="small text-muted"><?= htmlspecialchars((string) ($p['criado_por_nome'] ?? '-')) ?></td>
                             <td class="text-end">
                                 <?php if (in_array($p['status'], ['agendada', 'ativa'])): ?>
-                                    <form method="POST" action="/admin/promocoes-agendadas/cancelar/<?= (int) $p['id'] ?>" class="d-inline" onsubmit="return confirm('Cancelar esta promoção? Os preços dos produtos serão restaurados.')">
+                                    <form method="POST" action="/admin/promocoes-agendadas/cancelar/<?= (int) $p['id'] ?>" class="d-inline" onsubmit="return confirm('<?= htmlspecialchars(__('admin.scheduled_promos.confirm_cancel_restore', 'Cancelar esta promoção? Os preços dos produtos serão restaurados.'), ENT_QUOTES, 'UTF-8') ?>')">
                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
                                     </form>
                                 <?php endif; ?>
@@ -98,14 +98,14 @@
                         </div>
                         <div class="d-flex flex-wrap gap-2 small text-muted">
                             <span><span class="badge bg-info"><?= $p['desconto_tipo'] === 'percentual' ? $p['desconto_valor'] . '%' : 'US$ ' . number_format((float) $p['desconto_valor'], 2) ?></span></span>
-                            <span><?= (int) $p['total_produtos'] ?> produtos</span>
+                            <span><?= __('admin.scheduled_promos.products_count', '{n} produtos', ['n' => (int) $p['total_produtos']]) ?></span>
                         </div>
                         <div class="small text-muted mt-1">
                             <?= date('d/m/Y H:i', strtotime($p['inicio'])) ?> → <?= date('d/m/Y H:i', strtotime($p['fim'])) ?>
                         </div>
                         <?php if (in_array($p['status'], ['agendada', 'ativa'])): ?>
-                            <form method="POST" action="/admin/promocoes-agendadas/cancelar/<?= (int) $p['id'] ?>" class="mt-2" onsubmit="return confirm('Cancelar esta promoção?')">
-                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">Cancelar promoção</button>
+                            <form method="POST" action="/admin/promocoes-agendadas/cancelar/<?= (int) $p['id'] ?>" class="mt-2" onsubmit="return confirm('<?= htmlspecialchars(__('admin.scheduled_promos.confirm_cancel', 'Cancelar esta promoção?'), ENT_QUOTES, 'UTF-8') ?>')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100"><?= __('admin.scheduled_promos.cancel_promo', 'Cancelar promoção') ?></button>
                             </form>
                         <?php endif; ?>
                     </div>
@@ -122,24 +122,24 @@
         <div class="modal-content">
             <form method="POST" action="/admin/promocoes-agendadas/criar">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Nova Promoção Agendada</h5>
+                    <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i><?= __('admin.scheduled_promos.new_promo_modal', 'Nova Promoção Agendada') ?></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Nome da campanha</label>
-                            <input type="text" class="form-control" name="nome" required placeholder="Ex: Black Friday, Promoção de Inverno...">
+                            <label class="form-label fw-semibold"><?= __('admin.scheduled_promos.campaign_name', 'Nome da campanha') ?></label>
+                            <input type="text" class="form-control" name="nome" required placeholder="<?= htmlspecialchars(__('admin.scheduled_promos.campaign_name_placeholder', 'Ex: Black Friday, Promoção de Inverno...'), ENT_QUOTES, 'UTF-8') ?>">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Tipo de desconto</label>
+                            <label class="form-label fw-semibold"><?= __('admin.scheduled_promos.discount_type', 'Tipo de desconto') ?></label>
                             <select class="form-select" name="desconto_tipo" id="promoDescontoTipo">
-                                <option value="percentual">Percentual (%)</option>
-                                <option value="fixo">Valor fixo (US$)</option>
+                                <option value="percentual"><?= __('admin.scheduled_promos.discount_percent', 'Percentual (%)') ?></option>
+                                <option value="fixo"><?= __('admin.scheduled_promos.discount_fixed', 'Valor fixo (US$)') ?></option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Valor do desconto</label>
+                            <label class="form-label fw-semibold"><?= __('admin.scheduled_promos.discount_value', 'Valor do desconto') ?></label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="desconto_valor" step="0.01" min="0.01" required placeholder="10">
                                 <span class="input-group-text" id="promoDescontoSuffix">%</span>
@@ -147,29 +147,29 @@
                         </div>
                         <div class="col-md-4"></div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Início</label>
+                            <label class="form-label fw-semibold"><?= __('admin.scheduled_promos.col_start', 'Início') ?></label>
                             <input type="datetime-local" class="form-control" name="inicio" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Fim</label>
+                            <label class="form-label fw-semibold"><?= __('admin.scheduled_promos.col_end', 'Fim') ?></label>
                             <input type="datetime-local" class="form-control" name="fim" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Produtos (selecione os que participam)</label>
+                            <label class="form-label fw-semibold"><?= __('admin.scheduled_promos.products_select', 'Produtos (selecione os que participam)') ?></label>
                             <div class="mb-2">
-                                <input type="text" class="form-control" id="buscaProdutoPromo" placeholder="Digite para buscar produtos..." autocomplete="off">
+                                <input type="text" class="form-control" id="buscaProdutoPromo" placeholder="<?= htmlspecialchars(__('admin.scheduled_promos.search_products_placeholder', 'Digite para buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
                             </div>
                             <div id="produtosSelecionados" class="mb-2"></div>
                             <div class="border rounded p-2" style="max-height:250px;overflow-y:auto;" id="listaProdutosPromo">
-                                <div class="text-muted small text-center py-3">Digite pelo menos 2 caracteres para buscar...</div>
+                                <div class="text-muted small text-center py-3"><?= __('admin.scheduled_promos.type_2_chars', 'Digite pelo menos 2 caracteres para buscar...') ?></div>
                             </div>
-                            <div class="mt-1 small text-muted" id="contadorProdutos">0 produtos selecionados</div>
+                            <div class="mt-1 small text-muted" id="contadorProdutos"><?= __('admin.scheduled_promos.products_selected', '0 produtos selecionados') ?></div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Criar Promoção</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('admin.scheduled_promos.cancel', 'Cancelar') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i><?= __('admin.scheduled_promos.create_promo', 'Criar Promoção') ?></button>
                 </div>
             </form>
         </div>
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function atualizarContador() {
         var n = Object.keys(produtosSelecionados).length;
-        if (contadorEl) contadorEl.textContent = n + ' produto' + (n !== 1 ? 's' : '') + ' selecionado' + (n !== 1 ? 's' : '');
+        if (contadorEl) contadorEl.textContent = n + ' <?= htmlspecialchars(__('admin.scheduled_promos.js_product', 'produto'), ENT_QUOTES, 'UTF-8') ?>' + (n !== 1 ? 's' : '') + ' <?= htmlspecialchars(__('admin.scheduled_promos.js_selected', 'selecionado'), ENT_QUOTES, 'UTF-8') ?>' + (n !== 1 ? 's' : '');
     }
 
     function renderSelecionados() {
@@ -244,17 +244,17 @@ document.addEventListener('DOMContentLoaded', function() {
             var term = this.value.trim();
             if (buscaTimer) clearTimeout(buscaTimer);
             if (term.length < 2) {
-                listaEl.innerHTML = '<div class="text-muted small text-center py-3">Digite pelo menos 2 caracteres para buscar...</div>';
+                listaEl.innerHTML = '<div class="text-muted small text-center py-3"><?= htmlspecialchars(__('admin.scheduled_promos.type_2_chars', 'Digite pelo menos 2 caracteres para buscar...'), ENT_QUOTES, 'UTF-8') ?></div>';
                 return;
             }
-            listaEl.innerHTML = '<div class="text-muted small text-center py-2"><i class="fas fa-spinner fa-spin me-1"></i>Buscando...</div>';
+            listaEl.innerHTML = '<div class="text-muted small text-center py-2"><i class="fas fa-spinner fa-spin me-1"></i><?= htmlspecialchars(__('admin.scheduled_promos.js_searching', 'Buscando...'), ENT_QUOTES, 'UTF-8') ?></div>';
             buscaTimer = setTimeout(function() {
                 fetch('/admin/promocoes-agendadas/buscar-produtos?q=' + encodeURIComponent(term))
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         var prods = data.produtos || [];
                         if (prods.length === 0) {
-                            listaEl.innerHTML = '<div class="text-muted small text-center py-3">Nenhum produto encontrado.</div>';
+                            listaEl.innerHTML = '<div class="text-muted small text-center py-3"><?= htmlspecialchars(__('admin.scheduled_promos.js_no_products', 'Nenhum produto encontrado.'), ENT_QUOTES, 'UTF-8') ?></div>';
                             return;
                         }
                         var html = '';
@@ -269,11 +269,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 + p.nome + ' <span class="text-muted">(US$ ' + Number(p.preco||0).toFixed(2) + ')</span>'
                                 + '</label></div>';
                         });
-                        html += '<div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll(\'#listaProdutosPromo input[type=checkbox]\').forEach(function(c){c.checked=true;toggleProdutoPromo(Number(c.value),c.nextElementSibling.nextElementSibling.textContent.split(\'(\')[0].trim(),0,true)})">Selecionar todos visíveis</button></div>';
+                        html += '<div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll(\'#listaProdutosPromo input[type=checkbox]\').forEach(function(c){c.checked=true;toggleProdutoPromo(Number(c.value),c.nextElementSibling.nextElementSibling.textContent.split(\'(\')[0].trim(),0,true)})"><?= htmlspecialchars(__('admin.scheduled_promos.js_select_all_visible', 'Selecionar todos visíveis'), ENT_QUOTES, 'UTF-8') ?></button></div>';
                         listaEl.innerHTML = html;
                     })
                     .catch(function() {
-                        listaEl.innerHTML = '<div class="text-danger small text-center py-3">Erro ao buscar.</div>';
+                        listaEl.innerHTML = '<div class="text-danger small text-center py-3"><?= htmlspecialchars(__('admin.scheduled_promos.js_error_search', 'Erro ao buscar.'), ENT_QUOTES, 'UTF-8') ?></div>';
                     });
             }, 300);
         });

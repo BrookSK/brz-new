@@ -256,16 +256,16 @@ class AdminProdutosNovoController extends Controller {
 
         echo '<div class="pt-3">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
-                    <h1 class="page-title">Novo Produto</h1>
-                    <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <h1 class="page-title">' . __('admin.products_new.title', 'Novo Produto') . '</h1>
+                    <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> ' . __('admin.products_new.back', 'Voltar') . '</a>
                 </div>';
 
         echo '<ul class="nav nav-tabs" id="novoProdutoTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="tab-simples" data-bs-toggle="tab" data-bs-target="#pane-simples" type="button" role="tab">Simples</button>
+                    <button class="nav-link active" id="tab-simples" data-bs-toggle="tab" data-bs-target="#pane-simples" type="button" role="tab">' . __('admin.products_new.tab_simple', 'Simples') . '</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="tab-variavel" data-bs-toggle="tab" data-bs-target="#pane-variavel" type="button" role="tab">Variável</button>
+                    <button class="nav-link" id="tab-variavel" data-bs-toggle="tab" data-bs-target="#pane-variavel" type="button" role="tab">' . __('admin.products_new.tab_variable', 'Variável') . '</button>
                 </li>
               </ul>';
 
@@ -274,11 +274,11 @@ class AdminProdutosNovoController extends Controller {
                     <div class="card">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="text-muted">Cadastro simples (original)</div>
-                                <a class="btn btn-sm btn-outline-primary" href="/admin/produtos/novo-simples" target="_blank">Abrir em nova aba</a>
+                                <div class="text-muted">' . __('admin.products_new.simple_registration', 'Cadastro simples (original)') . '</div>
+                                <a class="btn btn-sm btn-outline-primary" href="/admin/produtos/novo-simples" target="_blank">' . __('admin.products_new.open_new_tab', 'Abrir em nova aba') . '</a>
                             </div>
                             <div id="novoProdutoSimplesContainer">
-                                <div class="text-muted">Carregando formulário...</div>
+                                <div class="text-muted">' . __('admin.products_new.loading_form', 'Carregando formulário...') . '</div>
                             </div>
                         </div>
                     </div>
@@ -287,7 +287,7 @@ class AdminProdutosNovoController extends Controller {
                 <div class="tab-pane fade" id="pane-variavel" role="tabpanel">';
 
         if (!$schemaOk) {
-            echo '<div class="alert alert-warning">Para cadastrar produto variável, rode a migration <strong>061_create_produto_variacoes_schema.sql</strong> no banco.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.products_new.migration_warning', 'Para cadastrar produto variável, rode a migration <strong>061_create_produto_variacoes_schema.sql</strong> no banco.') . '</div>';
         }
 
         echo '<form method="POST" action="/admin/produtos/variavel/salvar" enctype="multipart/form-data">
@@ -296,33 +296,33 @@ class AdminProdutosNovoController extends Controller {
                         <div class="card mb-4">
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Nome *</label>
+                                    <label class="form-label">' . __('admin.products_new.label_name', 'Nome *') . '</label>
                                     <input type="text" class="form-control" name="name" required>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">SKU (opcional)</label>
+                                    <label class="form-label">' . __('admin.products_new.label_sku', 'SKU (opcional)') . '</label>
                                     <input type="text" class="form-control" name="sku">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">NCM</label>
-                                    <input type="text" class="form-control" id="ncmSearchVar" placeholder="Pesquisar NCM...">
+                                    <label class="form-label">' . __('admin.products_new.label_ncm', 'NCM') . '</label>
+                                    <input type="text" class="form-control" id="ncmSearchVar" placeholder="' . htmlspecialchars(__('admin.products_new.ncm_search_placeholder', 'Pesquisar NCM...'), ENT_QUOTES, 'UTF-8') . '">
                                     <select class="form-select mt-2" name="ncm" id="ncmSelectVar">
-                                        <option value="">Selecione...</option>';
+                                        <option value="">' . __('admin.products_new.select_placeholder', 'Selecione...') . '</option>';
 
         foreach ($ncmOptions as $code => $label) {
             echo '<option value="' . htmlspecialchars((string) $code, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars((string) $code . ' - ' . $label, ENT_QUOTES, 'UTF-8') . '</option>';
         }
 
         echo '                     </select>
-                                    <small class="text-muted">Opcional</small>
+                                    <small class="text-muted">' . __('admin.products_new.optional', 'Opcional') . '</small>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Loja</label>
+                                    <label class="form-label">' . __('admin.products_new.label_store', 'Loja') . '</label>
                                     <select class="form-select" name="loja">
-                                        <option value="">Selecione...</option>';
+                                        <option value="">' . __('admin.products_new.select_placeholder', 'Selecione...') . '</option>';
 
         if (!empty($lojas)) {
             foreach ($lojas as $l) {
@@ -334,9 +334,9 @@ class AdminProdutosNovoController extends Controller {
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Categoria</label>
+                                    <label class="form-label">' . __('admin.products_new.label_category', 'Categoria') . '</label>
                                     <select class="form-select" name="category_id">
-                                        <option value="">Selecione...</option>';
+                                        <option value="">' . __('admin.products_new.select_placeholder', 'Selecione...') . '</option>';
 
         foreach ($categorias as $cat) {
             $catName = (string) ($cat['name'] ?? ($cat['nome'] ?? ''));
@@ -347,40 +347,40 @@ class AdminProdutosNovoController extends Controller {
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Descrição Curta</label>
+                                    <label class="form-label">' . __('admin.products_new.label_short_description', 'Descrição Curta') . '</label>
                                     <textarea class="form-control" name="short_description" rows="3"></textarea>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Descrição Completa</label>
+                                    <label class="form-label">' . __('admin.products_new.label_full_description', 'Descrição Completa') . '</label>
                                     <textarea class="form-control" name="description" rows="5"></textarea>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Foto de Capa</label>
+                                    <label class="form-label">' . __('admin.products_new.label_cover_photo', 'Foto de Capa') . '</label>
                                     <input type="file" class="form-control" name="capa" accept="image/*">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Galeria de Fotos (produto pai)</label>
+                                    <label class="form-label">' . __('admin.products_new.label_gallery', 'Galeria de Fotos (produto pai)') . '</label>
                                     <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
                                 </div>
                             </div>
                         </div>
 
                         <div class="card mb-4">
-                            <div class="card-header bg-white"><strong>Atributos e Variações</strong></div>
+                            <div class="card-header bg-white"><strong>' . __('admin.products_new.attributes_variations', 'Atributos e Variações') . '</strong></div>
                             <div class="card-body">';
 
         if (empty($tipos)) {
             echo '<div class="alert alert-warning mb-0">
-                    Para gerar combinações (WooCommerce), você precisa cadastrar <strong>Tipos</strong> e <strong>Opções</strong> em <a href="/admin/variacoes" target="_blank">Variações</a>.
+                    ' . __('admin.products_new.need_types_options', 'Para gerar combinações (WooCommerce), você precisa cadastrar <strong>Tipos</strong> e <strong>Opções</strong> em <a href="/admin/variacoes" target="_blank">Variações</a>.') . '
                   </div>
                   <div class="mt-3">
-                    <a class="btn btn-primary" href="/admin/variacoes" target="_blank"><i class="fas fa-sliders-h"></i> Ir para Variações</a>
+                    <a class="btn btn-primary" href="/admin/variacoes" target="_blank"><i class="fas fa-sliders-h"></i> ' . __('admin.products_new.go_to_variations', 'Ir para Variações') . '</a>
                   </div>';
         } else {
-            echo '<div class="alert alert-info">Selecione as opções por tipo e clique em <strong>Gerar variações</strong>. Você pode ajustar preço/estoque por variação.</div>';
+            echo '<div class="alert alert-info">' . __('admin.products_new.variations_hint', 'Selecione as opções por tipo e clique em <strong>Gerar variações</strong>. Você pode ajustar preço/estoque por variação.') . '</div>';
 
             foreach ($tipos as $t) {
                 $tid = (int) ($t['id'] ?? 0);
@@ -407,18 +407,18 @@ class AdminProdutosNovoController extends Controller {
             }
 
             echo '<div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-outline-primary" id="btnGerarVariacoes"><i class="fas fa-cogs"></i> Gerar variações</button>
-                    <button type="button" class="btn btn-outline-danger" id="btnLimparVariacoes"><i class="fas fa-trash"></i> Limpar</button>
+                    <button type="button" class="btn btn-outline-primary" id="btnGerarVariacoes"><i class="fas fa-cogs"></i> ' . __('admin.products_new.generate_variations', 'Gerar variações') . '</button>
+                    <button type="button" class="btn btn-outline-danger" id="btnLimparVariacoes"><i class="fas fa-trash"></i> ' . __('admin.products_new.clear', 'Limpar') . '</button>
                   </div>';
 
             echo '<div class="table-responsive mt-3">
                     <table class="table table-sm align-middle" id="tabelaVariacoes">
                         <thead>
                             <tr>
-                                <th>Variação</th>
-                                <th style="width:180px">Preço (override)</th>
-                                <th style="width:140px">Estoque</th>
-                                <th style="width:260px">Fotos da variação</th>
+                                <th>' . __('admin.products_new.th_variation', 'Variação') . '</th>
+                                <th style="width:180px">' . __('admin.products_new.th_price_override', 'Preço (override)') . '</th>
+                                <th style="width:140px">' . __('admin.products_new.th_stock', 'Estoque') . '</th>
+                                <th style="width:260px">' . __('admin.products_new.th_variation_photos', 'Fotos da variação') . '</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -436,16 +436,16 @@ class AdminProdutosNovoController extends Controller {
                         <div class="card mb-4">
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Preço base (USD)</label>
+                                    <label class="form-label">' . __('admin.products_new.label_base_price', 'Preço base (USD)') . '</label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
                                         <input type="text" class="form-control" name="price" value="0">
                                     </div>
-                                    <small class="text-muted">Variações podem sobrescrever este preço.</small>
+                                    <small class="text-muted">' . __('admin.products_new.base_price_help', 'Variações podem sobrescrever este preço.') . '</small>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Preço de custo (USD)</label>
+                                    <label class="form-label">' . __('admin.products_new.label_cost_price', 'Preço de custo (USD)') . '</label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
                                         <input type="text" class="form-control" name="cost_price" value="0">
@@ -453,7 +453,7 @@ class AdminProdutosNovoController extends Controller {
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Preço promocional (USD)</label>
+                                    <label class="form-label">' . __('admin.products_new.label_sale_price', 'Preço promocional (USD)') . '</label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
                                         <input type="text" class="form-control" name="sale_price" value="0">
@@ -461,56 +461,56 @@ class AdminProdutosNovoController extends Controller {
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Estoque base</label>
+                                    <label class="form-label">' . __('admin.products_new.label_base_stock', 'Estoque base') . '</label>
                                     <input type="number" class="form-control" name="stock" value="0" min="0">
-                                    <small class="text-muted">Quando o produto tiver variações, o estoque real passa a ser o da variação.</small>
+                                    <small class="text-muted">' . __('admin.products_new.base_stock_help', 'Quando o produto tiver variações, o estoque real passa a ser o da variação.') . '</small>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Estoque mínimo</label>
+                                    <label class="form-label">' . __('admin.products_new.label_min_stock', 'Estoque mínimo') . '</label>
                                     <input type="number" class="form-control" name="min_stock" value="0" min="0">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Peso (kg)</label>
+                                    <label class="form-label">' . __('admin.products_new.label_weight', 'Peso (kg)') . '</label>
                                     <input type="text" class="form-control" name="weight" value="0">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Status</label>
+                                    <label class="form-label">' . __('admin.products_new.label_status', 'Status') . '</label>
                                     <select class="form-select" name="status">
-                                        <option value="draft">Rascunho</option>
-                                        <option value="published" selected>Publicado</option>
-                                        <option value="archived">Arquivado</option>
+                                        <option value="draft">' . __('admin.products_new.status_draft', 'Rascunho') . '</option>
+                                        <option value="published" selected>' . __('admin.products_new.status_published', 'Publicado') . '</option>
+                                        <option value="archived">' . __('admin.products_new.status_archived', 'Arquivado') . '</option>
                                     </select>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Ativo</label>
+                                    <label class="form-label">' . __('admin.products_new.label_active', 'Ativo') . '</label>
                                     <select class="form-select" name="active">
-                                        <option value="1" selected>Ativo</option>
-                                        <option value="0">Inativo</option>
+                                        <option value="1" selected>' . __('admin.products_new.active', 'Ativo') . '</option>
+                                        <option value="0">' . __('admin.products_new.inactive', 'Inativo') . '</option>
                                     </select>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Destaque</label>
+                                    <label class="form-label">' . __('admin.products_new.label_featured', 'Destaque') . '</label>
                                     <select class="form-select" name="featured">
-                                        <option value="0" selected>Não</option>
-                                        <option value="1">Sim</option>
+                                        <option value="0" selected>' . __('admin.products_new.no', 'Não') . '</option>
+                                        <option value="1">' . __('admin.products_new.yes', 'Sim') . '</option>
                                     </select>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Ocultar em todo o site</label>
+                                    <label class="form-label">' . __('admin.products_new.label_hide_site', 'Ocultar em todo o site') . '</label>
                                     <select class="form-select" name="oculto">
-                                        <option value="0" selected>Não</option>
-                                        <option value="1">Sim</option>
+                                        <option value="0" selected>' . __('admin.products_new.no', 'Não') . '</option>
+                                        <option value="1">' . __('admin.products_new.yes', 'Sim') . '</option>
                                     </select>
-                                    <small class="text-muted">Se ativo, o produto não aparece para clientes. Só fica visível no pedido manual.</small>
+                                    <small class="text-muted">' . __('admin.products_new.hide_site_help', 'Se ativo, o produto não aparece para clientes. Só fica visível no pedido manual.') . '</small>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary w-100" ' . (!$schemaOk ? 'disabled' : '') . '><i class="fas fa-save"></i> Salvar Produto Variável</button>
+                                <button type="submit" class="btn btn-primary w-100" ' . (!$schemaOk ? 'disabled' : '') . '><i class="fas fa-save"></i> ' . __('admin.products_new.btn_save_variable', 'Salvar Produto Variável') . '</button>
                             </div>
                         </div>
                     </div>
@@ -682,7 +682,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Novo Produto - Braziliana Admin';
+        $title = __('admin.products_new.page_title', 'Novo Produto - Braziliana Admin');
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -700,7 +700,7 @@ HTML;
                 && $this->tableExists($pdo, 'produto_variacao_itens');
 
             if (!$schemaOk) {
-                $_SESSION['message'] = 'Tabelas de variações não encontradas. Rode a migration 061.';
+                $_SESSION['message'] = __('admin.products_new.msg_variation_tables_missing', 'Tabelas de variações não encontradas. Rode a migration 061.');
                 $_SESSION['message_type'] = 'warning';
                 header('Location: /admin/produtos/novo');
                 exit;
@@ -724,7 +724,7 @@ HTML;
 
             $name = trim((string) $request->getParam('name', ''));
             if ($name === '') {
-                $_SESSION['message'] = 'Informe o nome do produto.';
+                $_SESSION['message'] = __('admin.products_new.msg_name_required', 'Informe o nome do produto.');
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/produtos/novo');
                 exit;
@@ -732,7 +732,7 @@ HTML;
 
             if ($perfilSessao === 'representante') {
                 if (trim((string) $costPrice) === '') {
-                    $_SESSION['message'] = 'Preço de custo (USD) é obrigatório para representante.';
+                    $_SESSION['message'] = __('admin.products_new.msg_cost_price_required', 'Preço de custo (USD) é obrigatório para representante.');
                     $_SESSION['message_type'] = 'danger';
                     header('Location: /admin/produtos/novo');
                     exit;
@@ -817,7 +817,7 @@ HTML;
             if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
 
             if (empty($data)) {
-                throw new \Exception('Não foi possível salvar: nenhuma coluna compatível foi encontrada na tabela produtos.');
+                throw new \Exception(__('admin.products_new.msg_no_compatible_columns', 'Não foi possível salvar: nenhuma coluna compatível foi encontrada na tabela produtos.'));
             }
 
             $columnsSql = implode(', ', array_keys($data));
@@ -982,7 +982,7 @@ HTML;
             }
 
             $pdo->commit();
-            $_SESSION['message'] = 'Produto variável criado com sucesso.';
+            $_SESSION['message'] = __('admin.products_new.msg_created', 'Produto variável criado com sucesso.');
             $_SESSION['message_type'] = 'success';
 
             header('Location: /admin/produtos/editar/' . $produtoId);
@@ -992,7 +992,7 @@ HTML;
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $_SESSION['message'] = 'Erro ao criar produto variável: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.products_new.msg_create_error', 'Erro ao criar produto variável:') . ' ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/produtos/novo');
             exit;

@@ -2,27 +2,27 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="page-title">Co-Piloto Braziliana</h1>
-            <p class="page-subtitle">Configurações do assistente inteligente do site</p>
+            <h1 class="page-title"><?= __('admin.copilot.braziliana_copilot','Co-Piloto Braziliana') ?></h1>
+            <p class="page-subtitle"><?= __('admin.copilot.index_subtitle','Configurações do assistente inteligente do site') ?></p>
         </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="/admin/copiloto/conversas" class="btn btn-outline-dark btn-sm">
-                        <i class="fas fa-comments me-1"></i>Conversas
+                        <i class="fas fa-comments me-1"></i><?= __('admin.copilot.nav_conversations','Conversas') ?>
                     </a>
                     <a href="/admin/copiloto/analytics" class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-chart-bar me-1"></i>Analytics
+                        <i class="fas fa-chart-bar me-1"></i><?= __('admin.copilot.nav_analytics','Analytics') ?>
                     </a>
                     <a href="/admin/copiloto/aprendizado" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-brain me-1"></i>Aprendizado
+                        <i class="fas fa-brain me-1"></i><?= __('admin.copilot.nav_learning','Aprendizado') ?>
                         <?php if (($stats['total_pendencias'] ?? 0) > 0): ?>
                             <span class="badge bg-danger ms-1"><?= $stats['total_pendencias'] ?></span>
                         <?php endif; ?>
                     </a>
                     <a href="/admin/copiloto/conteudo" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-book me-1"></i>Conteúdo
+                        <i class="fas fa-book me-1"></i><?= __('admin.copilot.nav_content','Conteúdo') ?>
                     </a>
                     <a href="/admin/copiloto/cancelamentos" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-times-circle me-1"></i>Cancelamentos
+                        <i class="fas fa-times-circle me-1"></i><?= __('admin.copilot.nav_cancellations','Cancelamentos') ?>
                         <?php if (($stats['total_cancelamentos_pendentes'] ?? 0) > 0): ?>
                             <span class="badge bg-warning ms-1"><?= $stats['total_cancelamentos_pendentes'] ?></span>
                         <?php endif; ?>
@@ -51,25 +51,25 @@
                 <div class="col-md-3">
                     <div class="card text-center p-3">
                         <div class="fs-3 fw-bold text-primary"><?= $stats['total_sessoes_hoje'] ?? 0 ?></div>
-                        <small class="text-muted">Sessões hoje</small>
+                        <small class="text-muted"><?= __('admin.copilot.sessions_today','Sessões hoje') ?></small>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card text-center p-3">
                         <div class="fs-3 fw-bold text-primary"><?= $stats['total_mensagens_hoje'] ?? 0 ?></div>
-                        <small class="text-muted">Mensagens hoje</small>
+                        <small class="text-muted"><?= __('admin.copilot.messages_today','Mensagens hoje') ?></small>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card text-center p-3">
                         <div class="fs-3 fw-bold text-warning"><?= $stats['total_pendencias'] ?? 0 ?></div>
-                        <small class="text-muted">Pendências IA</small>
+                        <small class="text-muted"><?= __('admin.copilot.ai_pending','Pendências IA') ?></small>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card text-center p-3">
                         <div class="fs-3 fw-bold text-danger"><?= $stats['total_cancelamentos_pendentes'] ?? 0 ?></div>
-                        <small class="text-muted">Cancelamentos pendentes</small>
+                        <small class="text-muted"><?= __('admin.copilot.pending_cancellations','Cancelamentos pendentes') ?></small>
                     </div>
                 </div>
             </div>
@@ -78,39 +78,38 @@
             <form method="POST" action="/admin/copiloto/salvar">
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-toggle-on me-2"></i>Status do Co-Piloto</h5>
+                        <h5 class="mb-0"><i class="fas fa-toggle-on me-2"></i><?= __('admin.copilot.copilot_status','Status do Co-Piloto') ?></h5>
                     </div>
                     <div class="card-body">
                         <?php $modo = $configs['modo'] ?? 'desativado'; ?>
                         <input type="hidden" name="copiloto_ativo" value="<?= $modo !== 'desativado' ? '1' : '0' ?>">
                         <div class="mb-3">
-                            <label for="copiloto_modo" class="form-label"><strong>Modo de operação</strong></label>
+                            <label for="copiloto_modo" class="form-label"><strong><?= __('admin.copilot.operation_mode','Modo de operação') ?></strong></label>
                             <select class="form-select" id="copiloto_modo" name="copiloto_modo">
                                 <option value="desativado" <?= $modo === 'desativado' ? 'selected' : '' ?>>
-                                    🔴 Desativado — widget não aparece para ninguém
+                                    🔴 <?= __('admin.copilot.mode_disabled','Desativado — widget não aparece para ninguém') ?>
                                 </option>
                                 <option value="somente_admins" <?= $modo === 'somente_admins' ? 'selected' : '' ?>>
-                                    🟡 Somente Admins — widget aparece apenas para usuários admin logados (modo teste)
+                                    🟡 <?= __('admin.copilot.mode_admins_only','Somente Admins — widget aparece apenas para usuários admin logados (modo teste)') ?>
                                 </option>
                                 <option value="publico" <?= $modo === 'publico' ? 'selected' : '' ?>>
-                                    🟢 Público — widget aparece para todos os visitantes do site
+                                    🟢 <?= __('admin.copilot.mode_public','Público — widget aparece para todos os visitantes do site') ?>
                                 </option>
                             </select>
                             <small class="text-muted mt-1 d-block">
-                                Use "Somente Admins" para testar o copiloto sem que os clientes vejam.
-                                Quando estiver satisfeito, mude para "Público".
+                                <?= __('admin.copilot.mode_help','Use "Somente Admins" para testar o copiloto sem que os clientes vejam. Quando estiver satisfeito, mude para "Público".') ?>
                             </small>
                         </div>
 
                         <?php if ($modo === 'somente_admins'): ?>
                             <div class="alert alert-warning py-2 mb-0">
                                 <i class="fas fa-flask me-1"></i>
-                                <strong>Modo teste ativo.</strong> O widget só aparece para admins logados. Clientes não veem nada.
+                                <strong><?= __('admin.copilot.test_mode_active','Modo teste ativo.') ?></strong> <?= __('admin.copilot.test_mode_desc','O widget só aparece para admins logados. Clientes não veem nada.') ?>
                             </div>
                         <?php elseif ($modo === 'publico'): ?>
                             <div class="alert alert-success py-2 mb-0">
                                 <i class="fas fa-globe me-1"></i>
-                                <strong>Público.</strong> O widget está visível para todos os visitantes.
+                                <strong><?= __('admin.copilot.public_label','Público.') ?></strong> <?= __('admin.copilot.public_desc','O widget está visível para todos os visitantes.') ?>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -122,48 +121,48 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="api_key_claude" class="form-label">API Key do Claude</label>
+                            <label for="api_key_claude" class="form-label"><?= __('admin.copilot.claude_api_key','API Key do Claude') ?></label>
                             <input type="password" class="form-control" id="api_key_claude" name="api_key_claude"
                                 value="<?= htmlspecialchars($configs['api_key_claude'] ?? '') ?>"
                                 placeholder="sk-ant-...">
-                            <small class="text-muted">Chave da API Anthropic para o modelo claude-sonnet-4-5</small>
+                            <small class="text-muted"><?= __('admin.copilot.claude_api_key_hint','Chave da API Anthropic para o modelo claude-sonnet-4-5') ?></small>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Modelo de IA</label>
+                            <label class="form-label"><?= __('admin.copilot.ai_model','Modelo de IA') ?></label>
                             <input type="text" class="form-control" value="claude-sonnet-4-5" disabled>
-                            <small class="text-muted">Modelo fixo — não pode ser alterado conforme especificação do projeto</small>
+                            <small class="text-muted"><?= __('admin.copilot.ai_model_hint','Modelo fixo — não pode ser alterado conforme especificação do projeto') ?></small>
                         </div>
                     </div>
                 </div>
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Parâmetros Operacionais</h5>
+                        <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i><?= __('admin.copilot.operational_params','Parâmetros Operacionais') ?></h5>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label for="max_msgs_por_minuto" class="form-label">Máx. mensagens/minuto</label>
+                                <label for="max_msgs_por_minuto" class="form-label"><?= __('admin.copilot.max_msgs_per_minute','Máx. mensagens/minuto') ?></label>
                                 <input type="number" class="form-control" id="max_msgs_por_minuto" name="max_msgs_por_minuto"
                                     value="<?= htmlspecialchars($configs['max_msgs_por_minuto'] ?? '20') ?>" min="1" max="100">
                             </div>
                             <div class="col-md-4">
-                                <label for="timeout_claude_ms" class="form-label">Timeout Claude (ms)</label>
+                                <label for="timeout_claude_ms" class="form-label"><?= __('admin.copilot.claude_timeout_ms','Timeout Claude (ms)') ?></label>
                                 <input type="number" class="form-control" id="timeout_claude_ms" name="timeout_claude_ms"
                                     value="<?= htmlspecialchars($configs['timeout_claude_ms'] ?? '15000') ?>" min="1000" max="60000">
                             </div>
                             <div class="col-md-4">
-                                <label for="cambio_usd_brl" class="form-label">Câmbio USD→BRL</label>
+                                <label for="cambio_usd_brl" class="form-label"><?= __('admin.copilot.exchange_usd_brl','Câmbio USD→BRL') ?></label>
                                 <input type="number" class="form-control" id="cambio_usd_brl" name="cambio_usd_brl"
                                     value="<?= htmlspecialchars($configs['cambio_usd_brl'] ?? '5.80') ?>" step="0.01" min="0.01">
                             </div>
                             <div class="col-md-4">
-                                <label for="gatilho_tempo_ms" class="form-label">Tempo gatilho proativo (ms)</label>
+                                <label for="gatilho_tempo_ms" class="form-label"><?= __('admin.copilot.proactive_trigger_ms','Tempo gatilho proativo (ms)') ?></label>
                                 <input type="number" class="form-control" id="gatilho_tempo_ms" name="gatilho_tempo_ms"
                                     value="<?= htmlspecialchars($configs['gatilho_tempo_ms'] ?? '30000') ?>" min="5000">
                             </div>
                             <div class="col-md-4">
-                                <label for="max_historico_enviado" class="form-label">Máx. histórico enviado</label>
+                                <label for="max_historico_enviado" class="form-label"><?= __('admin.copilot.max_history_sent','Máx. histórico enviado') ?></label>
                                 <input type="number" class="form-control" id="max_historico_enviado" name="max_historico_enviado"
                                     value="<?= htmlspecialchars($configs['max_historico_enviado'] ?? '10') ?>" min="1" max="50">
                             </div>

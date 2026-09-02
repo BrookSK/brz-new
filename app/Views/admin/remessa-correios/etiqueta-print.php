@@ -14,7 +14,7 @@ $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 $simbolo = $simboloEncaminhamento ?? 'sedex';
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="<?= \App\Core\I18n::getLocaleHtml() ?>">
 <head>
 <meta charset="UTF-8">
 <title>etiqueta-<?= $h($codigo) ?></title>
@@ -141,7 +141,7 @@ body {
 </style>
 </head>
 <body>
-<button class="print-btn no-print" onclick="document.title='etiqueta-<?= $h($codigo) ?>';window.print()">🖨 Imprimir</button>
+<button class="print-btn no-print" onclick="document.title='etiqueta-<?= $h($codigo) ?>';window.print()">🖨 <?= __('admin.shipment_correios.print','Imprimir') ?></button>
 
 <div class="label">
 
@@ -154,23 +154,23 @@ body {
       <canvas id="datamatrix"></canvas>
     </div>
     <div class="simbolo">
-      <img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="Símbolo" style="width:18mm;height:auto;">
+      <img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="<?= htmlspecialchars(__('admin.shipment_correios.symbol','Símbolo'), ENT_QUOTES, 'UTF-8') ?>" style="width:18mm;height:auto;">
     </div>
   </div>
 
   <!-- INFO SERVIÇO: NF + Contrato + Serviço + Pedido + Volume + Peso -->
   <div class="lbl-info">
     <div class="col-left">
-      NF:<br>
-      Pedido: <strong><?= $pedidoId > 0 ? $pedidoId : '0' ?></strong>
+      <?= __('admin.shipment_correios.nf','NF:') ?><br>
+      <?= __('admin.shipment_correios.order','Pedido:') ?> <strong><?= $pedidoId > 0 ? $pedidoId : '0' ?></strong>
     </div>
     <div class="col-center">
-      Contrato: <strong><?= $h($contrato) ?></strong><br>
+      <?= __('admin.shipment_correios.contract','Contrato:') ?> <strong><?= $h($contrato) ?></strong><br>
       <strong><?= $h($servicoLabel) ?></strong>
     </div>
     <div class="col-right">
-      Volume: 1/1<br>
-      Peso (g): <strong><?= $h($pesoGramas) ?></strong>
+      <?= __('admin.shipment_correios.volume','Volume:') ?> 1/1<br>
+      <?= __('admin.shipment_correios.weight_g','Peso (g):') ?> <strong><?= $h($pesoGramas) ?></strong>
     </div>
   </div>
 
@@ -190,16 +190,16 @@ body {
   <!-- FORMULÁRIO RECEBEDOR -->
   <div class="lbl-recebedor">
     <div class="field">
-      <span class="fl">Recebedor:</span>
+      <span class="fl"><?= __('admin.shipment_correios.receiver','Recebedor:') ?></span>
       <span class="fv"></span>
     </div>
     <div class="field-row">
       <div class="field">
-        <span class="fl">Assinatura:</span>
+        <span class="fl"><?= __('admin.shipment_correios.signature','Assinatura:') ?></span>
         <span class="fv"></span>
       </div>
       <div class="field">
-        <span class="fl">Documento:</span>
+        <span class="fl"><?= __('admin.shipment_correios.document','Documento:') ?></span>
         <span class="fv"></span>
       </div>
     </div>
@@ -208,7 +208,7 @@ body {
   <!-- DESTINATÁRIO -->
   <div class="lbl-dest">
     <div class="dest-header">
-      <span>DESTINATÁRIO</span>
+      <span><?= __('admin.shipment_correios.recipient','DESTINATÁRIO') ?></span>
       <img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="height:4mm;width:auto;">
     </div>
     <div class="dest-body">
@@ -226,11 +226,11 @@ body {
 
   <!-- REMETENTE -->
   <div class="lbl-rem">
-    <div class="rem-title">Remetente: <?= $h($remNome) ?></div>
+    <div class="rem-title"><?= __('admin.shipment_correios.sender','Remetente:') ?> <?= $h($remNome) ?></div>
     <div><?= $h($remEndereco) ?></div>
     <div class="rem-cep"><?= $h($remCep) ?> <?= $h($remCidade . '/' . $remUf) ?></div>
     <?php if (!empty($remCnpj)): ?>
-    <div>CNPJ: <?= $h($remCnpj) ?></div>
+    <div><?= __('admin.shipment_correios.cnpj','CNPJ:') ?> <?= $h($remCnpj) ?></div>
     <?php endif; ?>
   </div>
 

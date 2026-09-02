@@ -1,0 +1,674 @@
+﻿admin.inventory.access_denied|Access denied.
+admin.inventory.actions|Actions
+admin.inventory.add_location|Add location
+admin.inventory.available|Available
+admin.inventory.available_quantity|Available quantity
+admin.inventory.back|Back
+admin.inventory.cancel|Cancel
+admin.inventory.change_logs|Change logs
+admin.inventory.clear|Clear
+admin.inventory.click_to_select|Click a product to select.
+admin.inventory.close|Close
+admin.inventory.confirm|Confirm
+admin.inventory.confirmation|Confirmation
+admin.inventory.control_expiry|Control expiry
+admin.inventory.current_stock|Current Stock
+admin.inventory.edit_heading|Edit Stock
+admin.inventory.edit_page_title|Edit Stock
+admin.inventory.entry_data|Entry data
+admin.inventory.entry_heading|Stock Entry (Warehouse)
+admin.inventory.entry_page_title|Stock Entry
+admin.inventory.entry_short|Entry
+admin.inventory.err_fetch_reservations|Error fetching reservations.
+admin.inventory.err_invalid_params|Invalid parameters.
+admin.inventory.err_mark_purchased|Error marking as purchased.
+admin.inventory.err_search_products|Error searching products.
+admin.inventory.err_table_not_found|Table lista_compras not found.
+admin.inventory.expiry_date|Expiry date
+admin.inventory.filter_all|All
+admin.inventory.filter_critical|Critical
+admin.inventory.filter_low|Low
+admin.inventory.filter_normal|Normal
+admin.inventory.flash_changes_saved|Changes saved and recorded in the log.
+admin.inventory.flash_deficit_added|(+ {n} to cover deficit vs reserved)
+admin.inventory.flash_entry_not_found|Entry not found.
+admin.inventory.flash_entry_registered|Stock entry registered successfully.
+admin.inventory.flash_error_delete_entry|Error deleting stock entry: {e}
+admin.inventory.flash_error_entry|Error registering stock entry: {e}
+admin.inventory.flash_error_load_edit|Error loading stock edit: {e}
+admin.inventory.flash_error_save_edit|Error saving stock edit: {e}
+admin.inventory.flash_expiry_less_90|Product with expiry under 90 days. The product must be replaced before registering again.
+admin.inventory.flash_inform_valid_qty|Enter a valid quantity.
+admin.inventory.flash_invalid_params_delete|Invalid parameters for deletion.
+admin.inventory.flash_invalid_product|Invalid product.
+admin.inventory.flash_location_deleted|Location deleted and recorded in the log.
+admin.inventory.flash_location_exists|An entry for this product already exists for this location. Adjust the quantity in the existing record.
+admin.inventory.flash_no_change|No changes to save.
+admin.inventory.flash_no_entry_update|No entry to update.
+admin.inventory.flash_product_not_found|Product not found.
+admin.inventory.flash_qty_updated|Quantity updated successfully (without duplicating location).
+admin.inventory.flash_reduction_reservations|Warning: stock was reduced and there are active reservations. Purchase pending was adjusted automatically.
+admin.inventory.flash_removed_reservations|Warning: you removed stock and there are active reservations. Purchase pending was adjusted automatically.
+admin.inventory.flash_select_valid_product|Select a valid product.
+admin.inventory.flash_tables_not_found|Stock tables not found in the database. Run the migration 020_create_estoque_profissional_fix.sql on the server database.
+admin.inventory.flash_tables_not_found_migrations|Stock tables not found in the database. Run the stock migrations on the server database.
+admin.inventory.food_item|Food
+admin.inventory.generate_pdf|Generate PDF
+admin.inventory.js_cannot_load_product|Could not load the selected product data.
+admin.inventory.js_continue_anyway|Do you want to continue anyway?
+admin.inventory.js_created_at|Created at:
+admin.inventory.js_customer|Customer:
+admin.inventory.js_delete_below_reserved|WARNING: this deletion will leave total stock
+admin.inventory.js_delete_location|Delete this location from stock?
+admin.inventory.js_delete_location_log|Delete this location from stock? This action will be recorded in the log.
+admin.inventory.js_error|Error.
+admin.inventory.js_no_items|No items.
+admin.inventory.js_open_order|Open order
+admin.inventory.js_order|Order
+admin.inventory.js_order_items_unavailable|Order items unavailable.
+admin.inventory.js_paid_at|Paid at:
+admin.inventory.js_price|Price
+admin.inventory.js_product_id|Product ID:
+admin.inventory.js_qty|Qty
+admin.inventory.js_reserved_qty|Reserved qty:
+admin.inventory.js_reserved_quantity|Reserved quantity:
+admin.inventory.js_select_product_first|Select a product before saving.
+admin.inventory.js_subtotal|Subtotal
+admin.inventory.js_warn_below_reserved_1|WARNING: when saving, total stock will be
+admin.inventory.js_warn_below_reserved_2|below reserved
+admin.inventory.loading|Loading...
+admin.inventory.log_by|By:
+admin.inventory.log_from|from
+admin.inventory.log_qty|Qty:
+admin.inventory.log_to|to
+admin.inventory.modal_reservations_title|Related reservations / orders
+admin.inventory.msg_marked_purchased|Item(s) marked as purchased.
+admin.inventory.next|Next
+admin.inventory.no_entry_found|No entry found for this product in internal stock.
+admin.inventory.no_log_found|No log found.
+admin.inventory.no_name|(No name)
+admin.inventory.no_order_found|No order found.
+admin.inventory.no_product_found|No product found.
+admin.inventory.no_product_selected|No product selected.
+admin.inventory.observation|Observation
+admin.inventory.open_purchase_list|Open purchase list
+admin.inventory.optional|Optional
+admin.inventory.orphan_reservation|Orphan reservation (no order)
+admin.inventory.page_of|Page {p} of {t} ({n} products)
+admin.inventory.page_title|Internal Stock
+admin.inventory.pending_purchases|Pending (purchases)
+admin.inventory.previous|Previous
+admin.inventory.product|Product
+admin.inventory.product_stock_info|Product stock information
+admin.inventory.products_count|product(s)
+admin.inventory.purchase_date|Purchase date
+admin.inventory.refresh|Refresh
+admin.inventory.reserved_real|Reserved (real)
+admin.inventory.save_changes|Save changes
+admin.inventory.save_entry|Save entry
+admin.inventory.search_product|Search product
+admin.inventory.search_product_placeholder|Type name or SKU...
+admin.inventory.search_product_sku|Search product, SKU...
+admin.inventory.selected_product|Selected product
+admin.inventory.shelf|Shelf
+admin.inventory.shelf_placeholder|Ex: 3
+admin.inventory.stat_active|Active in the system
+admin.inventory.stat_adequate|Adequate levels
+admin.inventory.stat_below_ideal|Below ideal
+admin.inventory.stat_below_min|Below minimum
+admin.inventory.stat_critical|Critical Stock
+admin.inventory.stat_low|Low Stock
+admin.inventory.stat_normal|Normal Stock
+admin.inventory.stat_total_products|Total Products
+admin.inventory.status_replenishment|Replenishment
+admin.inventory.status_replenishment_warning|Status: <strong>Replenishment</strong>. Reserved above stock; available stays negative until entry.
+admin.inventory.summary_title|Summary (avoid selling/buying wrong)
+admin.inventory.th_actions|Actions
+admin.inventory.th_available|Available
+admin.inventory.th_expiry|Expiry
+admin.inventory.th_location|Location
+admin.inventory.th_notes|Notes
+admin.inventory.th_product|Product
+admin.inventory.th_purchase_date|Purchase date
+admin.inventory.th_quantity|Quantity
+admin.inventory.th_reserved|Reserved
+admin.inventory.th_sku|SKU
+admin.inventory.th_status|Status
+admin.inventory.total_stock|Total stock
+admin.inventory.unit_abbr|un
+admin.inventory.view_reservations|View reservations
+admin.inventory.warehouse|Warehouse
+admin.inventory.warehouse_placeholder|Ex: Warehouse A
+admin.product_desc.btn_approve|Approve
+admin.product_desc.btn_close|Close
+admin.product_desc.btn_generate|Generate
+admin.product_desc.btn_reject|Reject
+admin.product_desc.btn_review|Review
+admin.product_desc.err_api_unknown|Unknown API error (HTTP {code})
+admin.product_desc.err_connection|Connection error: {e}
+admin.product_desc.err_invalid_id|Invalid ID
+admin.product_desc.err_no_api_key|ChatGPT API Key not configured. Go to Settings > AI.
+admin.product_desc.err_no_description_to_approve|No description to approve
+admin.product_desc.err_no_product_selected|No product selected
+admin.product_desc.err_product_not_found|Product not found
+admin.product_desc.heading|Product Descriptions
+admin.product_desc.js_confirm_approve|Approve
+admin.product_desc.js_confirm_reject|Reject
+admin.product_desc.js_descriptions|descriptions?
+admin.product_desc.js_empty_description|Empty description
+admin.product_desc.js_error|Error
+admin.product_desc.js_error_generating|Error generating
+admin.product_desc.kpi_approved|Approved
+admin.product_desc.kpi_errors|Errors
+admin.product_desc.kpi_no_description|No Description
+admin.product_desc.kpi_pending_review|Pending Review
+admin.product_desc.modal_ai_description_label|AI-generated description:
+admin.product_desc.modal_title|Review Description
+admin.product_desc.no_products|No products found in this filter.
+admin.product_desc.page_title|Product Descriptions
+admin.product_desc.status_approved|Approved
+admin.product_desc.status_error|Error
+admin.product_desc.status_generating|Generating...
+admin.product_desc.status_no_description|No description
+admin.product_desc.status_pending|Pending
+admin.product_desc.status_rejected|Rejected
+admin.product_desc.subtitle|AI description generation and review
+admin.product_desc.tab_all_no_description|All without description
+admin.product_desc.tab_approved|Approved
+admin.product_desc.tab_error|With error
+admin.product_desc.tab_pending|Pending
+admin.product_desc.tab_rejected|Rejected
+admin.product_desc.th_actions|Actions
+admin.product_desc.th_category|Category
+admin.product_desc.th_image|Img
+admin.product_desc.th_product|Product
+admin.product_desc.th_status|Status
+admin.products.actions|Actions
+admin.products.active|Active
+admin.products.add_description|Add description
+admin.products.add_description_per_variant|Add a description for each product variant.
+admin.products.all_stores|All stores
+admin.products.archived|Archived
+admin.products.archived_page_title|Archived Products
+admin.products.back|Back
+admin.products.batch_registration|Batch registration
+admin.products.batch_same_data_help|Same photo, weight, price and stock for all. Only the description changes.
+admin.products.batch_variants|Batch (variants)
+admin.products.cancel|Cancel
+admin.products.category|Category
+admin.products.charge_local_tax|Charge local tax
+admin.products.click_mic_describe|Click the microphone and describe the product...
+admin.products.club_exclusive|Braziliana Club exclusive
+admin.products.confirm_delete_product|Are you sure you want to delete this product?
+admin.products.cost_equals_price|Cost = Product value
+admin.products.cost_equals_price_help|If enabled, cost will be filled with the sale value.
+admin.products.create_group|Create group
+admin.products.delete|Delete
+admin.products.desapego|Braziliana Desapego
+admin.products.desapego_desc|Desapego product (sold to the USA only)
+admin.products.desapeguista|Seller (desapeguista)
+admin.products.desapeguista_help|Select the seller who owns this product (if any).
+admin.products.description|Description
+admin.products.descriptions_variants|Descriptions (variants)
+admin.products.deselect_all|Deselect all
+admin.products.details|Details
+admin.products.do_not_change|Do not change
+admin.products.edit|Edit
+admin.products.eg_8|Ex: 8
+admin.products.eg_iphone|Ex: iPhone 15 Pro
+admin.products.eg_iphone_variant|Ex: iPhone 15 Pro - Blue 128GB
+admin.products.eg_walmart|Ex: Walmart
+admin.products.err_category_exists|Category already exists.
+admin.products.err_chatgpt|ChatGPT error: {e}
+admin.products.err_create|Error creating: {e}
+admin.products.err_csv_invalid|Invalid CSV
+admin.products.err_csv_not_found|CSV file not found on the server.
+admin.products.err_csv_not_sent|CSV file not sent.
+admin.products.err_csv_read|Could not read the CSV.
+admin.products.err_csv_upload|CSV upload failed.
+admin.products.err_import_corrupted|Import state corrupted.
+admin.products.err_import_not_found|Import not found (expired).
+admin.products.err_invalid_ai_response|Invalid AI response.
+admin.products.err_invalid_ids|Invalid IDs.
+admin.products.err_invalid_token|Invalid token.
+admin.products.err_name_or_transcription|Enter the product name or transcription.
+admin.products.err_name_required|Name is required.
+admin.products.err_no_api_key|ChatGPT API Key not configured.
+admin.products.err_no_api_key_config|ChatGPT API Key not configured. Go to Settings.
+admin.products.err_no_audio|No audio received.
+admin.products.err_no_field_update|No field to update.
+admin.products.err_no_product_selected|No product selected.
+admin.products.err_not_authorized|Not authorized.
+admin.products.err_save_file|Could not save the file on the server.
+admin.products.err_transcription|Transcription error: {e}
+admin.products.error_label|Error:
+admin.products.featured|Featured (appears on Home)
+admin.products.featured_label|Featured
+admin.products.flash_attributes_saved|Attributes/Options saved.
+admin.products.flash_error_save_attributes|Error saving attributes.
+admin.products.flash_error_update_variations|Error updating variations.
+admin.products.flash_variation_tables_not_found|Variation tables not found. Run migration 061.
+admin.products.flash_variations_removed|Variations removed.
+admin.products.flash_variations_updated|Variations updated.
+admin.products.group_active|Group active
+admin.products.hide_from_site|Hide across the entire site
+admin.products.hide_help|If checked, the product only appears for admin/seller in manual orders.
+admin.products.hide_help_batch|If checked, the products only appear for admin/seller in manual orders.
+admin.products.how_to_register|How do you want to register the products?
+admin.products.image|Image
+admin.products.inactive|Inactive
+admin.products.js_add_at_least_one_desc|Add at least one description.
+admin.products.js_ai_filling_fields|AI filling in the fields...
+admin.products.js_ai_no_data|AI returned no data
+admin.products.js_connection_error|Connection error. Please try again.
+admin.products.js_connection_error_short|Connection error.
+admin.products.js_create_group|Create group
+admin.products.js_creating|Creating...
+admin.products.js_error|Error
+admin.products.js_error_enriching|Error enriching.
+admin.products.js_error_label|Error:
+admin.products.js_error_saving|Error saving.
+admin.products.js_fields_filled_ai|Fields filled by AI!
+admin.products.js_fill_at_least_one|Fill in at least one field to change.
+admin.products.js_fill_value_weight|Fill in value and weight.
+admin.products.js_mic_permission_denied|Microphone permission denied.
+admin.products.js_name_required|Name required.
+admin.products.js_new_product|New product
+admin.products.js_new_registration|New registration
+admin.products.js_no_product_saved|No product was saved. Check the data.
+admin.products.js_of|of
+admin.products.js_open_product|Open product
+admin.products.js_product_saved_kept|Product saved! Data kept for the next one.
+admin.products.js_product_saved_success|Product saved successfully.
+admin.products.js_products_saved_success|product(s) registered successfully.
+admin.products.js_recording_click_stop|Recording... click to stop
+admin.products.js_save_failed|Failed to save.
+admin.products.js_saved_partial_1|saved,
+admin.products.js_saved_partial_2|failed.
+admin.products.js_saving|Saving...
+admin.products.js_saving_x_of|Saving
+admin.products.js_server_comm_error|Communication error with the server.
+admin.products.js_transcribed_sending_ai|Transcribed! Sending to AI...
+admin.products.js_transcribing|Transcribing...
+admin.products.js_wait_few_seconds|Please wait, this takes a few seconds.
+admin.products.keep_data_after_save|Keep data after saving
+admin.products.leave_empty_no_deadline|Leave empty for a promotion without a deadline
+admin.products.leave_empty_no_promo|Leave empty if there is no promotion
+admin.products.mass_edit|Mass edit
+admin.products.mass_edit_help|Fill in only the fields you want to change. Blank fields will be ignored.
+admin.products.mass_edit_title|Mass Edit
+admin.products.mic_placeholder|Click the microphone and describe the product...
+admin.products.msg_products_updated|{n} product(s) updated successfully.
+admin.products.name|Name
+admin.products.new|New
+admin.products.new_category|New category
+admin.products.new_category_name|New category name
+admin.products.new_product|New product
+admin.products.new_purchase_group|New purchase group
+admin.products.new_store|New store
+admin.products.new_store_name|New store name
+admin.products.new_submission|New submission
+admin.products.next|Next
+admin.products.no|No
+admin.products.no_group|No group registered. Create the first one!
+admin.products.none_own_product|None (own product)
+admin.products.open_group|Open Group
+admin.products.optional|Optional
+admin.products.optional_applied_all_batch|Optional Ã¢â‚¬â€ applied to all batch items
+admin.products.optional_applied_all_batch_f|Optional Ã¢â‚¬â€ applied to all batch items
+admin.products.outlet|Braziliana Outlet
+admin.products.outlet_help|If checked, the product appears on the Braziliana Outlet page.
+admin.products.outlet_help_batch|If checked, the products appear on the Braziliana Outlet page.
+admin.products.percentage|Percentage (%)
+admin.products.previous|Previous
+admin.products.price|Price
+admin.products.price_usd|Price (USD)
+admin.products.product_for_site|Product for the Site
+admin.products.product_for_site_desc|Register a standalone product (without purchase group)
+admin.products.product_link|Product link
+admin.products.product_photo|Product photo
+admin.products.products|Products
+admin.products.products_count|product(s)
+admin.products.products_page_title|Products
+admin.products.products_selected|product(s) selected
+admin.products.promo_deadline|Promotion Deadline
+admin.products.promo_deadline_help|After this date, the price automatically returns to normal.
+admin.products.purchase_group|Purchase Group
+admin.products.quick_add|Quick add
+admin.products.quick_add_title|Quick Add
+admin.products.record_audio|Record audio
+admin.products.registration|Registration
+admin.products.sale_price_expires|Promotion Deadline
+admin.products.sale_price_expires_help|After this date, the price automatically returns to normal.
+admin.products.sale_price_help|If filled in, the product appears with a struck-through price and highlighted promotional value.
+admin.products.sale_price_usd|Promotional Value (USD)
+admin.products.save|Save
+admin.products.save_all|Save all
+admin.products.save_all_selected|Save for all selected
+admin.products.saved_appears_home|If it is featured, it should appear on the Home.
+admin.products.saving|Saving...
+admin.products.search_category|Search category...
+admin.products.search_ncm|Search NCM (code or description)...
+admin.products.search_product|Search product...
+admin.products.search_store|Search store...
+admin.products.select|Select...
+admin.products.select_all|Select all
+admin.products.select_or_create_group|Select or create a group
+admin.products.select_placeholder|Select...
+admin.products.select_store|Select the store...
+admin.products.selected_group|Selected group:
+admin.products.stock|Stock
+admin.products.store|Store
+admin.products.store_required_site|Required for site products (without purchase group).
+admin.products.value_usd|Value (USD)
+admin.products.variant_description|Variant description
+admin.products.voice_description|Voice description (AI)
+admin.products.voice_description_ai|Voice description (AI)
+admin.products.voice_description_help|Record audio describing the product. The AI will fill in the fields automatically.
+admin.products.voice_help|Record audio describing the product. The AI will transcribe it and use it to fill in the fields automatically.
+admin.products.weight|Weight
+admin.products.weight_kg|Weight (kg)
+admin.products.yes|Yes
+admin.purchases.all|All
+admin.purchases.all_stores|All stores
+admin.purchases.apply|Apply
+admin.purchases.back|Back
+admin.purchases.badge_carne|Installment plan
+admin.purchases.cancel|Cancel
+admin.purchases.click_to_zoom|Click to zoom
+admin.purchases.close|Close
+admin.purchases.complete_all_info|You can complete pending items in this filter <strong>fully</strong> or <strong>partially</strong>.
+admin.purchases.complete_purchase_of|Complete purchase of:
+admin.purchases.confirm_full_purchase|Confirm full purchase
+admin.purchases.confirm_partial|Confirm partial
+admin.purchases.err_fetch_user_orders|Error fetching user orders.
+admin.purchases.err_generate_link|Error generating link: {e}
+admin.purchases.err_generic|Error: {e}
+admin.purchases.err_invalid_params|Invalid parameters.
+admin.purchases.feature_in_development|Feature in development
+admin.purchases.flash_error_complete|Error completing purchases.
+admin.purchases.flash_error_load_list|Error loading purchase list: {e}
+admin.purchases.flash_error_remove|Error removing item.
+admin.purchases.flash_error_reopen|Error reopening items.
+admin.purchases.flash_error_save_item|Error saving new item: {e}
+admin.purchases.flash_error_set_store|Error setting store.
+admin.purchases.flash_error_update_item|Error updating item.
+admin.purchases.flash_inform_partial_qty|Enter the purchased quantity to partially complete.
+admin.purchases.flash_item_inserted|Item inserted in the order and list. Difference calculated automatically: $ {v}.
+admin.purchases.flash_item_inserted_paid|Item inserted in the order and purchase list. Order is paid: difference calculated at $ {v}.
+admin.purchases.flash_item_removed|Item removed from the list.
+admin.purchases.flash_item_updated|Item updated.
+admin.purchases.flash_items_reopened|Items reopened.
+admin.purchases.flash_no_pending_complete|No pending item found to complete.
+admin.purchases.flash_no_pending_item|No pending item found to remove.
+admin.purchases.flash_order_not_belong_user|Order does not belong to the selected user.
+admin.purchases.flash_order_not_found|Order not found.
+admin.purchases.flash_partial_registered|Partial purchase registered. The remainder stays pending.
+admin.purchases.flash_product_not_found|Product not found.
+admin.purchases.flash_purchases_completed|Purchases completed.
+admin.purchases.flash_qty_exceeds|The number of products exceeds the purchase quantity; if you bought spare items please add them to stock
+admin.purchases.flash_store_configured|Store configured and applied to pending purchases.
+admin.purchases.generate_pdf|Generate PDF
+admin.purchases.generated_at|Generated at:
+admin.purchases.heading|Purchase List
+admin.purchases.help_auto_calculated|Calculated automatically on save (default rules).
+admin.purchases.help_partial_purchase|If buying partially, enter how many items were bought. The difference stays pending.
+admin.purchases.help_partial_remaining|In a partial purchase, the remainder stays pending.
+admin.purchases.help_pending_value|On save, if the order is pending, the system adds the pending value to the order total (without calling the gateway automatically).
+admin.purchases.help_select_user|Select the user to load the orders.
+admin.purchases.important|Important:
+admin.purchases.important_text|the quantities shown in the Purchase List represent the <strong>remaining</strong> amount considering registered stock (Stock screen), and not necessarily the total ordered.
+admin.purchases.important_text2|Site (online) orders and manual orders follow the same remaining calculation rule.
+admin.purchases.items|items
+admin.purchases.js_awaiting_first_installment|Awaiting 1st installment
+admin.purchases.js_created_at|Created at:
+admin.purchases.js_customer|Customer:
+admin.purchases.js_difference_only_asaas|Difference charge available only for Asaas orders.
+admin.purchases.js_difference_value|Difference value
+admin.purchases.js_error_fetch_orders|Error fetching orders.
+admin.purchases.js_error_generate_link|Error generating link
+admin.purchases.js_error_loading_orders|Error loading orders
+admin.purchases.js_generate_link|Generate link
+admin.purchases.js_generating_link|Generating link...
+admin.purchases.js_installments|Installments:
+admin.purchases.js_link_generated|Link generated:
+admin.purchases.js_link_generated_success|Link generated successfully.
+admin.purchases.js_loading|Loading...
+admin.purchases.js_no_orders_for_user|No order for this user
+admin.purchases.js_open_carne|Open installment plan
+admin.purchases.js_open_charge|Open charge
+admin.purchases.js_open_order|Open order
+admin.purchases.js_order|Order
+admin.purchases.js_order_items_unavailable|Order items unavailable.
+admin.purchases.js_paid|paid
+admin.purchases.js_paid_at|Paid at:
+admin.purchases.js_price|Price
+admin.purchases.js_product_id|Product ID:
+admin.purchases.js_purchase_released|Purchase released
+admin.purchases.js_qty|Qty
+admin.purchases.js_qty_exceeds|The number of products exceeds the purchase quantity; if you bought spare items please add them to stock 
+admin.purchases.js_status|Status:
+admin.purchases.js_subtotal|Subtotal
+admin.purchases.label_order|Order
+admin.purchases.label_pending_value|Pending value (difference)
+admin.purchases.label_priority|Priority
+admin.purchases.label_product|Product
+admin.purchases.label_purchased_qty|Purchased quantity (for partial purchase only)
+admin.purchases.label_quantity|Quantity
+admin.purchases.label_user|User
+admin.purchases.list_items_title|Purchase List Items
+admin.purchases.modal_complete_item_title|Complete item
+admin.purchases.modal_complete_purchases_title|Complete purchases
+admin.purchases.modal_related_orders_title|Related orders
+admin.purchases.modal_remove_title|Remove item from list
+admin.purchases.modal_reopen_item_title|Reopen item
+admin.purchases.modal_set_store_title|Set product store
+admin.purchases.month_01|January
+admin.purchases.month_02|February
+admin.purchases.month_03|March
+admin.purchases.month_04|April
+admin.purchases.month_05|May
+admin.purchases.month_06|June
+admin.purchases.month_07|July
+admin.purchases.month_08|August
+admin.purchases.month_09|September
+admin.purchases.month_10|October
+admin.purchases.month_11|November
+admin.purchases.month_12|December
+admin.purchases.new_item_heading|New Item in the Purchase List
+admin.purchases.new_item_page_title|New Item - Purchase List
+admin.purchases.no_date|No date
+admin.purchases.no_orders_for_item|No order found for this item.
+admin.purchases.no_store|No store
+admin.purchases.no_store_defined|No Store Defined
+admin.purchases.page_title|Purchase List
+admin.purchases.pdf_general|PDF (general)
+admin.purchases.pdf_no_store|PDF (No store)
+admin.purchases.pdf_ok|Ok
+admin.purchases.pdf_order_notes|Order notes
+admin.purchases.pdf_photo|Photo
+admin.purchases.pdf_qty|Qty
+admin.purchases.pdf_qty_purchased|Qty Purchased
+admin.purchases.pdf_this_store|PDF for this store
+admin.purchases.print_save_pdf|Print / Save as PDF
+admin.purchases.priority_high|High
+admin.purchases.priority_low|Low
+admin.purchases.priority_medium|Medium
+admin.purchases.priority_urgent|Urgent
+admin.purchases.product|Product
+admin.purchases.product_image_alt|Product image
+admin.purchases.refresh|Refresh
+admin.purchases.remove|Remove
+admin.purchases.remove_confirm_prefix|Are you sure you want to remove the item from the list
+admin.purchases.reopen|Reopen
+admin.purchases.reopen_all_confirm|Do you want to set all completed items in this filter back to <strong>pending</strong>?
+admin.purchases.reopen_item_prefix|Set back to <strong>pending</strong>:
+admin.purchases.reopen_items|Reopen items
+admin.purchases.save|Save
+admin.purchases.search_store|Search store...
+admin.purchases.select_placeholder|Select...
+admin.purchases.select_user_first|Select a user first...
+admin.purchases.stat_acquired|Items acquired
+admin.purchases.stat_awaiting|Awaiting purchase
+admin.purchases.stat_cancelled|Cancelled
+admin.purchases.stat_cancelled_items|Cancelled items
+admin.purchases.stat_in_list|In the purchase list
+admin.purchases.stat_pending|Pending
+admin.purchases.stat_purchased|Purchased
+admin.purchases.stat_total_items|Total Items
+admin.purchases.stock_check_for_product|Stock check for product ID: {id}
+admin.purchases.store|store
+admin.purchases.stores_selected|{n} stores selected
+admin.purchases.tab_completed|Completed
+admin.purchases.tab_pending|Pending
+admin.purchases.th_actions|Actions
+admin.purchases.th_priority|Priority
+admin.purchases.th_product|Product
+admin.purchases.th_quantity|Quantity
+admin.purchases.th_request_date|Request Date
+admin.purchases.th_status|Status
+admin.purchases.th_store|Store
+admin.purchases.type|Type:
+admin.purchases.type_all|All
+admin.purchases.type_offline|Offline
+admin.purchases.type_online|Online
+admin.purchases.unit_abbr|un
+admin.purchases.user|User
+admin.settings.actions|Actions
+admin.settings.add_banner|Add banner
+admin.settings.address|Address
+admin.settings.admin_logo|Admin Logo
+admin.settings.admin_logo_help|Upload the logo to appear in the admin panel.
+admin.settings.available_variables|Available variables:
+admin.settings.available_variables_label|Available Variables
+admin.settings.banner_desktop|Desktop Banner (1149x436)
+admin.settings.banner_language|Banner language
+admin.settings.banner_mobile|Mobile Banner (391x333)
+admin.settings.banners_help|Register images to rotate in the site header.
+admin.settings.banners_lang_help|The banners shown on the Home change according to the language selected on the site.
+admin.settings.carne_group|Braziliana Installment Plan
+admin.settings.clear_logs|Clear logs
+admin.settings.contact_email|Contact Email
+admin.settings.currency_conversion_help|When disabled, the BRL/USD currency selector and converted values do not appear to the customer on the site screens (except at checkout, where conversion is always available).
+admin.settings.custom_fields_help|These fields are merged into the final payload sent to the webhook.
+admin.settings.custom_fields_json|Custom Fields (JSON)
+admin.settings.database_name|Database (name)
+admin.settings.date|Date
+admin.settings.description|Description
+admin.settings.documentation|Documentation
+admin.settings.email_creator|Email Creator
+admin.settings.email_preview|Email Preview
+admin.settings.email_settings|Email Settings
+admin.settings.email_subject|Email Subject
+admin.settings.email_subject_placeholder|Email subject
+admin.settings.encryption|Encryption
+admin.settings.event|Event
+admin.settings.event_carne_cancel_warning|Installment Plan Cancellation Warning
+admin.settings.event_carne_cancel_warning_short|Plan - Cancellation Warning
+admin.settings.event_carne_canceled|Installment Plan Cancelled
+admin.settings.event_carne_charge|Installment Plan Charge (overdue installment)
+admin.settings.event_carne_charge_short|Plan - Charge
+admin.settings.event_carne_created|Installment Plan Created
+admin.settings.event_carne_due_soon|Installment Plan Due Soon
+admin.settings.event_carne_due_soon_short|Plan - Installment Due Soon
+admin.settings.event_carne_paid_off|Installment Plan Paid Off
+admin.settings.event_carne_payment_confirmed|Installment Plan Payment Confirmed
+admin.settings.event_carne_payment_confirmed_short|Plan - Payment Confirmed
+admin.settings.event_carne_shipping_released|Installment Plan Shipping Released
+admin.settings.event_carne_shipping_released_short|Plan - Shipping Released
+admin.settings.event_contact|Contact
+admin.settings.event_new_order|New Order
+admin.settings.event_new_user|New User
+admin.settings.event_order_approved|Order Approved
+admin.settings.event_order_canceled|Order Cancelled
+admin.settings.event_order_delivered|Order Delivered
+admin.settings.event_order_shipped|Order Shipped
+admin.settings.event_password_reset|Password Reset
+admin.settings.event_type|Event Type
+admin.settings.favicon_help|Upload the icon to appear in the browser tab.
+admin.settings.fields_sent_webhook|Fields Sent in the Webhook
+admin.settings.footer_logo|Footer Logo
+admin.settings.footer_logo_help|Upload the logo to appear in the site footer.
+admin.settings.from_email|From Email
+admin.settings.from_name|From Name
+admin.settings.html_editor|HTML Editor
+admin.settings.html_editor_placeholder|Type the HTML content of the email...
+admin.settings.http_method|HTTP Method
+admin.settings.insert_variable|Insert Variable
+admin.settings.js_admin_logo_removed_on_save|Admin logo will be removed on save.
+admin.settings.js_favicon_removed_on_save|Favicon will be removed on save.
+admin.settings.js_footer_logo_removed_on_save|Footer logo will be removed on save.
+admin.settings.js_logo_removed_on_save|Logo will be removed on save.
+admin.settings.link_on_click|Link (on click)
+admin.settings.logo|Logo
+admin.settings.logo_help|Upload the logo to appear at the top of the site.
+admin.settings.logo_url|Logo URL
+admin.settings.message_template|Message Template
+admin.settings.message_template_help|You can use variables in the format <code>{{name}}</code>, <code>{{order_code}}</code>, <code>{{status}}</code>, etc.
+admin.settings.message_template_placeholder|Hello {{name}}, your order #{{order_code}} is {{status}}
+admin.settings.no_admin_logo|No admin logo registered
+admin.settings.no_favicon|No favicon registered
+admin.settings.no_footer_logo|No footer logo registered
+admin.settings.no_image|No image
+admin.settings.no_log_found|No log found
+admin.settings.no_logo|No logo registered
+admin.settings.no_template_saved|No template saved yet
+admin.settings.none_f|None
+admin.settings.notifications_webhook_title|Configure Webhook Notifications
+admin.settings.page_title|Settings
+admin.settings.password|Password
+admin.settings.payload_example|Payload Example (JSON)
+admin.settings.phone|Phone
+admin.settings.preview|Preview
+admin.settings.preview_short|Preview
+admin.settings.remove|Remove
+admin.settings.remove_admin_logo|Remove admin logo
+admin.settings.remove_favicon|Remove favicon
+admin.settings.remove_footer_logo|Remove footer logo
+admin.settings.remove_logo|Remove logo
+admin.settings.response|Response
+admin.settings.retry_attempts|Retry Attempts
+admin.settings.save_config|Save Configuration
+admin.settings.save_template|Save Template
+admin.settings.saved_templates|Saved Templates
+admin.settings.select_event|Select an event...
+admin.settings.select_event_see_vars|Select an event to see the available variables
+admin.settings.send_logs|Send Logs
+admin.settings.show_currency_conversion|Show currency conversion to the customer
+admin.settings.smtp_driver|SMTP Driver
+admin.settings.smtp_password|SMTP Password
+admin.settings.smtp_port|SMTP Port
+admin.settings.smtp_user|SMTP User
+admin.settings.store_name|Store Name
+admin.settings.store_settings|Store Settings
+admin.settings.tab_advisory_ai|Advisory / AI
+admin.settings.tab_commissions|Commissions
+admin.settings.tab_demands_it|Demands (IT)
+admin.settings.tab_email|Email
+admin.settings.tab_email_creator|Create Email
+admin.settings.tab_heatmap|Heatmap
+admin.settings.tab_layout|Layout
+admin.settings.tab_notifications|Notifications
+admin.settings.tab_payments|Payments
+admin.settings.tab_shipping|Shipping
+admin.settings.tab_store|Store
+admin.settings.tab_system|System
+admin.settings.table_prefix|Table prefix
+admin.settings.table_prefix_help|Usually <code>wp_</code>. If the old site has another prefix, adjust it here.
+admin.settings.test_connection|Test Connection
+admin.settings.test_email_help|Used when clicking "Test" on the email templates.
+admin.settings.test_email_to|Test email (to)
+admin.settings.test_webhook|Test Webhook
+admin.settings.upload_admin_logo|Upload the Admin Logo
+admin.settings.upload_favicon|Upload the Favicon
+admin.settings.upload_footer_logo|Upload the Footer Logo
+admin.settings.upload_logo|Upload the Logo
+admin.settings.user|User
+admin.settings.webhook_active|Webhook Active
+admin.settings.webhook_extra_fields_note|In addition, the system may add extra event fields (when applicable) and everything you put in "Custom Fields (JSON)".
+admin.settings.webhook_url|Webhook URL
+admin.settings.woo_credentials_help|Configure credentials per origin (BR / RED / US). If empty, the system may fall back to the old configuration (without origin) when applicable.
+admin.settings.woo_credentials_usage|These credentials are used to <strong>update the order in WooCommerce</strong> (order meta) with <code>wexpress_shipping_id</code>, label link and tracking.
+admin.settings.wordpress_integration_readonly|WordPress Integration (Read-only)
+admin.settings.wp_credentials_help|Configure the WordPress database credentials per origin (BR / RED / US). Since they are different sites, repeated IDs/numbers may exist.
+admin.settings.wp_readonly_note|This integration is <strong>read-only</strong>. The system will use these credentials to display orders from the old site.

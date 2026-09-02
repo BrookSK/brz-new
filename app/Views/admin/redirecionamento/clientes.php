@@ -1,6 +1,6 @@
 <?php
 $sidebarActive = 'redirecionamento-clientes';
-$title = 'Clientes dos Redirecionadores';
+$title = __('admin.redirect.redirector_clients', 'Clientes dos Redirecionadores');
 $clientes = is_array($clientes ?? null) ? $clientes : [];
 $redirecionadores = is_array($redirecionadores ?? null) ? $redirecionadores : [];
 $busca = htmlspecialchars($busca ?? '', ENT_QUOTES, 'UTF-8');
@@ -10,19 +10,19 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
-            <h1 class="h2 mb-1">Clientes dos Redirecionadores</h1>
-            <div class="text-muted small"><?= count($clientes) ?> cliente(s)</div>
+            <h1 class="h2 mb-1"><?= __('admin.redirect.redirector_clients', 'Clientes dos Redirecionadores') ?></h1>
+            <div class="text-muted small"><?= count($clientes) ?> <?= __('admin.redirect.clients_count_suffix', 'cliente(s)') ?></div>
         </div>
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoCliente"><i class="fas fa-plus me-1"></i>Novo cliente</button>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoCliente"><i class="fas fa-plus me-1"></i><?= __('admin.redirect.new_client', 'Novo cliente') ?></button>
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-8"><input class="form-control form-control-sm" type="text" name="busca" value="<?= $busca ?>" placeholder="Buscar por nome, CPF ou e-mail..."></div>
+                <div class="col-md-8"><input class="form-control form-control-sm" type="text" name="busca" value="<?= $busca ?>" placeholder="<?= htmlspecialchars(__('admin.redirect.search_name_cpf_email', 'Buscar por nome, CPF ou e-mail...'), ENT_QUOTES, 'UTF-8') ?>"></div>
                 <div class="col-md-4 d-flex gap-2">
-                    <button class="btn btn-primary btn-sm flex-fill" type="submit"><i class="fas fa-search me-1"></i>Buscar</button>
-                    <a class="btn btn-outline-secondary btn-sm" href="/admin/redirecionamento/clientes">Limpar</a>
+                    <button class="btn btn-primary btn-sm flex-fill" type="submit"><i class="fas fa-search me-1"></i><?= __('admin.redirect.search', 'Buscar') ?></button>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/redirecionamento/clientes"><?= __('admin.redirect.clear', 'Limpar') ?></a>
                 </div>
             </form>
         </div>
@@ -35,17 +35,17 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
                     <thead class="table-light">
                         <tr>
                             <th class="ps-3">#</th>
-                            <th>Nome</th>
+                            <th><?= __('admin.redirect.name', 'Nome') ?></th>
                             <th>CPF</th>
-                            <th>E-mail</th>
-                            <?php if (!$redirecionadorFixo): ?><th>Redirecionador</th><?php endif; ?>
-                            <th>Endereços</th>
-                            <th class="pe-3">Ações</th>
+                            <th><?= __('admin.redirect.email', 'E-mail') ?></th>
+                            <?php if (!$redirecionadorFixo): ?><th><?= __('admin.redirect.redirector', 'Redirecionador') ?></th><?php endif; ?>
+                            <th><?= __('admin.redirect.addresses', 'Endereços') ?></th>
+                            <th class="pe-3"><?= __('admin.redirect.actions', 'Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($clientes)): ?>
-                        <tr><td colspan="<?= $redirecionadorFixo ? 6 : 7 ?>" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
+                        <tr><td colspan="<?= $redirecionadorFixo ? 6 : 7 ?>" class="text-center text-muted py-4"><?= __('admin.redirect.no_clients_registered', 'Nenhum cliente cadastrado.') ?></td></tr>
                         <?php else: foreach ($clientes as $c): ?>
                         <tr>
                             <td class="ps-3"><?= (int)$c['id'] ?></td>
@@ -63,11 +63,11 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
                                         data-email="<?= htmlspecialchars($c['email']??'',ENT_QUOTES,'UTF-8') ?>"
                                         data-telefone="<?= htmlspecialchars($c['telefone']??'',ENT_QUOTES,'UTF-8') ?>"
                                         data-nascimento="<?= htmlspecialchars($c['data_nascimento']??'',ENT_QUOTES,'UTF-8') ?>"
-                                        title="Editar"><i class="fas fa-pen"></i></button>
+                                        title="<?= htmlspecialchars(__('admin.redirect.edit', 'Editar'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-pen"></i></button>
                                     <button type="button" class="btn btn-sm btn-outline-danger js-excluir-cliente"
                                         data-id="<?= (int)$c['id'] ?>"
                                         data-nome="<?= htmlspecialchars($c['nome']??'',ENT_QUOTES,'UTF-8') ?>"
-                                        title="Excluir"><i class="fas fa-trash"></i></button>
+                                        title="<?= htmlspecialchars(__('admin.redirect.delete', 'Excluir'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -83,36 +83,36 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
 <div class="modal fade" id="modalNovoCliente" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Novo cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title"><?= __('admin.redirect.new_client', 'Novo cliente') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="row g-3">
                     <?php if ($redirecionadorFixo): ?>
                     <input type="hidden" id="ncRedId" value="<?= (int)$redirecionadorFixo['id'] ?>">
                     <?php else: ?>
                     <div class="col-md-6">
-                        <label class="form-label">Redirecionador <span class="text-danger">*</span></label>
+                        <label class="form-label"><?= __('admin.redirect.redirector', 'Redirecionador') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" id="ncRedId">
-                            <option value="">Selecione...</option>
+                            <option value=""><?= __('admin.redirect.select', 'Selecione...') ?></option>
                             <?php foreach ($redirecionadores as $r): ?>
                             <option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['nome'],ENT_QUOTES,'UTF-8') ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <?php endif; ?>
-                    <div class="<?= $redirecionadorFixo ? 'col-md-8' : 'col-md-6' ?>"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
+                    <div class="<?= $redirecionadorFixo ? 'col-md-8' : 'col-md-6' ?>"><label class="form-label"><?= __('admin.redirect.name', 'Nome') ?> <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
                     <div class="col-md-4">
                         <label class="form-label">CPF <span class="text-danger">*</span></label>
                         <input class="form-control" type="text" id="ncCpf" placeholder="000.000.000-00" maxlength="14">
                         <div class="invalid-feedback" id="ncCpfFeedback"></div>
                     </div>
-                    <div class="col-md-4"><label class="form-label">E-mail</label><input class="form-control" type="email" id="ncEmail"></div>
-                    <div class="col-md-4"><label class="form-label">Telefone</label><input class="form-control" type="text" id="ncTel"></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.email', 'E-mail') ?></label><input class="form-control" type="email" id="ncEmail"></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.phone', 'Telefone') ?></label><input class="form-control" type="text" id="ncTel"></div>
                     <div class="col-md-3">
-                        <label class="form-label">Data nascimento <span class="text-danger">*</span></label>
+                        <label class="form-label"><?= __('admin.redirect.birth_date_short', 'Data nascimento') ?> <span class="text-danger">*</span></label>
                         <input class="form-control" type="date" id="ncNasc">
                         <div class="invalid-feedback" id="ncNascFeedback"></div>
                     </div>
-                    <div class="col-12"><hr class="my-1"><small class="text-muted fw-semibold">Endereço principal</small></div>
+                    <div class="col-12"><hr class="my-1"><small class="text-muted fw-semibold"><?= __('admin.redirect.main_address', 'Endereço principal') ?></small></div>
                     <div class="col-md-3">
                         <label class="form-label">CEP</label>
                         <div class="input-group">
@@ -120,18 +120,18 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
                             <span class="input-group-text" id="ncCepSpinner" style="display:none"><i class="fas fa-spinner fa-spin"></i></span>
                         </div>
                     </div>
-                    <div class="col-md-6"><label class="form-label">Logradouro</label><input class="form-control" type="text" id="ncLogr"></div>
-                    <div class="col-md-3"><label class="form-label">Número</label><input class="form-control" type="text" id="ncNum"></div>
-                    <div class="col-md-3"><label class="form-label">Complemento</label><input class="form-control" type="text" id="ncComp"></div>
-                    <div class="col-md-4"><label class="form-label">Bairro</label><input class="form-control" type="text" id="ncBairro"></div>
-                    <div class="col-md-3"><label class="form-label">Cidade <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncCidade"></div>
-                    <div class="col-md-2"><label class="form-label">Estado</label><input class="form-control" type="text" id="ncEstado" maxlength="2"></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.street', 'Logradouro') ?></label><input class="form-control" type="text" id="ncLogr"></div>
+                    <div class="col-md-3"><label class="form-label"><?= __('admin.redirect.number', 'Número') ?></label><input class="form-control" type="text" id="ncNum"></div>
+                    <div class="col-md-3"><label class="form-label"><?= __('admin.redirect.complement', 'Complemento') ?></label><input class="form-control" type="text" id="ncComp"></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.neighborhood', 'Bairro') ?></label><input class="form-control" type="text" id="ncBairro"></div>
+                    <div class="col-md-3"><label class="form-label"><?= __('admin.redirect.city', 'Cidade') ?> <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncCidade"></div>
+                    <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.state', 'Estado') ?></label><input class="form-control" type="text" id="ncEstado" maxlength="2"></div>
                 </div>
                 <div id="msgCliente" class="mt-2"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnSalvarCliente">Salvar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('admin.redirect.cancel', 'Cancelar') ?></button>
+                <button type="button" class="btn btn-primary" id="btnSalvarCliente"><?= __('admin.redirect.save', 'Salvar') ?></button>
             </div>
         </div>
     </div>
@@ -156,7 +156,7 @@ if(ncCpf){
     ncCpf.addEventListener('input', function(){ this.value=mascaraCPF(this.value); });
     ncCpf.addEventListener('blur', function(){
         const cpf=this.value.replace(/\D/g,''), fb=document.getElementById('ncCpfFeedback');
-        if(cpf && !validarCPF(cpf)){ this.classList.add('is-invalid'); if(fb) fb.textContent='CPF inválido.'; }
+        if(cpf && !validarCPF(cpf)){ this.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.cpf_invalid', 'CPF inválido.'), ENT_QUOTES, 'UTF-8') ?>'; }
         else { this.classList.remove('is-invalid'); if(fb) fb.textContent=''; }
     });
 }
@@ -166,7 +166,7 @@ const ncNasc = document.getElementById('ncNasc');
 if(ncNasc){
     ncNasc.addEventListener('change', function(){
         const fb=document.getElementById('ncNascFeedback');
-        if(this.value && !validarIdade18(this.value)){ this.classList.add('is-invalid'); if(fb) fb.textContent='Cliente deve ter pelo menos 18 anos.'; }
+        if(this.value && !validarIdade18(this.value)){ this.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.client_min_18', 'Cliente deve ter pelo menos 18 anos.'), ENT_QUOTES, 'UTF-8') ?>'; }
         else { this.classList.remove('is-invalid'); if(fb) fb.textContent=''; }
     });
 }
@@ -194,12 +194,12 @@ function validarFormCliente(){
     const g=id=>document.getElementById(id);
     const nome=g('ncNome'); if(!nome?.value.trim()){ nome?.classList.add('is-invalid'); ok=false; } else nome?.classList.remove('is-invalid');
     const cpfEl=g('ncCpf'), fb=g('ncCpfFeedback'), cpf=cpfEl?.value.replace(/\D/g,'')||'';
-    if(!cpf){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='CPF obrigatório.'; ok=false; }
-    else if(!validarCPF(cpf)){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='CPF inválido.'; ok=false; }
+    if(!cpf){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.cpf_required', 'CPF obrigatório.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
+    else if(!validarCPF(cpf)){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.cpf_invalid', 'CPF inválido.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
     else { cpfEl?.classList.remove('is-invalid'); if(fb) fb.textContent=''; }
     const nascEl=g('ncNasc'), fb2=g('ncNascFeedback');
-    if(!nascEl?.value){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='Data obrigatória.'; ok=false; }
-    else if(!validarIdade18(nascEl.value)){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='Cliente deve ter pelo menos 18 anos.'; ok=false; }
+    if(!nascEl?.value){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='<?= htmlspecialchars(__('admin.redirect.date_required', 'Data obrigatória.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
+    else if(!validarIdade18(nascEl.value)){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='<?= htmlspecialchars(__('admin.redirect.client_min_18', 'Cliente deve ter pelo menos 18 anos.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
     else { nascEl?.classList.remove('is-invalid'); if(fb2) fb2.textContent=''; }
     const cidade=g('ncCidade'); if(!cidade?.value.trim()){ cidade?.classList.add('is-invalid'); ok=false; } else cidade?.classList.remove('is-invalid');
     return ok;
@@ -224,7 +224,7 @@ document.getElementById('btnSalvarCliente')?.addEventListener('click', async () 
     const r = await fetch('/admin/redirecionamento/clientes/salvar',{method:'POST',body:fd});
     const j = await r.json();
     if (j.ok) { location.reload(); }
-    else { document.getElementById('msgCliente').innerHTML='<div class="alert alert-danger py-1 small">'+(j.msg||'Erro')+'</div>'; }
+    else { document.getElementById('msgCliente').innerHTML='<div class="alert alert-danger py-1 small">'+(j.msg||'<?= htmlspecialchars(__('admin.redirect.error', 'Erro'), ENT_QUOTES, 'UTF-8') ?>')+'</div>'; }
 });
 
 // ── Editar cliente ──
@@ -254,7 +254,7 @@ document.getElementById('btnSalvarEdicao')?.addEventListener('click', async () =
     const r = await fetch('/admin/redirecionamento/clientes/atualizar', {method:'POST', body:fd});
     const j = await r.json();
     if (j.ok) { location.reload(); }
-    else { document.getElementById('editMsg').innerHTML = '<div class="alert alert-danger py-1 small">'+(j.msg||'Erro')+'</div>'; }
+    else { document.getElementById('editMsg').innerHTML = '<div class="alert alert-danger py-1 small">'+(j.msg||'<?= htmlspecialchars(__('admin.redirect.error', 'Erro'), ENT_QUOTES, 'UTF-8') ?>')+'</div>'; }
 });
 
 // ── Excluir cliente ──
@@ -262,13 +262,13 @@ document.querySelectorAll('.js-excluir-cliente').forEach(btn => {
     btn.addEventListener('click', async function() {
         const id = this.dataset.id;
         const nome = this.dataset.nome;
-        if (!confirm('Excluir o cliente "' + nome + '"? Esta ação não pode ser desfeita.')) return;
+        if (!confirm('<?= htmlspecialchars(__('admin.redirect.delete_client_q', 'Excluir o cliente'), ENT_QUOTES, 'UTF-8') ?> "' + nome + '"? <?= htmlspecialchars(__('admin.redirect.action_cannot_be_undone', 'Esta ação não pode ser desfeita.'), ENT_QUOTES, 'UTF-8') ?>')) return;
         const fd = new FormData();
         fd.append('id', id);
         const r = await fetch('/admin/redirecionamento/clientes/excluir', {method:'POST', body:fd});
         const j = await r.json();
         if (j.ok) { location.reload(); }
-        else { alert(j.msg || 'Erro ao excluir'); }
+        else { alert(j.msg || '<?= htmlspecialchars(__('admin.redirect.error_deleting', 'Erro ao excluir'), ENT_QUOTES, 'UTF-8') ?>'); }
     });
 });
 </script>
@@ -277,21 +277,21 @@ document.querySelectorAll('.js-excluir-cliente').forEach(btn => {
 <div class="modal fade" id="modalEditarCliente" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Editar cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title"><?= __('admin.redirect.edit_client', 'Editar cliente') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <input type="hidden" id="editClienteId">
                 <div class="row g-3">
-                    <div class="col-12"><label class="form-label">Nome</label><input class="form-control" type="text" id="editNome"></div>
+                    <div class="col-12"><label class="form-label"><?= __('admin.redirect.name', 'Nome') ?></label><input class="form-control" type="text" id="editNome"></div>
                     <div class="col-md-6"><label class="form-label">CPF</label><input class="form-control" type="text" id="editCpf"></div>
-                    <div class="col-md-6"><label class="form-label">Data nascimento</label><input class="form-control" type="date" id="editNasc"></div>
-                    <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control" type="email" id="editEmail"></div>
-                    <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" type="text" id="editTelefone"></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.birth_date_short', 'Data nascimento') ?></label><input class="form-control" type="date" id="editNasc"></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.email', 'E-mail') ?></label><input class="form-control" type="email" id="editEmail"></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.phone', 'Telefone') ?></label><input class="form-control" type="text" id="editTelefone"></div>
                 </div>
                 <div id="editMsg" class="mt-2"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnSalvarEdicao">Salvar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('admin.redirect.cancel', 'Cancelar') ?></button>
+                <button type="button" class="btn btn-primary" id="btnSalvarEdicao"><?= __('admin.redirect.save', 'Salvar') ?></button>
             </div>
         </div>
     </div>

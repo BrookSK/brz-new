@@ -1,14 +1,14 @@
 <?php
 $statusLabels = [
-    'aguardando_primeira_parcela' => ['label' => 'Aguardando 1ª Parcela', 'cor' => 'info'],
-    'ativo' => ['label' => 'Ativo', 'cor' => 'primary'],
-    'em_andamento' => ['label' => 'Em Andamento', 'cor' => 'primary'],
-    'com_atraso' => ['label' => 'Com Atraso', 'cor' => 'danger'],
-    'quitado' => ['label' => 'Quitado', 'cor' => 'success'],
-    'inadimplente' => ['label' => 'Inadimplente', 'cor' => 'dark'],
-    'liberado_envio' => ['label' => 'Liberado p/ Envio', 'cor' => 'success'],
-    'encerrado' => ['label' => 'Encerrado', 'cor' => 'secondary'],
-    'cancelado' => ['label' => 'Cancelado', 'cor' => 'secondary'],
+    'aguardando_primeira_parcela' => ['label' => __('admin.installment.status_awaiting_first', 'Aguardando 1ª Parcela'), 'cor' => 'info'],
+    'ativo' => ['label' => __('admin.installment.status_active', 'Ativo'), 'cor' => 'primary'],
+    'em_andamento' => ['label' => __('admin.installment.status_in_progress', 'Em Andamento'), 'cor' => 'primary'],
+    'com_atraso' => ['label' => __('admin.installment.status_overdue', 'Com Atraso'), 'cor' => 'danger'],
+    'quitado' => ['label' => __('admin.installment.status_paid_off', 'Quitado'), 'cor' => 'success'],
+    'inadimplente' => ['label' => __('admin.installment.status_defaulted', 'Inadimplente'), 'cor' => 'dark'],
+    'liberado_envio' => ['label' => __('admin.installment.status_released_shipping', 'Liberado p/ Envio'), 'cor' => 'success'],
+    'encerrado' => ['label' => __('admin.installment.status_closed', 'Encerrado'), 'cor' => 'secondary'],
+    'cancelado' => ['label' => __('admin.installment.status_cancelled', 'Cancelado'), 'cor' => 'secondary'],
 ];
 $carnes = $carnes ?? [];
 $stats = $stats ?? [];
@@ -31,14 +31,14 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
 <div class="container-fluid py-3">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h4 class="fw-bold mb-1">Gestão de Carnês</h4>
-            <p class="text-muted small mb-0 d-none d-md-block">Painel completo do ciclo de carnê</p>
+            <h4 class="fw-bold mb-1"><?= __('admin.installment.title', 'Gestão de Carnês') ?></h4>
+            <p class="text-muted small mb-0 d-none d-md-block"><?= __('admin.installment.subtitle', 'Painel completo do ciclo de carnê') ?></p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="/admin/carnes/arquivados" class="btn btn-outline-secondary btn-sm"><i class="fas fa-archive me-1"></i><span class="d-none d-md-inline">Arquivados</span></a>
-            <a href="/admin/carnes/logs" class="btn btn-outline-info btn-sm"><i class="fas fa-history me-1"></i><span class="d-none d-md-inline">Logs</span></a>
-            <a href="/admin/carnes/configuracoes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog me-1"></i><span class="d-none d-md-inline">Configurações</span></a>
-            <a href="/admin" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">Voltar</span></a>
+            <a href="/admin/carnes/arquivados" class="btn btn-outline-secondary btn-sm"><i class="fas fa-archive me-1"></i><span class="d-none d-md-inline"><?= __('admin.installment.archived', 'Arquivados') ?></span></a>
+            <a href="/admin/carnes/logs" class="btn btn-outline-info btn-sm"><i class="fas fa-history me-1"></i><span class="d-none d-md-inline"><?= __('admin.installment.logs', 'Logs') ?></span></a>
+            <a href="/admin/carnes/configuracoes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog me-1"></i><span class="d-none d-md-inline"><?= __('admin.installment.settings', 'Configurações') ?></span></a>
+            <a href="/admin" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline"><?= __('admin.installment.back', 'Voltar') ?></span></a>
         </div>
     </div>
 
@@ -56,10 +56,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small">Total Financiado</div><div class="fs-4 fw-bold"><?= fmtBrl($stats['total_financiado'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.total_financed', 'Total Financiado') ?></div><div class="fs-4 fw-bold"><?= fmtBrl($stats['total_financiado'] ?? 0) ?></div></div>
                         <i class="fas fa-coins fs-3 text-primary opacity-25"></i>
                     </div>
-                    <div class="text-muted small mt-1"><?= (int)($stats['total'] ?? 0) ?> carnês no período</div>
+                    <div class="text-muted small mt-1"><?= __('admin.installment.plans_in_period', '{n} carnês no período', ['n' => (int)($stats['total'] ?? 0)]) ?></div>
                 </div>
             </div>
         </div>
@@ -67,12 +67,12 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small">Já Recebido</div><div class="fs-4 fw-bold text-success"><?= fmtBrl($stats['total_recebido'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.already_received', 'Já Recebido') ?></div><div class="fs-4 fw-bold text-success"><?= fmtBrl($stats['total_recebido'] ?? 0) ?></div></div>
                         <i class="fas fa-check-circle fs-3 text-success opacity-25"></i>
                     </div>
                     <?php $pctRecebido = ($stats['total_financiado'] ?? 0) > 0 ? round(($stats['total_recebido'] ?? 0) / $stats['total_financiado'] * 100) : 0; ?>
                     <div class="progress mt-2" style="height:4px;"><div class="progress-bar bg-success" style="width:<?= $pctRecebido ?>%"></div></div>
-                    <div class="text-muted small mt-1"><?= $pctRecebido ?>% do total recebido</div>
+                    <div class="text-muted small mt-1"><?= __('admin.installment.pct_of_total_received', '{n}% do total recebido', ['n' => $pctRecebido]) ?></div>
                 </div>
             </div>
         </div>
@@ -80,10 +80,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small">Em Aberto</div><div class="fs-4 fw-bold text-warning"><?= fmtBrl($stats['total_aberto'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.open_balance', 'Em Aberto') ?></div><div class="fs-4 fw-bold text-warning"><?= fmtBrl($stats['total_aberto'] ?? 0) ?></div></div>
                         <i class="fas fa-clock fs-3 text-warning opacity-25"></i>
                     </div>
-                    <div class="text-muted small mt-1">a receber nos próximos meses</div>
+                    <div class="text-muted small mt-1"><?= __('admin.installment.to_receive_next_months', 'a receber nos próximos meses') ?></div>
                 </div>
             </div>
         </div>
@@ -91,10 +91,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small">Em Atraso</div><div class="fs-4 fw-bold text-danger"><?= fmtBrl($stats['total_atraso'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.overdue', 'Em Atraso') ?></div><div class="fs-4 fw-bold text-danger"><?= fmtBrl($stats['total_atraso'] ?? 0) ?></div></div>
                         <i class="fas fa-exclamation-triangle fs-3 text-danger opacity-25"></i>
                     </div>
-                    <div class="text-muted small mt-1"><?= $countAtrasados ?> carnês · inadimplência <?= ($stats['total_financiado'] ?? 0) > 0 ? round(($stats['total_atraso'] ?? 0) / $stats['total_financiado'] * 100, 1) : 0 ?>%</div>
+                    <div class="text-muted small mt-1"><?= __('admin.installment.plans_delinquency', '{n} carnês · inadimplência {p}%', ['n' => $countAtrasados, 'p' => (($stats['total_financiado'] ?? 0) > 0 ? round(($stats['total_atraso'] ?? 0) / $stats['total_financiado'] * 100, 1) : 0)]) ?></div>
                 </div>
             </div>
         </div>
@@ -102,26 +102,26 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
 
     <!-- Mini stats row -->
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= $countAguardando1 ?></div><div class="text-muted small">Aguard. 1ª Parcela</div></div><i class="fas fa-hourglass-half text-info"></i></div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['vence_7_dias'] ?? 0) ?></div><div class="text-muted small">Vencem em 7 dias</div></div><i class="fas fa-calendar-day text-warning"></i></div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['compras_pendentes'] ?? 0) ?></div><div class="text-muted small">Compras Pendentes</div></div><i class="fas fa-shopping-cart text-primary"></i></div></div></div>
-        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['envios_pendentes'] ?? 0) ?></div><div class="text-muted small">Envios Pendentes</div></div><i class="fas fa-truck text-success"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= $countAguardando1 ?></div><div class="text-muted small"><?= __('admin.installment.awaiting_first_short', 'Aguard. 1ª Parcela') ?></div></div><i class="fas fa-hourglass-half text-info"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['vence_7_dias'] ?? 0) ?></div><div class="text-muted small"><?= __('admin.installment.due_in_7_days', 'Vencem em 7 dias') ?></div></div><i class="fas fa-calendar-day text-warning"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['compras_pendentes'] ?? 0) ?></div><div class="text-muted small"><?= __('admin.installment.pending_purchases', 'Compras Pendentes') ?></div></div><i class="fas fa-shopping-cart text-primary"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['envios_pendentes'] ?? 0) ?></div><div class="text-muted small"><?= __('admin.installment.pending_shipments', 'Envios Pendentes') ?></div></div><i class="fas fa-truck text-success"></i></div></div></div>
     </div>
 
     <!-- Tabs: Mobile dropdown + Desktop tabs -->
     <div class="d-md-none mb-3">
         <select class="form-select" onchange="switchCarneTab(this.value)">
-            <option value="tab-carnes" <?= $activeTab === 'carnes' ? 'selected' : '' ?>>Carnês (<?= count($carnes) ?>)</option>
-            <option value="tab-cobrancas" <?= $activeTab === 'cobrancas' ? 'selected' : '' ?>>Cobranças (<?= count($cobrancas) ?>)</option>
-            <option value="tab-compras" <?= $activeTab === 'compras' ? 'selected' : '' ?>>Compras (<?= count($comprasPendentes) ?>)</option>
-            <option value="tab-envios" <?= $activeTab === 'envios' ? 'selected' : '' ?>>Envios (<?= count($enviosPendentes) ?>)</option>
+            <option value="tab-carnes" <?= $activeTab === 'carnes' ? 'selected' : '' ?>><?= __('admin.installment.tab_plans', 'Carnês') ?> (<?= count($carnes) ?>)</option>
+            <option value="tab-cobrancas" <?= $activeTab === 'cobrancas' ? 'selected' : '' ?>><?= __('admin.installment.tab_charges', 'Cobranças') ?> (<?= count($cobrancas) ?>)</option>
+            <option value="tab-compras" <?= $activeTab === 'compras' ? 'selected' : '' ?>><?= __('admin.installment.tab_purchases', 'Compras') ?> (<?= count($comprasPendentes) ?>)</option>
+            <option value="tab-envios" <?= $activeTab === 'envios' ? 'selected' : '' ?>><?= __('admin.installment.tab_shipments', 'Envios') ?> (<?= count($enviosPendentes) ?>)</option>
         </select>
     </div>
     <ul class="nav nav-tabs mb-0 d-none d-md-flex" role="tablist">
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'carnes' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-carnes" type="button">Carnês <span class="badge bg-secondary ms-1"><?= count($carnes) ?></span></button></li>
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'cobrancas' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-cobrancas" type="button">Cobranças <span class="badge bg-danger ms-1"><?= count($cobrancas) ?></span></button></li>
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'compras' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button">Compras <span class="badge bg-warning text-dark ms-1"><?= count($comprasPendentes) ?></span></button></li>
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'envios' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-envios" type="button">Envios <span class="badge bg-success ms-1"><?= count($enviosPendentes) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'carnes' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-carnes" type="button"><?= __('admin.installment.tab_plans', 'Carnês') ?> <span class="badge bg-secondary ms-1"><?= count($carnes) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'cobrancas' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-cobrancas" type="button"><?= __('admin.installment.tab_charges', 'Cobranças') ?> <span class="badge bg-danger ms-1"><?= count($cobrancas) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'compras' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button"><?= __('admin.installment.tab_purchases', 'Compras') ?> <span class="badge bg-warning text-dark ms-1"><?= count($comprasPendentes) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'envios' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-envios" type="button"><?= __('admin.installment.tab_shipments', 'Envios') ?> <span class="badge bg-success ms-1"><?= count($enviosPendentes) ?></span></button></li>
     </ul>
     <script>
     function switchCarneTab(tabId) {
@@ -139,10 +139,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                 <form method="GET" class="row g-2 mb-3" id="carneFilterForm">
                     <div class="col-6 col-md-2">
                         <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-                            <option value="" <?= empty($filtros['status']) && empty($filtros['com_atraso']) && empty($filtros['liberado_compra']) && empty($filtros['liberado_envio']) ? 'selected' : '' ?>>Todos (<?= count($carnes) ?>)</option>
-                            <option value="aguardando_primeira_parcela" <?= ($filtros['status'] ?? '') === 'aguardando_primeira_parcela' ? 'selected' : '' ?>>Aguardando 1ª (<?= $countAguardando1 ?>)</option>
-                            <option value="em_andamento" <?= ($filtros['status'] ?? '') === 'em_andamento' ? 'selected' : '' ?>>Em Andamento</option>
-                            <option value="quitado" <?= ($filtros['status'] ?? '') === 'quitado' ? 'selected' : '' ?>>Quitados (<?= $countQuitados ?>)</option>
+                            <option value="" <?= empty($filtros['status']) && empty($filtros['com_atraso']) && empty($filtros['liberado_compra']) && empty($filtros['liberado_envio']) ? 'selected' : '' ?>><?= __('admin.installment.filter_all', 'Todos') ?> (<?= count($carnes) ?>)</option>
+                            <option value="aguardando_primeira_parcela" <?= ($filtros['status'] ?? '') === 'aguardando_primeira_parcela' ? 'selected' : '' ?>><?= __('admin.installment.filter_awaiting_first', 'Aguardando 1ª') ?> (<?= $countAguardando1 ?>)</option>
+                            <option value="em_andamento" <?= ($filtros['status'] ?? '') === 'em_andamento' ? 'selected' : '' ?>><?= __('admin.installment.status_in_progress', 'Em Andamento') ?></option>
+                            <option value="quitado" <?= ($filtros['status'] ?? '') === 'quitado' ? 'selected' : '' ?>><?= __('admin.installment.filter_paid_off', 'Quitados') ?> (<?= $countQuitados ?>)</option>
                             <?php foreach ($statusLabels as $k => $v): if (in_array($k, ['aguardando_primeira_parcela','em_andamento','quitado'])) continue; ?>
                             <option value="<?= $k ?>" <?= ($filtros['status'] ?? '') === $k ? 'selected' : '' ?>><?= $v['label'] ?></option>
                             <?php endforeach; ?>
@@ -150,26 +150,26 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                     </div>
                     <div class="col-6 col-md-2">
                         <select name="filtro_rapido" class="form-select form-select-sm" onchange="this.form.submit()">
-                            <option value="">Situação</option>
-                            <option value="com_atraso" <?= !empty($filtros['com_atraso']) ? 'selected' : '' ?>>Atrasados (<?= $countAtrasados ?>)</option>
-                            <option value="liberado_compra" <?= !empty($filtros['liberado_compra']) ? 'selected' : '' ?>>Aguardando compra</option>
-                            <option value="liberado_envio" <?= !empty($filtros['liberado_envio']) ? 'selected' : '' ?>>Prontos p/ envio</option>
+                            <option value=""><?= __('admin.installment.filter_situation', 'Situação') ?></option>
+                            <option value="com_atraso" <?= !empty($filtros['com_atraso']) ? 'selected' : '' ?>><?= __('admin.installment.filter_overdue', 'Atrasados') ?> (<?= $countAtrasados ?>)</option>
+                            <option value="liberado_compra" <?= !empty($filtros['liberado_compra']) ? 'selected' : '' ?>><?= __('admin.installment.filter_awaiting_purchase', 'Aguardando compra') ?></option>
+                            <option value="liberado_envio" <?= !empty($filtros['liberado_envio']) ? 'selected' : '' ?>><?= __('admin.installment.filter_ready_shipping', 'Prontos p/ envio') ?></option>
                         </select>
                     </div>
                     <div class="col-6 col-md-3">
-                        <input type="text" name="cliente" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['cliente'] ?? '') ?>" placeholder="Buscar cliente..." oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.submit(),400)">
+                        <input type="text" name="cliente" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['cliente'] ?? '') ?>" placeholder="<?= htmlspecialchars(__('admin.installment.search_customer', 'Buscar cliente...'), ENT_QUOTES, 'UTF-8') ?>" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.submit(),400)">
                     </div>
                     <div class="col-6 col-md-2">
-                        <input type="text" name="pedido_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['pedido_id'] ?? '') ?>" placeholder="Pedido #" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.submit(),400)">
+                        <input type="text" name="pedido_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['pedido_id'] ?? '') ?>" placeholder="<?= htmlspecialchars(__('admin.installment.order_hash', 'Pedido #'), ENT_QUOTES, 'UTF-8') ?>" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.submit(),400)">
                     </div>
                     <div class="col-6 col-md-2">
-                        <a href="/admin/carnes" class="btn btn-sm btn-outline-secondary w-100">Limpar</a>
+                        <a href="/admin/carnes" class="btn btn-sm btn-outline-secondary w-100"><?= __('admin.installment.clear', 'Limpar') ?></a>
                     </div>
                 </form>
 
                 <!-- Recriar carnê -->
                 <div class="mb-3">
-                    <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="#recriarCarneCollapse"><i class="fas fa-plus-circle me-1"></i>Recriar carnê</button>
+                    <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="#recriarCarneCollapse"><i class="fas fa-plus-circle me-1"></i><?= __('admin.installment.recreate_plan', 'Recriar carnê') ?></button>
                 </div>
 
                 <!-- Recriar Carnê (collapse) -->
@@ -178,11 +178,11 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                         <div class="card-body">
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-3">
-                                    <label class="form-label small">ID do Pedido</label>
-                                    <input type="number" id="recriar-pedido-id" class="form-control form-control-sm" placeholder="Ex: 715" min="1">
+                                    <label class="form-label small"><?= __('admin.installment.order_id', 'ID do Pedido') ?></label>
+                                    <input type="number" id="recriar-pedido-id" class="form-control form-control-sm" placeholder="<?= htmlspecialchars(__('admin.installment.order_id_placeholder', 'Ex: 715'), ENT_QUOTES, 'UTF-8') ?>" min="1">
                                 </div>
                                 <div class="col-md-auto">
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="buscarDadosPedidoCarne()"><i class="fas fa-search me-1"></i>Buscar</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="buscarDadosPedidoCarne()"><i class="fas fa-search me-1"></i><?= __('admin.installment.search', 'Buscar') ?></button>
                                 </div>
                             </div>
                             <div id="recriar-resultado" class="mt-3" style="display:none;">
@@ -191,7 +191,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                     <input type="hidden" name="pedido_id" id="recriar-form-pedido-id">
                                     <div class="row g-2 align-items-end" id="recriar-form-campos">
                                         <div class="col-md-3">
-                                            <label class="form-label small">Parcelas</label>
+                                            <label class="form-label small"><?= __('admin.installment.installments', 'Parcelas') ?></label>
                                             <select name="quantidade_parcelas" id="recriar-parcelas" class="form-select form-select-sm">
                                                 <?php for ($i = 1; $i <= 12; $i++): ?>
                                                 <option value="<?= $i ?>" <?= $i === 4 ? 'selected' : '' ?>><?= $i ?>x</option>
@@ -199,13 +199,13 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                             </select>
                                         </div>
                                         <div class="col-md-auto">
-                                            <button type="submit" id="recriar-btn-submit" class="btn btn-warning btn-sm"><i class="fas fa-plus me-1"></i>Criar Carnê</button>
+                                            <button type="submit" id="recriar-btn-submit" class="btn btn-warning btn-sm"><i class="fas fa-plus me-1"></i><?= __('admin.installment.create_plan', 'Criar Carnê') ?></button>
                                         </div>
                                     </div>
                                 </form>
                             </div>
                             <div id="recriar-erro" class="mt-2 alert alert-danger small" style="display:none;"></div>
-                            <small class="text-muted d-block mt-2">Para pedidos com forma_pagamento = carne_braziliana que não tiveram o carnê criado automaticamente.</small>
+                            <small class="text-muted d-block mt-2"><?= __('admin.installment.recreate_hint', 'Para pedidos com forma_pagamento = carne_braziliana que não tiveram o carnê criado automaticamente.') ?></small>
                         </div>
                     </div>
                 </div>
@@ -215,7 +215,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                 <!-- Mobile: Cards -->
                 <div class="d-md-none p-3">
                     <?php if (empty($carnes)): ?>
-                        <div class="text-center text-muted py-4 small">Nenhum carnê encontrado.</div>
+                        <div class="text-center text-muted py-4 small"><?= __('admin.installment.none_found', 'Nenhum carnê encontrado.') ?></div>
                     <?php else: ?>
                         <?php foreach ($carnes as $c):
                             $st = $statusLabels[$c['status']] ?? ['label' => $c['status'], 'cor' => 'secondary'];
@@ -232,7 +232,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                     <span class="badge bg-light text-dark border" style="font-size:10px;"><?= $pagas ?>/<?= $totalParcelas ?></span>
                                     <?php if (($c['parcelas_atrasadas'] ?? 0) > 0): ?>
-                                    <span class="badge bg-danger" style="font-size:9px;"><?= $c['parcelas_atrasadas'] ?> atraso</span>
+                                    <span class="badge bg-danger" style="font-size:9px;"><?= __('admin.installment.overdue_count', '{n} atraso', ['n' => $c['parcelas_atrasadas']]) ?></span>
                                     <?php endif; ?>
                                     <span class="badge bg-<?= $st['cor'] ?>" style="font-size:9px;"><?= $st['label'] ?></span>
                                 </div>
@@ -249,20 +249,20 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                     <table class="table table-hover table-sm align-middle mb-0" id="carnesTable">
                         <thead class="table-light">
                             <tr>
-                                <th class="sortable" data-sort="id" style="cursor:pointer;">ID <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="sortable" data-sort="cliente" style="cursor:pointer;">Pedido / Cliente <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="text-end d-none d-lg-table-cell sortable" data-sort="total" style="cursor:pointer;">Total <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="text-end d-none d-lg-table-cell sortable" data-sort="pago" style="cursor:pointer;">Pago / Saldo <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="sortable" data-sort="parcelas" style="cursor:pointer;">Parcelas <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="d-none d-md-table-cell sortable" data-sort="proximo_vencimento" style="cursor:pointer;">Próx. Vencimento <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="d-none d-md-table-cell sortable" data-sort="ultimo_vencimento" style="cursor:pointer;">Último Venc. <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="sortable" data-sort="status" style="cursor:pointer;">Status <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
-                                <th class="d-none d-xl-table-cell">Compra</th><th class="d-none d-xl-table-cell">Envio</th><th>Ações</th>
+                                <th class="sortable" data-sort="id" style="cursor:pointer;"><?= __('admin.installment.col_id', 'ID') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="sortable" data-sort="cliente" style="cursor:pointer;"><?= __('admin.installment.col_order_customer', 'Pedido / Cliente') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="text-end d-none d-lg-table-cell sortable" data-sort="total" style="cursor:pointer;"><?= __('admin.installment.col_total', 'Total') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="text-end d-none d-lg-table-cell sortable" data-sort="pago" style="cursor:pointer;"><?= __('admin.installment.col_paid_balance', 'Pago / Saldo') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="sortable" data-sort="parcelas" style="cursor:pointer;"><?= __('admin.installment.installments', 'Parcelas') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="d-none d-md-table-cell sortable" data-sort="proximo_vencimento" style="cursor:pointer;"><?= __('admin.installment.col_next_due', 'Próx. Vencimento') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="d-none d-md-table-cell sortable" data-sort="ultimo_vencimento" style="cursor:pointer;"><?= __('admin.installment.col_last_due', 'Último Venc.') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="sortable" data-sort="status" style="cursor:pointer;"><?= __('admin.installment.col_status', 'Status') ?> <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="d-none d-xl-table-cell"><?= __('admin.installment.col_purchase', 'Compra') ?></th><th class="d-none d-xl-table-cell"><?= __('admin.installment.col_shipping', 'Envio') ?></th><th><?= __('admin.installment.col_actions', 'Ações') ?></th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($carnes)): ?>
-                            <tr><td colspan="11" class="text-center text-muted py-4">Nenhum carnê encontrado.</td></tr>
+                            <tr><td colspan="11" class="text-center text-muted py-4"><?= __('admin.installment.none_found', 'Nenhum carnê encontrado.') ?></td></tr>
                             <?php else: ?>
                             <?php foreach ($carnes as $c):
                                 $st = $statusLabels[$c['status']] ?? ['label' => $c['status'], 'cor' => 'secondary'];
@@ -287,7 +287,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 <td class="text-end fw-semibold d-none d-lg-table-cell"><?= fmtBrl($c['total_geral']) ?></td>
                                 <td class="text-end d-none d-lg-table-cell">
                                     <span class="text-success small"><?= fmtBrl($pago) ?></span>
-                                    <div class="text-muted small"><?= fmtBrl($saldo) ?> restante</div>
+                                    <div class="text-muted small"><?= fmtBrl($saldo) ?> <?= __('admin.installment.remaining', 'restante') ?></div>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark border"><?= $pagas ?>/<?= $totalParcelas ?></span>
@@ -300,7 +300,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 <td><span class="badge bg-<?= $st['cor'] ?>"><?= $st['label'] ?></span></td>
                                 <td class="d-none d-xl-table-cell"><?= !empty($c['compra_interna_liberada']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-clock text-muted"></i>' ?></td>
                                 <td class="d-none d-xl-table-cell"><?= !empty($c['envio_liberado']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-lock text-muted"></i>' ?></td>
-                                <td><a href="/admin/carnes/detalhes/<?= $c['id'] ?>" class="btn btn-sm btn-outline-primary" title="Detalhes"><i class="fas fa-eye"></i></a></td>
+                                <td><a href="/admin/carnes/detalhes/<?= $c['id'] ?>" class="btn btn-sm btn-outline-primary" title="<?= htmlspecialchars(__('admin.installment.details', 'Detalhes'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-eye"></i></a></td>
                             </tr>
                             <?php endforeach; ?>
                             <?php endif; ?>
@@ -396,17 +396,17 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th>Cliente / Pedido</th><th class="text-end">Valor parcela</th><th>Vencimento</th><th>Situação</th><th>Atraso</th><th>Ações</th></tr>
+                            <tr><th><?= __('admin.installment.col_customer_order', 'Cliente / Pedido') ?></th><th class="text-end"><?= __('admin.installment.col_installment_value', 'Valor parcela') ?></th><th><?= __('admin.installment.col_due_date', 'Vencimento') ?></th><th><?= __('admin.installment.col_situation', 'Situação') ?></th><th><?= __('admin.installment.col_delay', 'Atraso') ?></th><th><?= __('admin.installment.col_actions', 'Ações') ?></th></tr>
                         </thead>
                         <tbody>
                             <?php if (empty($cobrancas)): ?>
-                            <tr><td colspan="6" class="text-center text-muted py-4">Nenhuma cobrança pendente.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted py-4"><?= __('admin.installment.no_pending_charges', 'Nenhuma cobrança pendente.') ?></td></tr>
                             <?php else: ?>
                             <?php foreach ($cobrancas as $cob):
                                 $venc = strtotime($cob['vencimento']);
                                 $hoje = strtotime(date('Y-m-d'));
                                 $diasAtraso = ($hoje > $venc) ? (int)(($hoje - $venc) / 86400) : 0;
-                                $situacao = $diasAtraso > 0 ? 'Com atraso' : ($venc == $hoje ? 'Vence hoje' : 'Em ' . (int)(($venc - $hoje) / 86400) . ' dias');
+                                $situacao = $diasAtraso > 0 ? __('admin.installment.overdue_label', 'Com atraso') : ($venc == $hoje ? __('admin.installment.due_today', 'Vence hoje') : __('admin.installment.due_in_days', 'Em {n} dias', ['n' => (int)(($venc - $hoje) / 86400)]));
                                 $corSit = $diasAtraso > 0 ? 'danger' : ($venc == $hoje ? 'warning' : 'info');
                             ?>
                             <tr>
@@ -417,13 +417,13 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 <td class="text-end fw-semibold"><?= fmtBrl($cob['valor_total'] ?? 0) ?></td>
                                 <td><?= date('d/m/Y', $venc) ?></td>
                                 <td><span class="badge bg-<?= $corSit ?>"><?= $situacao ?></span></td>
-                                <td><?= $diasAtraso > 0 ? $diasAtraso . ' dias' : '—' ?></td>
+                                <td><?= $diasAtraso > 0 ? __('admin.installment.days_count', '{n} dias', ['n' => $diasAtraso]) : '—' ?></td>
                                 <td>
-                                    <form method="POST" action="/admin/carnes/enviar-cobranca/<?= $cob['id'] ?>" class="d-inline" onsubmit="return confirm('Enviar cobrança?')">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Enviar cobrança"><i class="fas fa-paper-plane"></i></button>
+                                    <form method="POST" action="/admin/carnes/enviar-cobranca/<?= $cob['id'] ?>" class="d-inline" onsubmit="return confirm('<?= htmlspecialchars(__('admin.installment.confirm_send_charge', 'Enviar cobrança?'), ENT_QUOTES, 'UTF-8') ?>')">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="<?= htmlspecialchars(__('admin.installment.send_charge', 'Enviar cobrança'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-paper-plane"></i></button>
                                     </form>
                                     <form method="POST" action="/admin/carnes/reemitir-boleto/<?= $cob['id'] ?>" class="d-inline ms-1">
-                                        <button type="submit" class="btn btn-sm btn-outline-info" title="Reemitir boleto"><i class="fas fa-redo"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-outline-info" title="<?= htmlspecialchars(__('admin.installment.reissue_boleto', 'Reemitir boleto'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-redo"></i></button>
                                     </form>
                                 </td>
                             </tr>
@@ -441,29 +441,29 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
         <div class="card border-0 shadow-sm border-top-0 rounded-0 rounded-bottom">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold mb-0">Compras Pendentes</h6>
-                    <a href="/admin/carnes/compras" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i>Ver completo</a>
+                    <h6 class="fw-bold mb-0"><?= __('admin.installment.pending_purchases', 'Compras Pendentes') ?></h6>
+                    <a href="/admin/carnes/compras" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i><?= __('admin.installment.view_full', 'Ver completo') ?></a>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th>Carnê / Pedido</th><th>Cliente</th><th>Status</th><th>Criado em</th><th>Ações</th></tr>
+                            <tr><th><?= __('admin.installment.col_plan_order', 'Carnê / Pedido') ?></th><th><?= __('admin.installment.col_customer', 'Cliente') ?></th><th><?= __('admin.installment.col_status', 'Status') ?></th><th><?= __('admin.installment.col_created_at', 'Criado em') ?></th><th><?= __('admin.installment.col_actions', 'Ações') ?></th></tr>
                         </thead>
                         <tbody>
                             <?php if (empty($comprasPendentes)): ?>
-                            <tr><td colspan="5" class="text-center text-muted py-4">Nenhuma compra pendente.</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-4"><?= __('admin.installment.no_pending_purchases', 'Nenhuma compra pendente.') ?></td></tr>
                             <?php else: ?>
                             <?php foreach ($comprasPendentes as $cp): ?>
                             <tr>
                                 <td><span class="fw-semibold">#<?= $cp['carne_id'] ?></span> <span class="text-muted small">/ Pedido #<?= $cp['pedido_id'] ?? '' ?></span></td>
                                 <td><?= htmlspecialchars($cp['cliente_nome'] ?? '') ?></td>
-                                <td><span class="badge bg-warning text-dark">Aguardando compra</span></td>
+                                <td><span class="badge bg-warning text-dark"><?= __('admin.installment.filter_awaiting_purchase', 'Aguardando compra') ?></span></td>
                                 <td class="small text-muted"><?= !empty($cp['created_at']) ? date('d/m/Y', strtotime($cp['created_at'])) : '-' ?></td>
                                 <td>
-                                    <form method="POST" action="/admin/carnes/marcar-comprado/<?= $cp['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como comprado?')">
-                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Marcar comprado"><i class="fas fa-check"></i></button>
+                                    <form method="POST" action="/admin/carnes/marcar-comprado/<?= $cp['id'] ?>" class="d-inline" onsubmit="return confirm('<?= htmlspecialchars(__('admin.installment.confirm_mark_purchased', 'Marcar como comprado?'), ENT_QUOTES, 'UTF-8') ?>')">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="<?= htmlspecialchars(__('admin.installment.mark_purchased', 'Marcar comprado'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-check"></i></button>
                                     </form>
-                                    <a href="/admin/carnes/detalhes/<?= $cp['carne_id'] ?>" class="btn btn-sm btn-outline-primary ms-1" title="Ver carnê"><i class="fas fa-eye"></i></a>
+                                    <a href="/admin/carnes/detalhes/<?= $cp['carne_id'] ?>" class="btn btn-sm btn-outline-primary ms-1" title="<?= htmlspecialchars(__('admin.installment.view_plan', 'Ver carnê'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-eye"></i></a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -482,11 +482,11 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th>Cliente / Pedido</th><th class="text-end">Total</th><th>Status Financ.</th><th>Status Envio</th><th>Ações</th></tr>
+                            <tr><th><?= __('admin.installment.col_customer_order', 'Cliente / Pedido') ?></th><th class="text-end"><?= __('admin.installment.col_total', 'Total') ?></th><th><?= __('admin.installment.col_financial_status', 'Status Financ.') ?></th><th><?= __('admin.installment.col_shipping_status', 'Status Envio') ?></th><th><?= __('admin.installment.col_actions', 'Ações') ?></th></tr>
                         </thead>
                         <tbody>
                             <?php if (empty($enviosPendentes)): ?>
-                            <tr><td colspan="5" class="text-center text-muted py-4">Nenhum envio pendente.</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-4"><?= __('admin.installment.no_pending_shipments', 'Nenhum envio pendente.') ?></td></tr>
                             <?php else: ?>
                             <?php foreach ($enviosPendentes as $env):
                                 $stEnv = $statusLabels[$env['status']] ?? ['label' => $env['status'], 'cor' => 'secondary'];
@@ -498,10 +498,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 </td>
                                 <td class="text-end fw-semibold"><?= fmtBrl($env['total_geral'] ?? 0) ?></td>
                                 <td><span class="badge bg-<?= $stEnv['cor'] ?>"><?= $stEnv['label'] ?></span></td>
-                                <td><span class="badge bg-success">Pronto p/ envio</span></td>
+                                <td><span class="badge bg-success"><?= __('admin.installment.ready_for_shipping', 'Pronto p/ envio') ?></span></td>
                                 <td>
-                                    <a href="/admin/carnes/detalhes/<?= $env['id'] ?>" class="btn btn-sm btn-outline-primary" title="Ver carnê"><i class="fas fa-eye"></i></a>
-                                    <a href="/admin/pedidos/detalhes/<?= $env['pedido_id'] ?>" class="btn btn-sm btn-outline-secondary ms-1" title="Ver pedido"><i class="fas fa-box"></i></a>
+                                    <a href="/admin/carnes/detalhes/<?= $env['id'] ?>" class="btn btn-sm btn-outline-primary" title="<?= htmlspecialchars(__('admin.installment.view_plan', 'Ver carnê'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-eye"></i></a>
+                                    <a href="/admin/pedidos/detalhes/<?= $env['pedido_id'] ?>" class="btn btn-sm btn-outline-secondary ms-1" title="<?= htmlspecialchars(__('admin.installment.view_order', 'Ver pedido'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-box"></i></a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -518,7 +518,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
     <!-- Atividade Recente -->
     <?php if (!empty($atividadeRecente)): ?>
     <div class="card border-0 shadow-sm mt-4">
-        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-stream me-2"></i>Atividade recente</h6></div>
+        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-stream me-2"></i><?= __('admin.installment.recent_activity', 'Atividade recente') ?></h6></div>
         <div class="card-body pt-0">
             <div class="list-group list-group-flush">
                 <?php foreach ($atividadeRecente as $at):
@@ -552,12 +552,12 @@ function atualizarOptionsParcelas(d) {
 }
 function buscarDadosPedidoCarne() {
     var pid = document.getElementById('recriar-pedido-id').value;
-    if (!pid || pid <= 0) { alert('Informe o ID do pedido'); return; }
+    if (!pid || pid <= 0) { alert('<?= htmlspecialchars(__('admin.installment.js_inform_order_id', 'Informe o ID do pedido'), ENT_QUOTES, 'UTF-8') ?>'); return; }
     var info = document.getElementById('recriar-info');
     var resultado = document.getElementById('recriar-resultado');
     var erro = document.getElementById('recriar-erro');
     erro.style.display = 'none'; resultado.style.display = 'none';
-    info.textContent = 'Buscando...'; resultado.style.display = '';
+    info.textContent = '<?= htmlspecialchars(__('admin.installment.js_searching', 'Buscando...'), ENT_QUOTES, 'UTF-8') ?>'; resultado.style.display = '';
 
     fetch('/admin/carnes/buscar-pedido?pedido_id=' + encodeURIComponent(pid))
         .then(function(r) { return r.json(); })
@@ -568,31 +568,31 @@ function buscarDadosPedidoCarne() {
             window._dadosPedidoCarne = d;
             atualizarOptionsParcelas(d);
             var qtd = d.parcelas_sugeridas || parseInt(document.getElementById('recriar-parcelas').value) || 4;
-            var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
-            html += 'Produtos: R$ ' + Number(d.subtotal_brl).toFixed(2) + ' — <strong>Parcela: R$ ' + (Number(d.subtotal_brl)/qtd).toFixed(2) + '</strong><br>';
-            html += 'Taxas: R$ ' + Number(d.taxas_brl).toFixed(2) + ' — <strong>Parcela: R$ ' + (Number(d.taxas_brl)/qtd).toFixed(2) + '</strong><br>';
-            html += '<strong>Total: R$ ' + Number(d.total_brl).toFixed(2) + ' — Parcela: R$ ' + (Number(d.total_brl)/qtd).toFixed(2) + ' (' + qtd + 'x)</strong>';
-            if (d.ja_tem_carne) html += '<br><span class="text-danger"><i class="fas fa-ban"></i> Já tem carnê (ID: ' + d.carne_id + ')</span>';
+            var html = '<strong><?= htmlspecialchars(__('admin.installment.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') ?> #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
+            html += '<?= htmlspecialchars(__('admin.installment.js_products', 'Produtos:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + Number(d.subtotal_brl).toFixed(2) + ' — <strong><?= htmlspecialchars(__('admin.installment.js_installment', 'Parcela:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + (Number(d.subtotal_brl)/qtd).toFixed(2) + '</strong><br>';
+            html += '<?= htmlspecialchars(__('admin.installment.js_fees', 'Taxas:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + Number(d.taxas_brl).toFixed(2) + ' — <strong><?= htmlspecialchars(__('admin.installment.js_installment', 'Parcela:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + (Number(d.taxas_brl)/qtd).toFixed(2) + '</strong><br>';
+            html += '<strong><?= htmlspecialchars(__('admin.installment.js_total', 'Total:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + Number(d.total_brl).toFixed(2) + ' — <?= htmlspecialchars(__('admin.installment.js_installment', 'Parcela:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + (Number(d.total_brl)/qtd).toFixed(2) + ' (' + qtd + 'x)</strong>';
+            if (d.ja_tem_carne) html += '<br><span class="text-danger"><i class="fas fa-ban"></i> <?= htmlspecialchars(__('admin.installment.js_already_has_plan_id', 'Já tem carnê (ID: {id})'), ENT_QUOTES, 'UTF-8') ?>'.replace('{id}', d.carne_id) + '</span>';
             info.innerHTML = html;
             document.getElementById('recriar-form-campos').style.display = d.ja_tem_carne ? 'none' : '';
         })
-        .catch(function(e) { resultado.style.display = 'none'; erro.textContent = 'Erro: ' + e.message; erro.style.display = ''; });
+        .catch(function(e) { resultado.style.display = 'none'; erro.textContent = '<?= htmlspecialchars(__('admin.installment.js_error_prefix', 'Erro:'), ENT_QUOTES, 'UTF-8') ?> ' + e.message; erro.style.display = ''; });
 }
 function validarCriacaoCarne() {
     var d = window._dadosPedidoCarne;
-    if (d && d.ja_tem_carne) { alert('Já possui carnê (ID: ' + d.carne_id + ')'); return false; }
-    return confirm('Criar carnê para este pedido?');
+    if (d && d.ja_tem_carne) { alert('<?= htmlspecialchars(__('admin.installment.js_already_has_plan_id', 'Já tem carnê (ID: {id})'), ENT_QUOTES, 'UTF-8') ?>'.replace('{id}', d.carne_id)); return false; }
+    return confirm('<?= htmlspecialchars(__('admin.installment.js_confirm_create_plan', 'Criar carnê para este pedido?'), ENT_QUOTES, 'UTF-8') ?>');
 }
 document.getElementById('recriar-parcelas').addEventListener('change', function() {
     var d = window._dadosPedidoCarne; if (!d) return;
     atualizarOptionsParcelas(d);
     var qtd = parseInt(this.value) || 1;
     var info = document.getElementById('recriar-info');
-    var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + '<br>';
-    html += 'Produtos: R$ ' + Number(d.subtotal_brl).toFixed(2) + ' — Parcela: R$ ' + (Number(d.subtotal_brl)/qtd).toFixed(2) + '<br>';
-    html += 'Taxas: R$ ' + Number(d.taxas_brl).toFixed(2) + ' — Parcela: R$ ' + (Number(d.taxas_brl)/qtd).toFixed(2) + '<br>';
-    html += '<strong>Total: R$ ' + Number(d.total_brl).toFixed(2) + ' — Parcela: R$ ' + (Number(d.total_brl)/qtd).toFixed(2) + ' (' + qtd + 'x)</strong>';
-    if (d.ja_tem_carne) html += '<br><span class="text-danger"><i class="fas fa-ban"></i> Já tem carnê</span>';
+    var html = '<strong><?= htmlspecialchars(__('admin.installment.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') ?> #' + d.pedido_id + '</strong> — ' + d.cliente_nome + '<br>';
+    html += '<?= htmlspecialchars(__('admin.installment.js_products', 'Produtos:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + Number(d.subtotal_brl).toFixed(2) + ' — <?= htmlspecialchars(__('admin.installment.js_installment', 'Parcela:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + (Number(d.subtotal_brl)/qtd).toFixed(2) + '<br>';
+    html += '<?= htmlspecialchars(__('admin.installment.js_fees', 'Taxas:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + Number(d.taxas_brl).toFixed(2) + ' — <?= htmlspecialchars(__('admin.installment.js_installment', 'Parcela:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + (Number(d.taxas_brl)/qtd).toFixed(2) + '<br>';
+    html += '<strong><?= htmlspecialchars(__('admin.installment.js_total', 'Total:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + Number(d.total_brl).toFixed(2) + ' — <?= htmlspecialchars(__('admin.installment.js_installment', 'Parcela:'), ENT_QUOTES, 'UTF-8') ?> R$ ' + (Number(d.total_brl)/qtd).toFixed(2) + ' (' + qtd + 'x)</strong>';
+    if (d.ja_tem_carne) html += '<br><span class="text-danger"><i class="fas fa-ban"></i> <?= htmlspecialchars(__('admin.installment.js_already_has_plan', 'Já tem carnê'), ENT_QUOTES, 'UTF-8') ?></span>';
     info.innerHTML = html;
 });
 </script>

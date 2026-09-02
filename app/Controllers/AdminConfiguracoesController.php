@@ -217,11 +217,11 @@ class AdminConfiguracoesController extends Controller {
 
         echo "<!-- DEBUG_ADMIN_CONFIG controller=" . basename(__FILE__) . " ts=" . date('c') . " -->\n";
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações - Braziliana Admin</title>
+    <title>' . __('admin.settings.page_title', 'Configurações') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -303,13 +303,13 @@ class AdminConfiguracoesController extends Controller {
             <div class="settings-page">
 
             <header class="page-header">
-                <h1 class="page-title">Configurações</h1>
+                <h1 class="page-title">' . __('admin.settings.page_title', 'Configurações') . '</h1>
                 <div class="header-actions">
                     <button type="button" class="btn-config" onclick="testarStripeAPI()">
-                        <i class="bi bi-plug-fill"></i> Testar Conexão
+                        <i class="bi bi-plug-fill"></i> ' . __('admin.settings.test_connection', 'Testar Conexão') . '
                     </button>
                     <button type="button" class="btn-config" onclick="verDocumentacaoStripe()">
-                        <i class="bi bi-file-earmark-text"></i> Documentação
+                        <i class="bi bi-file-earmark-text"></i> ' . __('admin.settings.documentation', 'Documentação') . '
                     </button>
                 </div>
             </header>
@@ -320,40 +320,40 @@ class AdminConfiguracoesController extends Controller {
                 <aside class="settings-sidebar">
                     <div class="settings-nav nav flex-column nav-pills" id="v-pills-tab" role="tablist">
                         <button class="nav-link active" id="v-pills-loja-tab" data-bs-toggle="pill" data-bs-target="#v-pills-loja" type="button">
-                            <i class="bi bi-shop"></i> Loja
+                            <i class="bi bi-shop"></i> ' . __('admin.settings.tab_store', 'Loja') . '
                         </button>
                         <button class="nav-link" id="v-pills-layout-tab" data-bs-toggle="pill" data-bs-target="#v-pills-layout" type="button">
-                            <i class="bi bi-image"></i> Layout
+                            <i class="bi bi-image"></i> ' . __('admin.settings.tab_layout', 'Layout') . '
                         </button>
                         <button class="nav-link" id="v-pills-email-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email" type="button">
-                            <i class="bi bi-envelope-fill"></i> Email
+                            <i class="bi bi-envelope-fill"></i> ' . __('admin.settings.tab_email', 'Email') . '
                         </button>
                         <button class="nav-link" id="v-pills-email-creator-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email-creator" type="button">
-                            <i class="bi bi-pencil-square"></i> Criar E-mail
+                            <i class="bi bi-pencil-square"></i> ' . __('admin.settings.tab_email_creator', 'Criar E-mail') . '
                         </button>
                         <button class="nav-link" id="v-pills-notificacoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-notificacoes" type="button">
-                            <i class="bi bi-bell-fill"></i> Notificações
+                            <i class="bi bi-bell-fill"></i> ' . __('admin.settings.tab_notifications', 'Notificações') . '
                         </button>
                         <button class="nav-link" id="v-pills-pagamentos-tab" data-bs-toggle="pill" data-bs-target="#v-pills-pagamentos" type="button">
-                            <i class="bi bi-credit-card-fill"></i> Pagamentos
+                            <i class="bi bi-credit-card-fill"></i> ' . __('admin.settings.tab_payments', 'Pagamentos') . '
                         </button>
                         <button class="nav-link" id="v-pills-entrega-tab" data-bs-toggle="pill" data-bs-target="#v-pills-entrega" type="button">
-                            <i class="bi bi-truck"></i> Entrega
+                            <i class="bi bi-truck"></i> ' . __('admin.settings.tab_shipping', 'Entrega') . '
                         </button>
                         <button class="nav-link" id="v-pills-seo-tab" data-bs-toggle="pill" data-bs-target="#v-pills-seo" type="button">
                             <i class="bi bi-search"></i> SEO
                         </button>
                         <button class="nav-link" id="v-pills-assessoria-tab" data-bs-toggle="pill" data-bs-target="#v-pills-assessoria" type="button">
-                            <i class="bi bi-robot"></i> Assessoria / IA
+                            <i class="bi bi-robot"></i> ' . __('admin.settings.tab_advisory_ai', 'Assessoria / IA') . '
                         </button>
                         <button class="nav-link" id="v-pills-comissoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-comissoes" type="button">
-                            <i class="bi bi-percent"></i> Comissões
+                            <i class="bi bi-percent"></i> ' . __('admin.settings.tab_commissions', 'Comissões') . '
                         </button>
                         <button class="nav-link" id="v-pills-mapa-calor-tab" data-bs-toggle="pill" data-bs-target="#v-pills-mapa-calor" type="button">
-                            <i class="bi bi-map-fill"></i> Mapa de calor
+                            <i class="bi bi-map-fill"></i> ' . __('admin.settings.tab_heatmap', 'Mapa de calor') . '
                         </button>
                         <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
-                            <i class="bi bi-gear-fill"></i> Sistema
+                            <i class="bi bi-gear-fill"></i> ' . __('admin.settings.tab_system', 'Sistema') . '
                         </button>
                         <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
                             <i class="bi bi-wordpress"></i> WordPress
@@ -362,7 +362,7 @@ class AdminConfiguracoesController extends Controller {
                             <i class="bi bi-bag-check-fill"></i> WooCommerce
                         </button>
                         <button class="nav-link" id="v-pills-demandas-tab" data-bs-toggle="pill" data-bs-target="#v-pills-demandas" type="button">
-                            <i class="bi bi-list-check"></i> Demandas (TI)
+                            <i class="bi bi-list-check"></i> ' . __('admin.settings.tab_demands_it', 'Demandas (TI)') . '
                         </button>
                     </div>
                 </aside>
@@ -370,21 +370,21 @@ class AdminConfiguracoesController extends Controller {
                 <!-- MENU MOBILE -->
                 <div class="settings-mobile-nav-wrap">
                     <select class="settings-mobile-nav" id="settingsMobileSelect">
-                        <option value="v-pills-loja" selected>Loja</option>
-                        <option value="v-pills-layout">Layout</option>
-                        <option value="v-pills-email">Email</option>
-                        <option value="v-pills-email-creator">Criar E-mail</option>
-                        <option value="v-pills-notificacoes">Notificações</option>
-                        <option value="v-pills-pagamentos">Pagamentos</option>
-                        <option value="v-pills-entrega">Entrega</option>
+                        <option value="v-pills-loja" selected>' . __('admin.settings.tab_store', 'Loja') . '</option>
+                        <option value="v-pills-layout">' . __('admin.settings.tab_layout', 'Layout') . '</option>
+                        <option value="v-pills-email">' . __('admin.settings.tab_email', 'Email') . '</option>
+                        <option value="v-pills-email-creator">' . __('admin.settings.tab_email_creator', 'Criar E-mail') . '</option>
+                        <option value="v-pills-notificacoes">' . __('admin.settings.tab_notifications', 'Notificações') . '</option>
+                        <option value="v-pills-pagamentos">' . __('admin.settings.tab_payments', 'Pagamentos') . '</option>
+                        <option value="v-pills-entrega">' . __('admin.settings.tab_shipping', 'Entrega') . '</option>
                         <option value="v-pills-seo">SEO</option>
-                        <option value="v-pills-assessoria">Assessoria / IA</option>
-                        <option value="v-pills-comissoes">Comissões</option>
-                        <option value="v-pills-mapa-calor">Mapa de calor</option>
-                        <option value="v-pills-sistema">Sistema</option>
+                        <option value="v-pills-assessoria">' . __('admin.settings.tab_advisory_ai', 'Assessoria / IA') . '</option>
+                        <option value="v-pills-comissoes">' . __('admin.settings.tab_commissions', 'Comissões') . '</option>
+                        <option value="v-pills-mapa-calor">' . __('admin.settings.tab_heatmap', 'Mapa de calor') . '</option>
+                        <option value="v-pills-sistema">' . __('admin.settings.tab_system', 'Sistema') . '</option>
                         <option value="v-pills-wordpress">WordPress</option>
                         <option value="v-pills-woocommerce">WooCommerce</option>
-                        <option value="v-pills-demandas">Demandas (TI)</option>
+                        <option value="v-pills-demandas">' . __('admin.settings.tab_demands_it', 'Demandas (TI)') . '</option>
                     </select>
                 </div>
 
@@ -396,31 +396,31 @@ class AdminConfiguracoesController extends Controller {
                             <div class="tab-pane fade show active" id="v-pills-loja" role="tabpanel">
                                 <div class="card">
                                     <div class="card-header">
-                                        <h5 class="mb-0">Configurações da Loja</h5>
+                                        <h5 class="mb-0">' . __('admin.settings.store_settings', 'Configurações da Loja') . '</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="mb-3">
-                                            <label class="form-label">Nome da Loja</label>
+                                            <label class="form-label">' . __('admin.settings.store_name', 'Nome da Loja') . '</label>
                                             <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana') . '">
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Descrição</label>
+                                            <label class="form-label">' . __('admin.settings.description', 'Descrição') . '</label>
                                             <textarea class="form-control" name="loja_descricao" rows="3">' . $this->getConfigValue($config, 'loja', 'descricao', '') . '</textarea>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Email de Contato</label>
+                                            <label class="form-label">' . __('admin.settings.contact_email', 'Email de Contato') . '</label>
                                             <input type="email" class="form-control" name="loja_email" value="' . $this->getConfigValue($config, 'loja', 'email', 'contato@brazilianashop.com.br') . '">
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Telefone</label>
+                                            <label class="form-label">' . __('admin.settings.phone', 'Telefone') . '</label>
                                             <input type="tel" class="form-control" name="loja_telefone" value="' . $this->getConfigValue($config, 'loja', 'telefone', '') . '">
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Endereço</label>
+                                            <label class="form-label">' . __('admin.settings.address', 'Endereço') . '</label>
                                             <input type="text" class="form-control" name="loja_endereco" value="' . $this->getConfigValue($config, 'loja', 'endereco', '') . '">
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Logo URL</label>
+                                            <label class="form-label">' . __('admin.settings.logo_url', 'Logo URL') . '</label>
                                             <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
                                         </div>
                                         <hr>
@@ -428,10 +428,10 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" role="switch" id="loja_conversao_moeda_ativa" name="loja_conversao_moeda_ativa" value="1" ' . ($this->getConfigValue($config, 'loja', 'conversao_moeda_ativa', '0') === '1' ? 'checked' : '') . '>
                                                 <label class="form-check-label" for="loja_conversao_moeda_ativa">
-                                                    <strong>Exibir conversão de moeda para o cliente</strong>
+                                                    <strong>' . __('admin.settings.show_currency_conversion', 'Exibir conversão de moeda para o cliente') . '</strong>
                                                 </label>
                                             </div>
-                                            <small class="text-muted">Quando desativado, o seletor de moeda BRL/USD e os valores convertidos não aparecem para o cliente nas telas do site (exceto no checkout, onde a conversão é sempre disponível).</small>
+                                            <small class="text-muted">' . __('admin.settings.currency_conversion_help', 'Quando desativado, o seletor de moeda BRL/USD e os valores convertidos não aparecem para o cliente nas telas do site (exceto no checkout, onde a conversão é sempre disponível).') . '</small>
                                         </div>
                                     </div>
                                 </div>
@@ -440,12 +440,12 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-layout" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Layout</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.tab_layout', 'Layout') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-4">
-                                                <div class="mb-2 fw-semibold">Logotipo</div>
-                                                <div class="text-muted small mb-3">Upload do logo para aparecer no topo do site.</div>
+                                                <div class="mb-2 fw-semibold">' . __('admin.settings.logo', 'Logotipo') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.logo_help', 'Upload do logo para aparecer no topo do site.') . '</div>
 
                                                 ';
                                                 $existingLogo = (string) $this->getConfigValue($config, 'layout', 'logo', '');
@@ -455,18 +455,18 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row g-3 align-items-center">
                                                     <div class="col-12 col-md-5">
                                                         <div class="border rounded p-2" style="background: #fff;">
-                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div class="text-muted small mb-2">' . __('admin.settings.preview', 'Pré-visualização') . '</div>
                                                             <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
-                                                                ' . ($existingLogoEsc !== '' ? '<img src="' . $existingLogoEsc . '" alt="Logotipo" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logotipo cadastrado</div>') . '
+                                                                ' . ($existingLogoEsc !== '' ? '<img src="' . $existingLogoEsc . '" alt="Logotipo" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">' . __('admin.settings.no_logo', 'Nenhum logotipo cadastrado') . '</div>') . '
                                                             </div>
                                                         </div>
                                                         <input type="hidden" name="layout_logo_keep" value="' . $existingLogoEsc . '">
                                                     </div>
                                                     <div class="col-12 col-md-7">
-                                                        <label class="form-label">Upload do Logotipo</label>
+                                                        <label class="form-label">' . __('admin.settings.upload_logo', 'Upload do Logotipo') . '</label>
                                                         <input type="file" class="form-control" name="layout_logo" accept="image/*">
                                                         <div class="mt-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutLogo">Remover logotipo</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutLogo">' . __('admin.settings.remove_logo', 'Remover logotipo') . '</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -477,7 +477,7 @@ class AdminConfiguracoesController extends Controller {
                                                     btn.addEventListener("click", function() {
                                                         var input = document.querySelector("input[name=layout_logo_keep]");
                                                         if (input) input.value = "";
-                                                        alert("Logotipo será removido ao salvar.");
+                                                        alert("' . htmlspecialchars(__('admin.settings.js_logo_removed_on_save', 'Logotipo será removido ao salvar.'), ENT_QUOTES, 'UTF-8') . '");
                                                     });
                                                 });
                                                 </script>
@@ -486,8 +486,8 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="mb-4">
-                                                <div class="mb-2 fw-semibold">Logotipo do Rodapé</div>
-                                                <div class="text-muted small mb-3">Upload do logo para aparecer no rodapé do site.</div>
+                                                <div class="mb-2 fw-semibold">' . __('admin.settings.footer_logo', 'Logotipo do Rodapé') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.footer_logo_help', 'Upload do logo para aparecer no rodapé do site.') . '</div>
 
                                                 ';
                                                 $existingFooterLogo = (string) $this->getConfigValue($config, 'layout', 'logo_footer', '');
@@ -497,18 +497,18 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row g-3 align-items-center">
                                                     <div class="col-12 col-md-5">
                                                         <div class="border rounded p-2" style="background: #fff;">
-                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div class="text-muted small mb-2">' . __('admin.settings.preview', 'Pré-visualização') . '</div>
                                                             <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
-                                                                ' . ($existingFooterLogoEsc !== '' ? '<img src="' . $existingFooterLogoEsc . '" alt="Logotipo Rodapé" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logotipo do rodapé cadastrado</div>') . '
+                                                                ' . ($existingFooterLogoEsc !== '' ? '<img src="' . $existingFooterLogoEsc . '" alt="Logotipo Rodapé" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">' . __('admin.settings.no_footer_logo', 'Nenhum logotipo do rodapé cadastrado') . '</div>') . '
                                                             </div>
                                                         </div>
                                                         <input type="hidden" name="layout_logo_footer_keep" value="' . $existingFooterLogoEsc . '">
                                                     </div>
                                                     <div class="col-12 col-md-7">
-                                                        <label class="form-label">Upload do Logotipo do Rodapé</label>
+                                                        <label class="form-label">' . __('admin.settings.upload_footer_logo', 'Upload do Logotipo do Rodapé') . '</label>
                                                         <input type="file" class="form-control" name="layout_logo_footer" accept="image/*">
                                                         <div class="mt-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFooterLogo">Remover logotipo do rodapé</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFooterLogo">' . __('admin.settings.remove_footer_logo', 'Remover logotipo do rodapé') . '</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -519,7 +519,7 @@ class AdminConfiguracoesController extends Controller {
                                                     btn.addEventListener("click", function() {
                                                         var input = document.querySelector("input[name=layout_logo_footer_keep]");
                                                         if (input) input.value = "";
-                                                        alert("Logotipo do rodapé será removido ao salvar.");
+                                                        alert("' . htmlspecialchars(__('admin.settings.js_footer_logo_removed_on_save', 'Logotipo do rodapé será removido ao salvar.'), ENT_QUOTES, 'UTF-8') . '");
                                                     });
                                                 });
                                                 </script>
@@ -528,8 +528,8 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="mb-4">
-                                                <div class="mb-2 fw-semibold">Logo do Admin</div>
-                                                <div class="text-muted small mb-3">Upload do logo para aparecer no painel administrativo.</div>
+                                                <div class="mb-2 fw-semibold">' . __('admin.settings.admin_logo', 'Logo do Admin') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.admin_logo_help', 'Upload do logo para aparecer no painel administrativo.') . '</div>
 
                                                 ';
                                                 $existingAdminLogo = (string) $this->getConfigValue($config, 'layout', 'logo_admin', '');
@@ -539,18 +539,18 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row g-3 align-items-center">
                                                     <div class="col-12 col-md-5">
                                                         <div class="border rounded p-2" style="background: #fff;">
-                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div class="text-muted small mb-2">' . __('admin.settings.preview', 'Pré-visualização') . '</div>
                                                             <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
-                                                                ' . ($existingAdminLogoEsc !== '' ? '<img src="' . $existingAdminLogoEsc . '" alt="Logo Admin" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logo do admin cadastrado</div>') . '
+                                                                ' . ($existingAdminLogoEsc !== '' ? '<img src="' . $existingAdminLogoEsc . '" alt="Logo Admin" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">' . __('admin.settings.no_admin_logo', 'Nenhum logo do admin cadastrado') . '</div>') . '
                                                             </div>
                                                         </div>
                                                         <input type="hidden" name="layout_logo_admin_keep" value="' . $existingAdminLogoEsc . '">
                                                     </div>
                                                     <div class="col-12 col-md-7">
-                                                        <label class="form-label">Upload do Logo do Admin</label>
+                                                        <label class="form-label">' . __('admin.settings.upload_admin_logo', 'Upload do Logo do Admin') . '</label>
                                                         <input type="file" class="form-control" name="layout_logo_admin" accept="image/*">
                                                         <div class="mt-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutAdminLogo">Remover logo do admin</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutAdminLogo">' . __('admin.settings.remove_admin_logo', 'Remover logo do admin') . '</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -561,7 +561,7 @@ class AdminConfiguracoesController extends Controller {
                                                     btn.addEventListener("click", function() {
                                                         var input = document.querySelector("input[name=layout_logo_admin_keep]");
                                                         if (input) input.value = "";
-                                                        alert("Logo do admin será removido ao salvar.");
+                                                        alert("' . htmlspecialchars(__('admin.settings.js_admin_logo_removed_on_save', 'Logo do admin será removido ao salvar.'), ENT_QUOTES, 'UTF-8') . '");
                                                     });
                                                 });
                                                 </script>
@@ -572,7 +572,7 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-4">
                                                 <div class="mb-2 fw-semibold">Favicon</div>
-                                                <div class="text-muted small mb-3">Upload do ícone para aparecer na aba do navegador.</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.favicon_help', 'Upload do ícone para aparecer na aba do navegador.') . '</div>
 
                                                 ';
                                                 $existingFavicon = (string) $this->getConfigValue($config, 'layout', 'favicon', '');
@@ -582,18 +582,18 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row g-3 align-items-center">
                                                     <div class="col-12 col-md-5">
                                                         <div class="border rounded p-2" style="background: #fff;">
-                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div class="text-muted small mb-2">' . __('admin.settings.preview', 'Pré-visualização') . '</div>
                                                             <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
-                                                                ' . ($existingFaviconEsc !== '' ? '<img src="' . $existingFaviconEsc . '" alt="Favicon" style="height: 32px; width: 32px; object-fit: contain;"> <span class="text-muted small">' . $existingFaviconEsc . '</span>' : '<div class="text-muted">Nenhum favicon cadastrado</div>') . '
+                                                                ' . ($existingFaviconEsc !== '' ? '<img src="' . $existingFaviconEsc . '" alt="Favicon" style="height: 32px; width: 32px; object-fit: contain;"> <span class="text-muted small">' . $existingFaviconEsc . '</span>' : '<div class="text-muted">' . __('admin.settings.no_favicon', 'Nenhum favicon cadastrado') . '</div>') . '
                                                             </div>
                                                         </div>
                                                         <input type="hidden" name="layout_favicon_keep" value="' . $existingFaviconEsc . '">
                                                     </div>
                                                     <div class="col-12 col-md-7">
-                                                        <label class="form-label">Upload do Favicon</label>
+                                                        <label class="form-label">' . __('admin.settings.upload_favicon', 'Upload do Favicon') . '</label>
                                                         <input type="file" class="form-control" name="layout_favicon" accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml">
                                                         <div class="mt-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFavicon">Remover favicon</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFavicon">' . __('admin.settings.remove_favicon', 'Remover favicon') . '</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -604,7 +604,7 @@ class AdminConfiguracoesController extends Controller {
                                                     btn.addEventListener("click", function() {
                                                         var input = document.querySelector("input[name=layout_favicon_keep]");
                                                         if (input) input.value = "";
-                                                        alert("Favicon será removido ao salvar.");
+                                                        alert("' . htmlspecialchars(__('admin.settings.js_favicon_removed_on_save', 'Favicon será removido ao salvar.'), ENT_QUOTES, 'UTF-8') . '");
                                                     });
                                                 });
                                                 </script>
@@ -618,21 +618,21 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="mb-2 fw-semibold">Banners</div>
-                                            <div class="text-muted small mb-3">Cadastre imagens para rodarem no header do site.</div>
+                                            <div class="text-muted small mb-3">' . __('admin.settings.banners_help', 'Cadastre imagens para rodarem no header do site.') . '</div>
                                             <div class="text-muted small mb-3">
                                                 Desktop: <strong>1149 x 436</strong><br>
                                                 Mobile: <strong>391 x 333</strong>
                                             </div>
 
                                             <div class="mb-3">
-                                                <label class="form-label small mb-1">Idioma do banner</label>
+                                                <label class="form-label small mb-1">' . __('admin.settings.banner_language', 'Idioma do banner') . '</label>
                                                 <select class="form-select" name="layout_banners_lang" onchange="(function(sel){var u=new URL(window.location.href);u.searchParams.set(\'layout_banners_lang\', sel.value);window.location.href=u.toString();})(this)">';
 
                                             echo '<option value="pt" ' . ($selectedLang === 'pt' ? 'selected' : '') . '>Português (PT)</option>';
                                             echo '<option value="en" ' . ($selectedLang === 'en' ? 'selected' : '') . '>English (EN)</option>';
 
                                             echo '</select>
-                                                <div class="text-muted small mt-1">Os banners exibidos na Home mudam de acordo com o idioma selecionado no site.</div>
+                                                <div class="text-muted small mt-1">' . __('admin.settings.banners_lang_help', 'Os banners exibidos na Home mudam de acordo com o idioma selecionado no site.') . '</div>
                                             </div>
 
                                             <div id="layout-banners-existing" class="row g-2 mb-3">
@@ -667,23 +667,23 @@ class AdminConfiguracoesController extends Controller {
                                                         . '<div class="col-12 col-sm-6">'
                                                         . '<div class="small text-muted mb-1">Desktop (1149x436)</div>'
                                                         . '<div class="ratio ratio-16x9 mb-2">'
-                                                        . ($desktopEsc !== '' ? '<img src="' . $desktopEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Desktop">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
+                                                        . ($desktopEsc !== '' ? '<img src="' . $desktopEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Desktop">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">' . __('admin.settings.no_image', 'Sem imagem') . '</div>')
                                                         . '</div>'
                                                         . '<input type="hidden" name="layout_banners_keep_desktop[]" value="' . $desktopEsc . '">' 
                                                         . '</div>'
                                                         . '<div class="col-12 col-sm-6">'
                                                         . '<div class="small text-muted mb-1">Mobile (391x333)</div>'
                                                         . '<div class="ratio" style="--bs-aspect-ratio: 85.2%;">'
-                                                        . ($mobileEsc !== '' ? '<img src="' . $mobileEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Mobile">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
+                                                        . ($mobileEsc !== '' ? '<img src="' . $mobileEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Mobile">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">' . __('admin.settings.no_image', 'Sem imagem') . '</div>')
                                                         . '</div>'
                                                         . '<input type="hidden" name="layout_banners_keep_mobile[]" value="' . $mobileEsc . '">' 
                                                         . '</div>'
                                                         . '<div class="col-12">'
-                                                        . '<label class="form-label small mb-1">Link (ao clicar)</label>'
+                                                        . '<label class="form-label small mb-1">' . __('admin.settings.link_on_click', 'Link (ao clicar)') . '</label>'
                                                         . '<input type="url" class="form-control" name="layout_banners_keep_link[]" value="' . $linkEsc . '" placeholder="https://...">'
                                                         . '</div>'
                                                         . '</div>'
-                                                        . '<button type="button" class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="this.closest(\'.col-12\').remove();">Remover</button>'
+                                                        . '<button type="button" class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="this.closest(\'.col-12\').remove();">' . __('admin.settings.remove', 'Remover') . '</button>'
                                                         . '</div>'
                                                         . '</div>';
                                                 }
@@ -694,19 +694,19 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="border rounded p-2">
                                                     <div class="row g-2 align-items-end">
                                                         <div class="col-12 col-md-6">
-                                                            <label class="form-label small mb-1">Banner Desktop (1149x436)</label>
+                                                            <label class="form-label small mb-1">' . __('admin.settings.banner_desktop', 'Banner Desktop (1149x436)') . '</label>
                                                             <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">
                                                         </div>
                                                         <div class="col-12 col-md-6">
-                                                            <label class="form-label small mb-1">Banner Mobile (391x333)</label>
+                                                            <label class="form-label small mb-1">' . __('admin.settings.banner_mobile', 'Banner Mobile (391x333)') . '</label>
                                                             <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">
                                                         </div>
                                                         <div class="col-12">
-                                                            <label class="form-label small mb-1">Link (ao clicar)</label>
+                                                            <label class="form-label small mb-1">' . __('admin.settings.link_on_click', 'Link (ao clicar)') . '</label>
                                                             <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">
                                                         </div>
                                                         <div class="col-12">
-                                                            <button type="button" class="btn btn-outline-secondary w-100" onclick="this.closest(\'.border\').remove();" title="Remover">-</button>
+                                                            <button type="button" class="btn btn-outline-secondary w-100" onclick="this.closest(\'.border\').remove();" title="' . htmlspecialchars(__('admin.settings.remove', 'Remover'), ENT_QUOTES, 'UTF-8') . '">-</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -714,7 +714,7 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mt-2">
                                                 <button type="button" class="btn btn-sm btn-primary" id="btnAddLayoutBanner">
-                                                    <i class="fas fa-plus me-1"></i>Adicionar banner
+                                                    <i class="fas fa-plus me-1"></i>' . __('admin.settings.add_banner', 'Adicionar banner') . '
                                                 </button>
                                             </div>
 
@@ -730,19 +730,19 @@ class AdminConfiguracoesController extends Controller {
                                                     box.innerHTML = `
                                                         <div class="row g-2 align-items-end">
                                                             <div class="col-12 col-md-6">
-                                                                <label class="form-label small mb-1">Banner Desktop (1149x436)</label>
+                                                                <label class="form-label small mb-1">' . htmlspecialchars(__('admin.settings.banner_desktop', 'Banner Desktop (1149x436)'), ENT_QUOTES, 'UTF-8') . '</label>
                                                                 <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">
                                                             </div>
                                                             <div class="col-12 col-md-6">
-                                                                <label class="form-label small mb-1">Banner Mobile (391x333)</label>
+                                                                <label class="form-label small mb-1">' . htmlspecialchars(__('admin.settings.banner_mobile', 'Banner Mobile (391x333)'), ENT_QUOTES, 'UTF-8') . '</label>
                                                                 <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">
                                                             </div>
                                                             <div class="col-12">
-                                                                <label class="form-label small mb-1">Link (ao clicar)</label>
+                                                                <label class="form-label small mb-1">' . htmlspecialchars(__('admin.settings.link_on_click', 'Link (ao clicar)'), ENT_QUOTES, 'UTF-8') . '</label>
                                                                 <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">
                                                             </div>
                                                             <div class="col-12">
-                                                                <button type="button" class="btn btn-outline-secondary w-100" title="Remover">-</button>
+                                                                <button type="button" class="btn btn-outline-secondary w-100" title="' . htmlspecialchars(__('admin.settings.remove', 'Remover'), ENT_QUOTES, 'UTF-8') . '">-</button>
                                                             </div>
                                                         </div>
                                                     `;
@@ -766,7 +766,7 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                         <div class="card-body">
                                             <div class="alert alert-warning">
-                                                Configure as credenciais por origem (BR / RED / US). Se estiver vazio, o sistema pode cair para a configuração antiga (sem origem) quando aplicável.
+                                                ' . __('admin.settings.woo_credentials_help', 'Configure as credenciais por origem (BR / RED / US). Se estiver vazio, o sistema pode cair para a configuração antiga (sem origem) quando aplicável.') . '
                                             </div>
 
                                             <div class="border rounded p-3 mb-3">
@@ -857,7 +857,7 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="alert alert-info mb-0">
-                                                Essas credenciais são usadas para <strong>atualizar o pedido no WooCommerce</strong> (order meta) com <code>wexpress_shipping_id</code>, link da etiqueta e rastreio.
+                                                ' . __('admin.settings.woo_credentials_usage', 'Essas credenciais são usadas para <strong>atualizar o pedido no WooCommerce</strong> (order meta) com <code>wexpress_shipping_id</code>, link da etiqueta e rastreio.') . '
                                             </div>
                                         </div>
                                     </div>
@@ -866,11 +866,11 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-wordpress" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Integração WordPress (Somente leitura)</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.wordpress_integration_readonly', 'Integração WordPress (Somente leitura)') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="alert alert-warning">
-                                                Configure as credenciais do banco WordPress por origem (BR / RED / US). Como são sites diferentes, podem existir IDs/números repetidos.
+                                                ' . __('admin.settings.wp_credentials_help', 'Configure as credenciais do banco WordPress por origem (BR / RED / US). Como são sites diferentes, podem existir IDs/números repetidos.') . '
                                             </div>
 
                                             <div class="border rounded p-3 mb-3">
@@ -884,7 +884,7 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Database (nome)</label>
+                                                            <label class="form-label">' . __('admin.settings.database_name', 'Database (nome)') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_br_db_name" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_name', $this->getConfigValue($config, 'wordpress', 'db_name', '')) . '" placeholder="wp_database">
                                                         </div>
                                                     </div>
@@ -893,13 +893,13 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Usuário</label>
+                                                            <label class="form-label">' . __('admin.settings.user', 'Usuário') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_br_db_user" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_user', $this->getConfigValue($config, 'wordpress', 'db_user', '')) . '" placeholder="wp_user">
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Senha</label>
+                                                            <label class="form-label">' . __('admin.settings.password', 'Senha') . '</label>
                                                             <input type="password" class="form-control" name="wordpress_br_db_pass" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_pass', $this->getConfigValue($config, 'wordpress', 'db_pass', '')) . '" placeholder="********">
                                                         </div>
                                                     </div>
@@ -908,7 +908,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <label class="form-label">' . __('admin.settings.table_prefix', 'Prefixo das tabelas') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_br_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_br', 'table_prefix', $this->getConfigValue($config, 'wordpress', 'table_prefix', 'wp_')) . '" placeholder="wp_">
                                                         </div>
                                                     </div>
@@ -926,7 +926,7 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Database (nome)</label>
+                                                            <label class="form-label">' . __('admin.settings.database_name', 'Database (nome)') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_red_db_name" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_name', '') . '" placeholder="wp_database">
                                                         </div>
                                                     </div>
@@ -935,13 +935,13 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Usuário</label>
+                                                            <label class="form-label">' . __('admin.settings.user', 'Usuário') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_red_db_user" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_user', '') . '" placeholder="wp_user">
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Senha</label>
+                                                            <label class="form-label">' . __('admin.settings.password', 'Senha') . '</label>
                                                             <input type="password" class="form-control" name="wordpress_red_db_pass" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_pass', '') . '" placeholder="********">
                                                         </div>
                                                     </div>
@@ -950,7 +950,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <label class="form-label">' . __('admin.settings.table_prefix', 'Prefixo das tabelas') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_red_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_red', 'table_prefix', 'wp_') . '" placeholder="wp_">
                                                         </div>
                                                     </div>
@@ -968,7 +968,7 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Database (nome)</label>
+                                                            <label class="form-label">' . __('admin.settings.database_name', 'Database (nome)') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_us_db_name" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_name', '') . '" placeholder="wp_database">
                                                         </div>
                                                     </div>
@@ -977,13 +977,13 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Usuário</label>
+                                                            <label class="form-label">' . __('admin.settings.user', 'Usuário') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_us_db_user" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_user', '') . '" placeholder="wp_user">
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Senha</label>
+                                                            <label class="form-label">' . __('admin.settings.password', 'Senha') . '</label>
                                                             <input type="password" class="form-control" name="wordpress_us_db_pass" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_pass', '') . '" placeholder="********">
                                                         </div>
                                                     </div>
@@ -992,7 +992,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="mb-3">
-                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <label class="form-label">' . __('admin.settings.table_prefix', 'Prefixo das tabelas') . '</label>
                                                             <input type="text" class="form-control" name="wordpress_us_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_us', 'table_prefix', 'wp_') . '" placeholder="wp_">
                                                         </div>
                                                     </div>
@@ -1008,7 +1008,7 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Database (nome)</label>
+                                                        <label class="form-label">' . __('admin.settings.database_name', 'Database (nome)') . '</label>
                                                         <input type="text" class="form-control" name="wordpress_db_name" value="' . $this->getConfigValue($config, 'wordpress', 'db_name', '') . '" placeholder="wp_database">
                                                     </div>
                                                 </div>
@@ -1017,13 +1017,13 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Usuário</label>
+                                                        <label class="form-label">' . __('admin.settings.user', 'Usuário') . '</label>
                                                         <input type="text" class="form-control" name="wordpress_db_user" value="' . $this->getConfigValue($config, 'wordpress', 'db_user', '') . '" placeholder="wp_user">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Senha</label>
+                                                        <label class="form-label">' . __('admin.settings.password', 'Senha') . '</label>
                                                         <input type="password" class="form-control" name="wordpress_db_pass" value="' . $this->getConfigValue($config, 'wordpress', 'db_pass', '') . '" placeholder="********">
                                                     </div>
                                                 </div>
@@ -1032,15 +1032,15 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Prefixo das tabelas</label>
+                                                        <label class="form-label">' . __('admin.settings.table_prefix', 'Prefixo das tabelas') . '</label>
                                                         <input type="text" class="form-control" name="wordpress_table_prefix" value="' . $this->getConfigValue($config, 'wordpress', 'table_prefix', 'wp_') . '" placeholder="wp_">
-                                                        <small class="text-muted">Normalmente <code>wp_</code>. Se o site antigo tiver outro prefixo, ajuste aqui.</small>
+                                                        <small class="text-muted">' . __('admin.settings.table_prefix_help', 'Normalmente <code>wp_</code>. Se o site antigo tiver outro prefixo, ajuste aqui.') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div class="alert alert-info mb-0">
-                                                Essa integração é <strong>somente leitura</strong>. O sistema usará essas credenciais para exibir pedidos do site antigo.
+                                                ' . __('admin.settings.wp_readonly_note', 'Essa integração é <strong>somente leitura</strong>. O sistema usará essas credenciais para exibir pedidos do site antigo.') . '
                                             </div>
                                         </div>
                                     </div>
@@ -1049,39 +1049,39 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-notificacoes" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurar Notificações por Webhook</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.notifications_webhook_title', 'Configurar Notificações por Webhook') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div id="formNotificacoes">
                                                 <div class="mb-3">
-                                                    <label class="form-label">Evento</label>
+                                                    <label class="form-label">' . __('admin.settings.event', 'Evento') . '</label>
                                                     <select name="evento" class="form-select" required>
-                                                        <option value="">Selecione um evento...</option>
-                                                        <option value="novo_pedido">Novo Pedido</option>
-                                                        <option value="pedido_aprovado">Pedido Aprovado</option>
-                                                        <option value="pedido_enviado">Pedido Enviado</option>
-                                                        <option value="pedido_entregue">Pedido Entregue</option>
-                                                        <option value="pedido_cancelado">Pedido Cancelado</option>
-                                                        <optgroup label="Carnê Braziliana">
-                                                            <option value="carne_criado">Carnê Criado</option>
-                                                            <option value="carne_cobranca">Carnê Cobrança (parcela em atraso)</option>
-                                                            <option value="carne_parcela_proxima_vencimento">Carnê Parcela Próxima do Vencimento</option>
-                                                            <option value="carne_pagamento_confirmado">Carnê Pagamento Confirmado</option>
-                                                            <option value="carne_quitado">Carnê Quitado</option>
-                                                            <option value="carne_envio_liberado">Carnê Envio Liberado</option>
-                                                            <option value="carne_aviso_cancelamento">Carnê Aviso de Cancelamento</option>
-                                                            <option value="carne_cancelado">Carnê Cancelado</option>
+                                                        <option value="">' . __('admin.settings.select_event', 'Selecione um evento...') . '</option>
+                                                        <option value="novo_pedido">' . __('admin.settings.event_new_order', 'Novo Pedido') . '</option>
+                                                        <option value="pedido_aprovado">' . __('admin.settings.event_order_approved', 'Pedido Aprovado') . '</option>
+                                                        <option value="pedido_enviado">' . __('admin.settings.event_order_shipped', 'Pedido Enviado') . '</option>
+                                                        <option value="pedido_entregue">' . __('admin.settings.event_order_delivered', 'Pedido Entregue') . '</option>
+                                                        <option value="pedido_cancelado">' . __('admin.settings.event_order_canceled', 'Pedido Cancelado') . '</option>
+                                                        <optgroup label="' . htmlspecialchars(__('admin.settings.carne_group', 'Carnê Braziliana'), ENT_QUOTES, 'UTF-8') . '">
+                                                            <option value="carne_criado">' . __('admin.settings.event_carne_created', 'Carnê Criado') . '</option>
+                                                            <option value="carne_cobranca">' . __('admin.settings.event_carne_charge', 'Carnê Cobrança (parcela em atraso)') . '</option>
+                                                            <option value="carne_parcela_proxima_vencimento">' . __('admin.settings.event_carne_due_soon', 'Carnê Parcela Próxima do Vencimento') . '</option>
+                                                            <option value="carne_pagamento_confirmado">' . __('admin.settings.event_carne_payment_confirmed', 'Carnê Pagamento Confirmado') . '</option>
+                                                            <option value="carne_quitado">' . __('admin.settings.event_carne_paid_off', 'Carnê Quitado') . '</option>
+                                                            <option value="carne_envio_liberado">' . __('admin.settings.event_carne_shipping_released', 'Carnê Envio Liberado') . '</option>
+                                                            <option value="carne_aviso_cancelamento">' . __('admin.settings.event_carne_cancel_warning', 'Carnê Aviso de Cancelamento') . '</option>
+                                                            <option value="carne_cancelado">' . __('admin.settings.event_carne_canceled', 'Carnê Cancelado') . '</option>
                                                         </optgroup>
                                                     </select>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">URL do Webhook</label>
+                                                    <label class="form-label">' . __('admin.settings.webhook_url', 'URL do Webhook') . '</label>
                                                     <input type="url" name="webhook_url" class="form-control" placeholder="https://seu-webhook.com/notificacoes" required>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Método HTTP</label>
+                                                    <label class="form-label">' . __('admin.settings.http_method', 'Método HTTP') . '</label>
                                                     <select name="webhook_method" class="form-select">
                                                         <option value="POST">POST</option>
                                                         <option value="PUT">PUT</option>
@@ -1095,21 +1095,21 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Campos Personalizados (JSON)</label>
+                                                    <label class="form-label">' . __('admin.settings.custom_fields_json', 'Campos Personalizados (JSON)') . '</label>
                                                     <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana&quot;}"></textarea>
-                                                    <small class="text-muted">Esses campos são mesclados no payload final enviado ao webhook.</small>
+                                                    <small class="text-muted">' . __('admin.settings.custom_fields_help', 'Esses campos são mesclados no payload final enviado ao webhook.') . '</small>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Template da Mensagem</label>
-                                                    <textarea name="webhook_template" class="form-control" rows="4" placeholder="Olá {{nome}}, seu pedido #{{codigo_pedido}} está {{status}}"></textarea>
-                                                    <small class="text-muted">Você pode usar variáveis no formato <code>{{nome}}</code>, <code>{{codigo_pedido}}</code>, <code>{{status}}</code>, etc.</small>
+                                                    <label class="form-label">' . __('admin.settings.message_template', 'Template da Mensagem') . '</label>
+                                                    <textarea name="webhook_template" class="form-control" rows="4" placeholder="' . htmlspecialchars(__('admin.settings.message_template_placeholder', 'Olá {{nome}}, seu pedido #{{codigo_pedido}} está {{status}}'), ENT_QUOTES, 'UTF-8') . '"></textarea>
+                                                    <small class="text-muted">' . __('admin.settings.message_template_help', 'Você pode usar variáveis no formato <code>{{nome}}</code>, <code>{{codigo_pedido}}</code>, <code>{{status}}</code>, etc.') . '</small>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Campos Enviados no Webhook</label>
+                                                    <label class="form-label">' . __('admin.settings.fields_sent_webhook', 'Campos Enviados no Webhook') . '</label>
                                                     <div class="border rounded p-3 bg-light">
-                                                        <div class="mb-2"><strong>Variáveis disponíveis:</strong></div>
+                                                        <div class="mb-2"><strong>' . __('admin.settings.available_variables', 'Variáveis disponíveis:') . '</strong></div>
                                                         <div class="row">
                                                             <div class="col-md-4"><code>{{evento}}</code></div>
                                                             <div class="col-md-4"><code>{{pedido_id}}</code></div>
@@ -1122,12 +1122,12 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="col-md-4"><code>{{telefone}}</code></div>
                                                             <div class="col-md-4"><code>{{data}}</code></div>
                                                         </div>
-                                                        <div class="mt-2"><small class="text-muted">Além disso, o sistema pode adicionar campos extras do evento (quando aplicável) e também tudo que você colocar em “Campos Personalizados (JSON)”.</small></div>
+                                                        <div class="mt-2"><small class="text-muted">' . __('admin.settings.webhook_extra_fields_note', 'Além disso, o sistema pode adicionar campos extras do evento (quando aplicável) e também tudo que você colocar em “Campos Personalizados (JSON)”.') . '</small></div>
                                                     </div>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Exemplo de Payload (JSON)</label>
+                                                    <label class="form-label">' . __('admin.settings.payload_example', 'Exemplo de Payload (JSON)') . '</label>
                                                     <pre class="border rounded p-3 bg-light mb-0" style="white-space: pre-wrap;">{
   "channel": "whatsapp",
   "evento": "novo_pedido",
@@ -1151,49 +1151,49 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="mb-3">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" name="webhook_ativo" id="notificacoes_webhook_ativo" checked>
-                                                        <label class="form-check-label" for="notificacoes_webhook_ativo">Webhook Ativo</label>
+                                                        <label class="form-check-label" for="notificacoes_webhook_ativo">' . __('admin.settings.webhook_active', 'Webhook Ativo') . '</label>
                                                     </div>
                                                 </div>
 
                                                 <div class="mb-3">
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" name="webhook_retries" id="notificacoes_webhook_retries" checked>
-                                                        <label class="form-check-label" for="notificacoes_webhook_retries">Tentativas de Reenvio</label>
+                                                        <label class="form-check-label" for="notificacoes_webhook_retries">' . __('admin.settings.retry_attempts', 'Tentativas de Reenvio') . '</label>
                                                     </div>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Logs de Envio</label>
+                                                    <label class="form-label">' . __('admin.settings.send_logs', 'Logs de Envio') . '</label>
                                                     <div class="table-responsive">
                                                         <table class="table table-sm">
                                                             <thead>
                                                                 <tr>
-                                                                    <th>Data</th>
+                                                                    <th>' . __('admin.settings.date', 'Data') . '</th>
                                                                     <th>Status</th>
-                                                                    <th>Resposta</th>
-                                                                    <th>Ações</th>
+                                                                    <th>' . __('admin.settings.response', 'Resposta') . '</th>
+                                                                    <th>' . __('admin.settings.actions', 'Ações') . '</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody id="notificacoes-logs-webhook">
                                                                 <tr>
-                                                                    <td colspan="4" class="text-center">Nenhum log encontrado</td>
+                                                                    <td colspan="4" class="text-center">' . __('admin.settings.no_log_found', 'Nenhum log encontrado') . '</td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
                                                     </div>
                                                     <div class="d-flex justify-content-end">
                                                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="limparLogsWebhookNotificacoes()">
-                                                            <i class="fas fa-trash"></i> Limpar logs
+                                                            <i class="fas fa-trash"></i> ' . __('admin.settings.clear_logs', 'Limpar logs') . '
                                                         </button>
                                                     </div>
                                                 </div>
 
                                                 <div class="d-flex gap-2">
                                                     <button type="button" class="btn btn-primary" onclick="salvarNotificacaoAdmin()">
-                                                        <i class="fas fa-save me-2"></i>Salvar Configuração
+                                                        <i class="fas fa-save me-2"></i>' . __('admin.settings.save_config', 'Salvar Configuração') . '
                                                     </button>
                                                     <button type="button" class="btn btn-success" onclick="testarWebhookNotificacoes()">
-                                                        <i class="fas fa-paper-plane me-2"></i>Testar Webhook
+                                                        <i class="fas fa-paper-plane me-2"></i>' . __('admin.settings.test_webhook', 'Testar Webhook') . '
                                                     </button>
                                                 </div>
                                             </div>
@@ -1205,11 +1205,11 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-email" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações de Email</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.email_settings', 'Configurações de Email') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-3">
-                                                <label class="form-label">Driver SMTP</label>
+                                                <label class="form-label">' . __('admin.settings.smtp_driver', 'Driver SMTP') . '</label>
                                                 <select class="form-select" name="email_driver">
                                                     <option value="smtp" ' . ($this->getConfigValue($config, 'email', 'driver', 'smtp') === 'smtp' ? 'selected' : '') . '>SMTP</option>
                                                     <option value="mail" ' . ($this->getConfigValue($config, 'email', 'driver', '') === 'mail' ? 'selected' : '') . '>PHP Mail</option>
@@ -1221,37 +1221,37 @@ class AdminConfiguracoesController extends Controller {
                                                 <input type="text" class="form-control" name="email_host" value="' . $this->getConfigValue($config, 'email', 'host', '') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Porta SMTP</label>
+                                                <label class="form-label">' . __('admin.settings.smtp_port', 'Porta SMTP') . '</label>
                                                 <input type="number" class="form-control" name="email_port" value="' . $this->getConfigValue($config, 'email', 'port', '587') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Usuário SMTP</label>
+                                                <label class="form-label">' . __('admin.settings.smtp_user', 'Usuário SMTP') . '</label>
                                                 <input type="text" class="form-control" name="email_username" value="' . $this->getConfigValue($config, 'email', 'username', '') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Senha SMTP</label>
+                                                <label class="form-label">' . __('admin.settings.smtp_password', 'Senha SMTP') . '</label>
                                                 <input type="password" class="form-control" name="email_password" value="' . $this->getConfigValue($config, 'email', 'password', '') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Criptografia</label>
+                                                <label class="form-label">' . __('admin.settings.encryption', 'Criptografia') . '</label>
                                                 <select class="form-select" name="email_encryption">
                                                     <option value="tls" ' . ($this->getConfigValue($config, 'email', 'encryption', 'tls') === 'tls' ? 'selected' : '') . '>TLS</option>
                                                     <option value="ssl" ' . ($this->getConfigValue($config, 'email', 'encryption', '') === 'ssl' ? 'selected' : '') . '>SSL</option>
-                                                    <option value="" ' . ($this->getConfigValue($config, 'email', 'encryption', '') === '' ? 'selected' : '') . '>Nenhuma</option>
+                                                    <option value="" ' . ($this->getConfigValue($config, 'email', 'encryption', '') === '' ? 'selected' : '') . '>' . __('admin.settings.none_f', 'Nenhuma') . '</option>
                                                 </select>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Email de Envio</label>
+                                                <label class="form-label">' . __('admin.settings.from_email', 'Email de Envio') . '</label>
                                                 <input type="email" class="form-control" name="email_from" value="' . $this->getConfigValue($config, 'email', 'from', 'noreply@brazilianashop.com.br') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Nome de Envio</label>
+                                                <label class="form-label">' . __('admin.settings.from_name', 'Nome de Envio') . '</label>
                                                 <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Email de teste (para)</label>
+                                                <label class="form-label">' . __('admin.settings.test_email_to', 'Email de teste (para)') . '</label>
                                                 <input type="email" class="form-control" name="email_test_to" value="' . $this->getConfigValue($config, 'email', 'test_to', '') . '">
-                                                <small class="text-muted">Usado ao clicar em “Testar” nos templates de e-mail.</small>
+                                                <small class="text-muted">' . __('admin.settings.test_email_help', 'Usado ao clicar em “Testar” nos templates de e-mail.') . '</small>
                                             </div>
                                         </div>
                                     </div>
@@ -1261,58 +1261,58 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-email-creator" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header d-flex justify-content-between align-items-center">
-                                            <h5 class="mb-0">Criador de E-mail</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.email_creator', 'Criador de E-mail') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Tipo de Evento</label>
+                                                        <label class="form-label">' . __('admin.settings.event_type', 'Tipo de Evento') . '</label>
                                                         <select class="form-select" id="evento_tipo" onchange="carregarVariaveis()">
-                                                            <option value="">Selecione um evento...</option>
-                                                            <option value="novo_pedido">🛒 Novo Pedido</option>
-                                                            <option value="pedido_aprovado">✅ Pedido Aprovado</option>
-                                                            <option value="pedido_enviado">📦 Pedido Enviado</option>
-                                                            <option value="pedido_entregue">🎁 Pedido Entregue</option>
-                                                            <option value="pedido_cancelado">❌ Pedido Cancelado</option>
-                                                            <option value="novo_usuario">👤 Novo Usuário</option>
-                                                            <option value="recuperar_senha">🔑 Recuperar Senha</option>
-                                                            <option value="contato_contato">📧 Contato</option>
-                                                            <option value="carne_criado">📄 Carnê Criado</option>
-                                                            <option value="carne_cobranca">💰 Carnê - Cobrança</option>
-                                                            <option value="carne_parcela_proxima_vencimento">⏰ Carnê - Parcela Próxima Vencimento</option>
-                                                            <option value="carne_pagamento_confirmado">✅ Carnê - Pagamento Confirmado</option>
-                                                            <option value="carne_quitado">🎉 Carnê Quitado</option>
-                                                            <option value="carne_envio_liberado">🚚 Carnê - Envio Liberado</option>
-                                                            <option value="carne_aviso_cancelamento">🚨 Carnê - Aviso Cancelamento</option>
-                                                            <option value="carne_cancelado">❌ Carnê Cancelado</option>
+                                                            <option value="">' . __('admin.settings.select_event', 'Selecione um evento...') . '</option>
+                                                            <option value="novo_pedido">🛒 ' . __('admin.settings.event_new_order', 'Novo Pedido') . '</option>
+                                                            <option value="pedido_aprovado">✅ ' . __('admin.settings.event_order_approved', 'Pedido Aprovado') . '</option>
+                                                            <option value="pedido_enviado">📦 ' . __('admin.settings.event_order_shipped', 'Pedido Enviado') . '</option>
+                                                            <option value="pedido_entregue">🎁 ' . __('admin.settings.event_order_delivered', 'Pedido Entregue') . '</option>
+                                                            <option value="pedido_cancelado">❌ ' . __('admin.settings.event_order_canceled', 'Pedido Cancelado') . '</option>
+                                                            <option value="novo_usuario">👤 ' . __('admin.settings.event_new_user', 'Novo Usuário') . '</option>
+                                                            <option value="recuperar_senha">🔑 ' . __('admin.settings.event_password_reset', 'Recuperar Senha') . '</option>
+                                                            <option value="contato_contato">📧 ' . __('admin.settings.event_contact', 'Contato') . '</option>
+                                                            <option value="carne_criado">📄 ' . __('admin.settings.event_carne_created', 'Carnê Criado') . '</option>
+                                                            <option value="carne_cobranca">💰 ' . __('admin.settings.event_carne_charge_short', 'Carnê - Cobrança') . '</option>
+                                                            <option value="carne_parcela_proxima_vencimento">⏰ ' . __('admin.settings.event_carne_due_soon_short', 'Carnê - Parcela Próxima Vencimento') . '</option>
+                                                            <option value="carne_pagamento_confirmado">✅ ' . __('admin.settings.event_carne_payment_confirmed_short', 'Carnê - Pagamento Confirmado') . '</option>
+                                                            <option value="carne_quitado">🎉 ' . __('admin.settings.event_carne_paid_off', 'Carnê Quitado') . '</option>
+                                                            <option value="carne_envio_liberado">🚚 ' . __('admin.settings.event_carne_shipping_released_short', 'Carnê - Envio Liberado') . '</option>
+                                                            <option value="carne_aviso_cancelamento">🚨 ' . __('admin.settings.event_carne_cancel_warning_short', 'Carnê - Aviso Cancelamento') . '</option>
+                                                            <option value="carne_cancelado">❌ ' . __('admin.settings.event_carne_canceled', 'Carnê Cancelado') . '</option>
                                                         </select>
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Assunto do E-mail</label>
-                                                        <input type="text" class="form-control" id="email_assunto" placeholder="Assunto do e-mail">
+                                                        <label class="form-label">' . __('admin.settings.email_subject', 'Assunto do E-mail') . '</label>
+                                                        <input type="text" class="form-control" id="email_assunto" placeholder="' . htmlspecialchars(__('admin.settings.email_subject_placeholder', 'Assunto do e-mail'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Variáveis Disponíveis</label>
+                                                        <label class="form-label">' . __('admin.settings.available_variables_label', 'Variáveis Disponíveis') . '</label>
                                                         <div class="border rounded p-2 bg-light" style="max-height: 150px; overflow-y: auto;" id="variaveis_disponiveis">
-                                                            <small class="text-muted">Selecione um evento para ver as variáveis disponíveis</small>
+                                                            <small class="text-muted">' . __('admin.settings.select_event_see_vars', 'Selecione um evento para ver as variáveis disponíveis') . '</small>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Editor HTML</label>
-                                                        <textarea class="form-control" id="email_conteudo" rows="15" placeholder="Digite o conteúdo HTML do e-mail..."></textarea>
+                                                        <label class="form-label">' . __('admin.settings.html_editor', 'Editor HTML') . '</label>
+                                                        <textarea class="form-control" id="email_conteudo" rows="15" placeholder="' . htmlspecialchars(__('admin.settings.html_editor_placeholder', 'Digite o conteúdo HTML do e-mail...'), ENT_QUOTES, 'UTF-8') . '"></textarea>
                                                     </div>
                                                     <div class="d-flex gap-2">
                                                         <button type="button" class="btn btn-outline-primary" onclick="inserirVariavel()">
-                                                            <i class="fas fa-code"></i> Inserir Variável
+                                                            <i class="fas fa-code"></i> ' . __('admin.settings.insert_variable', 'Inserir Variável') . '
                                                         </button>
                                                         <button type="button" class="btn btn-outline-success" onclick="previsualizarEmail()">
-                                                            <i class="fas fa-eye"></i> Pré-visualizar
+                                                            <i class="fas fa-eye"></i> ' . __('admin.settings.preview_short', 'Pré-visualizar') . '
                                                         </button>
                                                         <button type="button" class="btn btn-outline-info" onclick="salvarTemplate()">
-                                                            <i class="fas fa-save"></i> Salvar Template
+                                                            <i class="fas fa-save"></i> ' . __('admin.settings.save_template', 'Salvar Template') . '
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1324,7 +1324,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header">
-                                                            <h6 class="mb-0">📧 Pré-visualização do E-mail</h6>
+                                                            <h6 class="mb-0">📧 ' . __('admin.settings.email_preview', 'Pré-visualização do E-mail') . '</h6>
                                                         </div>
                                                         <div class="card-body">
                                                             <iframe id="email_preview" style="width: 100%; height: 400px; border: 1px solid #ddd;"></iframe>
@@ -1338,11 +1338,11 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header">
-                                                            <h6 class="mb-0">📋 Templates Salvos</h6>
+                                                            <h6 class="mb-0">📋 ' . __('admin.settings.saved_templates', 'Templates Salvos') . '</h6>
                                                         </div>
                                                         <div class="card-body">
                                                             <div id="templates_salvos">
-                                                                <small class="text-muted">Nenhum template salvo ainda</small>
+                                                                <small class="text-muted">' . __('admin.settings.no_template_saved', 'Nenhum template salvo ainda') . '</small>
                                                             </div>
                                                         </div>
                                                     </div>

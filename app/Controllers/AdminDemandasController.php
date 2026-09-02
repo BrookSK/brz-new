@@ -21,7 +21,7 @@ class AdminDemandasController extends Controller {
         // Verificar testes expirados ao carregar o painel
         $this->verificarTestesExpirados();
         $demandas = $this->listar();
-        $title = 'Painel de Demandas'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.panel_title', 'Painel de Demandas'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/painel.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -35,7 +35,7 @@ class AdminDemandasController extends Controller {
             $uid = $_SESSION['usuario_id'] ?? 0;
             if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: ''); }
         } catch (\Exception $e) {}
-        $title = 'Nova Solicitação'; $sidebarActive = 'demandas-nova';
+        $title = __('admin.demands.new_request', 'Nova Solicitação'); $sidebarActive = 'demandas-nova';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/nova.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -44,7 +44,7 @@ class AdminDemandasController extends Controller {
     public function concluidos(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
         $demandas = $this->listar('concluido');
-        $title = 'Demandas Concluídas'; $sidebarActive = 'demandas-concluidos';
+        $title = __('admin.demands.completed_title', 'Demandas Concluídas'); $sidebarActive = 'demandas-concluidos';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/concluidos.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -64,20 +64,20 @@ class AdminDemandasController extends Controller {
             $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusLabels = ['pendente'=>__('admin.demands.status_pending','Pendente'),'em_analise'=>__('admin.demands.status_analyzing','Em Análise'),'em_execucao'=>__('admin.demands.status_in_progress','Em Execução'),'em_teste'=>__('admin.demands.status_testing','Em Teste'),'recusado'=>__('admin.demands.status_rejected','Recusado'),'concluido'=>__('admin.demands.status_completed','Concluído')];
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Minhas Solicitações'; $sidebarActive = 'demandas-minhas';
+        $title = __('admin.demands.my_requests', 'Minhas Solicitações'); $sidebarActive = 'demandas-minhas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3">';
         echo '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">';
-        echo '<h1 class="page-title">Minhas Solicitações</h1>';
-        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>';
+        echo '<h1 class="page-title">' . __('admin.demands.my_requests', 'Minhas Solicitações') . '</h1>';
+        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>' . __('admin.demands.new_request', 'Nova Solicitação') . '</a>';
         echo '</div>';
 
         if (empty($demandas)) {
-            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">Nenhuma solicitação ainda</h5><p class="text-muted small">Clique em "Nova Solicitação" para registrar uma demanda.</p></div></div>';
+            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">' . __('admin.demands.no_requests_yet', 'Nenhuma solicitação ainda') . '</h5><p class="text-muted small">' . __('admin.demands.no_requests_hint', 'Clique em "Nova Solicitação" para registrar uma demanda.') . '</p></div></div>';
         } else {
             foreach ($demandas as $d) {
                 $st = $statusLabels[$d['status']] ?? $d['status'];
@@ -116,7 +116,7 @@ class AdminDemandasController extends Controller {
         } catch (\Exception $e) {}
 
         if (!$demanda) {
-            $_SESSION['message'] = 'Solicitação não encontrada.';
+            $_SESSION['message'] = __('admin.demands.request_not_found', 'Solicitação não encontrada.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/demandas/minhas');
             return;
@@ -126,38 +126,38 @@ class AdminDemandasController extends Controller {
         $arquivosBug = $this->getArquivosDemanda($id);
         $historico = $this->getHistorico($id);
 
-        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusLabels = ['pendente'=>__('admin.demands.status_pending','Pendente'),'em_analise'=>__('admin.demands.status_analyzing','Em Análise'),'em_execucao'=>__('admin.demands.status_in_progress','Em Execução'),'em_teste'=>__('admin.demands.status_testing','Em Teste'),'recusado'=>__('admin.demands.status_rejected','Recusado'),'concluido'=>__('admin.demands.status_completed','Concluído')];
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Solicitação #' . $id; $sidebarActive = 'demandas-minhas';
+        $title = __('admin.demands.request_number', 'Solicitação #{n}', ['n'=>$id]); $sidebarActive = 'demandas-minhas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3">';
-        echo '<a href="/admin/demandas/minhas" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Voltar</a>';
+        echo '<a href="/admin/demandas/minhas" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>' . __('admin.demands.back', 'Voltar') . '</a>';
 
         // Header
         echo '<div class="card border-0 shadow-sm mb-4"><div class="card-body">';
         echo '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">';
         echo '<div><h5 class="fw-bold mb-1">' . htmlspecialchars($demanda['bloco1_titulo']) . '</h5>';
-        echo '<div class="text-muted small">Criada em ' . date('d/m/Y H:i', strtotime($demanda['created_at'])) . '</div></div>';
+        echo '<div class="text-muted small">' . __('admin.demands.created_on', 'Criada em') . ' ' . date('d/m/Y H:i', strtotime($demanda['created_at'])) . '</div></div>';
         echo '<span class="badge bg-' . ($statusCores[$demanda['status']] ?? 'secondary') . ' fs-6">' . ($statusLabels[$demanda['status']] ?? $demanda['status']) . '</span>';
         echo '</div>';
 
         // Motivo recusa
         if ($demanda['status'] === 'recusado' && !empty($demanda['motivo_recusa'])) {
-            echo '<div class="alert alert-danger mt-3 mb-0 small"><i class="fas fa-ban me-1"></i><strong>Motivo da recusa:</strong> ' . nl2br(htmlspecialchars($demanda['motivo_recusa'])) . '</div>';
+            echo '<div class="alert alert-danger mt-3 mb-0 small"><i class="fas fa-ban me-1"></i><strong>' . __('admin.demands.rejection_reason', 'Motivo da recusa:') . '</strong> ' . nl2br(htmlspecialchars($demanda['motivo_recusa'])) . '</div>';
         }
 
         // Aviso teste
         if ($demanda['status'] === 'em_teste') {
-            echo '<div class="alert alert-warning mt-3 mb-0 small"><i class="fas fa-stopwatch me-1"></i><strong>Em teste!</strong> Você tem 24h úteis para testar e dar seu parecer. Caso contrário, será fechada automaticamente.</div>';
+            echo '<div class="alert alert-warning mt-3 mb-0 small"><i class="fas fa-stopwatch me-1"></i><strong>' . __('admin.demands.in_testing_label', 'Em teste!') . '</strong> ' . __('admin.demands.in_testing_hint', 'Você tem 24h úteis para testar e dar seu parecer. Caso contrário, será fechada automaticamente.') . '</div>';
         }
 
         echo '</div></div>';
 
         // Arquivos
         if (!empty($arquivosBug)) {
-            echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>Arquivos Anexados</h6></div><div class="card-body"><div class="row g-2">';
+            echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>' . __('admin.demands.attached_files', 'Arquivos Anexados') . '</h6></div><div class="card-body"><div class="row g-2">';
             foreach ($arquivosBug as $arq) {
                 $isImg = str_starts_with($arq['tipo'] ?? '', 'image/');
                 echo '<div class="col-md-3 col-6"><div class="border rounded p-2 text-center">';
@@ -170,7 +170,7 @@ class AdminDemandasController extends Controller {
         }
 
         // Histórico resumido
-        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-history me-1"></i>Histórico</h6></div><div class="card-body p-0"><ul class="list-group list-group-flush">';
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-history me-1"></i>' . __('admin.demands.history', 'Histórico') . '</h6></div><div class="card-body p-0"><ul class="list-group list-group-flush">';
         foreach ($historico as $h) {
             echo '<li class="list-group-item small"><strong>' . date('d/m H:i', strtotime($h['created_at'])) . '</strong> — ' . ucfirst(str_replace('_', ' ', $h['status_novo']));
             if ($h['observacao']) echo '<br><span class="text-muted">' . htmlspecialchars($h['observacao']) . '</span>';
@@ -179,10 +179,10 @@ class AdminDemandasController extends Controller {
         echo '</ul></div></div>';
 
         // Chat
-        echo '<div class="card border-0 shadow-sm mb-4" id="chat"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>Comunicação com o TI</h6><span class="badge bg-secondary">' . count($mensagens) . '</span></div>';
+        echo '<div class="card border-0 shadow-sm mb-4" id="chat"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>' . __('admin.demands.communication_with_it', 'Comunicação com o TI') . '</h6><span class="badge bg-secondary">' . count($mensagens) . '</span></div>';
         echo '<div class="card-body" style="max-height:400px;overflow-y:auto;">';
         if (empty($mensagens)) {
-            echo '<div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>Nenhuma mensagem ainda.</div>';
+            echo '<div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>' . __('admin.demands.no_messages_yet', 'Nenhuma mensagem ainda.') . '</div>';
         } else {
             foreach ($mensagens as $msg) {
                 $isMeu = ((int)($msg['usuario_id'] ?? 0) === $uid);
@@ -205,9 +205,9 @@ class AdminDemandasController extends Controller {
 
         // Form enviar mensagem
         echo '<div class="card-footer bg-white border-top"><form method="POST" action="/admin/demandas/minha/' . $id . '/mensagem" enctype="multipart/form-data">';
-        echo '<div class="d-flex gap-2"><div class="flex-grow-1"><textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="Escreva uma mensagem..."></textarea></div></div>';
-        echo '<div class="d-flex justify-content-between align-items-center mt-2"><div><label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;"><i class="fas fa-paperclip me-1"></i>Anexar<input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip"></label></div>';
-        echo '<button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Enviar</button></div>';
+        echo '<div class="d-flex gap-2"><div class="flex-grow-1"><textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="' . htmlspecialchars(__('admin.demands.write_message_placeholder', 'Escreva uma mensagem...'), ENT_QUOTES, 'UTF-8') . '"></textarea></div></div>';
+        echo '<div class="d-flex justify-content-between align-items-center mt-2"><div><label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;"><i class="fas fa-paperclip me-1"></i>' . __('admin.demands.attach', 'Anexar') . '<input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip"></label></div>';
+        echo '<button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>' . __('admin.demands.send', 'Enviar') . '</button></div>';
         echo '</form></div></div>';
 
         echo '</div>';
@@ -231,8 +231,8 @@ class AdminDemandasController extends Controller {
         } catch (\Exception $e) { $this->redirect('/admin/demandas/minhas'); return; }
 
         $mensagem = trim($_POST['mensagem'] ?? '');
-        $nomeUsuario = 'Usuário';
-        try { if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: 'Usuário'); } } catch (\Exception $e) {}
+        $nomeUsuario = __('admin.demands.default_user', 'Usuário');
+        try { if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: __('admin.demands.default_user', 'Usuário')); } } catch (\Exception $e) {}
 
         $this->ensureChatTables();
         $msgId = null;
@@ -291,12 +291,12 @@ class AdminDemandasController extends Controller {
                 'detalhes' => $body['bug_detalhes'] ?? '',
                 'prioridade' => $body['bug_prioridade'] ?? 'media',
             ];
-            $bloco2_problema = "ERRO: " . $bugData['erro'] . "\n\nO QUE FAZIA: " . $bugData['acao'];
-            $bloco2_melhoria = "Corrigir o bug para que funcione corretamente.";
-            $bloco2_consequencia = "QUANDO: " . $bugData['quando'] . "\nONDE: " . $bugData['onde'];
-            $bloco3_financeiro = "Bug - Prioridade: " . strtoupper($bugData['prioridade']);
-            $bloco3_jornada = "PRINTS/EVIDÊNCIAS: " . $bugData['prints'];
-            $bloco3_detalhes = "DETALHES: " . $bugData['detalhes'];
+            $bloco2_problema = __('admin.demands.bug_error_label', 'ERRO:') . " " . $bugData['erro'] . "\n\n" . __('admin.demands.bug_action_label', 'O QUE FAZIA:') . " " . $bugData['acao'];
+            $bloco2_melhoria = __('admin.demands.bug_fix_goal', 'Corrigir o bug para que funcione corretamente.');
+            $bloco2_consequencia = __('admin.demands.bug_when_label', 'QUANDO:') . " " . $bugData['quando'] . "\n" . __('admin.demands.bug_where_label', 'ONDE:') . " " . $bugData['onde'];
+            $bloco3_financeiro = __('admin.demands.bug_priority_label', 'Bug - Prioridade:') . " " . strtoupper($bugData['prioridade']);
+            $bloco3_jornada = __('admin.demands.bug_evidence_label', 'PRINTS/EVIDÊNCIAS:') . " " . $bugData['prints'];
+            $bloco3_detalhes = __('admin.demands.bug_details_label', 'DETALHES:') . " " . $bugData['detalhes'];
         }
 
         $stmt = $this->db->prepare("INSERT INTO demandas (titulo, solicitante, solicitante_email, bloco1_solicitante, bloco1_titulo, bloco2_problema, bloco2_melhoria, bloco2_consequencia, bloco3_financeiro, bloco3_capital_giro, bloco3_custos_operacionais, bloco3_jornada_cliente, bloco3_equipe, bloco3_conflitos, bloco4_etapas, bloco5_novo_ou_existente, bloco5_ferramentas, bloco5_regras, bloco5_usuarios, criado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
@@ -324,7 +324,7 @@ class AdminDemandasController extends Controller {
             $tipo === 'bug' ? '' : ($body['bloco3_equipe'] ?? ''),
             $tipo === 'bug' ? '' : ($body['bloco3_conflitos'] ?? ''),
             json_encode($etapas, JSON_UNESCAPED_UNICODE),
-            $tipo === 'bug' ? 'Bug/Correção' : ($body['bloco5_novo_ou_existente'] ?? ''),
+            $tipo === 'bug' ? __('admin.demands.bug_fix_type', 'Bug/Correção') : ($body['bloco5_novo_ou_existente'] ?? ''),
             $tipo === 'bug' ? ($body['bug_onde'] ?? '') : ($body['bloco5_ferramentas'] ?? ''),
             $tipo === 'bug' ? '' : ($body['bloco5_regras'] ?? ''),
             $tipo === 'bug' ? '' : ($body['bloco5_usuarios'] ?? ''),
@@ -332,7 +332,7 @@ class AdminDemandasController extends Controller {
         ]);
 
         $id = (int)$this->db->lastInsertId();
-        $obs = $tipo === 'bug' ? 'Bug reportado - Prioridade: ' . strtoupper($body['bug_prioridade'] ?? 'media') : 'Demanda criada';
+        $obs = $tipo === 'bug' ? __('admin.demands.bug_reported_priority', 'Bug reportado - Prioridade:') . ' ' . strtoupper($body['bug_prioridade'] ?? 'media') : __('admin.demands.demand_created', 'Demanda criada');
         $this->registrarHistorico($id, null, 'pendente', $obs);
 
         // Processar arquivos anexados (prints de bug, etc)
@@ -342,8 +342,8 @@ class AdminDemandasController extends Controller {
         $this->notificarNovaDemanda($id, ($tipo === 'bug' ? '[BUG] ' : '') . ($body['bloco1_titulo'] ?? ''), $body['bloco1_solicitante'] ?? '', $tipo);
 
         $_SESSION['message'] = $tipo === 'bug'
-            ? 'Bug reportado com prioridade ' . strtoupper($body['bug_prioridade'] ?? 'media') . '! Já aparece no Painel.'
-            : 'Demanda registrada com sucesso! Ela já aparece no Painel de Demandas.';
+            ? __('admin.demands.bug_reported_success', 'Bug reportado com prioridade {n}! Já aparece no Painel.', ['n'=>strtoupper($body['bug_prioridade'] ?? 'media')])
+            : __('admin.demands.demand_registered_success', 'Demanda registrada com sucesso! Ela já aparece no Painel de Demandas.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/demandas/minhas');
     }
@@ -361,7 +361,7 @@ class AdminDemandasController extends Controller {
         if ($novoStatus === 'em_execucao') {
             $st = $this->db->query("SELECT COUNT(*) FROM demandas WHERE status = 'em_execucao'");
             if ((int)$st->fetchColumn() > 0) {
-                $_SESSION['message'] = 'Já existe uma demanda em execução. Conclua ou mova a demanda atual antes de iniciar uma nova.';
+                $_SESSION['message'] = __('admin.demands.already_in_progress', 'Já existe uma demanda em execução. Conclua ou mova a demanda atual antes de iniciar uma nova.');
                 $_SESSION['message_type'] = 'danger';
                 $this->redirect('/admin/demandas/painel'); return;
             }
@@ -407,7 +407,7 @@ class AdminDemandasController extends Controller {
             $this->enviarEmailTeste($demanda);
         }
 
-        $_SESSION['message'] = 'Status atualizado para: ' . ucfirst(str_replace('_', ' ', $novoStatus));
+        $_SESSION['message'] = __('admin.demands.status_updated_to', 'Status atualizado para: {n}', ['n'=>ucfirst(str_replace('_', ' ', $novoStatus))]);
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/demandas/painel');
     }
@@ -415,11 +415,11 @@ class AdminDemandasController extends Controller {
     public function detalhe(Request $request, $id) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
         $demanda = $this->getById((int)$id);
-        if (!$demanda) { $_SESSION['message'] = 'Demanda não encontrada.'; $_SESSION['message_type'] = 'danger'; $this->redirect('/admin/demandas/painel'); return; }
+        if (!$demanda) { $_SESSION['message'] = __('admin.demands.demand_not_found', 'Demanda não encontrada.'); $_SESSION['message_type'] = 'danger'; $this->redirect('/admin/demandas/painel'); return; }
         $historico = $this->getHistorico((int)$id);
         $mensagens = $this->getMensagens((int)$id);
         $arquivosBug = $this->getArquivosDemanda((int)$id);
-        $title = 'Demanda #' . $id; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.demand_number', 'Demanda #{n}', ['n'=>$id]); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/detalhe.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -432,18 +432,18 @@ class AdminDemandasController extends Controller {
         $etapas = json_decode($d['bloco4_etapas'] ?? '[]', true) ?: [];
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Demanda #' . $d['id'] . '</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:40px;color:#1e293b;}h1{font-size:18px;border-bottom:2px solid #1e293b;padding-bottom:8px;}h2{font-size:14px;margin-top:24px;color:#334155;border-bottom:1px solid #e2e8f0;padding-bottom:4px;}p{margin:4px 0;line-height:1.5;}table{width:100%;border-collapse:collapse;margin:8px 0;}th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left;font-size:11px;}th{background:#f8fafc;}.footer{margin-top:40px;border-top:1px solid #e2e8f0;padding-top:10px;font-size:10px;color:#94a3b8;text-align:center;}@media print{body{margin:20px;}}</style></head><body>';
-        echo '<h1>BRAZILIANA SHOP — Processo de Demanda</h1>';
-        echo '<table style="border:none;"><tr style="border:none;"><td style="border:none;"><strong>Título:</strong> ' . htmlspecialchars($d['bloco1_titulo']) . '</td><td style="border:none;"><strong>Solicitante:</strong> ' . htmlspecialchars($d['bloco1_solicitante']) . '</td></tr><tr style="border:none;"><td style="border:none;"><strong>Envio:</strong> ' . date('d/m/Y H:i', strtotime($d['created_at'])) . '</td><td style="border:none;"><strong>Conclusão:</strong> ' . ($d['concluido_em'] ? date('d/m/Y H:i', strtotime($d['concluido_em'])) : 'N/A') . '</td></tr></table>';
-        echo '<h2>1. Identificação</h2><p><strong>Solicitante:</strong> ' . htmlspecialchars($d['bloco1_solicitante']) . '</p><p><strong>Título:</strong> ' . htmlspecialchars($d['bloco1_titulo']) . '</p>';
-        echo '<h2>2. Justificativa</h2><p><strong>Problema:</strong><br>' . nl2br(htmlspecialchars($d['bloco2_problema'])) . '</p><p><strong>Melhoria:</strong><br>' . nl2br(htmlspecialchars($d['bloco2_melhoria'])) . '</p><p><strong>Consequência:</strong><br>' . nl2br(htmlspecialchars($d['bloco2_consequencia'])) . '</p>';
-        echo '<h2>3. Impactos</h2><p><strong>3.1 Financeiro:</strong><br>' . nl2br(htmlspecialchars($d['bloco3_financeiro'])) . '</p><p><strong>3.2 Capital de giro:</strong><br>' . nl2br(htmlspecialchars($d['bloco3_capital_giro'])) . '</p><p><strong>3.3 Custos operacionais:</strong><br>' . nl2br(htmlspecialchars($d['bloco3_custos_operacionais'])) . '</p><p><strong>3.4 Jornada do cliente:</strong><br>' . nl2br(htmlspecialchars($d['bloco3_jornada_cliente'])) . '</p><p><strong>3.5 Equipe:</strong><br>' . nl2br(htmlspecialchars($d['bloco3_equipe'])) . '</p><p><strong>3.6 Conflitos:</strong><br>' . nl2br(htmlspecialchars($d['bloco3_conflitos'])) . '</p>';
-        echo '<h2>4. Etapas e Custos</h2><table><thead><tr><th>Etapa</th><th>Custo</th></tr></thead><tbody>';
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="utf-8"><title>' . htmlspecialchars(__('admin.demands.demand_number', 'Demanda #{n}', ['n'=>$d['id']]), ENT_QUOTES, 'UTF-8') . '</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:40px;color:#1e293b;}h1{font-size:18px;border-bottom:2px solid #1e293b;padding-bottom:8px;}h2{font-size:14px;margin-top:24px;color:#334155;border-bottom:1px solid #e2e8f0;padding-bottom:4px;}p{margin:4px 0;line-height:1.5;}table{width:100%;border-collapse:collapse;margin:8px 0;}th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left;font-size:11px;}th{background:#f8fafc;}.footer{margin-top:40px;border-top:1px solid #e2e8f0;padding-top:10px;font-size:10px;color:#94a3b8;text-align:center;}@media print{body{margin:20px;}}</style></head><body>';
+        echo '<h1>BRAZILIANA SHOP — ' . __('admin.demands.pdf_process_title', 'Processo de Demanda') . '</h1>';
+        echo '<table style="border:none;"><tr style="border:none;"><td style="border:none;"><strong>' . __('admin.demands.pdf_title_label', 'Título:') . '</strong> ' . htmlspecialchars($d['bloco1_titulo']) . '</td><td style="border:none;"><strong>' . __('admin.demands.pdf_requester_label', 'Solicitante:') . '</strong> ' . htmlspecialchars($d['bloco1_solicitante']) . '</td></tr><tr style="border:none;"><td style="border:none;"><strong>' . __('admin.demands.pdf_sent_label', 'Envio:') . '</strong> ' . date('d/m/Y H:i', strtotime($d['created_at'])) . '</td><td style="border:none;"><strong>' . __('admin.demands.pdf_completion_label', 'Conclusão:') . '</strong> ' . ($d['concluido_em'] ? date('d/m/Y H:i', strtotime($d['concluido_em'])) : 'N/A') . '</td></tr></table>';
+        echo '<h2>' . __('admin.demands.pdf_section_identification', '1. Identificação') . '</h2><p><strong>' . __('admin.demands.pdf_requester_label', 'Solicitante:') . '</strong> ' . htmlspecialchars($d['bloco1_solicitante']) . '</p><p><strong>' . __('admin.demands.pdf_title_label', 'Título:') . '</strong> ' . htmlspecialchars($d['bloco1_titulo']) . '</p>';
+        echo '<h2>' . __('admin.demands.pdf_section_justification', '2. Justificativa') . '</h2><p><strong>' . __('admin.demands.pdf_problem_label', 'Problema:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco2_problema'])) . '</p><p><strong>' . __('admin.demands.pdf_improvement_label', 'Melhoria:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco2_melhoria'])) . '</p><p><strong>' . __('admin.demands.pdf_consequence_label', 'Consequência:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco2_consequencia'])) . '</p>';
+        echo '<h2>' . __('admin.demands.pdf_section_impacts', '3. Impactos') . '</h2><p><strong>' . __('admin.demands.pdf_financial_label', '3.1 Financeiro:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco3_financeiro'])) . '</p><p><strong>' . __('admin.demands.pdf_working_capital_label', '3.2 Capital de giro:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco3_capital_giro'])) . '</p><p><strong>' . __('admin.demands.pdf_operational_costs_label', '3.3 Custos operacionais:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco3_custos_operacionais'])) . '</p><p><strong>' . __('admin.demands.pdf_customer_journey_label', '3.4 Jornada do cliente:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco3_jornada_cliente'])) . '</p><p><strong>' . __('admin.demands.pdf_team_label', '3.5 Equipe:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco3_equipe'])) . '</p><p><strong>' . __('admin.demands.pdf_conflicts_label', '3.6 Conflitos:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco3_conflitos'])) . '</p>';
+        echo '<h2>' . __('admin.demands.pdf_section_steps', '4. Etapas e Custos') . '</h2><table><thead><tr><th>' . __('admin.demands.pdf_step_col', 'Etapa') . '</th><th>' . __('admin.demands.pdf_cost_col', 'Custo') . '</th></tr></thead><tbody>';
         foreach ($etapas as $et) echo '<tr><td>' . htmlspecialchars($et['descricao'] ?? '') . '</td><td>' . htmlspecialchars($et['custo'] ?? '') . '</td></tr>';
         echo '</tbody></table>';
-        echo '<h2>5. Execução</h2><p><strong>Novo/existente:</strong><br>' . nl2br(htmlspecialchars($d['bloco5_novo_ou_existente'])) . '</p><p><strong>Ferramentas:</strong><br>' . nl2br(htmlspecialchars($d['bloco5_ferramentas'])) . '</p><p><strong>Regras:</strong><br>' . nl2br(htmlspecialchars($d['bloco5_regras'])) . '</p><p><strong>Usuários:</strong><br>' . nl2br(htmlspecialchars($d['bloco5_usuarios'])) . '</p>';
-        if ($d['nota_admin']) echo '<h2>Nota Final do Administrador</h2><p>' . nl2br(htmlspecialchars($d['nota_admin'])) . '</p>';
-        echo '<div class="footer">Documento gerado em ' . date('d/m/Y H:i:s') . ' — Braziliana Shop</div>';
+        echo '<h2>' . __('admin.demands.pdf_section_execution', '5. Execução') . '</h2><p><strong>' . __('admin.demands.pdf_new_or_existing_label', 'Novo/existente:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco5_novo_ou_existente'])) . '</p><p><strong>' . __('admin.demands.pdf_tools_label', 'Ferramentas:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco5_ferramentas'])) . '</p><p><strong>' . __('admin.demands.pdf_rules_label', 'Regras:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco5_regras'])) . '</p><p><strong>' . __('admin.demands.pdf_users_label', 'Usuários:') . '</strong><br>' . nl2br(htmlspecialchars($d['bloco5_usuarios'])) . '</p>';
+        if ($d['nota_admin']) echo '<h2>' . __('admin.demands.pdf_admin_final_note', 'Nota Final do Administrador') . '</h2><p>' . nl2br(htmlspecialchars($d['nota_admin'])) . '</p>';
+        echo '<div class="footer">' . __('admin.demands.pdf_generated_on', 'Documento gerado em') . ' ' . date('d/m/Y H:i:s') . ' — Braziliana Shop</div>';
         echo '<script>window.print();</script></body></html>';
         exit;
     }
@@ -458,9 +458,9 @@ class AdminDemandasController extends Controller {
         $uid = $_SESSION['usuario_id'] ?? 0;
 
         // Buscar nome do usuário
-        $nomeUsuario = 'Sistema';
+        $nomeUsuario = __('admin.demands.default_system', 'Sistema');
         try {
-            if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: 'Usuário'); }
+            if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: __('admin.demands.default_user', 'Usuário')); }
         } catch (\Exception $e) {}
 
         // Garantir tabelas
@@ -501,7 +501,7 @@ class AdminDemandasController extends Controller {
             $this->notificarMensagemChat($id, $nomeUsuario, $mensagem, 'admin_para_solicitante');
         }
 
-        $_SESSION['message'] = 'Mensagem enviada!';
+        $_SESSION['message'] = __('admin.demands.message_sent', 'Mensagem enviada!');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/demandas/detalhe/' . $id . '#chat');
     }
@@ -590,7 +590,7 @@ class AdminDemandasController extends Controller {
                 if ($horasUteis >= 24) {
                     // Expirou — fechar demanda
                     $this->db->prepare("UPDATE demandas SET status = 'concluido', teste_expirado = 1, concluido_em = NOW(), nota_admin = CONCAT(COALESCE(nota_admin,''), '\n[AUTO] Teste expirado após 24h úteis sem parecer do solicitante.') WHERE id = ?")->execute([$d['id']]);
-                    $this->registrarHistorico((int)$d['id'], 'em_teste', 'concluido', 'Teste expirado (24h úteis). Fechado automaticamente.');
+                    $this->registrarHistorico((int)$d['id'], 'em_teste', 'concluido', __('admin.demands.test_expired_note', 'Teste expirado (24h úteis). Fechado automaticamente.'));
                     $fechados++;
                 }
             }
@@ -633,15 +633,15 @@ class AdminDemandasController extends Controller {
             $email = $this->getEmailSolicitante($demanda);
             if (!$email) return;
 
-            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? 'Demanda';
+            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? __('admin.demands.default_demand', 'Demanda');
             $solicitante = $demanda['solicitante'] ?? '';
 
-            $assunto = 'Demanda Recusada: ' . $titulo;
-            $corpo = "Olá {$solicitante},\n\n";
-            $corpo .= "Sua demanda \"{$titulo}\" foi analisada e infelizmente foi recusada.\n\n";
-            $corpo .= "Motivo: " . ($motivo ?: 'Não informado') . "\n\n";
-            $corpo .= "Se discordar da decisão ou tiver novas informações, você pode abrir uma nova solicitação com os ajustes necessários.\n\n";
-            $corpo .= "Atenciosamente,\nEquipe Braziliana";
+            $assunto = __('admin.demands.email_rejected_subject', 'Demanda Recusada: {n}', ['n'=>$titulo]);
+            $corpo = __('admin.demands.email_greeting', 'Olá {n},', ['n'=>$solicitante]) . "\n\n";
+            $corpo .= __('admin.demands.email_rejected_body1', 'Sua demanda "{n}" foi analisada e infelizmente foi recusada.', ['n'=>$titulo]) . "\n\n";
+            $corpo .= __('admin.demands.email_reason_label', 'Motivo:') . " " . ($motivo ?: __('admin.demands.not_informed', 'Não informado')) . "\n\n";
+            $corpo .= __('admin.demands.email_rejected_body2', 'Se discordar da decisão ou tiver novas informações, você pode abrir uma nova solicitação com os ajustes necessários.') . "\n\n";
+            $corpo .= __('admin.demands.email_signature_team', 'Atenciosamente,') . "\n" . __('admin.demands.email_signature_braziliana', 'Equipe Braziliana');
 
             $this->enviarEmailSimples($email, $assunto, $corpo);
         } catch (\Exception $e) {
@@ -657,16 +657,16 @@ class AdminDemandasController extends Controller {
             $email = $this->getEmailSolicitante($demanda);
             if (!$email) return;
 
-            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? 'Demanda';
+            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? __('admin.demands.default_demand', 'Demanda');
             $solicitante = $demanda['solicitante'] ?? '';
 
-            $assunto = 'Demanda Pronta para Teste: ' . $titulo;
-            $corpo = "Olá {$solicitante},\n\n";
-            $corpo .= "Sua demanda \"{$titulo}\" foi concluída pelo TI e está pronta para teste!\n\n";
-            $corpo .= "⚠️ IMPORTANTE: Você tem 24 horas úteis (dias úteis, horário comercial) para testar e dar seu parecer.\n\n";
-            $corpo .= "Se não testar dentro do prazo, a demanda será automaticamente fechada como concluída e você precisará abrir uma nova solicitação caso encontre problemas.\n\n";
-            $corpo .= "Acesse o painel de demandas para testar: https://brazilianashop.com.br/admin/demandas/painel\n\n";
-            $corpo .= "Atenciosamente,\nEquipe TI Braziliana";
+            $assunto = __('admin.demands.email_test_subject', 'Demanda Pronta para Teste: {n}', ['n'=>$titulo]);
+            $corpo = __('admin.demands.email_greeting', 'Olá {n},', ['n'=>$solicitante]) . "\n\n";
+            $corpo .= __('admin.demands.email_test_body1', 'Sua demanda "{n}" foi concluída pelo TI e está pronta para teste!', ['n'=>$titulo]) . "\n\n";
+            $corpo .= __('admin.demands.email_test_body2', '⚠️ IMPORTANTE: Você tem 24 horas úteis (dias úteis, horário comercial) para testar e dar seu parecer.') . "\n\n";
+            $corpo .= __('admin.demands.email_test_body3', 'Se não testar dentro do prazo, a demanda será automaticamente fechada como concluída e você precisará abrir uma nova solicitação caso encontre problemas.') . "\n\n";
+            $corpo .= __('admin.demands.email_test_body4', 'Acesse o painel de demandas para testar: https://brazilianashop.com.br/admin/demandas/painel') . "\n\n";
+            $corpo .= __('admin.demands.email_signature_team', 'Atenciosamente,') . "\n" . __('admin.demands.email_signature_it_braziliana', 'Equipe TI Braziliana');
 
             $this->enviarEmailSimples($email, $assunto, $corpo);
         } catch (\Exception $e) {
@@ -842,11 +842,11 @@ class AdminDemandasController extends Controller {
             $usuarios = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $title = 'Configurações de Demandas'; $sidebarActive = 'configuracoes';
+        $title = __('admin.demands.settings_title', 'Configurações de Demandas'); $sidebarActive = 'configuracoes';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3"><div class="row justify-content-center"><div class="col-lg-8">';
-        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title">Configurações de Demandas</h1><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
+        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title">' . __('admin.demands.settings_title', 'Configurações de Demandas') . '</h1><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('admin.demands.back', 'Voltar') . '</a></div>';
 
         if (!empty($_SESSION['message'])) {
             echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' alert-dismissible fade show">' . htmlspecialchars($_SESSION['message']) . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
@@ -854,29 +854,29 @@ class AdminDemandasController extends Controller {
         }
 
         echo '<form method="POST" action="/admin/demandas/configuracoes">';
-        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-lock me-2"></i>Acesso ao Painel</h6></div><div class="card-body">';
-        echo '<div class="mb-3"><label class="form-label fw-semibold small">Senha do Painel de Demandas</label><input type="text" name="demandas_senha_painel" class="form-control" value="' . htmlspecialchars($config['demandas_senha_painel']) . '" placeholder="Deixe vazio para desativar"><small class="text-muted">Se preenchida, será exigida ao acessar o painel de demandas.</small></div>';
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-lock me-2"></i>' . __('admin.demands.panel_access', 'Acesso ao Painel') . '</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">' . __('admin.demands.panel_password', 'Senha do Painel de Demandas') . '</label><input type="text" name="demandas_senha_painel" class="form-control" value="' . htmlspecialchars($config['demandas_senha_painel']) . '" placeholder="' . htmlspecialchars(__('admin.demands.leave_empty_disable', 'Deixe vazio para desativar'), ENT_QUOTES, 'UTF-8') . '"><small class="text-muted">' . __('admin.demands.panel_password_hint', 'Se preenchida, será exigida ao acessar o painel de demandas.') . '</small></div>';
         echo '</div></div>';
 
-        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-envelope me-2"></i>Notificações por Email</h6></div><div class="card-body">';
-        echo '<div class="mb-3"><label class="form-label fw-semibold small">Emails que recebem novas solicitações</label><textarea name="demandas_emails_notificacao" class="form-control" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com">' . htmlspecialchars($config['demandas_emails_notificacao']) . '</textarea><small class="text-muted">Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.</small></div>';
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-envelope me-2"></i>' . __('admin.demands.email_notifications', 'Notificações por Email') . '</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">' . __('admin.demands.emails_receiving_requests', 'Emails que recebem novas solicitações') . '</label><textarea name="demandas_emails_notificacao" class="form-control" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com">' . htmlspecialchars($config['demandas_emails_notificacao']) . '</textarea><small class="text-muted">' . __('admin.demands.emails_hint', 'Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.') . '</small></div>';
         echo '</div></div>';
 
         echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-plug me-2"></i>Webhook</h6></div><div class="card-body">';
-        echo '<div class="mb-3"><label class="form-label fw-semibold small">URL do Webhook</label><input type="url" name="demandas_webhook_url" class="form-control" value="' . htmlspecialchars($config['demandas_webhook_url']) . '" placeholder="https://hooks.slack.com/..."><small class="text-muted">Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.</small></div>';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">' . __('admin.demands.webhook_url', 'URL do Webhook') . '</label><input type="url" name="demandas_webhook_url" class="form-control" value="' . htmlspecialchars($config['demandas_webhook_url']) . '" placeholder="https://hooks.slack.com/..."><small class="text-muted">' . __('admin.demands.webhook_hint', 'Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.') . '</small></div>';
         echo '</div></div>';
 
-        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-bell me-2"></i>Notificações Push (no Admin)</h6></div><div class="card-body">';
-        echo '<div class="mb-3"><label class="form-label fw-semibold small">Usuários que recebem notificações</label><select name="demandas_usuarios_notificacao[]" class="form-select" multiple size="6">';
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-bell me-2"></i>' . __('admin.demands.push_notifications', 'Notificações Push (no Admin)') . '</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">' . __('admin.demands.users_receiving_notifications', 'Usuários que recebem notificações') . '</label><select name="demandas_usuarios_notificacao[]" class="form-select" multiple size="6">';
         $idsNotif = array_filter(array_map('intval', explode(',', $config['demandas_usuarios_notificacao'])));
         foreach ($usuarios as $u) {
             $sel = in_array((int)$u['id'], $idsNotif) ? ' selected' : '';
             echo '<option value="' . (int)$u['id'] . '"' . $sel . '>' . htmlspecialchars($u['nome']) . ' (' . htmlspecialchars($u['email']) . ')</option>';
         }
-        echo '</select><small class="text-muted">Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.</small></div>';
+        echo '</select><small class="text-muted">' . __('admin.demands.users_notif_hint', 'Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.') . '</small></div>';
         echo '</div></div>';
 
-        echo '<button type="submit" class="btn btn-dark w-100 mb-4"><i class="fas fa-save me-1"></i>Salvar Configurações</button>';
+        echo '<button type="submit" class="btn btn-dark w-100 mb-4"><i class="fas fa-save me-1"></i>' . __('admin.demands.save_settings', 'Salvar Configurações') . '</button>';
         echo '</form></div></div></div>';
         $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -900,7 +900,7 @@ class AdminDemandasController extends Controller {
             $this->setConfig('demandas_usuarios_notificacao', implode(',', array_filter(array_map('intval', $usuarios))));
         }
 
-        $_SESSION['message'] = 'Configurações salvas com sucesso!';
+        $_SESSION['message'] = __('admin.demands.settings_saved', 'Configurações salvas com sucesso!');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/demandas/configuracoes');
     }
@@ -935,27 +935,27 @@ class AdminDemandasController extends Controller {
                 $_SESSION['demandas_painel_auth'] = true;
                 return true;
             } else {
-                $_SESSION['message'] = 'Senha incorreta.';
+                $_SESSION['message'] = __('admin.demands.wrong_password', 'Senha incorreta.');
                 $_SESSION['message_type'] = 'danger';
             }
         }
 
         // Mostrar tela de senha
-        $title = 'Painel de Demandas - Acesso Restrito'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.panel_restricted_title', 'Painel de Demandas - Acesso Restrito'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-5"><div class="row justify-content-center"><div class="col-md-4">';
         echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5">';
         echo '<i class="fas fa-lock fs-1 text-muted mb-3 d-block"></i>';
-        echo '<h5 class="fw-bold mb-3">Acesso Restrito</h5>';
-        echo '<p class="text-muted small mb-4">O painel de demandas requer autenticação adicional.</p>';
+        echo '<h5 class="fw-bold mb-3">' . __('admin.demands.restricted_access', 'Acesso Restrito') . '</h5>';
+        echo '<p class="text-muted small mb-4">' . __('admin.demands.restricted_access_hint', 'O painel de demandas requer autenticação adicional.') . '</p>';
         if (!empty($_SESSION['message'])) {
             echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' small">' . htmlspecialchars($_SESSION['message']) . '</div>';
             unset($_SESSION['message'], $_SESSION['message_type']);
         }
         echo '<form method="POST" action="/admin/demandas/painel">';
-        echo '<div class="mb-3"><input type="password" name="senha_painel" class="form-control text-center" placeholder="Digite a senha" autofocus required></div>';
-        echo '<button type="submit" class="btn btn-dark w-100"><i class="fas fa-unlock me-1"></i>Acessar</button>';
+        echo '<div class="mb-3"><input type="password" name="senha_painel" class="form-control text-center" placeholder="' . htmlspecialchars(__('admin.demands.enter_password', 'Digite a senha'), ENT_QUOTES, 'UTF-8') . '" autofocus required></div>';
+        echo '<button type="submit" class="btn btn-dark w-100"><i class="fas fa-unlock me-1"></i>' . __('admin.demands.access', 'Acessar') . '</button>';
         echo '</form>';
         echo '</div></div></div></div></div>';
         $content = ob_get_clean();
@@ -974,9 +974,9 @@ class AdminDemandasController extends Controller {
             $demanda = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$demanda) return;
 
-            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? 'Demanda #' . $demandaId;
+            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? __('admin.demands.demand_number', 'Demanda #{n}', ['n'=>$demandaId]);
             $preview = mb_substr($mensagem, 0, 200);
-            if ($preview === '') $preview = '(arquivo anexado)';
+            if ($preview === '') $preview = __('admin.demands.attached_file_preview', '(arquivo anexado)');
 
             if ($direcao === 'admin_para_solicitante') {
                 // Admin/dev enviou mensagem → notificar o solicitante (email + push)
@@ -987,13 +987,13 @@ class AdminDemandasController extends Controller {
                 $statusDemanda = strtolower(trim((string)($demanda['status'] ?? '')));
                 $arquivado = (int)($demanda['arquivado'] ?? 0);
                 if ($email && $statusDemanda !== 'concluido' && !$arquivado) {
-                    $assunto = '💬 Nova mensagem na sua demanda: ' . $titulo;
-                    $corpo = "Olá " . ($demanda['solicitante'] ?? $demanda['bloco1_solicitante'] ?? '') . ",\n\n";
-                    $corpo .= "Você recebeu uma nova mensagem na sua demanda \"{$titulo}\".\n\n";
-                    $corpo .= "De: {$remetente}\n";
-                    $corpo .= "Mensagem: {$preview}\n\n";
-                    $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/minha/{$demandaId}#chat\n\n";
-                    $corpo .= "Atenciosamente,\nEquipe TI Braziliana";
+                    $assunto = __('admin.demands.email_new_msg_subject', '💬 Nova mensagem na sua demanda: {n}', ['n'=>$titulo]);
+                    $corpo = __('admin.demands.email_greeting', 'Olá {n},', ['n'=>($demanda['solicitante'] ?? $demanda['bloco1_solicitante'] ?? '')]) . "\n\n";
+                    $corpo .= __('admin.demands.email_new_msg_body', 'Você recebeu uma nova mensagem na sua demanda "{n}".', ['n'=>$titulo]) . "\n\n";
+                    $corpo .= __('admin.demands.email_from_label', 'De:') . " {$remetente}\n";
+                    $corpo .= __('admin.demands.email_message_label', 'Mensagem:') . " {$preview}\n\n";
+                    $corpo .= __('admin.demands.email_reply_link', 'Acesse para responder: https://brazilianashop.com.br/admin/demandas/minha/{n}#chat', ['n'=>$demandaId]) . "\n\n";
+                    $corpo .= __('admin.demands.email_signature_team', 'Atenciosamente,') . "\n" . __('admin.demands.email_signature_it_braziliana', 'Equipe TI Braziliana');
                     try { $this->enviarEmailSimples($email, $assunto, $corpo); } catch (\Exception $e) {}
                 }
 
@@ -1003,7 +1003,7 @@ class AdminDemandasController extends Controller {
                     $link = '/admin/demandas/minha/' . $demandaId . '#chat';
                     try {
                         $this->db->prepare("INSERT INTO admin_notificacoes (usuario_id, tipo, titulo, mensagem, link) VALUES (?,?,?,?,?)")
-                            ->execute([$criadorId, 'demanda_mensagem', '💬 ' . $remetente . ' respondeu', $preview, $link]);
+                            ->execute([$criadorId, 'demanda_mensagem', '💬 ' . __('admin.demands.notif_replied', '{n} respondeu', ['n'=>$remetente]), $preview, $link]);
                     } catch (\Exception $e) {}
                 }
 
@@ -1017,12 +1017,12 @@ class AdminDemandasController extends Controller {
                     $emails = $this->getConfig('demandas_emails_notificacao');
                     if ($emails !== '') {
                         $listaEmails = array_filter(array_map('trim', explode(',', $emails)));
-                        $assunto = '💬 Nova mensagem do cliente na demanda: ' . $titulo;
-                        $corpo = "Nova mensagem recebida na demanda \"{$titulo}\".\n\n";
-                        $corpo .= "De: {$remetente}\n";
-                        $corpo .= "Mensagem: {$preview}\n\n";
-                        $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/detalhe/{$demandaId}#chat\n\n";
-                        $corpo .= "Atenciosamente,\nSistema Braziliana";
+                        $assunto = __('admin.demands.email_client_msg_subject', '💬 Nova mensagem do cliente na demanda: {n}', ['n'=>$titulo]);
+                        $corpo = __('admin.demands.email_client_msg_body', 'Nova mensagem recebida na demanda "{n}".', ['n'=>$titulo]) . "\n\n";
+                        $corpo .= __('admin.demands.email_from_label', 'De:') . " {$remetente}\n";
+                        $corpo .= __('admin.demands.email_message_label', 'Mensagem:') . " {$preview}\n\n";
+                        $corpo .= __('admin.demands.email_reply_link_admin', 'Acesse para responder: https://brazilianashop.com.br/admin/demandas/detalhe/{n}#chat', ['n'=>$demandaId]) . "\n\n";
+                        $corpo .= __('admin.demands.email_signature_team', 'Atenciosamente,') . "\n" . __('admin.demands.email_signature_system_braziliana', 'Sistema Braziliana');
 
                         foreach ($listaEmails as $email) {
                             if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -1042,7 +1042,7 @@ class AdminDemandasController extends Controller {
                         if ($uid > 0) {
                             try {
                                 $this->db->prepare("INSERT INTO admin_notificacoes (usuario_id, tipo, titulo, mensagem, link) VALUES (?,?,?,?,?)")
-                                    ->execute([$uid, 'demanda_mensagem', '💬 ' . $remetente . ' respondeu', $preview, $link]);
+                                    ->execute([$uid, 'demanda_mensagem', '💬 ' . __('admin.demands.notif_replied', '{n} respondeu', ['n'=>$remetente]), $preview, $link]);
                             } catch (\Exception $e) {}
                         }
                     }
@@ -1061,13 +1061,13 @@ class AdminDemandasController extends Controller {
         $emails = $this->getConfig('demandas_emails_notificacao');
         if ($emails !== '') {
             $listaEmails = array_filter(array_map('trim', explode(',', $emails)));
-            $assunto = ($tipo === 'bug' ? '🐛 ' : '🚀 ') . 'Nova Solicitação: ' . $titulo;
-            $corpo = "Nova solicitação de demanda registrada:\n\n";
-            $corpo .= "Título: {$titulo}\n";
-            $corpo .= "Solicitante: {$solicitante}\n";
-            $corpo .= "Tipo: " . ($tipo === 'bug' ? 'Bug/Erro' : 'Nova Função') . "\n\n";
-            $corpo .= "Acesse o painel: https://brazilianashop.com.br/admin/demandas/painel\n";
-            $corpo .= "Detalhe: https://brazilianashop.com.br/admin/demandas/detalhe/{$demandaId}\n";
+            $assunto = ($tipo === 'bug' ? '🐛 ' : '🚀 ') . __('admin.demands.email_new_request_subject', 'Nova Solicitação: {n}', ['n'=>$titulo]);
+            $corpo = __('admin.demands.email_new_request_body', 'Nova solicitação de demanda registrada:') . "\n\n";
+            $corpo .= __('admin.demands.email_title_label', 'Título:') . " {$titulo}\n";
+            $corpo .= __('admin.demands.email_requester_label', 'Solicitante:') . " {$solicitante}\n";
+            $corpo .= __('admin.demands.email_type_label', 'Tipo:') . " " . ($tipo === 'bug' ? __('admin.demands.type_bug', 'Bug/Erro') : __('admin.demands.type_new_feature', 'Nova Função')) . "\n\n";
+            $corpo .= __('admin.demands.email_panel_link', 'Acesse o painel: https://brazilianashop.com.br/admin/demandas/painel') . "\n";
+            $corpo .= __('admin.demands.email_detail_link', 'Detalhe: https://brazilianashop.com.br/admin/demandas/detalhe/{n}', ['n'=>$demandaId]) . "\n";
 
             foreach ($listaEmails as $email) {
                 if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -1110,8 +1110,8 @@ class AdminDemandasController extends Controller {
         if ($usuariosNotif !== '') {
             $this->ensureNotificacoesTable();
             $ids = array_filter(array_map('intval', explode(',', $usuariosNotif)));
-            $tituloNotif = ($tipo === 'bug' ? '🐛 Bug: ' : '🚀 Nova: ') . $titulo;
-            $msgNotif = 'Solicitante: ' . $solicitante;
+            $tituloNotif = ($tipo === 'bug' ? '🐛 ' . __('admin.demands.notif_bug_prefix', 'Bug:') . ' ' : '🚀 ' . __('admin.demands.notif_new_prefix', 'Nova:') . ' ') . $titulo;
+            $msgNotif = __('admin.demands.email_requester_label', 'Solicitante:') . ' ' . $solicitante;
             $link = '/admin/demandas/detalhe/' . $demandaId;
 
             foreach ($ids as $uid) {
@@ -1150,7 +1150,7 @@ class AdminDemandasController extends Controller {
         $this->ensureColumnArquivado();
         $this->db->prepare("UPDATE demandas SET arquivado = ? WHERE id = ?")->execute([$arquivar, $id]);
 
-        $_SESSION['message'] = $arquivar ? 'Demanda arquivada.' : 'Demanda desarquivada.';
+        $_SESSION['message'] = $arquivar ? __('admin.demands.demand_archived', 'Demanda arquivada.') : __('admin.demands.demand_unarchived', 'Demanda desarquivada.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/demandas/painel');
     }
@@ -1165,10 +1165,10 @@ class AdminDemandasController extends Controller {
         $st = $this->db->query("SELECT * FROM demandas WHERE arquivado = 1 ORDER BY updated_at DESC");
         $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusLabels = ['pendente'=>__('admin.demands.status_pending','Pendente'),'em_analise'=>__('admin.demands.status_analyzing','Em Análise'),'em_execucao'=>__('admin.demands.status_in_progress','Em Execução'),'em_teste'=>__('admin.demands.status_testing','Em Teste'),'recusado'=>__('admin.demands.status_rejected','Recusado'),'concluido'=>__('admin.demands.status_completed','Concluído')];
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Demandas Arquivadas'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.archived_title', 'Demandas Arquivadas'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/arquivados.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';

@@ -67,7 +67,7 @@ class AdminDescricaoProdutosController extends Controller {
     private function callChatGPT(\PDO $pdo, string $userMessage, string $lang = 'pt'): array {
         $apiKey = $this->getChatGPTApiKey($pdo);
         if (!$apiKey) {
-            return ['error' => 'API Key do ChatGPT não configurada. Vá em Configurações > IA.'];
+            return ['error' => __('admin.product_desc.err_no_api_key', 'API Key do ChatGPT não configurada. Vá em Configurações > IA.')];
         }
         $model = $this->getChatGPTModel($pdo);
 
@@ -106,11 +106,11 @@ class AdminDescricaoProdutosController extends Controller {
         curl_close($ch);
 
         if ($curlError) {
-            return ['error' => 'Erro de conexão: ' . $curlError];
+            return ['error' => __('admin.product_desc.err_connection', 'Erro de conexão: {e}', ['e' => $curlError])];
         }
         $data = json_decode($response, true);
         if ($httpCode !== 200 || !isset($data['choices'][0]['message']['content'])) {
-            $errMsg = $data['error']['message'] ?? 'Erro desconhecido da API (HTTP ' . $httpCode . ')';
+            $errMsg = $data['error']['message'] ?? __('admin.product_desc.err_api_unknown', 'Erro desconhecido da API (HTTP {code})', ['code' => $httpCode]);
             return ['error' => $errMsg];
         }
         return ['text' => trim($data['choices'][0]['message']['content'])];
@@ -124,7 +124,7 @@ class AdminDescricaoProdutosController extends Controller {
         $colInfo = $this->getColumns($pdo);
 
         $produtoId = (int) $request->getParam('produto_id');
-        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => 'ID inválido']); return; }
+        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_invalid_id', 'ID inválido')]); return; }
 
         // Get product info
         $fotoCol = $colInfo['hasFoto'] ? ", p.{$colInfo['hasFoto']}" : '';
@@ -133,7 +133,7 @@ class AdminDescricaoProdutosController extends Controller {
         $sql .= " WHERE p.id = ?";
         $st = $pdo->prepare($sql); $st->execute([$produtoId]);
         $produto = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$produto) { echo json_encode(['success' => false, 'error' => 'Produto não encontrado']); return; }
+        if (!$produto) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_product_not_found', 'Produto não encontrado')]); return; }
 
         // Mark as generating
         $stCheck = $pdo->prepare("SELECT id FROM produto_descricoes_ia WHERE produto_id = ?");
@@ -173,7 +173,7 @@ class AdminDescricaoProdutosController extends Controller {
         $auth = new AuthService(); $auth->requerPerfis(['admin','vendedor']);
         $data = json_decode(file_get_contents('php://input'), true);
         $ids = $data['ids'] ?? [];
-        if (empty($ids) || !is_array($ids)) { echo json_encode(['success' => false, 'error' => 'Nenhum produto selecionado']); return; }
+        if (empty($ids) || !is_array($ids)) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_no_product_selected', 'Nenhum produto selecionado')]); return; }
         // Frontend will call gerarDescricao sequentially; this endpoint just validates
         echo json_encode(['success' => true, 'total' => count($ids), 'ids' => array_map('intval', $ids)]);
     }
@@ -186,14 +186,14 @@ class AdminDescricaoProdutosController extends Controller {
         $colInfo = $this->getColumns($pdo);
 
         $produtoId = (int) $request->getParam('id');
-        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => 'ID inválido']); return; }
+        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_invalid_id', 'ID inválido')]); return; }
 
         $fotoCol = $colInfo['hasFoto'] ? ", p.{$colInfo['hasFoto']} AS foto" : ", NULL AS foto";
         $sql = "SELECT p.id, p.{$colInfo['nameCol']} AS nome, d.descricao_gerada, d.descricao_editada, d.status_revisao, d.erro_geracao {$fotoCol}
                 FROM produtos p LEFT JOIN produto_descricoes_ia d ON d.produto_id = p.id WHERE p.id = ?";
         $st = $pdo->prepare($sql); $st->execute([$produtoId]);
         $row = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$row) { echo json_encode(['success' => false, 'error' => 'Produto não encontrado']); return; }
+        if (!$row) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_product_not_found', 'Produto não encontrado')]); return; }
 
         echo json_encode(['success' => true, 'produto' => $row]);
     }
@@ -208,7 +208,7 @@ class AdminDescricaoProdutosController extends Controller {
         $data = json_decode(file_get_contents('php://input'), true);
         $produtoId = (int) ($data['produto_id'] ?? 0);
         $descricaoFinal = trim((string) ($data['descricao'] ?? ''));
-        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => 'ID inválido']); return; }
+        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_invalid_id', 'ID inválido')]); return; }
 
         // If no custom text provided, use the generated one
         if ($descricaoFinal === '') {
@@ -217,7 +217,7 @@ class AdminDescricaoProdutosController extends Controller {
             $row = $st->fetch(\PDO::FETCH_ASSOC);
             $descricaoFinal = !empty($row['descricao_editada']) ? $row['descricao_editada'] : ($row['descricao_gerada'] ?? '');
         }
-        if ($descricaoFinal === '') { echo json_encode(['success' => false, 'error' => 'Nenhuma descrição para aprovar']); return; }
+        if ($descricaoFinal === '') { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_no_description_to_approve', 'Nenhuma descrição para aprovar')]); return; }
 
         $uid = $_SESSION['usuario_id'] ?? 0;
         $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_editada=?, status_revisao='aprovado', aprovado_por=?, data_aprovacao=NOW() WHERE produto_id=?")->execute([$descricaoFinal, $uid, $produtoId]);
@@ -236,7 +236,7 @@ class AdminDescricaoProdutosController extends Controller {
 
         $data = json_decode(file_get_contents('php://input'), true);
         $produtoId = (int) ($data['produto_id'] ?? 0);
-        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => 'ID inválido']); return; }
+        if ($produtoId <= 0) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_invalid_id', 'ID inválido')]); return; }
 
         $pdo->prepare("UPDATE produto_descricoes_ia SET status_revisao='reprovado' WHERE produto_id=?")->execute([$produtoId]);
         echo json_encode(['success' => true, 'produto_id' => $produtoId]);
@@ -251,7 +251,7 @@ class AdminDescricaoProdutosController extends Controller {
 
         $data = json_decode(file_get_contents('php://input'), true);
         $ids = array_map('intval', $data['ids'] ?? []);
-        if (empty($ids)) { echo json_encode(['success' => false, 'error' => 'Nenhum produto selecionado']); return; }
+        if (empty($ids)) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_no_product_selected', 'Nenhum produto selecionado')]); return; }
 
         $uid = $_SESSION['usuario_id'] ?? 0;
         $aprovados = 0;
@@ -277,7 +277,7 @@ class AdminDescricaoProdutosController extends Controller {
 
         $data = json_decode(file_get_contents('php://input'), true);
         $ids = array_map('intval', $data['ids'] ?? []);
-        if (empty($ids)) { echo json_encode(['success' => false, 'error' => 'Nenhum produto selecionado']); return; }
+        if (empty($ids)) { echo json_encode(['success' => false, 'error' => __('admin.product_desc.err_no_product_selected', 'Nenhum produto selecionado')]); return; }
 
         $reprovados = 0;
         foreach ($ids as $pid) {
@@ -333,8 +333,8 @@ class AdminDescricaoProdutosController extends Controller {
     }
 
     private function renderPage(array $produtos, string $filtro, int $totalSemDesc, int $totalPendentes, int $totalAprovados, int $totalErros): void {
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Descrição de Produtos - Admin</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>' . __('admin.product_desc.page_title', 'Descrição de Produtos') . ' - Admin</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -368,24 +368,24 @@ class AdminDescricaoProdutosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">';
         // Title
         echo '<div class="d-flex align-items-center justify-content-between mb-4">
-<div><h1 class="page-title">Descrição de Produtos</h1>
-<p class="page-subtitle">Geração e revisão de descrições com IA</p></div></div>';
+<div><h1 class="page-title">' . __('admin.product_desc.heading', 'Descrição de Produtos') . '</h1>
+<p class="page-subtitle">' . __('admin.product_desc.subtitle', 'Geração e revisão de descrições com IA') . '</p></div></div>';
 
         // KPI Cards
         echo '<div class="row g-3 mb-4">
-<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalSemDesc . '</div><div class="kpi-label"><i class="fas fa-exclamation-circle text-danger me-1"></i>Sem Descrição</div></div></div>
-<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalPendentes . '</div><div class="kpi-label"><i class="fas fa-clock text-info me-1"></i>Pendentes Revisão</div></div></div>
-<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalAprovados . '</div><div class="kpi-label"><i class="fas fa-check-circle text-success me-1"></i>Aprovados</div></div></div>
-<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalErros . '</div><div class="kpi-label"><i class="fas fa-times-circle text-danger me-1"></i>Erros</div></div></div>
+<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalSemDesc . '</div><div class="kpi-label"><i class="fas fa-exclamation-circle text-danger me-1"></i>' . __('admin.product_desc.kpi_no_description', 'Sem Descrição') . '</div></div></div>
+<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalPendentes . '</div><div class="kpi-label"><i class="fas fa-clock text-info me-1"></i>' . __('admin.product_desc.kpi_pending_review', 'Pendentes Revisão') . '</div></div></div>
+<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalAprovados . '</div><div class="kpi-label"><i class="fas fa-check-circle text-success me-1"></i>' . __('admin.product_desc.kpi_approved', 'Aprovados') . '</div></div></div>
+<div class="col-6 col-md-3"><div class="kpi-card"><div class="kpi-value">' . $totalErros . '</div><div class="kpi-label"><i class="fas fa-times-circle text-danger me-1"></i>' . __('admin.product_desc.kpi_errors', 'Erros') . '</div></div></div>
 </div>';
 
         // Filter tabs
         $tabs = [
-            'sem_descricao' => 'Todos sem descrição',
-            'pendente_revisao' => 'Pendentes',
-            'aprovado' => 'Aprovados',
-            'reprovado' => 'Reprovados',
-            'erro' => 'Com erro'
+            'sem_descricao' => __('admin.product_desc.tab_all_no_description', 'Todos sem descrição'),
+            'pendente_revisao' => __('admin.product_desc.tab_pending', 'Pendentes'),
+            'aprovado' => __('admin.product_desc.tab_approved', 'Aprovados'),
+            'reprovado' => __('admin.product_desc.tab_rejected', 'Reprovados'),
+            'erro' => __('admin.product_desc.tab_error', 'Com erro')
         ];
         // Mobile: dropdown filter | Desktop: nav tabs
         echo '<div class="d-md-none mb-3"><select class="form-select" onchange="window.location.href=\'?filtro=\'+this.value">';
@@ -403,9 +403,9 @@ class AdminDescricaoProdutosController extends Controller {
 
         // Action bar
         echo '<div class="d-flex gap-2 mb-3 flex-wrap" id="actionBar">
-<button class="btn btn-sm btn-primary" onclick="gerarSelecionados()" id="btnGerarSel" disabled><i class="fas fa-magic me-1"></i>Gerar</button>
-<button class="btn btn-sm btn-success" onclick="aprovarSelecionados()" id="btnAprovarSel" disabled><i class="fas fa-check me-1"></i>Aprovar</button>
-<button class="btn btn-sm btn-danger" onclick="reprovarSelecionados()" id="btnReprovarSel" disabled><i class="fas fa-times me-1"></i>Reprovar</button>
+<button class="btn btn-sm btn-primary" onclick="gerarSelecionados()" id="btnGerarSel" disabled><i class="fas fa-magic me-1"></i>' . __('admin.product_desc.btn_generate', 'Gerar') . '</button>
+<button class="btn btn-sm btn-success" onclick="aprovarSelecionados()" id="btnAprovarSel" disabled><i class="fas fa-check me-1"></i>' . __('admin.product_desc.btn_approve', 'Aprovar') . '</button>
+<button class="btn btn-sm btn-danger" onclick="reprovarSelecionados()" id="btnReprovarSel" disabled><i class="fas fa-times me-1"></i>' . __('admin.product_desc.btn_reject', 'Reprovar') . '</button>
 <div id="progressArea" class="ms-3 align-self-center" style="display:none;min-width:200px;">
 <small class="text-muted" id="progressText">0/0</small>
 <div class="progress-bar-gen"><div class="fill" id="progressFill" style="width:0%"></div></div>
@@ -415,15 +415,15 @@ class AdminDescricaoProdutosController extends Controller {
         echo '<div class="card border-0 shadow-sm"><div class="table-responsive d-none d-md-block"><table class="table table-hover align-middle mb-0">
 <thead style="background:#f8f9fa;"><tr>
 <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
-<th style="width:50px;">Img</th>
-<th>Produto</th>
-<th>Categoria</th>
-<th>Status</th>
-<th style="width:140px;">Ações</th>
+<th style="width:50px;">' . __('admin.product_desc.th_image', 'Img') . '</th>
+<th>' . __('admin.product_desc.th_product', 'Produto') . '</th>
+<th>' . __('admin.product_desc.th_category', 'Categoria') . '</th>
+<th>' . __('admin.product_desc.th_status', 'Status') . '</th>
+<th style="width:140px;">' . __('admin.product_desc.th_actions', 'Ações') . '</th>
 </tr></thead><tbody>';
 
         if (empty($produtos)) {
-            echo '<tr><td colspan="6" class="text-center text-muted py-4">Nenhum produto encontrado neste filtro.</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted py-4">' . __('admin.product_desc.no_products', 'Nenhum produto encontrado neste filtro.') . '</td></tr>';
         }
         foreach ($produtos as $p) {
             $id = (int) $p['id'];
@@ -432,15 +432,15 @@ class AdminDescricaoProdutosController extends Controller {
             $foto = !empty($p['foto']) ? htmlspecialchars($p['foto'], ENT_QUOTES, 'UTF-8') : '';
             $fotoTag = $foto ? '<img src="' . $foto . '" class="product-img" alt="">' : '<div class="product-img d-flex align-items-center justify-content-center bg-light"><i class="fas fa-image text-muted"></i></div>';
             $status = $p['status_revisao'] ?? 'sem_descricao';
-            $statusLabels = ['sem_descricao'=>'Sem descrição','gerando'=>'Gerando...','pendente_revisao'=>'Pendente','aprovado'=>'Aprovado','reprovado'=>'Reprovado','erro'=>'Erro'];
+            $statusLabels = ['sem_descricao'=>__('admin.product_desc.status_no_description', 'Sem descrição'),'gerando'=>__('admin.product_desc.status_generating', 'Gerando...'),'pendente_revisao'=>__('admin.product_desc.status_pending', 'Pendente'),'aprovado'=>__('admin.product_desc.status_approved', 'Aprovado'),'reprovado'=>__('admin.product_desc.status_rejected', 'Reprovado'),'erro'=>__('admin.product_desc.status_error', 'Erro')];
             $badge = '<span class="status-badge status-' . $status . '">' . ($statusLabels[$status] ?? $status) . '</span>';
 
             $actions = '';
             if (in_array($status, ['sem_descricao','erro','reprovado'])) {
-                $actions .= '<button class="btn btn-sm btn-outline-primary me-1" onclick="gerarUm(' . $id . ')" title="Gerar"><i class="fas fa-magic"></i></button>';
+                $actions .= '<button class="btn btn-sm btn-outline-primary me-1" onclick="gerarUm(' . $id . ')" title="' . htmlspecialchars(__('admin.product_desc.btn_generate', 'Gerar'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-magic"></i></button>';
             }
             if (in_array($status, ['pendente_revisao','aprovado','reprovado','erro'])) {
-                $actions .= '<button class="btn btn-sm btn-outline-secondary" onclick="revisarProduto(' . $id . ')" title="Revisar"><i class="fas fa-eye"></i></button>';
+                $actions .= '<button class="btn btn-sm btn-outline-secondary" onclick="revisarProduto(' . $id . ')" title="' . htmlspecialchars(__('admin.product_desc.btn_review', 'Revisar'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-eye"></i></button>';
             }
 
             echo '<tr id="row-' . $id . '"><td><input type="checkbox" class="row-check" value="' . $id . '" onchange="updateActionBar()"></td>';
@@ -451,7 +451,7 @@ class AdminDescricaoProdutosController extends Controller {
         // Mobile: Cards
         echo '<div class="d-md-none p-2">';
         if (empty($produtos)) {
-            echo '<div class="text-center text-muted py-4">Nenhum produto encontrado neste filtro.</div>';
+            echo '<div class="text-center text-muted py-4">' . __('admin.product_desc.no_products', 'Nenhum produto encontrado neste filtro.') . '</div>';
         }
         foreach ($produtos as $p) {
             $id = (int) $p['id'];
@@ -459,7 +459,7 @@ class AdminDescricaoProdutosController extends Controller {
             $cat = htmlspecialchars((string) ($p['categoria'] ?? '-'), ENT_QUOTES, 'UTF-8');
             $foto = !empty($p['foto']) ? htmlspecialchars($p['foto'], ENT_QUOTES, 'UTF-8') : '';
             $status = $p['status_revisao'] ?? 'sem_descricao';
-            $statusLabels2 = ['sem_descricao'=>'Sem descrição','gerando'=>'Gerando...','pendente_revisao'=>'Pendente','aprovado'=>'Aprovado','reprovado'=>'Reprovado','erro'=>'Erro'];
+            $statusLabels2 = ['sem_descricao'=>__('admin.product_desc.status_no_description', 'Sem descrição'),'gerando'=>__('admin.product_desc.status_generating', 'Gerando...'),'pendente_revisao'=>__('admin.product_desc.status_pending', 'Pendente'),'aprovado'=>__('admin.product_desc.status_approved', 'Aprovado'),'reprovado'=>__('admin.product_desc.status_rejected', 'Reprovado'),'erro'=>__('admin.product_desc.status_error', 'Erro')];
             $badge2 = '<span class="status-badge status-' . $status . '">' . ($statusLabels2[$status] ?? $status) . '</span>';
 
             echo '<div class="card border-0 shadow-sm mb-2" id="mrow-' . $id . '"><div class="card-body py-2 px-3">';
@@ -477,10 +477,10 @@ class AdminDescricaoProdutosController extends Controller {
             // Actions
             echo '<div class="d-flex gap-1 mt-2">';
             if (in_array($status, ['sem_descricao','erro','reprovado'])) {
-                echo '<button class="btn btn-sm btn-outline-primary" onclick="gerarUm(' . $id . ')"><i class="fas fa-magic me-1"></i>Gerar</button>';
+                echo '<button class="btn btn-sm btn-outline-primary" onclick="gerarUm(' . $id . ')"><i class="fas fa-magic me-1"></i>' . __('admin.product_desc.btn_generate', 'Gerar') . '</button>';
             }
             if (in_array($status, ['pendente_revisao','aprovado','reprovado','erro'])) {
-                echo '<button class="btn btn-sm btn-outline-secondary" onclick="revisarProduto(' . $id . ')"><i class="fas fa-eye me-1"></i>Revisar</button>';
+                echo '<button class="btn btn-sm btn-outline-secondary" onclick="revisarProduto(' . $id . ')"><i class="fas fa-eye me-1"></i>' . __('admin.product_desc.btn_review', 'Revisar') . '</button>';
             }
             echo '</div>';
             echo '</div></div>';
@@ -489,19 +489,19 @@ class AdminDescricaoProdutosController extends Controller {
 
         // Modal
         echo '<div class="modal fade" id="modalRevisar" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
-<div class="modal-header" style="background:var(--navy);color:#fff;"><h5 class="modal-title"><i class="fas fa-pen-fancy me-2"></i>Revisar Descrição</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+<div class="modal-header" style="background:var(--navy);color:#fff;"><h5 class="modal-title"><i class="fas fa-pen-fancy me-2"></i>' . __('admin.product_desc.modal_title', 'Revisar Descrição') . '</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
 <div class="d-flex align-items-center gap-3 mb-3">
 <img id="modalFoto" src="" class="product-img" style="width:60px;height:60px;" alt="">
 <div><h6 id="modalNome" class="mb-0"></h6><small class="text-muted" id="modalStatus"></small></div></div>
-<label class="form-label fw-bold">Descrição gerada pela IA:</label>
+<label class="form-label fw-bold">' . __('admin.product_desc.modal_ai_description_label', 'Descrição gerada pela IA:') . '</label>
 <textarea class="form-control" id="modalDescricao" rows="6"></textarea>
 <div id="modalErro" class="alert alert-danger mt-2" style="display:none;"></div>
 </div>
 <div class="modal-footer">
-<button class="btn btn-success" onclick="aprovarModal()"><i class="fas fa-check me-1"></i>Aprovar</button>
-<button class="btn btn-danger" onclick="reprovarModal()"><i class="fas fa-times me-1"></i>Reprovar</button>
-<button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+<button class="btn btn-success" onclick="aprovarModal()"><i class="fas fa-check me-1"></i>' . __('admin.product_desc.btn_approve', 'Aprovar') . '</button>
+<button class="btn btn-danger" onclick="reprovarModal()"><i class="fas fa-times me-1"></i>' . __('admin.product_desc.btn_reject', 'Reprovar') . '</button>
+<button class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.product_desc.btn_close', 'Fechar') . '</button>
 </div></div></div></div>';
 
         // JavaScript
@@ -527,15 +527,15 @@ function getSelectedIds() {
 
 async function gerarUm(id) {
     const row = document.getElementById("row-"+id);
-    if(row) row.querySelector("td:nth-child(5)").innerHTML = \'<span class="status-badge status-gerando">Gerando...</span>\';
+    if(row) row.querySelector("td:nth-child(5)").innerHTML = \'<span class="status-badge status-gerando">' . htmlspecialchars(__('admin.product_desc.status_generating', 'Gerando...'), ENT_QUOTES, 'UTF-8') . '</span>\';
     const fd = new FormData(); fd.append("produto_id", id);
     const r = await fetch("/admin/descricao-produtos/gerar", {method:"POST", body:fd});
     const data = await r.json();
     if(data.success) {
-        if(row) row.querySelector("td:nth-child(5)").innerHTML = \'<span class="status-badge status-pendente_revisao">Pendente</span>\';
+        if(row) row.querySelector("td:nth-child(5)").innerHTML = \'<span class="status-badge status-pendente_revisao">' . htmlspecialchars(__('admin.product_desc.status_pending', 'Pendente'), ENT_QUOTES, 'UTF-8') . '</span>\';
     } else {
-        if(row) row.querySelector("td:nth-child(5)").innerHTML = \'<span class="status-badge status-erro">Erro</span>\';
-        alert(data.error || "Erro ao gerar");
+        if(row) row.querySelector("td:nth-child(5)").innerHTML = \'<span class="status-badge status-erro">' . htmlspecialchars(__('admin.product_desc.status_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '</span>\';
+        alert(data.error || "' . htmlspecialchars(__('admin.product_desc.js_error_generating', 'Erro ao gerar'), ENT_QUOTES, 'UTF-8') . '");
     }
 }
 
@@ -561,21 +561,21 @@ async function gerarSelecionados() {
 async function aprovarSelecionados() {
     const ids = getSelectedIds();
     if(!ids.length) return;
-    if(!confirm("Aprovar "+ids.length+" descrições?")) return;
+    if(!confirm("' . htmlspecialchars(__('admin.product_desc.js_confirm_approve', 'Aprovar'), ENT_QUOTES, 'UTF-8') . ' "+ids.length+" ' . htmlspecialchars(__('admin.product_desc.js_descriptions', 'descrições?'), ENT_QUOTES, 'UTF-8') . '")) return;
     const r = await fetch("/admin/descricao-produtos/aprovar-lote", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ids})});
     const data = await r.json();
     if(data.success) location.reload();
-    else alert(data.error || "Erro");
+    else alert(data.error || "' . htmlspecialchars(__('admin.product_desc.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '");
 }
 
 async function reprovarSelecionados() {
     const ids = getSelectedIds();
     if(!ids.length) return;
-    if(!confirm("Reprovar "+ids.length+" descrições?")) return;
+    if(!confirm("' . htmlspecialchars(__('admin.product_desc.js_confirm_reject', 'Reprovar'), ENT_QUOTES, 'UTF-8') . ' "+ids.length+" ' . htmlspecialchars(__('admin.product_desc.js_descriptions', 'descrições?'), ENT_QUOTES, 'UTF-8') . '")) return;
     const r = await fetch("/admin/descricao-produtos/reprovar-lote", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ids})});
     const data = await r.json();
     if(data.success) location.reload();
-    else alert(data.error || "Erro");
+    else alert(data.error || "' . htmlspecialchars(__('admin.product_desc.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '");
 }
 
 async function revisarProduto(id) {
@@ -596,18 +596,18 @@ async function revisarProduto(id) {
 
 async function aprovarModal() {
     const desc = document.getElementById("modalDescricao").value.trim();
-    if(!desc) { alert("Descrição vazia"); return; }
+    if(!desc) { alert("' . htmlspecialchars(__('admin.product_desc.js_empty_description', 'Descrição vazia'), ENT_QUOTES, 'UTF-8') . '"); return; }
     const r = await fetch("/admin/descricao-produtos/aprovar", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({produto_id:currentProdutoId, descricao:desc})});
     const data = await r.json();
     if(data.success) { modal.hide(); location.reload(); }
-    else alert(data.error || "Erro");
+    else alert(data.error || "' . htmlspecialchars(__('admin.product_desc.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '");
 }
 
 async function reprovarModal() {
     const r = await fetch("/admin/descricao-produtos/reprovar", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({produto_id:currentProdutoId})});
     const data = await r.json();
     if(data.success) { modal.hide(); location.reload(); }
-    else alert(data.error || "Erro");
+    else alert(data.error || "' . htmlspecialchars(__('admin.product_desc.js_error', 'Erro'), ENT_QUOTES, 'UTF-8') . '");
 }
 </script>';
 

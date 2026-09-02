@@ -317,7 +317,7 @@ class AdminEtiquetasWpController extends Controller
 
         $this->json([
             'success' => $allOk,
-            'message' => $allOk ? 'Todos os testes passaram!' : 'Alguns testes falharam.',
+            'message' => $allOk ? __('admin.labels_wp.all_tests_passed', 'Todos os testes passaram!') : __('admin.labels_wp.some_tests_failed', 'Alguns testes falharam.'),
             'ambiente' => $ambiente ?? 'DESCONHECIDO',
             'results' => $results,
         ]);
@@ -342,7 +342,7 @@ class AdminEtiquetasWpController extends Controller
         if (empty($r['success'])) {
             $this->json([
                 'success' => false,
-                'error' => (string) ($r['error'] ?? 'Falha ao consultar saldo.'),
+                'error' => (string) ($r['error'] ?? __('admin.labels_wp.balance_query_failed', 'Falha ao consultar saldo.')),
             ], 400);
             return;
         }
@@ -370,20 +370,20 @@ class AdminEtiquetasWpController extends Controller
         $body = json_decode(file_get_contents('php://input'), true);
         $pedidoId = (int) ($body['pedido_id'] ?? 0);
         if ($pedidoId <= 0) {
-            $this->json(['success' => false, 'error' => 'pedido_id inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_order_id', 'pedido_id inválido')], 400);
             return;
         }
 
         $pedidoModel = new PedidoEcommerce();
         $pedido = $pedidoModel->getComDetalhes($pedidoId);
         if (!is_array($pedido) || empty($pedido['id'])) {
-            $this->json(['success' => false, 'error' => 'Pedido não encontrado'], 404);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.order_not_found', 'Pedido não encontrado')], 404);
             return;
         }
 
         $status = strtolower(trim((string) ($pedido['status'] ?? '')));
         if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
-            $this->json(['success' => false, 'error' => 'Pedido não está em Caixa Fechada (status: ' . $status . ')'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.order_not_closed_box', 'Pedido não está em Caixa Fechada (status: {status})', ['status' => $status])], 400);
             return;
         }
 
@@ -405,7 +405,7 @@ class AdminEtiquetasWpController extends Controller
 
             // Atualizar status do pedido
             try {
-                $pedidoModel->atualizarStatus($pedidoId, 'etiqueta_gerada', 'Etiqueta via WordPress - Rastreio: ' . $tracking, $_SESSION['usuario_id'] ?? null);
+                $pedidoModel->atualizarStatus($pedidoId, 'etiqueta_gerada', __('admin.labels_wp.status_label_via_wp', 'Etiqueta via WordPress - Rastreio: ') . $tracking, $_SESSION['usuario_id'] ?? null);
             } catch (\Exception $e) {}
 
             $this->json([
@@ -417,7 +417,7 @@ class AdminEtiquetasWpController extends Controller
         } else {
             $this->json([
                 'success' => false,
-                'error' => $resp['error'] ?? 'Erro desconhecido do WordPress',
+                'error' => $resp['error'] ?? __('admin.labels_wp.wp_unknown_error', 'Erro desconhecido do WordPress'),
                 'pedido_id' => $pedidoId,
             ], 400);
         }
@@ -438,13 +438,13 @@ class AdminEtiquetasWpController extends Controller
         $body = json_decode(file_get_contents('php://input'), true);
         $ids = $body['ids'] ?? [];
         if (!is_array($ids) || empty($ids)) {
-            echo json_encode(['success' => false, 'error' => 'Nenhum pedido selecionado']);
+            echo json_encode(['success' => false, 'error' => __('admin.labels_wp.no_order_selected', 'Nenhum pedido selecionado')]);
             exit;
         }
 
         $ids = array_filter(array_map('intval', $ids), fn($v) => $v > 0);
         if (empty($ids)) {
-            echo json_encode(['success' => false, 'error' => 'IDs inválidos']);
+            echo json_encode(['success' => false, 'error' => __('admin.labels_wp.invalid_ids', 'IDs inválidos')]);
             exit;
         }
 
@@ -460,7 +460,7 @@ class AdminEtiquetasWpController extends Controller
                     $stCheck = $this->connection->prepare('SELECT id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
                     $stCheck->execute([$pid]);
                     if ((int) ($stCheck->fetchColumn() ?: 0) > 0) {
-                        $result['error'] = 'Já possui etiqueta';
+                        $result['error'] = __('admin.labels_wp.already_has_label', 'Já possui etiqueta');
                         $results[] = $result;
                         continue;
                     }
@@ -468,14 +468,14 @@ class AdminEtiquetasWpController extends Controller
 
                 $pedido = $pedidoModel->getComDetalhes($pid);
                 if (!is_array($pedido) || empty($pedido['id'])) {
-                    $result['error'] = 'Pedido não encontrado';
+                    $result['error'] = __('admin.labels_wp.order_not_found', 'Pedido não encontrado');
                     $results[] = $result;
                     continue;
                 }
 
                 $status = strtolower(trim((string) ($pedido['status'] ?? '')));
                 if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
-                    $result['error'] = 'Não está em Caixa Fechada';
+                    $result['error'] = __('admin.labels_wp.not_closed_box', 'Não está em Caixa Fechada');
                     $results[] = $result;
                     continue;
                 }
@@ -493,12 +493,12 @@ class AdminEtiquetasWpController extends Controller
                     $tracking = $resp['tracking_number'] ?? '';
                     $this->salvarEtiquetaLocal($pid, $packageData['customerControlCode'], $tracking, $resp);
 
-                    try { $pedidoModel->atualizarStatus($pid, 'etiqueta_gerada', 'Etiqueta via WP em massa - Rastreio: ' . $tracking, $_SESSION['usuario_id'] ?? null); } catch (\Exception $e) {}
+                    try { $pedidoModel->atualizarStatus($pid, 'etiqueta_gerada', __('admin.labels_wp.status_label_via_wp_bulk', 'Etiqueta via WP em massa - Rastreio: ') . $tracking, $_SESSION['usuario_id'] ?? null); } catch (\Exception $e) {}
 
                     $result['success'] = true;
                     $result['tracking_number'] = $tracking;
                 } else {
-                    $result['error'] = $resp['error'] ?? 'Erro WordPress';
+                    $result['error'] = $resp['error'] ?? __('admin.labels_wp.wp_error', 'Erro WordPress');
                 }
             } catch (\Exception $e) {
                 $result['error'] = $e->getMessage();
@@ -543,11 +543,11 @@ class AdminEtiquetasWpController extends Controller
         ];
 
         if ($data['dispatchNumber'] <= 0) {
-            $this->json(['success' => false, 'error' => 'dispatchNumber inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_dispatch_number', 'dispatchNumber inválido')], 400);
             return;
         }
         if (empty($data['trackingCodes'])) {
-            $this->json(['success' => false, 'error' => 'Selecione pelo menos 1 pacote'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.select_one_package', 'Selecione pelo menos 1 pacote')], 400);
             return;
         }
 
@@ -572,7 +572,7 @@ class AdminEtiquetasWpController extends Controller
         $containerIds = $body['containerIds'] ?? [];
 
         if (!is_array($containerIds) || empty($containerIds)) {
-            $this->json(['success' => false, 'error' => 'Selecione pelo menos 1 container'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.select_one_container', 'Selecione pelo menos 1 container')], 400);
             return;
         }
 
@@ -598,7 +598,7 @@ class AdminEtiquetasWpController extends Controller
         $required = ['billIds', 'flightNumber', 'airlineCode', 'departureDate', 'departureAirportCode', 'arrivalDate', 'arrivalAirportCode'];
         foreach ($required as $field) {
             if (empty($body[$field])) {
-                $this->json(['success' => false, 'error' => "Campo obrigatório: {$field}"], 400);
+                $this->json(['success' => false, 'error' => __('admin.labels_wp.required_field', 'Campo obrigatório: {field}', ['field' => $field])], 400);
                 return;
             }
         }
@@ -619,7 +619,7 @@ class AdminEtiquetasWpController extends Controller
         $body = json_decode(file_get_contents('php://input'), true);
         $wpPostId = (int) ($body['wp_post_id'] ?? 0);
         if ($wpPostId <= 0) {
-            $this->json(['success' => false, 'error' => 'wp_post_id inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
             return;
         }
 
@@ -630,7 +630,7 @@ class AdminEtiquetasWpController extends Controller
         
         // Garantir que sempre tem a chave 'error' se não teve sucesso
         if (empty($resp['success']) && empty($resp['error'])) {
-            $resp['error'] = $resp['message'] ?? $resp['raw'] ?? 'Erro desconhecido ao deletar container';
+            $resp['error'] = $resp['message'] ?? $resp['raw'] ?? __('admin.labels_wp.delete_container_unknown_error', 'Erro desconhecido ao deletar container');
         }
         
         $this->json($resp, !empty($resp['success']) ? 200 : 400);
@@ -644,7 +644,7 @@ class AdminEtiquetasWpController extends Controller
         $body = json_decode(file_get_contents('php://input'), true);
         $wpPostId = (int) ($body['wp_post_id'] ?? 0);
         if ($wpPostId <= 0) {
-            $this->json(['success' => false, 'error' => 'wp_post_id inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
             return;
         }
 
@@ -660,7 +660,7 @@ class AdminEtiquetasWpController extends Controller
         $body = json_decode(file_get_contents('php://input'), true);
         $wpPostId = (int) ($body['wp_post_id'] ?? 0);
         if ($wpPostId <= 0) {
-            $this->json(['success' => false, 'error' => 'wp_post_id inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
             return;
         }
 
@@ -685,7 +685,7 @@ class AdminEtiquetasWpController extends Controller
         $body = json_decode(file_get_contents('php://input'), true);
         $pedidoId = (int) ($body['pedido_id'] ?? 0);
         if ($pedidoId <= 0) {
-            $this->json(['success' => false, 'error' => 'pedido_id inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_order_id', 'pedido_id inválido')], 400);
             return;
         }
 
@@ -711,14 +711,14 @@ class AdminEtiquetasWpController extends Controller
                 $stDel->execute([$pedidoId]);
             }
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => 'Erro ao deletar etiqueta anterior: ' . $e->getMessage()], 500);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.delete_previous_label_error', 'Erro ao deletar etiqueta anterior: ') . $e->getMessage()], 500);
             return;
         }
 
         // Reverter status do pedido para permitir nova geração
         try {
             $pedidoModel = new PedidoEcommerce();
-            $pedidoModel->atualizarStatus($pedidoId, 'produto_consolidado', 'Etiqueta deletada para regeração (via WP)', $_SESSION['usuario_id'] ?? null);
+            $pedidoModel->atualizarStatus($pedidoId, 'produto_consolidado', __('admin.labels_wp.status_label_deleted_regen', 'Etiqueta deletada para regeração (via WP)'), $_SESSION['usuario_id'] ?? null);
         } catch (\Exception $e) {
             // Não bloquear se falhar a reversão de status
             error_log('[BRZ-REGERAR-WP] Erro ao reverter status pedido #' . $pedidoId . ': ' . $e->getMessage());
@@ -744,7 +744,7 @@ class AdminEtiquetasWpController extends Controller
         $wpPostId = (int) $request->getParam('id');
         if ($wpPostId <= 0) {
             http_response_code(400);
-            echo 'ID inválido.';
+            echo __('admin.labels_wp.invalid_id', 'ID inválido.');
             return;
         }
 
@@ -941,7 +941,7 @@ class AdminEtiquetasWpController extends Controller
         $wpPostId = (int) $request->getParam('id');
         if ($wpPostId <= 0) {
             http_response_code(400);
-            echo 'ID inválido.';
+            echo __('admin.labels_wp.invalid_id', 'ID inválido.');
             return;
         }
 
@@ -961,7 +961,7 @@ class AdminEtiquetasWpController extends Controller
         $wpPostId = (int) $request->getParam('id');
         if ($wpPostId <= 0) {
             http_response_code(400);
-            echo 'ID inválido.';
+            echo __('admin.labels_wp.invalid_id', 'ID inválido.');
             return;
         }
 
@@ -1154,23 +1154,23 @@ class AdminEtiquetasWpController extends Controller
         // Validações do destinatário
         $zipDigits = $destinatario['recipientZipCode'];
         if (strlen($zipDigits) !== 8) {
-            return ['_error' => 'CEP inválido (deve ter 8 dígitos)'];
+            return ['_error' => __('admin.labels_wp.invalid_zip', 'CEP inválido (deve ter 8 dígitos)')];
         }
         $phoneDigits = $destinatario['recipientPhoneNumber'];
         if ($phoneDigits === '' || !in_array(strlen($phoneDigits), [10, 11], true)) {
-            return ['_error' => 'Telefone inválido (10 ou 11 dígitos)'];
+            return ['_error' => __('admin.labels_wp.invalid_phone', 'Telefone inválido (10 ou 11 dígitos)')];
         }
         $destEmail = $destinatario['recipientEmail'];
         if ($destEmail === '' || filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
-            return ['_error' => 'E-mail inválido'];
+            return ['_error' => __('admin.labels_wp.invalid_email', 'E-mail inválido')];
         }
         $docType = $destinatario['recipientDocumentType'];
         $docNum = $destinatario['recipientDocumentNumber'];
         if ($docType === 'CPF' && strlen($docNum) !== 11) {
-            return ['_error' => 'CPF inválido (11 dígitos)'];
+            return ['_error' => __('admin.labels_wp.invalid_cpf', 'CPF inválido (11 dígitos)')];
         }
         if ($docType === 'CNPJ' && strlen($docNum) !== 14) {
-            return ['_error' => 'CNPJ inválido (14 dígitos)'];
+            return ['_error' => __('admin.labels_wp.invalid_cnpj', 'CNPJ inválido (14 dígitos)')];
         }
 
         // Peso e dimensões
@@ -1190,12 +1190,12 @@ class AdminEtiquetasWpController extends Controller
         if (!empty($overrides['packagingWidth'])) $packagingWidth = (float) $overrides['packagingWidth'];
         if (!empty($overrides['packagingHeight'])) $packagingHeight = (float) $overrides['packagingHeight'];
 
-        if ($totalWeight <= 0) return ['_error' => 'Peso não informado'];
-        if ($totalWeight > 30000) return ['_error' => 'Peso excede 30kg'];
-        if ($packagingLength < 16 || $packagingLength > 100) return ['_error' => 'Comprimento inválido (16-100cm)'];
-        if ($packagingWidth < 11 || $packagingWidth > 100) return ['_error' => 'Largura inválida (11-100cm)'];
-        if ($packagingHeight < 2 || $packagingHeight > 100) return ['_error' => 'Altura inválida (2-100cm)'];
-        if (($packagingLength + $packagingWidth + $packagingHeight) > 200) return ['_error' => 'Soma dimensões > 200cm'];
+        if ($totalWeight <= 0) return ['_error' => __('admin.labels_wp.weight_missing', 'Peso não informado')];
+        if ($totalWeight > 30000) return ['_error' => __('admin.labels_wp.weight_exceeds', 'Peso excede 30kg')];
+        if ($packagingLength < 16 || $packagingLength > 100) return ['_error' => __('admin.labels_wp.invalid_length', 'Comprimento inválido (16-100cm)')];
+        if ($packagingWidth < 11 || $packagingWidth > 100) return ['_error' => __('admin.labels_wp.invalid_width', 'Largura inválida (11-100cm)')];
+        if ($packagingHeight < 2 || $packagingHeight > 100) return ['_error' => __('admin.labels_wp.invalid_height', 'Altura inválida (2-100cm)')];
+        if (($packagingLength + $packagingWidth + $packagingHeight) > 200) return ['_error' => __('admin.labels_wp.dimensions_sum_exceeds', 'Soma dimensões > 200cm')];
 
         // Itens
         // Se o pedido tem invoice confirmado, usar dados do invoice (nome_produto, ncm, declaration_value)
@@ -1306,7 +1306,7 @@ class AdminEtiquetasWpController extends Controller
         } catch (\Throwable $e) {
             // Se falhar, usa itens normais do pedido
         }
-        if (empty($itemsIn)) return ['_error' => 'Sem itens'];
+        if (empty($itemsIn)) return ['_error' => __('admin.labels_wp.no_items', 'Sem itens')];
 
         // Não limitar quantidade de itens (antigo - if (count($itemsIn) > 20) return ['_error' => 'Mais de 20 itens'];) — o WordPress (plugin) cuida de separar
         // em 3 itens principais + folha suplementar internamente
@@ -1322,7 +1322,7 @@ class AdminEtiquetasWpController extends Controller
         foreach ($itemsIn as $idx => $it) {
             if (!is_array($it)) continue;
             $qtd = (int) ($it['quantidade'] ?? 0);
-            if ($qtd <= 0) return ['_error' => 'Item #' . ($idx+1) . ' qtd inválida'];
+            if ($qtd <= 0) return ['_error' => __('admin.labels_wp.item_invalid_qty', 'Item #{n} qtd inválida', ['n' => ($idx+1)])];
             $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
             if ($desc === '' || $desc === 'Item' || strpos($desc, 'Produto #') === 0) {
                 // Fallback: buscar nome do pacote_recebido
@@ -1344,7 +1344,7 @@ class AdminEtiquetasWpController extends Controller
             // NCM: tentar múltiplas fontes (ncm, produto_ncm, ncm_code)
             $ncmRaw = (string) ($it['ncm'] ?? ($it['produto_ncm'] ?? ($it['ncm_code'] ?? '')));
             $ncmDigits = $this->onlyDigits($ncmRaw);
-            if ($ncmDigits === '' || strlen($ncmDigits) < 6) return ['_error' => 'Item #' . ($idx+1) . ' sem NCM (' . $desc . ')'];
+            if ($ncmDigits === '' || strlen($ncmDigits) < 6) return ['_error' => __('admin.labels_wp.item_no_ncm', 'Item #{n} sem NCM ({desc})', ['n' => ($idx+1), 'desc' => $desc])];
             $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
 
             // Valor: para itens de pacote (produto_id >= 999990), o valor SEMPRE está em USD
@@ -1380,7 +1380,7 @@ class AdminEtiquetasWpController extends Controller
             }
             $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', ''), 'weight' => (float) number_format($pesoItem, 4, '.', '')];
         }
-        if (empty($items)) return ['_error' => 'Sem itens válidos'];
+        if (empty($items)) return ['_error' => __('admin.labels_wp.no_valid_items', 'Sem itens válidos')];
 
         $freightPaidValue = (float) ($overrides['freightPaidValue'] ?? 0.01);
         if ($freightPaidValue < 0.01) $freightPaidValue = 0.01;
@@ -1562,7 +1562,7 @@ class AdminEtiquetasWpController extends Controller
         $descricao = trim((string) ($body['descricao'] ?? ''));
 
         if ($nome === '') {
-            $this->json(['success' => false, 'error' => 'Nome da mala é obrigatório.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.bag_name_required', 'Nome da mala é obrigatório.')], 400);
             return;
         }
 
@@ -1591,7 +1591,7 @@ class AdminEtiquetasWpController extends Controller
         $malaId = (int) ($body['mala_id'] ?? 0);
 
         if ($malaId <= 0) {
-            $this->json(['success' => false, 'error' => 'mala_id inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_bag_id', 'mala_id inválido.')], 400);
             return;
         }
 
@@ -1621,11 +1621,11 @@ class AdminEtiquetasWpController extends Controller
         $pedidoIds = $body['pedido_ids'] ?? [];
 
         if ($malaId <= 0) {
-            $this->json(['success' => false, 'error' => 'mala_id inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_bag_id', 'mala_id inválido.')], 400);
             return;
         }
         if (!is_array($trackingCodes) || empty($trackingCodes)) {
-            $this->json(['success' => false, 'error' => 'Nenhum tracking code informado.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.no_tracking_code_provided', 'Nenhum tracking code informado.')], 400);
             return;
         }
 
@@ -1684,7 +1684,7 @@ class AdminEtiquetasWpController extends Controller
         $trackingCodes = $body['tracking_codes'] ?? [];
 
         if (!is_array($trackingCodes) || empty($trackingCodes)) {
-            $this->json(['success' => false, 'error' => 'Nenhum tracking code.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.no_tracking_code', 'Nenhum tracking code.')], 400);
             return;
         }
 
