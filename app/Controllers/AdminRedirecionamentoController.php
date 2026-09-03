@@ -1350,42 +1350,58 @@ class AdminRedirecionamentoController extends Controller {
     }
 
     /**
-     * Resolve a logo (configurada no banco ou asset estático) como src utilizável em PDF.
+     * Resolve a logo da Braziliana (configurada no banco) como src utilizável em PDF.
+     * Prioriza a logo do site (mesma exibida no cabeçalho público) e aplica a
+     * correção de path /uploads/ -> /public/uploads/ igual ao layout main.php.
      * Retorna data-URI para arquivos locais ou a própria URL http(s).
      */
     private function getLogoParaPdf(): string {
-        // 1) Logo configurada no banco (mesma lógica do menu/site)
+        // Ordem de preferência: logo do site (Braziliana) > logo_admin
+        $chaves = ['logo', 'logo_admin'];
         $raw = '';
         try {
             $db = $this->pdo();
-            $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave IN ('logo_admin','logo')) OR chave IN ('layout_logo_admin','layout_logo') ORDER BY (chave='logo_admin' OR chave='layout_logo_admin') DESC LIMIT 1");
-            $st->execute();
-            $raw = trim((string) ($st->fetchColumn() ?: ''));
+            foreach ($chaves as $chave) {
+                $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave=?) OR chave=? ORDER BY (categoria='layout') DESC LIMIT 1");
+                $st->execute([$chave, 'layout_' . $chave]);
+                $val = trim((string) ($st->fetchColumn() ?: ''));
+                $lower = strtolower($val);
+                if ($val !== '' && !in_array($lower, ['0','null','none','false','undefined'], true)) {
+                    $raw = $val;
+                    break;
+                }
+            }
         } catch (\Exception $e) { $raw = ''; }
 
-        $lower = strtolower($raw);
-        if ($raw === '' || in_array($lower, ['0','null','none','false','undefined'], true)) {
-            $raw = '';
-        }
+        if ($raw === '') return '';
 
         // URLs http(s) ou data-URI podem ser usadas direto (dompdf com isRemoteEnabled)
-        if ($raw !== '' && (stripos($raw, 'http://') === 0 || stripos($raw, 'https://') === 0 || stripos($raw, 'data:') === 0)) {
+        if (stripos($raw, 'http://') === 0 || stripos($raw, 'https://') === 0 || stripos($raw, 'data:') === 0) {
             return $raw;
         }
 
-        // Caminho local: resolver arquivo físico e converter para data-URI
-        $candidatos = [];
-        if ($raw !== '') {
-            $path = '/' . ltrim($raw, '/');
-            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
-            if ($docRoot !== '') {
-                $candidatos[] = $docRoot . str_replace('/', DIRECTORY_SEPARATOR, $path);
-            }
-            $candidatos[] = __DIR__ . '/../../public' . str_replace('/', DIRECTORY_SEPARATOR, $path);
+        // Correção de URLs legadas que não incluem /public/ (igual ao main.php)
+        $webPath = '/' . ltrim($raw, '/');
+        if (preg_match('#^/uploads/#', $webPath)) {
+            $webPath = '/public' . $webPath;
         }
-        // Fallbacks estáticos conhecidos
-        $candidatos[] = __DIR__ . '/../../public/assets/img/logo.png';
-        $candidatos[] = __DIR__ . '/../../public/assets/img/correiosLogoDeitado.png';
+
+        // Resolver arquivo físico e converter para data-URI (tenta variações de path)
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        $publicDir = realpath(__DIR__ . '/../../public') ?: (__DIR__ . '/../../public');
+        $variacoes = [$webPath];
+        // Também tenta sem o prefixo /public e com ele, para cobrir ambos os layouts de disco
+        $variacoes[] = preg_replace('#^/public#', '', $webPath);
+        $variacoes[] = '/public' . preg_replace('#^/public#', '', $webPath);
+
+        $candidatos = [];
+        foreach (array_unique($variacoes) as $p) {
+            $p = '/' . ltrim((string)$p, '/');
+            $pFs = str_replace('/', DIRECTORY_SEPARATOR, $p);
+            if ($docRoot !== '') { $candidatos[] = $docRoot . $pFs; }
+            // relativo ao diretório public (removendo eventual /public inicial para não duplicar)
+            $candidatos[] = $publicDir . str_replace('/', DIRECTORY_SEPARATOR, preg_replace('#^/public#', '', $p));
+        }
 
         foreach ($candidatos as $file) {
             $dataUri = $this->arquivoParaDataUri($file);
