@@ -642,6 +642,7 @@ class AdminConfiguracoesController extends Controller {
                                                 $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', $bannersKey, '[]');
                                                 $existingBanners = json_decode($existingBannersRaw, true);
                                                 if (!is_array($existingBanners)) $existingBanners = [];
+                                                $keepPos = 0;
                                                 foreach ($existingBanners as $idx => $item) {
                                                     $desktop = '';
                                                     $mobile = '';
@@ -661,6 +662,9 @@ class AdminConfiguracoesController extends Controller {
                                                     $mobileEsc = htmlspecialchars($mobile, ENT_QUOTES, 'UTF-8');
                                                     $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
 
+                                                    $idxEsc = $keepPos;
+                                                    $keepPos++;
+
                                                     echo '<div class="col-12 col-md-6">'
                                                         . '<div class="border rounded p-2 h-100">'
                                                         . '<div class="row g-2">'
@@ -669,21 +673,33 @@ class AdminConfiguracoesController extends Controller {
                                                         . '<div class="ratio ratio-16x9 mb-2">'
                                                         . ($desktopEsc !== '' ? '<img src="' . $desktopEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Desktop">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
                                                         . '</div>'
-                                                        . '<input type="hidden" name="layout_banners_keep_desktop[]" value="' . $desktopEsc . '">' 
+                                                        . '<input type="hidden" name="layout_banners_keep_desktop[]" value="' . $desktopEsc . '">'
+                                                        . '<input type="hidden" name="layout_banners_keep_idx[]" value="' . $idxEsc . '">'
+                                                        . '<div class="banner-replace-input mt-1" style="display:none;">'
+                                                        . '<label class="form-label small mb-1">Nova imagem Desktop</label>'
+                                                        . '<input type="file" class="form-control form-control-sm" name="layout_banners_replace_desktop[' . $idxEsc . ']" accept="image/*">'
+                                                        . '</div>'
                                                         . '</div>'
                                                         . '<div class="col-12 col-sm-6">'
                                                         . '<div class="small text-muted mb-1">Mobile (391x333)</div>'
                                                         . '<div class="ratio" style="--bs-aspect-ratio: 85.2%;">'
                                                         . ($mobileEsc !== '' ? '<img src="' . $mobileEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Mobile">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
                                                         . '</div>'
-                                                        . '<input type="hidden" name="layout_banners_keep_mobile[]" value="' . $mobileEsc . '">' 
+                                                        . '<input type="hidden" name="layout_banners_keep_mobile[]" value="' . $mobileEsc . '">'
+                                                        . '<div class="banner-replace-input mt-1" style="display:none;">'
+                                                        . '<label class="form-label small mb-1">Nova imagem Mobile</label>'
+                                                        . '<input type="file" class="form-control form-control-sm" name="layout_banners_replace_mobile[' . $idxEsc . ']" accept="image/*">'
+                                                        . '</div>'
                                                         . '</div>'
                                                         . '<div class="col-12">'
                                                         . '<label class="form-label small mb-1">Link (ao clicar)</label>'
                                                         . '<input type="url" class="form-control" name="layout_banners_keep_link[]" value="' . $linkEsc . '" placeholder="https://...">'
                                                         . '</div>'
                                                         . '</div>'
-                                                        . '<button type="button" class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="this.closest(\'.col-12\').remove();">Remover</button>'
+                                                        . '<div class="d-flex gap-2 mt-2">'
+                                                        . '<button type="button" class="btn btn-sm btn-outline-primary w-100 btn-trocar-banner"><i class="fas fa-image me-1"></i>Trocar imagem</button>'
+                                                        . '<button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="this.closest(\'.col-12\').remove();">Remover</button>'
+                                                        . '</div>'
                                                         . '</div>'
                                                         . '</div>';
                                                 }
@@ -752,6 +768,30 @@ class AdminConfiguracoesController extends Controller {
                                                         removeBtn.addEventListener("click", function() { box.remove(); });
                                                     }
                                                     list.appendChild(box);
+                                                });
+
+                                                document.querySelectorAll(".btn-trocar-banner").forEach(function(botao) {
+                                                    botao.addEventListener("click", function() {
+                                                        var card = botao.closest(".border");
+                                                        if (!card) return;
+                                                        var inputs = card.querySelectorAll(".banner-replace-input");
+                                                        var mostrar = false;
+                                                        inputs.forEach(function(el) {
+                                                            if (el.style.display === "none" || el.style.display === "") {
+                                                                mostrar = true;
+                                                            }
+                                                        });
+                                                        inputs.forEach(function(el) {
+                                                            el.style.display = mostrar ? "block" : "none";
+                                                            if (!mostrar) {
+                                                                var file = el.querySelector("input[type=file]");
+                                                                if (file) file.value = "";
+                                                            }
+                                                        });
+                                                        botao.innerHTML = mostrar
+                                                            ? \'<i class="fas fa-times me-1"></i>Cancelar troca\'
+                                                            : \'<i class="fas fa-image me-1"></i>Trocar imagem\';
+                                                    });
                                                 });
                                             });
                                             </script>
@@ -4500,18 +4540,25 @@ HTML;
                 $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
                 $keepMobile = $request->getParam('layout_banners_keep_mobile', []);
                 $keepLink = $request->getParam('layout_banners_keep_link', []);
+                $keepIdx = $request->getParam('layout_banners_keep_idx', []);
                 if (!is_array($keepDesktop)) $keepDesktop = [];
                 if (!is_array($keepMobile)) $keepMobile = [];
                 if (!is_array($keepLink)) $keepLink = [];
+                if (!is_array($keepIdx)) $keepIdx = [];
 
                 $maxKeep = max(count($keepDesktop), count($keepMobile), count($keepLink));
                 $keptItems = [];
+                // Mapeia o índice original do formulário (usado nos inputs de "Trocar imagem")
+                // para a posição do item em $keptItems.
+                $keptOrigIdx = [];
                 for ($i = 0; $i < $maxKeep; $i++) {
                     $d = isset($keepDesktop[$i]) && is_string($keepDesktop[$i]) ? trim((string) $keepDesktop[$i]) : '';
                     $m = isset($keepMobile[$i]) && is_string($keepMobile[$i]) ? trim((string) $keepMobile[$i]) : '';
                     $l = isset($keepLink[$i]) && is_string($keepLink[$i]) ? trim((string) $keepLink[$i]) : '';
                     if ($d === '' && $m === '') continue;
                     $keptItems[] = ['desktop' => $d, 'mobile' => $m, 'link' => $l];
+                    $origIdx = isset($keepIdx[$i]) && is_numeric($keepIdx[$i]) ? (int) $keepIdx[$i] : $i;
+                    $keptOrigIdx[count($keptItems) - 1] = $origIdx;
                 }
 
                 $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
@@ -4532,6 +4579,45 @@ HTML;
 
                 $webDir = '/uploads/banners/';
                 $newItems = [];
+
+                // Substituição de imagens de banners existentes ("Trocar imagem")
+                $allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+                if ($uploadDir !== '') {
+                    foreach ($keptItems as $pos => &$kept) {
+                        $origIdx = $keptOrigIdx[$pos] ?? $pos;
+                        // Desktop
+                        if (isset($_FILES['layout_banners_replace_desktop']['tmp_name'][$origIdx])) {
+                            $rName = (string) ($_FILES['layout_banners_replace_desktop']['name'][$origIdx] ?? '');
+                            $rTmp = (string) ($_FILES['layout_banners_replace_desktop']['tmp_name'][$origIdx] ?? '');
+                            $rErr = (int) ($_FILES['layout_banners_replace_desktop']['error'][$origIdx] ?? UPLOAD_ERR_NO_FILE);
+                            if ($rErr === UPLOAD_ERR_OK && $rTmp !== '' && $rName !== '') {
+                                $ext = strtolower(pathinfo($rName, PATHINFO_EXTENSION));
+                                if (in_array($ext, $allowedExt, true)) {
+                                    $fileName = 'banner_desktop_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                    if (@move_uploaded_file($rTmp, $uploadDir . $fileName)) {
+                                        $kept['desktop'] = $webDir . $fileName;
+                                    }
+                                }
+                            }
+                        }
+                        // Mobile
+                        if (isset($_FILES['layout_banners_replace_mobile']['tmp_name'][$origIdx])) {
+                            $rName = (string) ($_FILES['layout_banners_replace_mobile']['name'][$origIdx] ?? '');
+                            $rTmp = (string) ($_FILES['layout_banners_replace_mobile']['tmp_name'][$origIdx] ?? '');
+                            $rErr = (int) ($_FILES['layout_banners_replace_mobile']['error'][$origIdx] ?? UPLOAD_ERR_NO_FILE);
+                            if ($rErr === UPLOAD_ERR_OK && $rTmp !== '' && $rName !== '') {
+                                $ext = strtolower(pathinfo($rName, PATHINFO_EXTENSION));
+                                if (in_array($ext, $allowedExt, true)) {
+                                    $fileName = 'banner_mobile_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                    if (@move_uploaded_file($rTmp, $uploadDir . $fileName)) {
+                                        $kept['mobile'] = $webDir . $fileName;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    unset($kept);
+                }
 
                 $namesDesktop = (isset($_FILES['layout_banners_desktop']['name']) && is_array($_FILES['layout_banners_desktop']['name'])) ? $_FILES['layout_banners_desktop']['name'] : [];
                 $namesMobile  = (isset($_FILES['layout_banners_mobile']['name']) && is_array($_FILES['layout_banners_mobile']['name'])) ? $_FILES['layout_banners_mobile']['name'] : [];
