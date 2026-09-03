@@ -1086,12 +1086,42 @@ class AdminRedirecionamentoController extends Controller {
         if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
         $db = $this->pdo();
         $db->prepare("UPDATE redirecionamento_envios_sede SET status='recebido' WHERE id=?")->execute([$id]);
-        // Atualizar status do envio principal para 'coletado' (pacote em mãos)
-        $st = $db->prepare("SELECT envio_id FROM redirecionamento_envios_sede WHERE id=? LIMIT 1"); $st->execute([$id]);
+
+        // Buscar dados para atualizar o envio e notificar o redirecionador
+        $st = $db->prepare("SELECT s.envio_id, r.nome AS red_nome, r.email AS red_email, e.id_pedido_cliente
+            FROM redirecionamento_envios_sede s
+            LEFT JOIN redirecionadores r ON r.id = s.redirecionador_id
+            LEFT JOIN redirecionamento_envios e ON e.id = s.envio_id
+            WHERE s.id = ? LIMIT 1");
+        $st->execute([$id]);
         $row = $st->fetch(\PDO::FETCH_ASSOC);
+
         if ($row) {
-            $db->prepare("UPDATE redirecionamento_envios SET status='coletado' WHERE id=?")->execute([$row['envio_id']]);
+            // Atualizar status do envio principal para 'coletado' (pacote em mãos)
+            $db->prepare("UPDATE redirecionamento_envios SET status='coletado' WHERE id=?")->execute([(int)$row['envio_id']]);
+
+            // Notificar o redirecionador de que o pacote chegou na sede
+            $email = trim((string)($row['red_email'] ?? ''));
+            if ($email !== '') {
+                $envioId  = (int)$row['envio_id'];
+                $pedido   = (string)($row['id_pedido_cliente'] ?? '—');
+                $redNome  = (string)($row['red_nome'] ?? '');
+                $assunto  = "✅ Pacote recebido na sede - Envio #{$envioId}";
+                $corpo = '<table style="width:100%;border-collapse:collapse;margin:8px 0">
+                    <tr><td style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px">
+                        <strong style="color:#166534">✅ Recebemos o seu pacote na nossa sede</strong>
+                    </td></tr>
+                </table>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Redirecionador</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($redNome, ENT_QUOTES, 'UTF-8') . '</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#' . $envioId . '</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">ID do pedido</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($pedido, ENT_QUOTES, 'UTF-8') . '</td></tr>
+                </table>
+                <p style="color:#6b7280;font-size:13px;margin-top:16px">Seu pacote foi recebido e seguirá para conferência e envio internacional. Acompanhe o andamento pelo painel.</p>';
+                $this->enviarEmailNotificacao($email, $assunto, $corpo);
+            }
         }
+
         $this->json(['ok'=>true]);
     }
 

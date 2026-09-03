@@ -53,10 +53,10 @@ $tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
         <div class="row g-4">
             <?php
             $passos = [
-                ['icon' => 'fa-user-plus',       'titulo' => '1. Cadastre seus clientes',   'desc' => 'No painel, cadastre o destinatário final com CPF, endereço no Brasil e contato. É rápido e o CEP preenche o endereço automaticamente.'],
+                ['icon' => 'fa-user-plus',       'titulo' => '1. Cadastre seus clientes',   'desc' => 'No painel, cadastre o destinatário final com nome, CPF, data de nascimento (18+), endereço no Brasil e contato. O CEP preenche o endereço automaticamente.'],
                 ['icon' => 'fa-box',             'titulo' => '2. Crie o envio',              'desc' => 'Informe peso, dimensões e os produtos (com NCM). O sistema calcula o valor pela tabela de pesos e preços.'],
                 ['icon' => 'fa-credit-card',     'titulo' => '3. Pague pelo sistema',        'desc' => 'Pague o envio direto no painel via cartão. Se preferir, anexe o comprovante de pagamento para conferência.'],
-                ['icon' => 'fa-tag',             'titulo' => '4. Gere a etiqueta',           'desc' => 'Após o pagamento confirmado, a etiqueta é gerada com o código de rastreio. Imprima e cole na caixa.'],
+                ['icon' => 'fa-tag',             'titulo' => '4. Gere a etiqueta',           'desc' => 'Depois de pagar, o sistema libera a geração. Você mesmo gera a etiqueta com o código de rastreio, imprime e cola na caixa.'],
                 ['icon' => 'fa-truck-ramp-box',  'titulo' => '5. Coleta ou envio',           'desc' => 'Agende uma coleta na sua porta ou, se preferir, envie o pacote você mesmo para o nosso ponto de recebimento.'],
                 ['icon' => 'fa-weight-hanging',  'titulo' => '6. Conferência',               'desc' => 'Conferimos peso e dimensões reais. Se houver diferença em relação ao informado, cobramos ou reembolsamos.'],
                 ['icon' => 'fa-plane',           'titulo' => '7. Envio internacional',       'desc' => 'Despachamos o pacote ao Brasil com todo o processo aduaneiro cuidado pela nossa equipe.'],
@@ -160,7 +160,7 @@ $tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
                     </div>
                     <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
                         <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">Como o preço é calculado?</button></h2>
-                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Pela faixa de peso do pacote, conforme a tabela acima (em dólar). Depois da conferência do peso real, se houver diferença, cobramos ou reembolsamos automaticamente.</div></div>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Pela faixa de peso do pacote, conforme a tabela acima (em dólar). O peso máximo é de 30 kg por pacote. Depois da conferência do peso real, se houver diferença, cobramos ou reembolsamos automaticamente.</div></div>
                     </div>
                     <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
                         <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">Como pago pelos envios?</button></h2>
@@ -168,7 +168,31 @@ $tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
                     </div>
                     <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
                         <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">O pacote tem rastreio?</button></h2>
-                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Sim. Após o pagamento, a etiqueta é gerada com código de rastreio e o destinatário acompanha a entrega até receber em casa.</div></div>
+                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Sim. Depois de pagar, o sistema libera a geração da etiqueta e você mesmo a gera pelo painel, já com o código de rastreio. O destinatário acompanha a entrega até receber em casa.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">O que é o NCM?</button></h2>
+                        <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">NCM (Nomenclatura Comum do Mercosul) é o código que classifica o produto para a alfândega. É obrigatório para gerar a etiqueta. No painel, basta começar a digitar o nome ou o código do produto e o sistema sugere o NCM automaticamente.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">Como funcionam as divergências de peso?</button></h2>
+                        <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Depois que o pacote chega até nós, conferimos o peso e as dimensões reais. Se o peso real for maior que o informado, você recebe um aviso com a diferença a pagar; se for menor, o excedente é reembolsado. Dica: use uma balança precisa para evitar cobranças extras.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq7">Posso enviar qualquer produto?</button></h2>
+                        <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Não. Produtos proibidos pela alfândega brasileira (armas, drogas, medicamentos controlados, entre outros) não podem ser enviados.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq8">Quanto tempo demora a entrega?</button></h2>
+                        <div id="faq8" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">O prazo varia de 15 a 45 dias úteis, dependendo da liberação aduaneira.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq9">O destinatário paga impostos?</button></h2>
+                        <div id="faq9" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Sim, a Receita Federal pode cobrar impostos de importação. O valor depende do tipo de produto e do valor declarado.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq10">Posso cancelar um envio?</button></h2>
+                        <div id="faq10" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Antes da coleta ou do envio à nossa sede, fale com o suporte. Depois que o pacote já está com a gente, não é possível cancelar.</div></div>
                     </div>
                 </div>
             </div>
