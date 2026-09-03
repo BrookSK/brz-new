@@ -1,13 +1,13 @@
-<?php $title = 'Log de Emails - Admin'; ?>
+<?php $title = __('admin.email_logs.page_title', 'Log de Emails - Admin'); ?>
 <?php ob_start(); ?>
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="page-title">Log de Emails</h1>
+        <h1 class="page-title"><?= __('admin.email_logs.title', 'Log de Emails') ?></h1>
         <div class="d-flex gap-2">
-            <span class="badge bg-primary fs-6"><?= (int) ($stats['total'] ?? 0) ?> total</span>
-            <span class="badge bg-success fs-6"><?= (int) ($stats['enviados'] ?? 0) ?> enviados</span>
-            <span class="badge bg-danger fs-6"><?= (int) ($stats['erros'] ?? 0) ?> erros</span>
+            <span class="badge bg-primary fs-6"><?= (int) ($stats['total'] ?? 0) ?> <?= __('admin.email_logs.total', 'total') ?></span>
+            <span class="badge bg-success fs-6"><?= (int) ($stats['enviados'] ?? 0) ?> <?= __('admin.email_logs.sent', 'enviados') ?></span>
+            <span class="badge bg-danger fs-6"><?= (int) ($stats['erros'] ?? 0) ?> <?= __('admin.email_logs.errors', 'erros') ?></span>
         </div>
     </div>
 
@@ -16,36 +16,36 @@
         <div class="card-body">
             <form method="GET" action="/admin/emails" class="row g-2 align-items-end">
                 <div class="col-md-2">
-                    <label class="form-label small">Tipo</label>
+                    <label class="form-label small"><?= __('admin.email_logs.type', 'Tipo') ?></label>
                     <select name="tipo" class="form-select form-select-sm">
-                        <option value="">Todos</option>
+                        <option value=""><?= __('admin.email_logs.all', 'Todos') ?></option>
                         <?php foreach ($tipos as $t): ?>
                         <option value="<?= htmlspecialchars($t) ?>" <?= $filtros['filtroTipo'] === $t ? 'selected' : '' ?>><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $t))) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small">Status</label>
+                    <label class="form-label small"><?= __('admin.email_logs.status', 'Status') ?></label>
                     <select name="status" class="form-select form-select-sm">
-                        <option value="">Todos</option>
-                        <option value="enviado" <?= $filtros['filtroStatus'] === 'enviado' ? 'selected' : '' ?>>Enviado</option>
-                        <option value="erro" <?= $filtros['filtroStatus'] === 'erro' ? 'selected' : '' ?>>Erro</option>
+                        <option value=""><?= __('admin.email_logs.all', 'Todos') ?></option>
+                        <option value="enviado" <?= $filtros['filtroStatus'] === 'enviado' ? 'selected' : '' ?>><?= __('admin.email_logs.status_sent', 'Enviado') ?></option>
+                        <option value="erro" <?= $filtros['filtroStatus'] === 'erro' ? 'selected' : '' ?>><?= __('admin.email_logs.status_error', 'Erro') ?></option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small">Data início</label>
+                    <label class="form-label small"><?= __('admin.email_logs.date_start', 'Data início') ?></label>
                     <input type="date" name="data_inicio" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['filtroDataInicio']) ?>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small">Data fim</label>
+                    <label class="form-label small"><?= __('admin.email_logs.date_end', 'Data fim') ?></label>
                     <input type="date" name="data_fim" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['filtroDataFim']) ?>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small">Buscar (email/assunto)</label>
-                    <input type="text" name="busca" class="form-control form-control-sm" placeholder="Email ou assunto..." value="<?= htmlspecialchars($filtros['filtroBusca']) ?>">
+                    <label class="form-label small"><?= __('admin.email_logs.search_label', 'Buscar (email/assunto)') ?></label>
+                    <input type="text" name="busca" class="form-control form-control-sm" placeholder="<?= htmlspecialchars(__('admin.email_logs.search_placeholder', 'Email ou assunto...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($filtros['filtroBusca']) ?>">
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-search me-1"></i>Filtrar</button>
+                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-search me-1"></i><?= __('admin.email_logs.filter', 'Filtrar') ?></button>
                 </div>
             </form>
         </div>
@@ -58,18 +58,18 @@
                 <table class="table table-sm table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Data</th>
-                            <th>Tipo</th>
-                            <th>Destinatário</th>
-                            <th>Assunto</th>
-                            <th>Status</th>
-                            <th>Erro</th>
-                            <th>Ref.</th>
+                            <th><?= __('admin.email_logs.th_date', 'Data') ?></th>
+                            <th><?= __('admin.email_logs.th_type', 'Tipo') ?></th>
+                            <th><?= __('admin.email_logs.th_recipient', 'Destinatário') ?></th>
+                            <th><?= __('admin.email_logs.th_subject', 'Assunto') ?></th>
+                            <th><?= __('admin.email_logs.th_status', 'Status') ?></th>
+                            <th><?= __('admin.email_logs.th_error', 'Erro') ?></th>
+                            <th><?= __('admin.email_logs.th_ref', 'Ref.') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($logs)): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-4">Nenhum email encontrado.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4"><?= __('admin.email_logs.empty', 'Nenhum email encontrado.') ?></td></tr>
                         <?php else: ?>
                         <?php foreach ($logs as $log): ?>
                         <tr>
@@ -84,7 +84,7 @@
                             <td class="small"><?= htmlspecialchars($log['assunto']) ?></td>
                             <td>
                                 <span class="badge bg-<?= $log['status'] === 'enviado' ? 'success' : 'danger' ?>">
-                                    <?= $log['status'] === 'enviado' ? '✓ Enviado' : '✗ Erro' ?>
+                                    <?= $log['status'] === 'enviado' ? '✓ ' . __('admin.email_logs.status_sent', 'Enviado') : '✗ ' . __('admin.email_logs.status_error', 'Erro') ?>
                                 </span>
                             </td>
                             <td class="small text-danger">
@@ -94,9 +94,9 @@
                             </td>
                             <td class="small text-nowrap">
                                 <?php if (!empty($log['carne_id'])): ?>
-                                <a href="/admin/carnes/detalhes/<?= (int) $log['carne_id'] ?>" class="text-decoration-none">Carnê #<?= (int) $log['carne_id'] ?></a>
+                                <a href="/admin/carnes/detalhes/<?= (int) $log['carne_id'] ?>" class="text-decoration-none"><?= __('admin.email_logs.installment_ref', 'Carnê') ?> #<?= (int) $log['carne_id'] ?></a>
                                 <?php elseif (!empty($log['pedido_id'])): ?>
-                                <a href="/admin/pedidos/detalhes/<?= (int) $log['pedido_id'] ?>" class="text-decoration-none">Pedido #<?= (int) $log['pedido_id'] ?></a>
+                                <a href="/admin/pedidos/detalhes/<?= (int) $log['pedido_id'] ?>" class="text-decoration-none"><?= __('admin.email_logs.order_ref', 'Pedido') ?> #<?= (int) $log['pedido_id'] ?></a>
                                 <?php endif; ?>
                             </td>
                         </tr>

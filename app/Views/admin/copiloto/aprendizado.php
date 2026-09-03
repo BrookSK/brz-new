@@ -2,11 +2,11 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="page-title">Aprendizado da IA</h1>
-            <p class="page-subtitle">Pendências geradas automaticamente a partir de interações do copiloto</p>
+            <h1 class="page-title"><?= __('admin.copilot_learning.title', 'Aprendizado da IA') ?></h1>
+            <p class="page-subtitle"><?= __('admin.copilot_learning.subtitle', 'Pendências geradas automaticamente a partir de interações do copiloto') ?></p>
         </div>
         <a href="/admin/copiloto" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-arrow-left me-1"></i>Voltar
+            <i class="fas fa-arrow-left me-1"></i><?= __('common.back', 'Voltar') ?>
         </a>
     </div>
 
@@ -22,10 +22,10 @@
             <div class="d-flex gap-2 mb-4">
                 <?php
                 $filtros = [
-                    'pendente' => ['label' => 'Pendentes', 'badge' => $contadores['pendente'] ?? 0, 'color' => 'warning'],
-                    'aceita' => ['label' => 'Aceitas', 'badge' => $contadores['aceita'] ?? 0, 'color' => 'success'],
-                    'recusada' => ['label' => 'Recusadas', 'badge' => $contadores['recusada'] ?? 0, 'color' => 'danger'],
-                    'todos' => ['label' => 'Todos', 'badge' => array_sum($contadores), 'color' => 'secondary'],
+                    'pendente' => ['label' => __('admin.copilot_learning.filter_pending', 'Pendentes'), 'badge' => $contadores['pendente'] ?? 0, 'color' => 'warning'],
+                    'aceita' => ['label' => __('admin.copilot_learning.filter_accepted', 'Aceitas'), 'badge' => $contadores['aceita'] ?? 0, 'color' => 'success'],
+                    'recusada' => ['label' => __('admin.copilot_learning.filter_refused', 'Recusadas'), 'badge' => $contadores['recusada'] ?? 0, 'color' => 'danger'],
+                    'todos' => ['label' => __('admin.copilot_learning.filter_all', 'Todos'), 'badge' => array_sum($contadores), 'color' => 'secondary'],
                 ];
                 foreach ($filtros as $key => $f):
                     $active = ($status ?? 'pendente') === $key ? 'btn-primary' : 'btn-outline-secondary';
@@ -41,7 +41,7 @@
             <?php if (empty($pendencias)): ?>
                 <div class="card p-5 text-center text-muted">
                     <i class="fas fa-check-circle fa-3x mb-3"></i>
-                    <p>Nenhuma pendência encontrada neste filtro.</p>
+                    <p><?= __('admin.copilot_learning.empty', 'Nenhuma pendência encontrada neste filtro.') ?></p>
                 </div>
             <?php else: ?>
                 <?php foreach ($pendencias as $p): ?>
@@ -53,15 +53,15 @@
                                     $tipos = json_decode($p['tipos'] ?? '[]', true) ?: [];
                                     foreach ($tipos as $tipo):
                                         $cor = $tipo === 'lacuna_documento' ? 'info' : 'warning';
-                                        $label = $tipo === 'lacuna_documento' ? 'Lacuna de Documento' : 'Falha de Processo';
+                                        $label = $tipo === 'lacuna_documento' ? __('admin.copilot_learning.type_doc_gap', 'Lacuna de Documento') : __('admin.copilot_learning.type_process_fail', 'Falha de Processo');
                                     ?>
                                         <span class="badge bg-<?= $cor ?> me-1"><?= $label ?></span>
                                     <?php endforeach; ?>
                                     <span class="badge bg-<?= $p['impacto_estimado'] === 'alto' ? 'danger' : ($p['impacto_estimado'] === 'medio' ? 'warning' : 'secondary') ?>">
-                                        <?= ucfirst($p['impacto_estimado']) ?> impacto
+                                        <?= ucfirst($p['impacto_estimado']) ?> <?= __('admin.copilot_learning.impact', 'impacto') ?>
                                     </span>
                                     <?php if ($p['frequencia'] > 1): ?>
-                                        <span class="badge bg-dark"><?= $p['frequencia'] ?>× relatado</span>
+                                        <span class="badge bg-dark"><?= $p['frequencia'] ?>× <?= __('admin.copilot_learning.reported', 'relatado') ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <small class="text-muted"><?= date('d/m/Y H:i', strtotime($p['criado_em'])) ?></small>
@@ -71,24 +71,24 @@
 
                             <?php if (!empty($p['mensagem_usuario'])): ?>
                                 <div class="bg-light p-2 rounded mb-2">
-                                    <small class="text-muted">Cliente disse:</small><br>
+                                    <small class="text-muted"><?= __('admin.copilot_learning.customer_said', 'Cliente disse:') ?></small><br>
                                     <em>"<?= htmlspecialchars(mb_substr($p['mensagem_usuario'], 0, 300)) ?>"</em>
                                 </div>
                             <?php endif; ?>
 
                             <?php if (!empty($p['texto_sugerido'])): ?>
                                 <div class="border-start border-3 border-info ps-3 mb-2">
-                                    <small class="text-muted">Sugestão para <?= htmlspecialchars($p['documento_afetado'] ?? 'documento') ?>:</small>
+                                    <small class="text-muted"><?= __('admin.copilot_learning.suggestion_for', 'Sugestão para') ?> <?= htmlspecialchars($p['documento_afetado'] ?? __('admin.copilot_learning.document', 'documento')) ?>:</small>
                                     <p class="mb-1"><?= nl2br(htmlspecialchars($p['texto_sugerido'])) ?></p>
                                     <?php if (!empty($p['justificativa'])): ?>
-                                        <small class="text-muted"><strong>Justificativa:</strong> <?= htmlspecialchars($p['justificativa']) ?></small>
+                                        <small class="text-muted"><strong><?= __('admin.copilot_learning.justification', 'Justificativa:') ?></strong> <?= htmlspecialchars($p['justificativa']) ?></small>
                                     <?php endif; ?>
                                 </div>
                             <?php endif; ?>
 
                             <?php if (!empty($p['sugestao_melhoria'])): ?>
                                 <div class="border-start border-3 border-warning ps-3 mb-2">
-                                    <small class="text-muted">Sugestão de processo (<?= htmlspecialchars($p['area_responsavel'] ?? '') ?>):</small>
+                                    <small class="text-muted"><?= __('admin.copilot_learning.process_suggestion', 'Sugestão de processo') ?> (<?= htmlspecialchars($p['area_responsavel'] ?? '') ?>):</small>
                                     <p class="mb-1"><?= nl2br(htmlspecialchars($p['sugestao_melhoria'])) ?></p>
                                 </div>
                             <?php endif; ?>
@@ -96,10 +96,10 @@
                             <?php if ($p['status'] === 'pendente'): ?>
                                 <div class="d-flex gap-2 mt-3">
                                     <form method="POST" action="/admin/copiloto/aprendizado/aceitar/<?= $p['id'] ?>" class="d-inline">
-                                        <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Aceitar</button>
+                                        <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i><?= __('admin.copilot_learning.accept', 'Aceitar') ?></button>
                                     </form>
                                     <form method="POST" action="/admin/copiloto/aprendizado/recusar/<?= $p['id'] ?>" class="d-inline">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i>Recusar</button>
+                                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i><?= __('admin.copilot_learning.refuse', 'Recusar') ?></button>
                                     </form>
                                 </div>
                             <?php else: ?>

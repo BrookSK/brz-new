@@ -204,7 +204,7 @@ Pode mandar sua dúvida ou o que você procura! 💚';
                             <div id="qrcode-container" class="mb-3 d-inline-block p-3 bg-white rounded shadow-sm"></div>
                             <div class="d-flex gap-2 justify-content-center">
                                 <button type="button" class="btn btn-primary btn-sm" onclick="downloadQRCode()">
-                                    <i class="fas fa-download me-1"></i>Baixar PNG
+                                    <i class="fas fa-download me-1"></i><?= __('admin.copilot.download_png', 'Baixar PNG') ?>
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyQRUrl()">
                                     <i class="fas fa-link me-1"></i>Copiar Link
@@ -215,9 +215,9 @@ Pode mandar sua dúvida ou o que você procura! 💚';
                             </div>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label"><strong>Mensagem de boas-vindas (QR Code)</strong></label>
-                            <textarea class="form-control" name="copiloto_qrcode_mensagem" rows="10" placeholder="Mensagem que a Bri envia quando o visitante vem pelo QR Code..."><?= htmlspecialchars($msgBoasVindas) ?></textarea>
-                            <small class="text-muted mt-1 d-block">Esta mensagem aparece automaticamente quando alguém escaneia o QR Code. Use **negrito** e emojis à vontade.</small>
+                            <label class="form-label"><strong><?= __('admin.copilot.qr_welcome_label', 'Mensagem de boas-vindas (QR Code)') ?></strong></label>
+                            <textarea class="form-control" name="copiloto_qrcode_mensagem" rows="10" placeholder="<?= htmlspecialchars(__('admin.copilot.qr_welcome_placeholder', 'Mensagem que a Bri envia quando o visitante vem pelo QR Code...'), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($msgBoasVindas) ?></textarea>
+                            <small class="text-muted mt-1 d-block"><?= __('admin.copilot.qr_welcome_help', 'Esta mensagem aparece automaticamente quando alguém escaneia o QR Code. Use **negrito** e emojis à vontade.') ?></small>
                         </div>
                     </div>
                 </div>

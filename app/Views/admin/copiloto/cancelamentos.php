@@ -2,11 +2,11 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="page-title">Cancelamentos via Co-Piloto</h1>
-            <p class="page-subtitle">Solicitações de cancelamento feitas pelo copiloto</p>
+            <h1 class="page-title"><?= __('admin.copilot_cancel.title', 'Cancelamentos via Co-Piloto') ?></h1>
+            <p class="page-subtitle"><?= __('admin.copilot_cancel.subtitle', 'Solicitações de cancelamento feitas pelo copiloto') ?></p>
         </div>
         <a href="/admin/copiloto" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-arrow-left me-1"></i>Voltar
+            <i class="fas fa-arrow-left me-1"></i><?= __('common.back', 'Voltar') ?>
         </a>
     </div>
 
@@ -22,11 +22,11 @@
             <div class="d-flex gap-2 mb-4">
                 <?php
                 $filtros = [
-                    'aguardando_revisao' => ['label' => 'Aguardando', 'color' => 'warning'],
-                    'autorizado' => ['label' => 'Autorizados', 'color' => 'success'],
-                    'recusado' => ['label' => 'Recusados', 'color' => 'danger'],
-                    'processado' => ['label' => 'Processados', 'color' => 'info'],
-                    'todos' => ['label' => 'Todos', 'color' => 'secondary'],
+                    'aguardando_revisao' => ['label' => __('admin.copilot_cancel.filter_awaiting', 'Aguardando'), 'color' => 'warning'],
+                    'autorizado' => ['label' => __('admin.copilot_cancel.filter_authorized', 'Autorizados'), 'color' => 'success'],
+                    'recusado' => ['label' => __('admin.copilot_cancel.filter_refused', 'Recusados'), 'color' => 'danger'],
+                    'processado' => ['label' => __('admin.copilot_cancel.filter_processed', 'Processados'), 'color' => 'info'],
+                    'todos' => ['label' => __('admin.copilot_cancel.filter_all', 'Todos'), 'color' => 'secondary'],
                 ];
                 foreach ($filtros as $key => $f):
                     $active = ($status ?? 'aguardando_revisao') === $key ? 'btn-primary' : 'btn-outline-secondary';
@@ -41,7 +41,7 @@
             <?php if (empty($cancelamentos)): ?>
                 <div class="card p-5 text-center text-muted">
                     <i class="fas fa-check-circle fa-3x mb-3"></i>
-                    <p>Nenhum cancelamento neste filtro.</p>
+                    <p><?= __('admin.copilot_cancel.empty', 'Nenhum cancelamento neste filtro.') ?></p>
                 </div>
             <?php else: ?>
                 <?php foreach ($cancelamentos as $c): ?>
@@ -49,7 +49,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
-                                    <strong>Pedido: #<?= htmlspecialchars($c['numero_pedido']) ?></strong>
+                                    <strong><?= __('admin.copilot_cancel.order', 'Pedido') ?>: #<?= htmlspecialchars($c['numero_pedido']) ?></strong>
                                     <span class="badge bg-<?= $c['status'] === 'aguardando_revisao' ? 'warning' : ($c['status'] === 'autorizado' ? 'success' : ($c['status'] === 'recusado' ? 'danger' : 'info')) ?> ms-2">
                                         <?= ucfirst(str_replace('_', ' ', $c['status'])) ?>
                                     </span>
@@ -62,22 +62,22 @@
 
                             <div class="row g-3 mb-3">
                                 <div class="col-md-3">
-                                    <small class="text-muted d-block">Valor pago</small>
+                                    <small class="text-muted d-block"><?= __('admin.copilot_cancel.amount_paid', 'Valor pago') ?></small>
                                     <strong>US$ <?= number_format($c['valor_pago_usd'], 2) ?></strong>
                                 </div>
                                 <div class="col-md-3">
-                                    <small class="text-muted d-block">Taxa cancelamento</small>
+                                    <small class="text-muted d-block"><?= __('admin.copilot_cancel.cancellation_fee', 'Taxa cancelamento') ?></small>
                                     <strong class="text-danger">US$ <?= number_format($c['taxa_cancelamento_usd'], 2) ?></strong>
                                 </div>
                                 <div class="col-md-3">
-                                    <small class="text-muted d-block">Reembolso</small>
+                                    <small class="text-muted d-block"><?= __('admin.copilot_cancel.refund', 'Reembolso') ?></small>
                                     <strong class="text-success">US$ <?= number_format($c['valor_reembolso_usd'], 2) ?></strong>
                                     <?php if (!empty($c['valor_reembolso_brl'])): ?>
                                         <br><small class="text-muted">≈ R$ <?= number_format($c['valor_reembolso_brl'], 2, ',', '.') ?></small>
                                     <?php endif; ?>
                                 </div>
                                 <div class="col-md-3">
-                                    <small class="text-muted d-block">Método</small>
+                                    <small class="text-muted d-block"><?= __('admin.copilot_cancel.method', 'Método') ?></small>
                                     <strong><?= htmlspecialchars($c['metodo_reembolso'] ?? '—') ?></strong>
                                 </div>
                             </div>
@@ -86,14 +86,14 @@
                                 <div class="d-flex gap-2">
                                     <form method="POST" action="/admin/copiloto/cancelamentos/autorizar/<?= $c['id'] ?>">
                                         <button type="submit" class="btn btn-success btn-sm"
-                                            onclick="return confirm('Autorizar cancelamento e processar reembolso de US$ <?= number_format($c['valor_reembolso_usd'], 2) ?>?')">
-                                            <i class="fas fa-check me-1"></i>Autorizar e processar reembolso
+                                            onclick="return confirm('<?= htmlspecialchars(__('admin.copilot_cancel.confirm_authorize', 'Autorizar cancelamento e processar reembolso de US$ {amount}?', ['amount' => number_format($c['valor_reembolso_usd'], 2)]), ENT_QUOTES, 'UTF-8') ?>')">
+                                            <i class="fas fa-check me-1"></i><?= __('admin.copilot_cancel.authorize_process', 'Autorizar e processar reembolso') ?>
                                         </button>
                                     </form>
                                     <form method="POST" action="/admin/copiloto/cancelamentos/recusar/<?= $c['id'] ?>">
-                                        <input type="text" name="motivo" placeholder="Motivo (opcional)" class="form-control form-control-sm d-inline-block" style="width:250px">
+                                        <input type="text" name="motivo" placeholder="<?= htmlspecialchars(__('admin.copilot_cancel.reason_placeholder', 'Motivo (opcional)'), ENT_QUOTES, 'UTF-8') ?>" class="form-control form-control-sm d-inline-block" style="width:250px">
                                         <button type="submit" class="btn btn-outline-danger btn-sm">
-                                            <i class="fas fa-times me-1"></i>Recusar
+                                            <i class="fas fa-times me-1"></i><?= __('admin.copilot_cancel.refuse', 'Recusar') ?>
                                         </button>
                                     </form>
                                 </div>
@@ -101,7 +101,7 @@
 
                             <?php if (!empty($c['motivo_recusa'])): ?>
                                 <div class="alert alert-danger mt-2 mb-0 py-1 px-2">
-                                    <small><strong>Motivo da recusa:</strong> <?= htmlspecialchars($c['motivo_recusa']) ?></small>
+                                    <small><strong><?= __('admin.copilot_cancel.refusal_reason', 'Motivo da recusa:') ?></strong> <?= htmlspecialchars($c['motivo_recusa']) ?></small>
                                 </div>
                             <?php endif; ?>
                         </div>
