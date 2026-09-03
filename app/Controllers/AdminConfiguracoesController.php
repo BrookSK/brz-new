@@ -4561,22 +4561,35 @@ HTML;
                     $keptOrigIdx[count($keptItems) - 1] = $origIdx;
                 }
 
-                $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
-                $candidates = [
-                    $docRoot . '/public/uploads/banners/',
-                    $docRoot . '/uploads/banners/',
+                // Resolve o diretorio fisico dos banners de forma robusta.
+                // A URL publica sempre e /uploads/banners/ (o .htaccess da raiz
+                // reescreve /uploads/ -> public/uploads/). Fisicamente o arquivo
+                // deve ir para <raiz>/public/uploads/banners/.
+                // dirname(__DIR__, 2) = raiz do projeto (este controller esta em app/Controllers).
+                $projectRoot = rtrim(str_replace('\\', '/', dirname(__DIR__, 2)), '/');
+                $candidateDirs = [
+                    $projectRoot . '/public/uploads/banners/',
                 ];
+                // Fallback baseado em DOCUMENT_ROOT (caso a estrutura difira em algum ambiente)
+                $docRoot = rtrim(str_replace('\\', '/', (string) ($_SERVER['DOCUMENT_ROOT'] ?? '')), '/');
+                if ($docRoot !== '') {
+                    $candidateDirs[] = $docRoot . '/public/uploads/banners/';
+                    $candidateDirs[] = $docRoot . '/uploads/banners/';
+                }
+
                 $uploadDir = '';
-                foreach ($candidates as $dir) {
+                foreach ($candidateDirs as $dir) {
                     if (!is_dir($dir)) {
                         @mkdir($dir, 0755, true);
                     }
                     if (is_dir($dir) && is_writable($dir)) {
-                        $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                        $uploadDir = rtrim($dir, '/') . '/';
                         break;
                     }
                 }
 
+                // A URL publica e sempre /uploads/banners/ independentemente de onde
+                // o arquivo foi gravado fisicamente (public/ nao aparece na URL).
                 $webDir = '/uploads/banners/';
                 $newItems = [];
 
@@ -4671,7 +4684,24 @@ HTML;
 
                 // DEBUG TEMPORARIO: diagnostico do "Trocar imagem" dos banners
                 try {
+                    // Verifica se os arquivos referenciados no resultado final existem fisicamente
+                    $physCheck = [];
+                    foreach ($final as $bi => $b) {
+                        foreach (['desktop', 'mobile'] as $k) {
+                            $p = is_array($b) ? (string) ($b[$k] ?? '') : '';
+                            if ($p === '') continue;
+                            // Converte URL /uploads/banners/x para caminho fisico public/uploads/banners/x
+                            $rel = ltrim($p, '/');
+                            $physCheck[$bi . '_' . $k] = [
+                                'url' => $p,
+                                'phys_public' => file_exists($projectRoot . '/public/' . $rel),
+                                'phys_root' => file_exists($projectRoot . '/' . $rel),
+                            ];
+                        }
+                    }
                     $dbg = [
+                        'projectRoot' => $projectRoot,
+                        'docRoot' => $docRoot,
                         'uploadDir' => $uploadDir,
                         'uploadDir_exists' => $uploadDir !== '' ? is_dir($uploadDir) : false,
                         'uploadDir_writable' => $uploadDir !== '' ? is_writable($uploadDir) : false,
@@ -4683,9 +4713,10 @@ HTML;
                         'FILES_replace_desktop' => $_FILES['layout_banners_replace_desktop'] ?? null,
                         'FILES_replace_mobile' => $_FILES['layout_banners_replace_mobile'] ?? null,
                         'final' => $final,
+                        'physCheck' => $physCheck,
                     ];
                     @file_put_contents(
-                        rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? __DIR__), '/\\') . '/storage/banner_debug.log',
+                        $projectRoot . '/storage/banner_debug.log',
                         date('c') . ' ' . json_encode($dbg, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n",
                         FILE_APPEND
                     );
