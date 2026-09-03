@@ -207,16 +207,36 @@ class AdminShippoController extends Controller {
         // Base = caixa fechada + exclusão de removidos/arquivados.
         $baseWhere = $caixaFechadaWhere . $statusExtraFilter;
 
+        // ─── Filtro: EXIGIR peso e medidas preenchidos ───────────────────────
+        // Regra: só aparece o pedido pronto para etiqueta (peso > 0 e as três
+        // dimensões > 0). Se alguma coluna não existir no schema, essa condição
+        // é omitida (não há como validar aquilo que não existe).
+        $pesoMedidasFilter = '';
+        if (in_array('peso_total', $colsP, true)) {
+            $pesoMedidasFilter .= " AND COALESCE(p.peso_total, 0) > 0";
+        }
+        if (in_array('altura', $colsP, true)) {
+            $pesoMedidasFilter .= " AND COALESCE(p.altura, 0) > 0";
+        }
+        if (in_array('largura', $colsP, true)) {
+            $pesoMedidasFilter .= " AND COALESCE(p.largura, 0) > 0";
+        }
+        if (in_array('comprimento', $colsP, true)) {
+            $pesoMedidasFilter .= " AND COALESCE(p.comprimento, 0) > 0";
+        }
+
+        // Observação: NÃO excluímos pedidos que já possuem etiqueta. A regra do
+        // negócio pede listar TODOS os pedidos internacionais em Caixa Fechada
+        // com peso e medidas preenchidos, prontos para gerar (ou regerar) etiqueta.
         $sql = "
             SELECT p.id AS pedido_id, {$colUserNome} AS cliente_nome, p.usuario_id, p.created_at
                    {$extraSelect},
                    {$colUserEmail} AS cliente_email, {$colUserTel} AS cliente_telefone
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
-            LEFT JOIN shippo_etiquetas se ON se.pedido_id = p.id
             WHERE {$baseWhere}
-              AND se.id IS NULL
               {$paisFilter}
+              {$pesoMedidasFilter}
             ORDER BY p.created_at DESC
             LIMIT 200
         ";
@@ -238,13 +258,14 @@ class AdminShippoController extends Controller {
                 $this->lastDiag['caixa_fechada'] = (int) ($stCf ? $stCf->fetchColumn() : 0);
             } catch (\Exception $e) {}
             try {
-                // 2) Caixa fechada + internacional (ignora se já tem etiqueta).
+                // 2) Caixa fechada + internacional (sem exigir peso/medidas).
                 $stIntl = $this->connection->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$baseWhere} {$paisFilter}");
                 $stIntl->execute();
                 $this->lastDiag['internacionais'] = (int) $stIntl->fetchColumn();
             } catch (\Exception $e) {}
-            // 3) Quantos internacionais já têm etiqueta = internacionais - disponíveis.
-            $this->lastDiag['ja_com_etiqueta'] = max(0, $this->lastDiag['internacionais'] - $this->lastDiag['disponiveis']);
+            // 3) Internacionais em caixa fechada que ainda NÃO têm peso/medidas completos
+            //    (ficam de fora da lista até serem preenchidos).
+            $this->lastDiag['sem_peso_medidas'] = max(0, $this->lastDiag['internacionais'] - $this->lastDiag['disponiveis']);
 
             return $rows;
         } catch (\Exception $e) {
