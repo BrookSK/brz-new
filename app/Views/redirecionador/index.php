@@ -60,7 +60,7 @@ $tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
                 ['icon' => 'fa-truck-ramp-box',  'titulo' => '5. Coleta ou envio',           'desc' => 'Agende uma coleta na sua porta ou, se preferir, envie o pacote você mesmo para o nosso ponto de recebimento.'],
                 ['icon' => 'fa-weight-hanging',  'titulo' => '6. Conferência',               'desc' => 'Conferimos peso e dimensões reais. Se houver diferença em relação ao informado, cobramos ou reembolsamos.'],
                 ['icon' => 'fa-plane',           'titulo' => '7. Envio internacional',       'desc' => 'Despachamos o pacote ao Brasil com todo o processo aduaneiro cuidado pela nossa equipe.'],
-                ['icon' => 'fa-house-circle-check','titulo' => '8. Entrega e rastreio',      'desc' => 'O destinatário acompanha tudo pelo código de rastreio até receber em casa.'],
+                ['icon' => 'fa-house-user',      'titulo' => '8. Entrega e rastreio',      'desc' => 'O destinatário acompanha tudo pelo código de rastreio até receber em casa.'],
             ];
             foreach ($passos as $p): ?>
             <div class="col-md-6 col-lg-3">
@@ -129,7 +129,7 @@ $tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
         <div class="row g-4 justify-content-center">
             <div class="col-md-6 col-lg-5">
                 <div class="redir-card h-100 text-center">
-                    <i class="fas fa-hand-holding-box text-primary fa-3x mb-3"></i>
+                    <i class="fas fa-people-carry-box text-primary fa-3x mb-3"></i>
                     <h5 class="fw-bold">Agende uma coleta</h5>
                     <p class="text-muted mb-0">Marque data e horário no painel e passamos para buscar o pacote no endereço combinado.</p>
                 </div>
