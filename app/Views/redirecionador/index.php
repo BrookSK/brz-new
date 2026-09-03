@@ -1,6 +1,6 @@
 <?php
 $title = 'Seja um Redirecionador — Braziliana';
-$enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
+$tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
 ?>
 <?php ob_start(); ?>
 
@@ -12,7 +12,10 @@ $enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
                 <span class="badge bg-light text-dark mb-3 px-3 py-2"><i class="fas fa-truck-fast me-2"></i>Programa de Redirecionadores</span>
                 <h1 class="display-4 fw-bold mb-3">Envie os pacotes dos seus clientes pela Braziliana</h1>
                 <p class="lead mb-4">Você cuida da venda, a gente cuida da logística internacional. Painel próprio, tabela de preços transparente, etiqueta com rastreio e entrega no Brasil.</p>
-                <a href="/contato" class="btn btn-light btn-lg px-4"><i class="fas fa-paper-plane me-2"></i>Quero ser redirecionador</a>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a href="/contato" class="btn btn-light btn-lg px-4"><i class="fas fa-paper-plane me-2"></i>Quero ser redirecionador</a>
+                    <a href="#tabela-precos" class="btn btn-outline-light btn-lg px-4"><i class="fas fa-table me-2"></i>Ver tabela de preços</a>
+                </div>
             </div>
         </div>
     </div>
@@ -26,6 +29,7 @@ $enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
                 <h2 class="fw-bold mb-3">O que é o redirecionamento?</h2>
                 <p class="text-muted">Se você vende ou revende produtos para clientes no Brasil, o programa de redirecionadores da Braziliana coloca toda a nossa estrutura de envio internacional à sua disposição.</p>
                 <p class="text-muted">Você tem acesso a um <strong>painel exclusivo</strong> onde cadastra seus clientes, cria os envios, acompanha os pagamentos e gera as etiquetas. Nós recebemos o pacote, conferimos, despachamos ao Brasil e entregamos ao destinatário final, tudo com rastreio.</p>
+                <a href="/contato" class="btn btn-primary mt-2"><i class="fas fa-user-plus me-2"></i>Falar com a equipe</a>
             </div>
             <div class="col-lg-6">
                 <div class="row g-3">
@@ -53,7 +57,7 @@ $enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
                 ['icon' => 'fa-box',             'titulo' => '2. Crie o envio',              'desc' => 'Informe peso, dimensões e os produtos (com NCM). O sistema calcula o valor pela tabela de pesos e preços.'],
                 ['icon' => 'fa-credit-card',     'titulo' => '3. Pague pelo sistema',        'desc' => 'Pague o envio direto no painel via cartão. Se preferir, anexe o comprovante de pagamento para conferência.'],
                 ['icon' => 'fa-tag',             'titulo' => '4. Gere a etiqueta',           'desc' => 'Após o pagamento confirmado, a etiqueta é gerada com o código de rastreio. Imprima e cole na caixa.'],
-                ['icon' => 'fa-truck-ramp-box',  'titulo' => '5. Coleta ou envio à sede',    'desc' => 'Agende a coleta na sua porta ou, se preferir, envie o pacote você mesmo para o nosso endereço de recebimento.'],
+                ['icon' => 'fa-truck-ramp-box',  'titulo' => '5. Coleta ou envio',           'desc' => 'Agende uma coleta na sua porta ou, se preferir, envie o pacote você mesmo para o nosso ponto de recebimento.'],
                 ['icon' => 'fa-weight-hanging',  'titulo' => '6. Conferência',               'desc' => 'Conferimos peso e dimensões reais. Se houver diferença em relação ao informado, cobramos ou reembolsamos.'],
                 ['icon' => 'fa-plane',           'titulo' => '7. Envio internacional',       'desc' => 'Despachamos o pacote ao Brasil com todo o processo aduaneiro cuidado pela nossa equipe.'],
                 ['icon' => 'fa-house-circle-check','titulo' => '8. Entrega e rastreio',      'desc' => 'O destinatário acompanha tudo pelo código de rastreio até receber em casa.'],
@@ -71,8 +75,52 @@ $enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
     </div>
 </section>
 
-<!-- Coleta vs Envio à sede -->
-<section class="py-5">
+<!-- Tabela de pesos e preços -->
+<section class="py-5" id="tabela-precos">
+    <div class="container">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold">Tabela de pesos e preços</h2>
+            <p class="text-muted">Valores do envio internacional em dólar (USD), por faixa de peso. Peso máximo de 30 kg por pacote.</p>
+        </div>
+
+        <?php if (empty($tabelaPesos)): ?>
+        <div class="alert alert-light border text-center">
+            Nossa tabela de preços está sendo atualizada. <a href="/contato">Fale com a gente</a> para receber os valores.
+        </div>
+        <?php else: ?>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 redir-tabela">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Faixa de peso</th>
+                                    <th class="pe-4 text-end">Valor (USD)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($tabelaPesos as $row): ?>
+                                <tr>
+                                    <td class="ps-4">até <?= number_format((float)$row['peso_ate_kg'], 3, ',', '.') ?> kg</td>
+                                    <td class="pe-4 text-end fw-bold text-primary">US$ <?= number_format((float)$row['valor_usd'], 2, ',', '.') ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="text-muted small mt-3 text-center">
+                    <i class="fas fa-circle-info me-1"></i>O valor é calculado pela faixa de peso do pacote. Se o peso real conferido for diferente do informado, a diferença é cobrada ou reembolsada.
+                </p>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</section>
+
+<!-- Formas de entrega -->
+<section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
             <h2 class="fw-bold">Duas formas de entregar o pacote</h2>
@@ -83,17 +131,44 @@ $enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
                 <div class="redir-card h-100 text-center">
                     <i class="fas fa-hand-holding-box text-primary fa-3x mb-3"></i>
                     <h5 class="fw-bold">Agende uma coleta</h5>
-                    <p class="text-muted">Marque data e horário no painel e passamos para buscar o pacote no endereço combinado.</p>
+                    <p class="text-muted mb-0">Marque data e horário no painel e passamos para buscar o pacote no endereço combinado.</p>
                 </div>
             </div>
             <div class="col-md-6 col-lg-5">
                 <div class="redir-card h-100 text-center">
                     <i class="fas fa-dolly text-primary fa-3x mb-3"></i>
-                    <h5 class="fw-bold">Envie para a nossa sede</h5>
-                    <p class="text-muted mb-3">Prefere enviar você mesmo? Basta despachar o pacote para o nosso endereço de recebimento e marcar como "enviado" no painel. Você recebe a confirmação e nós seguimos com o processo.</p>
-                    <div class="redir-endereco">
-                        <div class="small text-uppercase text-muted mb-1"><i class="fas fa-map-marker-alt me-1"></i>Endereço de recebimento</div>
-                        <div class="fw-bold"><?= htmlspecialchars($enderecoSede) ?></div>
+                    <h5 class="fw-bold">Envie você mesmo</h5>
+                    <p class="text-muted mb-0">Prefere despachar você mesmo? Após ativar seu acesso, o endereço do nosso ponto de recebimento fica disponível no painel. Basta enviar e marcar como "enviado".</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section class="py-5">
+    <div class="container">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold">Perguntas frequentes</h2>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="accordion" id="faqRedir">
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">Quem pode ser redirecionador?</button></h2>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Qualquer pessoa ou empresa que venda ou revenda produtos para clientes no Brasil e queira usar nossa estrutura de envio internacional. Entre em contato para ativar seu acesso ao painel.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">Como o preço é calculado?</button></h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Pela faixa de peso do pacote, conforme a tabela acima (em dólar). Depois da conferência do peso real, se houver diferença, cobramos ou reembolsamos automaticamente.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">Como pago pelos envios?</button></h2>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Direto pelo painel, via cartão. Você também pode anexar o comprovante de pagamento para conferência da nossa equipe.</div></div>
+                    </div>
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">O pacote tem rastreio?</button></h2>
+                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqRedir"><div class="accordion-body text-muted">Sim. Após o pagamento, a etiqueta é gerada com código de rastreio e o destinatário acompanha a entrega até receber em casa.</div></div>
                     </div>
                 </div>
             </div>
@@ -143,11 +218,13 @@ $enderecoSede = $enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384';
         font-size: 1.4rem;
         margin: 0 auto 14px;
     }
-    .redir-endereco {
-        background: #f0f9ff;
-        border: 1px dashed #7dd3fc;
-        border-radius: 10px;
-        padding: 14px;
+    .redir-tabela thead th {
+        background: #0b1f3a;
+        color: #fff;
+        border: none;
+    }
+    .redir-tabela tbody tr:nth-child(even) {
+        background: #f8fafc;
     }
 </style>
 <?php $content = ob_get_clean(); ?>

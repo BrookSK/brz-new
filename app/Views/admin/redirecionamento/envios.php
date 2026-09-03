@@ -17,11 +17,6 @@ $statusLabels = [
     'divergencia'=>['Divergência','danger'],
     'cancelado'=>['Cancelado','secondary'],
 ];
-$_perfilEnvios = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
-$_isRedirecionador = ($_perfilEnvios === 'redirecionador');
-$enderecoSede = trim((string)($enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384'));
-// Status em que faz sentido o redirecionador declarar que enviou o pacote à sede
-$_statusEnviaSede = ['pago','etiqueta_gerada'];
 ?>
 <?php ob_start(); ?>
 <div class="container-fluid p-4">
@@ -32,17 +27,6 @@ $_statusEnviaSede = ['pago','etiqueta_gerada'];
         </div>
         <a class="btn btn-primary btn-sm" href="/admin/redirecionamento/envios/novo"><i class="fas fa-plus me-1"></i>Novo envio</a>
     </div>
-
-    <?php if ($_isRedirecionador): ?>
-    <div class="alert alert-info d-flex align-items-start gap-2 border-0 shadow-sm">
-        <i class="fas fa-dolly fa-lg mt-1"></i>
-        <div>
-            <strong>Vai enviar o pacote você mesmo?</strong>
-            Em vez de agendar coleta, despache para a nossa sede e clique em <strong>"Enviei à sede"</strong> no envio.
-            <div class="mt-1"><i class="fas fa-map-marker-alt me-1 text-primary"></i>Endereço de recebimento: <strong><?= htmlspecialchars($enderecoSede, ENT_QUOTES, 'UTF-8') ?></strong></div>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
@@ -125,13 +109,8 @@ $_statusEnviaSede = ['pago','etiqueta_gerada'];
                                 <span class="badge bg-<?= $__bc ?> ms-1" style="font-size:.65rem"><?= $__lb ?></span>
                                 <?php endif; endif; ?>
                             </td>
-                            <td class="pe-3 text-nowrap">
+                            <td class="pe-3">
                                 <a class="btn btn-xs btn-outline-primary" href="/admin/redirecionamento/envios/<?= (int)$e['id'] ?>" style="font-size:.75rem;padding:2px 8px">Ver</a>
-                                <?php if ($_isRedirecionador && in_array($e['status'] ?? '', $_statusEnviaSede, true) && empty($e['enviado_sede_em'])): ?>
-                                <button type="button" class="btn btn-xs btn-outline-info btn-enviei-sede" data-id="<?= (int)$e['id'] ?>" style="font-size:.75rem;padding:2px 8px"><i class="fas fa-dolly me-1"></i>Enviei à sede</button>
-                                <?php elseif (!empty($e['enviado_sede_em'])): ?>
-                                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" title="Enviado à sede em <?= htmlspecialchars((string)$e['enviado_sede_em'], ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-dolly me-1"></i>Enviado à sede</span>
-                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; endif; ?>
@@ -141,56 +120,4 @@ $_statusEnviaSede = ['pago','etiqueta_gerada'];
         </div>
     </div>
 </div>
-
-<!-- Modal: marcar enviado à sede -->
-<div class="modal fade" id="modalEnvieiSede" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-dolly me-2 text-info"></i>Enviei o pacote para a sede</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="esEnvioId">
-                <p class="text-muted small mb-3">Confirme que você despachou este pacote para o nosso endereço de recebimento. Nossa equipe será notificada.</p>
-                <div class="alert alert-light border small mb-3">
-                    <i class="fas fa-map-marker-alt me-1 text-primary"></i><strong>Endereço:</strong> <?= htmlspecialchars($enderecoSede, ENT_QUOTES, 'UTF-8') ?>
-                </div>
-                <label class="form-label">Código de rastreio (opcional)</label>
-                <input type="text" class="form-control" id="esTracking" placeholder="Rastreio da transportadora que você usou">
-                <div class="form-text">Se você tiver o rastreio do envio até a sede, informe para agilizarmos o recebimento.</div>
-                <div id="msgEnvieiSede" class="mt-2"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-info text-white" id="btnConfirmarEnvieiSede">Confirmar envio</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.querySelectorAll('.btn-enviei-sede').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.getElementById('esEnvioId').value = btn.dataset.id;
-        document.getElementById('esTracking').value = '';
-        document.getElementById('msgEnvieiSede').innerHTML = '';
-        new bootstrap.Modal(document.getElementById('modalEnvieiSede')).show();
-    });
-});
-
-document.getElementById('btnConfirmarEnvieiSede')?.addEventListener('click', async () => {
-    const id = document.getElementById('esEnvioId').value;
-    if (!id) return;
-    const fd = new FormData();
-    fd.append('tracking_code', document.getElementById('esTracking').value);
-    const r = await fetch('/admin/redirecionamento/envios/' + id + '/enviado-sede', {method:'POST', body:fd});
-    const j = await r.json();
-    if (j.ok) {
-        location.reload();
-    } else {
-        document.getElementById('msgEnvieiSede').innerHTML = '<div class="alert alert-danger py-1 small">' + (j.msg || 'Erro') + '</div>';
-    }
-});
-</script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>

@@ -281,7 +281,6 @@ $router->get('/admin/redirecionamento/envios/{id}',                     'AdminRe
 $router->post('/admin/redirecionamento/envios/{id}/peso-real',          'AdminRedirecionamentoController', 'envioAtualizarPeso');
 $router->post('/admin/redirecionamento/envios/{id}/tracking',           'AdminRedirecionamentoController', 'envioSalvarTracking');
 $router->post('/admin/redirecionamento/envios/{id}/coletado',           'AdminRedirecionamentoController', 'envioMarcarColetado');
-$router->post('/admin/redirecionamento/envios/{id}/enviado-sede',       'AdminRedirecionamentoController', 'envioMarcarEnviadoSede');
 $router->post('/admin/redirecionamento/envios/marcar-pago',             'AdminRedirecionamentoController', 'envioMarcarPago');
 $router->post('/admin/redirecionamento/envios/{id}/entregue',           'AdminRedirecionamentoController', 'envioMarcarEntregue');
 $router->get('/admin/redirecionamento/divergencias',                    'AdminRedirecionamentoController', 'divergencias');
@@ -309,6 +308,10 @@ $router->post('/admin/redirecionamento/coletas/confirmar',              'AdminRe
 $router->post('/admin/redirecionamento/coletas/cancelar',               'AdminRedirecionamentoController', 'coletaCancelar');
 $router->post('/admin/redirecionamento/coletas/coletado',               'AdminRedirecionamentoController', 'coletaMarcarColetado');
 $router->post('/admin/redirecionamento/coletas/reagendar',              'AdminRedirecionamentoController', 'coletaReagendar');
+$router->get('/admin/redirecionamento/envios-sede',                     'AdminRedirecionamentoController', 'enviosSede');
+$router->post('/admin/redirecionamento/envios-sede/registrar',          'AdminRedirecionamentoController', 'envioSedeRegistrar');
+$router->post('/admin/redirecionamento/envios-sede/recebido',           'AdminRedirecionamentoController', 'envioSedeMarcarRecebido');
+$router->post('/admin/redirecionamento/envios-sede/cancelar',           'AdminRedirecionamentoController', 'envioSedeCancelar');
 $router->post('/admin/redirecionamento/pagamento/criar-intent',         'AdminRedirecionamentoController', 'criarIntentPagamento');
 $router->post('/admin/redirecionamento/pagamento/confirmar',            'AdminRedirecionamentoController', 'confirmarPagamento');
 $router->post('/admin/redirecionamento/envios/gerar-etiqueta',          'AdminRedirecionamentoController', 'gerarEtiqueta');

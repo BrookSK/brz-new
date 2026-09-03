@@ -278,6 +278,22 @@ class AdminRedirecionamentoController extends Controller {
             INDEX idx_data (data_agendada)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        // Envios que o redirecionador despacha para a nossa sede (em vez de coleta)
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_envios_sede (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            envio_id INT NOT NULL,
+            redirecionador_id INT NOT NULL,
+            transportadora VARCHAR(100) DEFAULT NULL,
+            tracking_code VARCHAR(100) DEFAULT NULL,
+            data_envio DATE DEFAULT NULL,
+            status ENUM('enviado','recebido','cancelado') NOT NULL DEFAULT 'enviado',
+            observacoes TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_envio_id (envio_id),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         // ── Migração defensiva: dropar e recriar tabelas com schema incompatível ──
         $schemas = [
             'redirecionamento_coletas' => [
@@ -933,28 +949,71 @@ class AdminRedirecionamentoController extends Controller {
         $this->json(['ok'=>true]);
     }
 
-    /**
-     * O redirecionador marca que ELE enviou o pacote para a nossa sede
-     * (em vez de agendar coleta). Notifica o admin igual ao fluxo de coleta.
-     */
-    public function envioMarcarEnviadoSede(Request $request) {
+    // ─── ENVIOS À SEDE ──────────────────────────────────────────────────────
+
+    /** Tela de envios à sede (espelha /coletas) */
+    public function enviosSede(Request $request) {
         $this->auth(); $this->migrar();
-        $id = (int)$request->getParam('id', 0);
-        $tracking = trim((string)$request->getParam('tracking_code', ''));
-        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'Envio inválido']); return; }
+        $db = $this->pdo();
+        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+
+        $st = $db->query("SELECT s.*, r.nome AS redirecionador_nome, e.id_pedido_cliente, e.status AS envio_status, e.status_pagamento
+            FROM redirecionamento_envios_sede s
+            LEFT JOIN redirecionadores r ON r.id = s.redirecionador_id
+            LEFT JOIN redirecionamento_envios e ON e.id = s.envio_id
+            ORDER BY s.created_at DESC");
+        $registros = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
+
+        // Envios disponíveis para registrar envio à sede (pago/etiqueta_gerada, sem coleta nem envio-sede pendente)
+        $sqlEnvios = "SELECT e.id, e.id_pedido_cliente, r.nome AS redirecionador_nome
+            FROM redirecionamento_envios e
+            LEFT JOIN redirecionadores r ON r.id = e.redirecionador_id
+            WHERE e.status IN ('pago','etiqueta_gerada')
+              AND e.id NOT IN (SELECT envio_id FROM redirecionamento_coletas WHERE status IN ('agendado','confirmado'))
+              AND e.id NOT IN (SELECT envio_id FROM redirecionamento_envios_sede WHERE status = 'enviado')";
+        $paramsEnvios = [];
+        if ($perfil === 'redirecionador') {
+            $uid = (int)($_SESSION['usuario_id'] ?? 0);
+            $stR = $db->prepare("SELECT id FROM redirecionadores WHERE usuario_id=? LIMIT 1");
+            $stR->execute([$uid]);
+            $redId = (int)($stR->fetchColumn() ?: 0);
+            if ($redId) { $sqlEnvios .= " AND e.redirecionador_id=?"; $paramsEnvios[] = $redId; }
+        }
+        $sqlEnvios .= " ORDER BY e.id DESC LIMIT 200";
+        $stE = $db->prepare($sqlEnvios); $stE->execute($paramsEnvios);
+        $enviosDisponiveis = $stE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $enderecoSede = $this->getEnderecoSede();
+
+        $this->view('admin/redirecionamento/envios-sede', [
+            'registros' => $registros,
+            'enviosDisponiveis' => $enviosDisponiveis,
+            'enderecoSede' => $enderecoSede,
+        ]);
+    }
+
+    /** Registrar que o redirecionador enviou o pacote para a sede */
+    public function envioSedeRegistrar(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId = (int) $request->getParam('envio_id', 0);
+        $transportadora = trim((string) $request->getParam('transportadora', ''));
+        $tracking = trim((string) $request->getParam('tracking_code', ''));
+        $dataEnvio = trim((string) $request->getParam('data_envio', '')) ?: date('Y-m-d');
+        $obs = trim((string) $request->getParam('observacoes', ''));
+        if (!$envioId) { $this->json(['ok'=>false,'msg'=>'Selecione o envio']); return; }
         $db = $this->pdo();
 
-        // Carrega o envio (com nome do redirecionador e cliente)
+        // Carrega envio com dados para notificação
         $st = $db->prepare("SELECT e.*, r.nome AS redirecionador_nome, r.id AS red_id, c.nome AS cliente_nome
             FROM redirecionamento_envios e
             LEFT JOIN redirecionadores r ON r.id = e.redirecionador_id
             LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id
             WHERE e.id = ? LIMIT 1");
-        $st->execute([$id]);
+        $st->execute([$envioId]);
         $envio = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
 
-        // Se for um redirecionador logado, garante que o envio é dele
+        // Segurança: redirecionador só pode registrar seus próprios envios
         $redFixo = $this->getRedirecionadorFixo();
         if ($redFixo && (int)($redFixo['id'] ?? 0) > 0) {
             if ((int)$envio['redirecionador_id'] !== (int)$redFixo['id']) {
@@ -962,12 +1021,18 @@ class AdminRedirecionamentoController extends Controller {
             }
         }
 
-        $db->prepare("UPDATE redirecionamento_envios SET status='coletado', enviado_sede_em=NOW(), envio_sede_tracking=? WHERE id=?")
-           ->execute([$tracking !== '' ? $tracking : null, $id]);
+        // Inserir registro
+        $db->prepare("INSERT INTO redirecionamento_envios_sede (envio_id, redirecionador_id, transportadora, tracking_code, data_envio, observacoes)
+            VALUES (?,?,?,?,?,?)")
+           ->execute([$envioId, $envio['redirecionador_id'], $transportadora ?: null, $tracking ?: null, $dataEnvio, $obs ?: null]);
 
-        // Produtos do envio (para detalhar na notificação)
+        // Atualizar o envio
+        $db->prepare("UPDATE redirecionamento_envios SET enviado_sede_em=NOW(), envio_sede_tracking=? WHERE id=?")
+           ->execute([$tracking ?: null, $envioId]);
+
+        // Montar notificação (mesma estrutura da coleta)
         $stP = $db->prepare("SELECT descricao, quantidade FROM redirecionamento_produtos_envio WHERE envio_id=?");
-        $stP->execute([$id]);
+        $stP->execute([$envioId]);
         $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         $produtosTxt = '';
         foreach ($produtos as $p) {
@@ -980,10 +1045,11 @@ class AdminRedirecionamentoController extends Controller {
         }
 
         $clienteNome = (string)($envio['cliente_nome'] ?? $envio['destinatario_nome'] ?? '—');
-        $pedidoCli   = (string)($envio['id_pedido_cliente'] ?? '—');
+        $pedidoCli = (string)($envio['id_pedido_cliente'] ?? '—');
         $trackingTxt = $tracking !== '' ? htmlspecialchars($tracking, ENT_QUOTES, 'UTF-8') : 'Não informado';
+        $transpTxt = $transportadora !== '' ? htmlspecialchars($transportadora, ENT_QUOTES, 'UTF-8') : 'Não informada';
 
-        $assunto = "📦 Pacote enviado à sede - Envio #{$id}";
+        $assunto = "📦 Pacote enviado à sede - Envio #{$envioId}";
         $corpo = '<table style="width:100%;border-collapse:collapse;margin:8px 0">
             <tr><td style="padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px">
                 <strong style="color:#1e40af">📦 O redirecionador enviou o pacote para a nossa sede</strong>
@@ -991,17 +1057,18 @@ class AdminRedirecionamentoController extends Controller {
         </table>
         <table style="width:100%;border-collapse:collapse;margin:16px 0">
             <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Redirecionador</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars((string)($envio['redirecionador_nome'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td></tr>
-            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#' . $id . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#' . $envioId . '</td></tr>
             <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Cliente final</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($clienteNome, ENT_QUOTES, 'UTF-8') . '</td></tr>
             <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">ID do pedido</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($pedidoCli, ENT_QUOTES, 'UTF-8') . '</td></tr>
-            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Rastreio do envio à sede</td><td style="padding:6px 0;font-weight:600">' . $trackingTxt . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Transportadora</td><td style="padding:6px 0;font-weight:600">' . $transpTxt . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Rastreio</td><td style="padding:6px 0;font-weight:600">' . $trackingTxt . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Data do envio</td><td style="padding:6px 0;font-weight:600">' . date('d/m/Y', strtotime($dataEnvio)) . '</td></tr>
             <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Pagamento</td><td style="padding:6px 0;font-weight:600">' . (($envio['status_pagamento'] ?? '') === 'pago' ? 'Pago ✅' : 'Pendente') . '</td></tr>
         </table>
         <div style="margin-top:8px;font-size:13px;color:#6b7280">Produtos:</div>
         <table style="width:100%;border-collapse:collapse;margin:4px 0 16px">' . $produtosTxt . '</table>
         <p style="color:#6b7280;font-size:13px;margin-top:16px">Aguarde a chegada do pacote na sede para conferência e prosseguimento do envio.</p>';
 
-        // Notificar mesmos destinatários da coleta
         $emailsConfig = $this->getEmailsColetaConfig($db);
         foreach ($emailsConfig as $email) {
             $this->enviarEmailNotificacao($email, $assunto, $corpo);
@@ -1009,6 +1076,45 @@ class AdminRedirecionamentoController extends Controller {
         $emails = $this->getEmailsNotificacao();
         $this->enviarEmailNotificacao($emails['fabiana'] ?? '', $assunto, $corpo);
 
+        $this->json(['ok'=>true]);
+    }
+
+    /** Admin marca que o pacote foi recebido na sede */
+    public function envioSedeMarcarRecebido(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        $db = $this->pdo();
+        $db->prepare("UPDATE redirecionamento_envios_sede SET status='recebido' WHERE id=?")->execute([$id]);
+        // Atualizar status do envio principal para 'coletado' (pacote em mãos)
+        $st = $db->prepare("SELECT envio_id FROM redirecionamento_envios_sede WHERE id=? LIMIT 1"); $st->execute([$id]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        if ($row) {
+            $db->prepare("UPDATE redirecionamento_envios SET status='coletado' WHERE id=?")->execute([$row['envio_id']]);
+        }
+        $this->json(['ok'=>true]);
+    }
+
+    /** Admin cancela um envio à sede */
+    public function envioSedeCancelar(Request $request) {
+        $this->auth(); $this->migrar();
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        $db = $this->pdo();
+        // Segurança: redirecionador só pode cancelar os seus
+        $redFixo = $this->getRedirecionadorFixo();
+        if ($redFixo && (int)($redFixo['id'] ?? 0) > 0) {
+            $st = $db->prepare("SELECT id FROM redirecionamento_envios_sede WHERE id=? AND redirecionador_id=? AND status='enviado' LIMIT 1");
+            $st->execute([$id, (int)$redFixo['id']]);
+            if (!$st->fetchColumn()) { $this->json(['ok'=>false,'msg'=>'Registro não encontrado ou não pode ser cancelado']); return; }
+        }
+        $db->prepare("UPDATE redirecionamento_envios_sede SET status='cancelado' WHERE id=? AND status='enviado'")->execute([$id]);
+        // Limpar flags do envio principal
+        $st = $db->prepare("SELECT envio_id FROM redirecionamento_envios_sede WHERE id=? LIMIT 1"); $st->execute([$id]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        if ($row) {
+            $db->prepare("UPDATE redirecionamento_envios SET enviado_sede_em=NULL, envio_sede_tracking=NULL WHERE id=?")->execute([$row['envio_id']]);
+        }
         $this->json(['ok'=>true]);
     }
 

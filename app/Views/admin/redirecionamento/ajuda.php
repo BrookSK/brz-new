@@ -174,8 +174,8 @@ $title = 'Como Funciona - Guia do Redirecionador';
                     <ol>
                         <li>Gere e cole a etiqueta na caixa</li>
                         <li>Envie o pacote para o nosso endereço de recebimento (abaixo)</li>
-                        <li>Vá em <strong>Envios</strong>, abra o envio e clique em <strong>"Enviei à sede"</strong></li>
-                        <li>Informe o rastreio (opcional) e confirme — nossa equipe é notificada na hora</li>
+                        <li>Vá em <strong>Envios à Sede</strong> no menu lateral e clique em <strong>"Registrar envio à sede"</strong></li>
+                        <li>Selecione o envio, informe a transportadora e o rastreio, e confirme — nossa equipe é notificada na hora</li>
                     </ol>
                     <div class="alert alert-info small py-2 mb-0">
                         <i class="fas fa-map-marker-alt me-2"></i><strong>Endereço de recebimento:</strong>

@@ -166,6 +166,11 @@ function renderAdminSidebar($activePage = '') {
                 'label' => __('admin.menu.redirecionamento.coletas', 'Coletas'),
                 'url' => '/admin/redirecionamento/coletas',
             ],
+            'redirecionamento-envios-sede' => [
+                'icon' => 'fas fa-dolly',
+                'label' => __('admin.menu.redirecionamento.envios_sede', 'Envios à Sede'),
+                'url' => '/admin/redirecionamento/envios-sede',
+            ],
             'redirecionamento-ajuda' => [
                 'icon' => 'fas fa-question-circle',
                 'label' => __('admin.menu.redirecionamento.ajuda', 'Como Funciona'),
@@ -287,7 +292,8 @@ function renderAdminSidebar($activePage = '') {
         'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => '(RED) Tabela de Pesos e Preços', 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
         'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => '(RED) Pagamentos', 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
         'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => '(RED) Comprovantes', 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => '(RED) Coletas', 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']]
+        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => '(RED) Coletas', 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-envios-sede' => ['icon' => 'fas fa-dolly', 'label' => '(RED) Envios à Sede', 'url' => '/admin/redirecionamento/envios-sede', 'roles' => ['admin', 'suporte']]
     ];
 
     $unreadTickets = 0;
@@ -454,7 +460,7 @@ function renderAdminSidebar($activePage = '') {
                 'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos', 'demandas-arquivados']],
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
                 'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site']],
-                'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
+                'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas', 'redirecionamento-envios-sede']],
                 'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'desapego', 'desapego-pendentes', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];
 

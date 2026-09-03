@@ -1306,6 +1306,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         -->
                         <li class="mb-2"><a href="/como-funciona-clube" class="footer-link"><?= __('nav.club', 'Clube Braziliana') ?></a></li>
                         <li class="mb-2"><a href="/assessoria" class="footer-link"><?= __('nav.forwarding', 'Redirecionamento') ?></a></li>
+                        <li class="mb-2"><a href="/seja-redirecionador" class="footer-link"><?= __('footer.become_forwarder', 'Seja um Redirecionador') ?></a></li>
                         <?php
                         // Link do Carnê Braziliana: só aparece se ativo ou modo teste
                         try {

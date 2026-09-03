@@ -9,22 +9,19 @@ use App\Core\Request;
  */
 class RedirecionadorController extends Controller {
     public function index(Request $request) {
-        // Endereço de recebimento (sede nos EUA) — configurável no banco, com fallback fixo.
-        $enderecoSede = $this->getEnderecoSede();
-        $this->view('redirecionador/index', ['enderecoSede' => $enderecoSede]);
+        $tabelaPesos = $this->getTabelaPesos();
+        $this->view('redirecionador/index', ['tabelaPesos' => $tabelaPesos]);
     }
 
-    private function getEnderecoSede(): string
+    /** Tabela de pesos e preços do redirecionamento (pública). */
+    private function getTabelaPesos(): array
     {
-        $fallback = "1227 W Broad St, Saint Pauls, NC 28384";
         try {
             $pdo = \Config\Database::getConnection();
-            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'redirecionamento_endereco_sede' LIMIT 1");
-            $st->execute();
-            $val = trim((string) ($st->fetchColumn() ?: ''));
-            return $val !== '' ? $val : $fallback;
+            $st = $pdo->query("SELECT peso_ate_kg, valor_usd FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC");
+            return $st ? ($st->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
         } catch (\Exception $e) {
-            return $fallback;
+            return [];
         }
     }
 }
