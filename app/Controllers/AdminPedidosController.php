@@ -3303,22 +3303,29 @@ JS;
                 
                 echo '</main></div></div>';
 
-        echo <<<'HTML'
+        $trashTitle = __('admin.commissions.trash_modal_title', 'Enviar pedido para lixeira');
+        $trashClose = __('common.close', 'Fechar');
+        $trashConfirmPre = __('admin.commissions.trash_confirm_pre', 'Confirma enviar o pedido');
+        $trashConfirmPost = __('admin.commissions.trash_confirm_post', 'para a lixeira?');
+        $trashCancel = __('admin.commissions.cancel', 'Cancelar');
+        $trashSend = __('admin.commissions.trash_send', 'Enviar para lixeira');
+
+        echo <<<HTML
 
     <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST" action="" id="formLixeiraPedido">
                     <div class="modal-header">
-                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                        <h5 class="modal-title">{$trashTitle}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{$trashClose}"></button>
                     </div>
                     <div class="modal-body">
-                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                        <div>{$trashConfirmPre} <strong id="lixeiraPedidoIdLabel"></strong> {$trashConfirmPost}</div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{$trashCancel}</button>
+                        <button type="submit" class="btn btn-danger">{$trashSend}</button>
                     </div>
                 </form>
             </div>
@@ -6827,7 +6834,7 @@ LINKSCRIPT;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minhas Comissões - Admin</title>
+    <title>' . __('admin.commissions.title', 'Minhas Comissões') . ' - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">';
@@ -6863,10 +6870,10 @@ LINKSCRIPT;
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Minhas Comissões</h1>
+                    <h1 class="page-title">' . __('admin.commissions.title', 'Minhas Comissões') . '</h1>
                     <div>
-                        <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
-                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
+                        <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> ' . __('admin.commissions.back', 'Voltar') . '</a>
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> ' . __('admin.commissions.new_manual_order', 'Novo Pedido Manual') . '</a>
                     </div>
                 </div>
 
@@ -6874,11 +6881,11 @@ LINKSCRIPT;
                 <div class="card border-0 shadow-sm mb-4"><div class="card-body py-3">
                     <form method="GET" class="row g-2 align-items-end">
                         <input type="hidden" name="escopo" value="' . htmlspecialchars($escopo) . '">
-                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
-                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data fim</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
-                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Status pedido</label><select name="status_pedido" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
-                        <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
-                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes" class="btn btn-outline-secondary btn-sm">Limpar</a></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">' . __('admin.commissions.date_start', 'Data início') . '</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">' . __('admin.commissions.date_end', 'Data fim') . '</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">' . __('admin.commissions.order_status', 'Status pedido') . '</label><select name="status_pedido" class="form-select form-select-sm"><option value="">' . __('admin.commissions.all', 'Todos') . '</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
+                        <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>' . __('admin.commissions.filter', 'Filtrar') . '</button></div>
+                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes" class="btn btn-outline-secondary btn-sm">' . __('admin.commissions.clear', 'Limpar') . '</a></div>
                     </form>
                 </div></div>
 
@@ -6900,38 +6907,38 @@ LINKSCRIPT;
 
             echo '<div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="mb-0">Moeda: ' . htmlspecialchars($moeda) . '</h5>
+                        <h5 class="mb-0">' . __('admin.commissions.currency', 'Moeda') . ': ' . htmlspecialchars($moeda) . '</h5>
                     </div>
                     <div class="comm-cards">
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Total Faturado (Manuais)</div>
+                            <div class="text-muted small">' . __('admin.commissions.total_billed_manual', 'Total Faturado (Manuais)') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalFaturado, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Custo dos Produtos</div>
+                            <div class="text-muted small">' . __('admin.commissions.products_cost', 'Custo dos Produtos') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalCusto, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Total Líquido</div>
+                            <div class="text-muted small">' . __('admin.commissions.total_net', 'Total Líquido') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalLiquido, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Comissão</div>
+                            <div class="text-muted small">' . __('admin.commissions.commission', 'Comissão') . '</div>
                             <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (' . $formatMoney($valorComissao, $moeda) . ')</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Comissão total</div>
+                            <div class="text-muted small">' . __('admin.commissions.total_commission', 'Comissão total') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
 
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Processamento (Online) - Base líquida</div>
+                            <div class="text-muted small">' . __('admin.commissions.processing_net_base', 'Processamento (Online) - Base líquida') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Processamento (Online) - Comissão</div>
+                            <div class="text-muted small">' . __('admin.commissions.processing_commission', 'Processamento (Online) - Comissão') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>
-                            <div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>
+                            <div class="small text-muted">' . __('admin.commissions.avg_percent', '% médio') . ': ' . number_format($procPercMed, 2, ',', '.') . '%</div>
                         </div>
                     </div>
                 </div>';
@@ -6949,12 +6956,12 @@ LINKSCRIPT;
         echo '</div>
 
                 <div class="card mb-4">
-                    <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
+                    <div class="card-header"><strong>' . __('admin.commissions.paid_manual_orders', 'Pedidos Manuais Pagos') . '</strong></div>
                     <div class="card-body">';
 
         $renderTabelaPedidos = function(array $pedidos, string $moedaLabel, float $percentMoeda) use ($formatMoney) {
             if (empty($pedidos)) {
-                echo '<div class="text-muted">Sem pedidos manuais pagos em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                echo '<div class="text-muted">' . __('admin.commissions.no_paid_manual_in', 'Sem pedidos manuais pagos em') . ' ' . htmlspecialchars($moedaLabel) . '.</div>';
                 return;
             }
 
@@ -6962,14 +6969,14 @@ LINKSCRIPT;
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Pedido</th>
-                                <th>Data</th>
-                                <th class="text-end">Faturado</th>
-                                <th class="text-end">Impostos</th>
-                                <th class="text-end">Custo</th>
-                                <th class="text-end">Líquido</th>
-                                <th class="text-end">Comissão</th>
-                                <th>Ações</th>
+                                <th>' . __('admin.commissions.th_order', 'Pedido') . '</th>
+                                <th>' . __('admin.commissions.th_date', 'Data') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_billed', 'Faturado') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_taxes', 'Impostos') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_cost', 'Custo') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_net', 'Líquido') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_commission', 'Comissão') . '</th>
+                                <th>' . __('admin.commissions.th_actions', 'Ações') . '</th>
                             </tr>
                         </thead>
                         <tbody>';
@@ -7021,17 +7028,17 @@ LINKSCRIPT;
         echo '        </div>
                 </div>
                 <div class="card">
-                    <div class="card-header"><strong>Comissões de Processamento (Online)</strong></div>
+                    <div class="card-header"><strong>' . __('admin.commissions.processing_commissions', 'Comissões de Processamento (Online)') . '</strong></div>
                     <div class="card-body">';
 
         $renderTabelaProc = function(array $linhas, string $moedaLabel) use ($formatMoney) {
             if (empty($linhas)) {
-                echo '<div class="text-muted">Sem comissões de processamento em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                echo '<div class="text-muted">' . __('admin.commissions.no_processing_in', 'Sem comissões de processamento em') . ' ' . htmlspecialchars($moedaLabel) . '.</div>';
                 return;
             }
             echo '<div class="table-responsive">'
                 . '<table class="table table-hover">'
-                . '<thead><tr><th>Pedido</th><th>Data</th><th class="text-end">Pago</th><th class="text-end">Impostos</th><th class="text-end">Custo</th><th class="text-end">Líquido</th><th class="text-end">%</th><th class="text-end">Comissão</th><th>Ações</th></tr></thead><tbody>';
+                . '<thead><tr><th>' . __('admin.commissions.th_order', 'Pedido') . '</th><th>' . __('admin.commissions.th_date', 'Data') . '</th><th class="text-end">' . __('admin.commissions.th_paid', 'Pago') . '</th><th class="text-end">' . __('admin.commissions.th_taxes', 'Impostos') . '</th><th class="text-end">' . __('admin.commissions.th_cost', 'Custo') . '</th><th class="text-end">' . __('admin.commissions.th_net', 'Líquido') . '</th><th class="text-end">%</th><th class="text-end">' . __('admin.commissions.th_commission', 'Comissão') . '</th><th>' . __('admin.commissions.th_actions', 'Ações') . '</th></tr></thead><tbody>';
             foreach ($linhas as $r) {
                 $pid = (int) ($r['pedido_id'] ?? 0);
                 $dt = (string) ($r['created_at'] ?? '');
@@ -7074,22 +7081,29 @@ LINKSCRIPT;
         </div>
     </div>';
 
-        echo <<<'HTML'
+        $trashTitle = __('admin.commissions.trash_modal_title', 'Enviar pedido para lixeira');
+        $trashClose = __('common.close', 'Fechar');
+        $trashConfirmPre = __('admin.commissions.trash_confirm_pre', 'Confirma enviar o pedido');
+        $trashConfirmPost = __('admin.commissions.trash_confirm_post', 'para a lixeira?');
+        $trashCancel = __('admin.commissions.cancel', 'Cancelar');
+        $trashSend = __('admin.commissions.trash_send', 'Enviar para lixeira');
+
+        echo <<<HTML
 
     <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST" action="" id="formLixeiraPedido">
                     <div class="modal-header">
-                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                        <h5 class="modal-title">{$trashTitle}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{$trashClose}"></button>
                     </div>
                     <div class="modal-body">
-                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                        <div>{$trashConfirmPre} <strong id="lixeiraPedidoIdLabel"></strong> {$trashConfirmPost}</div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{$trashCancel}</button>
+                        <button type="submit" class="btn btn-danger">{$trashSend}</button>
                     </div>
                 </form>
             </div>
