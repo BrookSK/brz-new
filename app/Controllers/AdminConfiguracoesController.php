@@ -3877,7 +3877,7 @@ JS;
 
         $renderRows = function($rows, $cols) {
             if (!is_array($rows) || empty($rows)) {
-                return '<tr><td colspan="' . count($cols) . '" class="text-center text-muted">Sem dados</td></tr>';
+                return '<tr><td colspan="' . count($cols) . '" class="text-center text-muted">' . __('admin.settings.heatmap_no_data', 'Sem dados') . '</td></tr>';
             }
             $html = '';
             foreach ($rows as $r) {
@@ -3910,21 +3910,31 @@ JS;
                 $cardsCategorias .= '<div class="col-6 col-lg-4">'
                     . '<a href="#" class="card h-100 text-decoration-none mapa-calor-card" data-seg="categoria" data-val="' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') . '">'
                     . '<div class="card-body">'
-                    . '<div class="small text-muted">Categoria</div>'
+                    . '<div class="small text-muted">' . __('admin.settings.heatmap_category', 'Categoria') . '</div>'
                     . '<div class="fw-bold">' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') . '</div>'
-                    . '<div class="small">Vendidos: <span class="fw-semibold">' . htmlspecialchars($qtd, ENT_QUOTES, 'UTF-8') . '</span></div>'
+                    . '<div class="small">' . __('admin.settings.heatmap_sold', 'Vendidos') . ': <span class="fw-semibold">' . htmlspecialchars($qtd, ENT_QUOTES, 'UTF-8') . '</span></div>'
                     . '</div></a></div>';
             }
         }
         if ($cardsCategorias === '') {
-            $cardsCategorias = '<div class="col-12"><div class="text-muted">Sem dados de categorias para segmentar.</div></div>';
+            $cardsCategorias = '<div class="col-12"><div class="text-muted">' . __('admin.settings.heatmap_no_categories', 'Sem dados de categorias para segmentar.') . '</div></div>';
         }
 
-        $cardsLojas = '<div class="col-12"><div class="text-muted">Sem dados de lojas para segmentar.</div></div>';
+        $cardsLojas = '<div class="col-12"><div class="text-muted">' . __('admin.settings.heatmap_no_stores', 'Sem dados de lojas para segmentar.') . '</div></div>';
         // Lojas serão carregadas via AJAX (quando existir tabela lojas ou colunas loja/loja_id)
-        $cardsLojas = '<div class="col-12" id="mapaCalorLojasWrap"><div class="text-muted">Carregando lojas...</div></div>';
+        $cardsLojas = '<div class="col-12" id="mapaCalorLojasWrap"><div class="text-muted">' . __('admin.settings.heatmap_loading_stores', 'Carregando lojas...') . '</div></div>';
 
-        $mapaCalorScript = <<<'HTML'
+        // Textos traduzidos para uso dentro do JS (escapados para aspas simples do JS)
+        $jsClientesSegmento = addslashes(__('admin.settings.heatmap_segment_clients', 'Clientes do segmento'));
+        $jsCarregando = addslashes(__('admin.settings.heatmap_loading', 'Carregando...'));
+        $jsSemDados = addslashes(__('admin.settings.heatmap_no_data', 'Sem dados'));
+        $jsErroCarregar = addslashes(__('admin.settings.heatmap_load_error', 'Erro ao carregar'));
+        $jsErroLojas = addslashes(__('admin.settings.heatmap_load_stores_error', 'Erro ao carregar lojas'));
+        $jsLoja = addslashes(__('admin.settings.heatmap_store', 'Loja'));
+        $jsVendidos = addslashes(__('admin.settings.heatmap_sold', 'Vendidos'));
+        $jsSemDadosLojas = addslashes(__('admin.settings.heatmap_no_stores', 'Sem dados de lojas para segmentar.'));
+
+        $mapaCalorScript = <<<HTML
                         <script>
                             (function(){
                                 function qs(sel){ return document.querySelector(sel); }
@@ -3946,18 +3956,18 @@ JS;
                                     if (!card || !body || !title || !sub || !exportBtn) return;
 
                                     card.style.display = 'block';
-                                    title.textContent = 'Clientes do segmento';
+                                    title.textContent = '{$jsClientesSegmento}';
                                     sub.textContent = seg + ': ' + val;
                                     exportBtn.href = '/admin/configuracoes/mapa-calor/export-emails?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val);
 
-                                    body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>';
+                                    body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">{$jsCarregando}</td></tr>';
 
                                     try {
                                         const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val));
                                         const json = await resp.json();
                                         const rows = (json && json.clientes) ? json.clientes : [];
                                         if (!rows.length) {
-                                            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem dados</td></tr>';
+                                            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">{$jsSemDados}</td></tr>';
                                             return;
                                         }
                                         let html = '';
@@ -3971,7 +3981,7 @@ JS;
                                         });
                                         body.innerHTML = html;
                                     } catch (e) {
-                                        body.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar</td></tr>';
+                                        body.innerHTML = '<tr><td colspan="4" class="text-center text-danger">{$jsErroCarregar}</td></tr>';
                                     }
                                 }
 
@@ -3995,7 +4005,7 @@ JS;
                                         const json = await resp.json();
                                         const lojas = (json && json.lojas) ? json.lojas : [];
                                         if (!lojas.length) {
-                                            grid.innerHTML = '<div class="col-12"><div class="text-muted">Sem dados de lojas para segmentar.</div></div>';
+                                            grid.innerHTML = '<div class="col-12"><div class="text-muted">{$jsSemDadosLojas}</div></div>';
                                             bindCards();
                                             return;
                                         }
@@ -4004,15 +4014,15 @@ JS;
                                             html += '<div class="col-6 col-lg-4">'
                                                 + '<a href="#" class="card h-100 text-decoration-none mapa-calor-card" data-seg="loja" data-val="' + esc(l.label || '') + '">'
                                                 + '<div class="card-body">'
-                                                + '<div class="small text-muted">Loja</div>'
+                                                + '<div class="small text-muted">{$jsLoja}</div>'
                                                 + '<div class="fw-bold">' + esc(l.label || '') + '</div>'
-                                                + '<div class="small">Vendidos: <span class="fw-semibold">' + esc(l.quantidade || 0) + '</span></div>'
+                                                + '<div class="small">{$jsVendidos}: <span class="fw-semibold">' + esc(l.quantidade || 0) + '</span></div>'
                                                 + '</div></a></div>';
                                         });
                                         grid.innerHTML = html;
                                         bindCards();
                                     } catch (e) {
-                                        grid.innerHTML = '<div class="col-12"><div class="text-danger">Erro ao carregar lojas</div></div>';
+                                        grid.innerHTML = '<div class="col-12"><div class="text-danger">{$jsErroLojas}</div></div>';
                                     }
                                 }
 
@@ -4026,18 +4036,18 @@ HTML;
             <div class="tab-pane fade" id="v-pills-mapa-calor" role="tabpanel">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Mapa de calor</h5>
+                        <h5 class="mb-0">' . __('admin.settings.heatmap_title', 'Mapa de calor') . '</h5>
                         <span class="badge bg-secondary">Beta</span>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-info" style="border-radius: 12px;">
-                            Clique em uma categoria ou loja para ver os clientes que mais consumiram e exportar e-mails para campanhas.
+                            ' . __('admin.settings.heatmap_intro', 'Clique em uma categoria ou loja para ver os clientes que mais consumiram e exportar e-mails para campanhas.') . '
                         </div>
 
                         <div class="row g-3 mb-4">
                             <div class="col-12">
                                 <div class="card">
-                                    <div class="card-header"><strong>Segmentação por categoria</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_segment_by_category', 'Segmentação por categoria') . '</strong></div>
                                     <div class="card-body">
                                         <div class="row g-2">' . $cardsCategorias . '</div>
                                     </div>
@@ -4045,7 +4055,7 @@ HTML;
                             </div>
                             <div class="col-12">
                                 <div class="card">
-                                    <div class="card-header"><strong>Segmentação por loja</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_segment_by_store', 'Segmentação por loja') . '</strong></div>
                                     <div class="card-body">
                                         <div class="row g-2" id="mapaCalorLojasGrid">' . $cardsLojas . '</div>
                                     </div>
@@ -4056,12 +4066,12 @@ HTML;
                         <div class="card mb-4" id="mapaCalorSegmentoCard" style="display:none;">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div>
-                                    <strong id="mapaCalorSegmentoTitulo">Clientes do segmento</strong>
+                                    <strong id="mapaCalorSegmentoTitulo">' . __('admin.settings.heatmap_segment_clients', 'Clientes do segmento') . '</strong>
                                     <div class="small text-muted" id="mapaCalorSegmentoSub"></div>
                                 </div>
                                 <div class="d-flex gap-2">
                                     <a class="btn btn-sm btn-outline-primary" id="mapaCalorExportBtn" href="#" target="_blank">
-                                        <i class="fas fa-file-csv me-1"></i>Exportar e-mails (CSV)
+                                        <i class="fas fa-file-csv me-1"></i>' . __('admin.settings.heatmap_export_emails_csv', 'Exportar e-mails (CSV)') . '
                                     </a>
                                 </div>
                             </div>
@@ -4070,14 +4080,14 @@ HTML;
                                     <table class="table table-sm table-striped mb-0">
                                         <thead>
                                             <tr>
-                                                <th>Cliente</th>
-                                                <th>E-mail</th>
-                                                <th>Pedidos</th>
-                                                <th>Total gasto</th>
+                                                <th>' . __('admin.settings.heatmap_th_client', 'Cliente') . '</th>
+                                                <th>' . __('admin.settings.heatmap_th_email', 'E-mail') . '</th>
+                                                <th>' . __('admin.settings.heatmap_th_orders', 'Pedidos') . '</th>
+                                                <th>' . __('admin.settings.heatmap_th_total_spent', 'Total gasto') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody id="mapaCalorClientesBody">
-                                            <tr><td colspan="4" class="text-center text-muted">Selecione um segmento acima.</td></tr>
+                                            <tr><td colspan="4" class="text-center text-muted">' . __('admin.settings.heatmap_select_segment', 'Selecione um segmento acima.') . '</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -4087,11 +4097,11 @@ HTML;
                         <div class="row g-3">
                             <div class="col-lg-6">
                                 <div class="card">
-                                    <div class="card-header"><strong>Usuários por sexo</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_users_by_gender', 'Usuários por sexo') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>Sexo</th><th>Total</th></tr></thead>
+                                                <thead><tr><th>' . __('admin.settings.heatmap_th_gender', 'Sexo') . '</th><th>' . __('admin.settings.heatmap_th_total', 'Total') . '</th></tr></thead>
                                                 <tbody>' . $sexRows . '</tbody>
                                             </table>
                                         </div>
@@ -4100,11 +4110,11 @@ HTML;
                             </div>
                             <div class="col-lg-6">
                                 <div class="card">
-                                    <div class="card-header"><strong>Faixa etária com maior consumo</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_age_top_consumption', 'Faixa etária com maior consumo') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>Faixa</th><th>Total gasto</th><th>Pedidos</th></tr></thead>
+                                                <thead><tr><th>' . __('admin.settings.heatmap_th_age_range', 'Faixa') . '</th><th>' . __('admin.settings.heatmap_th_total_spent', 'Total gasto') . '</th><th>' . __('admin.settings.heatmap_th_orders', 'Pedidos') . '</th></tr></thead>
                                                 <tbody>' . $faixaRows . '</tbody>
                                             </table>
                                         </div>
@@ -4114,11 +4124,11 @@ HTML;
 
                             <div class="col-lg-6">
                                 <div class="card">
-                                    <div class="card-header"><strong>Regiões de cadastro (Estados)</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_regions_states', 'Regiões de cadastro (Estados)') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>Estado</th><th>Total</th></tr></thead>
+                                                <thead><tr><th>' . __('admin.settings.heatmap_th_state', 'Estado') . '</th><th>' . __('admin.settings.heatmap_th_total', 'Total') . '</th></tr></thead>
                                                 <tbody>' . $estadoRows . '</tbody>
                                             </table>
                                         </div>
@@ -4127,11 +4137,11 @@ HTML;
                             </div>
                             <div class="col-lg-6">
                                 <div class="card">
-                                    <div class="card-header"><strong>Regiões de cadastro (Países)</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_regions_countries', 'Regiões de cadastro (Países)') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>País</th><th>Total</th></tr></thead>
+                                                <thead><tr><th>' . __('admin.settings.heatmap_th_country', 'País') . '</th><th>' . __('admin.settings.heatmap_th_total', 'Total') . '</th></tr></thead>
                                                 <tbody>' . $paisRows . '</tbody>
                                             </table>
                                         </div>
@@ -4141,11 +4151,11 @@ HTML;
 
                             <div class="col-12">
                                 <div class="card">
-                                    <div class="card-header"><strong>Produtos mais vendidos</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_top_products', 'Produtos mais vendidos') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>ID</th><th>Produto</th><th>Quantidade</th></tr></thead>
+                                                <thead><tr><th>ID</th><th>' . __('admin.settings.heatmap_th_product', 'Produto') . '</th><th>' . __('admin.settings.heatmap_th_quantity', 'Quantidade') . '</th></tr></thead>
                                                 <tbody>' . $prodRows . '</tbody>
                                             </table>
                                         </div>
@@ -4155,11 +4165,11 @@ HTML;
 
                             <div class="col-lg-6">
                                 <div class="card">
-                                    <div class="card-header"><strong>Categorias mais vendidas</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_top_categories', 'Categorias mais vendidas') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>Categoria</th><th>Quantidade</th></tr></thead>
+                                                <thead><tr><th>' . __('admin.settings.heatmap_th_category', 'Categoria') . '</th><th>' . __('admin.settings.heatmap_th_quantity', 'Quantidade') . '</th></tr></thead>
                                                 <tbody>' . $catRows . '</tbody>
                                             </table>
                                         </div>
@@ -4168,11 +4178,11 @@ HTML;
                             </div>
                             <div class="col-lg-6">
                                 <div class="card">
-                                    <div class="card-header"><strong>Tipos de produtos mais vendidos</strong></div>
+                                    <div class="card-header"><strong>' . __('admin.settings.heatmap_top_types', 'Tipos de produtos mais vendidos') . '</strong></div>
                                     <div class="card-body">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped mb-0">
-                                                <thead><tr><th>Tipo</th><th>Quantidade</th></tr></thead>
+                                                <thead><tr><th>' . __('admin.settings.heatmap_th_type', 'Tipo') . '</th><th>' . __('admin.settings.heatmap_th_quantity', 'Quantidade') . '</th></tr></thead>
                                                 <tbody>' . $tipoRows . '</tbody>
                                             </table>
                                         </div>
