@@ -9,7 +9,8 @@ function Escape-PhpSingle($s) {
 # Carregar todas as correcoes
 $fixes = @{}
 foreach ($f in (Get-ChildItem "$root\scripts\retrans_fix_*.json")) {
-    $data = Get-Content $f.FullName -Raw | ConvertFrom-Json
+    $rawJson = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+    $data = $rawJson | ConvertFrom-Json
     foreach ($item in $data) {
         if ($item.key -and $item.en) { $fixes[$item.key] = [string]$item.en }
     }
