@@ -10,37 +10,12 @@
         </div>
     </div>
 
-    <div class="alert alert-info small mb-3">
-        <i class="fas fa-globe me-1"></i>
-        <?= __('admin.shippo.info_intl','Envios internacionais via Shippo para o mundo todo,') ?> <strong><?= __('admin.shippo.info_except_brazil','exceto Brasil') ?></strong>. <?= __('admin.shippo.info_brazil_use','Entregas para o Brasil devem usar o') ?> <a href="/admin/etiquetas-wp"><?= __('admin.shippo.info_intl_mail','Correio Internacional') ?></a>.
-    </div>
-
     <div class="alert alert-danger" id="shippo_error" style="display:none;"></div>
 
     <?php
         $pedidos = isset($pedidos) && is_array($pedidos) ? $pedidos : [];
         $diag = isset($diag) && is_array($diag) ? $diag : [];
     ?>
-    <?php if (empty($pedidos) && !empty($diag)): ?>
-        <div class="alert alert-warning small mb-3">
-            <i class="fas fa-info-circle me-1"></i>
-            <strong><?= __('admin.shippo.diag_title','Nenhum pedido disponível para etiqueta. Diagnóstico:') ?></strong>
-            <ul class="mb-0 mt-1">
-                <li><?= __('admin.shippo.diag_closed_box','Pedidos em Caixa Fechada (produto_consolidado)') ?>: <strong><?= (int) ($diag['caixa_fechada'] ?? 0) ?></strong></li>
-                <li><?= __('admin.shippo.diag_intl','Destes, com destino internacional (fora do Brasil)') ?>: <strong><?= (int) ($diag['internacionais'] ?? 0) ?></strong></li>
-                <li><?= __('admin.shippo.diag_labeled','Destes internacionais, que já possuem etiqueta') ?>: <strong><?= (int) ($diag['ja_com_etiqueta'] ?? 0) ?></strong></li>
-            </ul>
-            <div class="mt-2">
-                <?php if ((int) ($diag['caixa_fechada'] ?? 0) === 0): ?>
-                    <?= __('admin.shippo.diag_hint_no_closed','Não há pedidos em Caixa Fechada. Só aparecem aqui pedidos com status Caixa Fechada (peso e medidas preenchidos). Feche a caixa do pedido em Pedidos para que ele apareça.') ?>
-                <?php elseif ((int) ($diag['internacionais'] ?? 0) === 0): ?>
-                    <?= __('admin.shippo.diag_hint_no_intl','Há pedidos em Caixa Fechada, mas nenhum com destino internacional. Envios para o Brasil usam o Correio Internacional. Verifique o país de destino do endereço do pedido.') ?>
-                <?php else: ?>
-                    <?= __('admin.shippo.diag_hint_all_labeled','Todos os pedidos internacionais em Caixa Fechada já possuem etiqueta gerada (veja abaixo).') ?>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <!-- Pedidos internacionais (todos exceto Brasil) -->
     <div class="card border-0 shadow-sm mb-4">

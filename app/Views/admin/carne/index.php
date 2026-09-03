@@ -521,15 +521,68 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
         <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-stream me-2"></i><?= __('admin.installment.recent_activity', 'Atividade recente') ?></h6></div>
         <div class="card-body pt-0">
             <div class="list-group list-group-flush">
-                <?php foreach ($atividadeRecente as $at):
+                <?php
+                /**
+                 * Traduz a descrição de uma atividade do carnê a partir do seu tipo.
+                 * As descrições são gravadas em PT no banco; aqui reconstruímos a versão
+                 * traduzida com base no código do tipo, extraindo números da descrição original.
+                 */
+                $translateAtividade = function(string $tipo, string $descricao): string {
+                    // Captura sequências de dígitos da descrição original (ex.: numero da parcela / qtd)
+                    preg_match_all('/\d+/', $descricao, $m);
+                    $n = $m[0][0] ?? '';
+                    switch ($tipo) {
+                        case 'carne_criado':
+                            return __('admin.installment.act.carne_criado', 'Carnê criado com {n} parcelas', ['n' => $n]);
+                        case 'parcela_paga':
+                            return __('admin.installment.act.parcela_paga', 'Parcela {n} quitada', ['n' => $n]);
+                        case 'boleto_pago':
+                            return __('admin.installment.act.boleto_pago', 'Boleto da parcela {n} pago', ['n' => $n]);
+                        case 'pix_regerado':
+                            return __('admin.installment.act.pix_regerado', 'PIX regerado para parcela {n}', ['n' => $n]);
+                        case 'boleto_reemitido':
+                            return __('admin.installment.act.boleto_reemitido', 'Boleto reemitido', ['n' => $n]);
+                        case 'parcela_antecipada':
+                            return __('admin.installment.act.parcela_antecipada', 'Parcela {n} antecipada pelo cliente', ['n' => $n]);
+                        case 'pagamento_manual':
+                            return __('admin.installment.act.pagamento_manual', 'Parcela {n} marcada como paga manualmente', ['n' => $n]);
+                        case 'compra_liberada':
+                            return __('admin.installment.act.compra_liberada', 'Primeira parcela paga. Compra interna liberada.');
+                        case 'carne_quitado':
+                            return __('admin.installment.act.carne_quitado', 'Todas as parcelas pagas. Envio liberado.');
+                        case 'carne_cancelado':
+                            return __('admin.installment.act.carne_cancelado', 'Carnê cancelado');
+                        case 'aviso_cancelamento':
+                            return __('admin.installment.act.aviso_cancelamento', 'Aviso de cancelamento enviado');
+                        case 'produto_comprado':
+                            return __('admin.installment.act.produto_comprado', 'Produto marcado como comprado internamente');
+                        case 'produto_recebido':
+                            return __('admin.installment.act.produto_recebido', 'Produto marcado como recebido internamente');
+                        case 'compra_desfeita':
+                            return __('admin.installment.act.compra_desfeita', 'Compra interna revertida para aguardando compra');
+                        case 'envio_liberado':
+                            return __('admin.installment.act.envio_liberado', 'Envio liberado pelo admin');
+                        case 'credito_carteira':
+                            return __('admin.installment.act.credito_carteira', 'Crédito gerado na carteira');
+                        case 'cobranca_enviada':
+                            return __('admin.installment.act.cobranca_enviada', 'E-mail de cobrança processado');
+                        case 'reconciliacao':
+                            return __('admin.installment.act.reconciliacao', 'Parcela {n} reconciliada', ['n' => $n]);
+                        default:
+                            return $descricao; // fallback: mantém texto original do banco
+                    }
+                };
+                foreach ($atividadeRecente as $at):
                     $iconMap = ['parcela_paga' => 'fa-check-circle text-success', 'carne_criado' => 'fa-plus-circle text-primary', 'parcela_vencida' => 'fa-exclamation-circle text-danger', 'envio_liberado' => 'fa-truck text-success', 'compra_realizada' => 'fa-shopping-cart text-info'];
                     $icon = $iconMap[$at['tipo'] ?? ''] ?? 'fa-circle text-muted';
+                    $atTipo = (string) ($at['tipo'] ?? '');
+                    $atDesc = (string) ($at['descricao'] ?? '');
                 ?>
                 <div class="list-group-item px-0 border-0 d-flex align-items-start gap-3">
                     <i class="fas <?= $icon ?> mt-1"></i>
                     <div>
-                        <div class="small fw-semibold"><?= htmlspecialchars($at['descricao'] ?? '') ?></div>
-                        <div class="text-muted" style="font-size:.75rem;"><?= htmlspecialchars($at['cliente_nome'] ?? '') ?> · Pedido #<?= $at['pedido_id'] ?? '' ?> · <?= !empty($at['created_at']) ? date('d/m H:i', strtotime($at['created_at'])) : '' ?></div>
+                        <div class="small fw-semibold"><?= htmlspecialchars($translateAtividade($atTipo, $atDesc)) ?></div>
+                        <div class="text-muted" style="font-size:.75rem;"><?= htmlspecialchars($at['cliente_nome'] ?? '') ?> · <?= __('admin.installment.order', 'Pedido') ?> #<?= $at['pedido_id'] ?? '' ?> · <?= !empty($at['created_at']) ? date('d/m H:i', strtotime($at['created_at'])) : '' ?></div>
                     </div>
                 </div>
                 <?php endforeach; ?>

@@ -595,6 +595,18 @@ class AdminPedidosEditController extends Controller {
                 if ($taxaConvPedido <= 1.01) $taxaConvPedido = \App\Core\ExchangeRate::getUsdToBrl();
             }
 
+            // Exibição de moeda: pedidos em USD mostram US$ e não em R$.
+            // Os valores do pedido já estão gravados na moeda do pedido (não converter aqui).
+            $exibirEmBrl = ($moedaPedido === 'BRL');
+            $simboloMoeda = $exibirEmBrl ? 'R$' : 'US$';
+            // Helper de formatação (PHP)
+            $fmtEdit = function ($valor) use ($exibirEmBrl) {
+                $valor = (float) $valor;
+                return $exibirEmBrl
+                    ? 'R$ ' . number_format($valor, 2, ',', '.')
+                    : 'US$ ' . number_format($valor, 2, '.', ',');
+            };
+
             $gatewayPedido = strtolower((string) ($pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? ''));
             $transacao = (string) ($pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '');
             $temPagamentoAsaas = ($gatewayPedido === 'asaas' && $transacao !== '');
@@ -656,7 +668,7 @@ class AdminPedidosEditController extends Controller {
                                 <div class="d-flex gap-2 align-items-center flex-wrap">
                                     <div>
                                         <label class="form-label small mb-0">' . __('admin.orders_edit.calculated_difference', 'Diferença calculada') . '</label>
-                                        <input type="text" class="form-control" id="diferenca_calculada" readonly style="max-width:180px;" value="R$ 0,00">
+                                        <input type="text" class="form-control" id="diferenca_calculada" readonly style="max-width:180px;" value="' . $simboloMoeda . ' 0' . ($exibirEmBrl ? ',00' : '.00') . '">
                                     </div>
                                     <div>
                                         <label class="form-label small mb-0">' . __('admin.orders_edit.manual_value_optional', 'Valor manual (opcional)') . '</label>
@@ -827,7 +839,7 @@ class AdminPedidosEditController extends Controller {
                         <td>
                             <input type="number" class="form-control form-control-sm preco_unitario" value="' . (float) ($item['preco_unitario'] ?? 0) . '" min="0" step="0.01" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
                         </td>
-                        <td class="subtotal">R$ ' . number_format((float) ($item['subtotal'] ?? 0), 2, ',', '.') . '</td>
+                        <td class="subtotal">' . $fmtEdit((float) ($item['subtotal'] ?? 0)) . '</td>
                         <td>
                             <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)" ' . (!$canEditItens ? 'disabled' : '') . '>
                                 <i class="fas fa-trash"></i>
@@ -869,7 +881,8 @@ class AdminPedidosEditController extends Controller {
                 $pid = (int) ($p['id'] ?? 0);
                 $nome = (string) ($p['name'] ?? '');
                 $preco = (float) ($p['price'] ?? 0);
-                // Converter preço USD para moeda do pedido
+                // Converter preço USD para moeda do pedido (apenas em pedidos BRL).
+                // Em pedidos USD, o preço do catálogo já está em USD.
                 if ($moedaPedido === 'BRL' && $preco > 0) {
                     $preco = round($preco * $taxaConvPedido, 2);
                 }
@@ -890,8 +903,8 @@ class AdminPedidosEditController extends Controller {
                     . (!empty($loja) ? ('<div class="small text-muted">' . __('admin.orders_edit.store_label', 'Loja:') . ' ' . htmlspecialchars($loja) . '</div>') : '')
                     . '</div>'
                     . '<div class="text-end">'
-                    . '<div class="small text-muted">R$</div>'
-                    . '<div style="font-weight:800;">' . number_format($preco, 2, ',', '.') . '</div>'
+                    . '<div class="small text-muted">' . $simboloMoeda . '</div>'
+                    . '<div style="font-weight:800;">' . ($exibirEmBrl ? number_format($preco, 2, ',', '.') : number_format($preco, 2, '.', ',')) . '</div>'
                     . '</div>'
                     . '</div>'
                     . '<div class="mt-2">'
@@ -918,6 +931,16 @@ class AdminPedidosEditController extends Controller {
             const canEditItens = ' . ($canEditItens ? 'true' : 'false') . ';
             const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
             const totalOriginalPedido = ' . json_encode((float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0))) . ';
+            const EDIT_MOEDA_BRL = ' . ($exibirEmBrl ? 'true' : 'false') . ';
+            const EDIT_MOEDA_SIMBOLO = ' . json_encode($simboloMoeda) . ';
+            // Formata um número na moeda do pedido (BRL: 1.234,56 | USD: 1,234.56)
+            function fmtMoedaEdit(v){
+                v = Number(v) || 0;
+                const parts = v.toFixed(2).split(".");
+                const intPart = parts[0].replace(/\\B(?=(\\d{3})+(?!\\d))/g, EDIT_MOEDA_BRL ? "." : ",");
+                const decSep = EDIT_MOEDA_BRL ? "," : ".";
+                return (EDIT_MOEDA_BRL ? "R$ " : "US$ ") + intPart + decSep + parts[1];
+            }
 
             // Guardar URL de origem (listagem de pedidos com paginação/filtros)
             try {
@@ -970,15 +993,15 @@ class AdminPedidosEditController extends Controller {
                     if (el) el.value = v;
                 };
 
-                setVal("subtotal_produtos", "R$ " + subtotal.toFixed(2).replace(".", ","));
-                setVal("valor_desconto", "R$ " + valorDesconto.toFixed(2).replace(".", ","));
-                setVal("valor_total", "R$ " + total.toFixed(2).replace(".", ","));
+                setVal("subtotal_produtos", fmtMoedaEdit(subtotal));
+                setVal("valor_desconto", fmtMoedaEdit(valorDesconto));
+                setVal("valor_total", fmtMoedaEdit(total));
 
                 // Atualizar diferença calculada
                 const difCalc = document.getElementById("diferenca_calculada");
                 if (difCalc) {
                     const dif = Math.max(0, total - totalOriginalPedido);
-                    difCalc.value = "R$ " + dif.toFixed(2).replace(".", ",");
+                    difCalc.value = fmtMoedaEdit(dif);
                     difCalc.style.color = dif > 0 ? "#198754" : "";
                 }
             };
@@ -990,7 +1013,7 @@ class AdminPedidosEditController extends Controller {
                 const preco = parseFloat(row.querySelector(".preco_unitario")?.value || 0) || 0;
                 const subtotal = qtd * preco;
                 const cell = row.querySelector(".subtotal");
-                if (cell) cell.textContent = "R$ " + subtotal.toFixed(2).replace(".", ",");
+                if (cell) cell.textContent = fmtMoedaEdit(subtotal);
                 window.calcularTotal();
             };
 
@@ -1027,7 +1050,7 @@ class AdminPedidosEditController extends Controller {
                     "<td><span class=\"badge bg-secondary\">" + (loja || "outro") + "</span></td>" +
                     "<td><input type=\"number\" class=\"form-control form-control-sm quantidade\" value=\"1\" min=\"1\" onchange=\"atualizarSubtotal(this)\"></td>" +
                     "<td><input type=\"number\" class=\"form-control form-control-sm preco_unitario\" value=\"" + Number(preco) + "\" min=\"0\" step=\"0.01\" onchange=\"atualizarSubtotal(this)\"></td>" +
-                    "<td class=\"subtotal\">R$ " + Number(preco).toFixed(2).replace(".", ",") + "</td>" +
+                    "<td class=\"subtotal\">" + fmtMoedaEdit(Number(preco)) + "</td>" +
                     "<td><button type=\"button\" class=\"btn btn-sm btn-danger\" onclick=\"removerItem(this)\"><i class=\"fas fa-trash\"></i></button></td>";
 
                 try {

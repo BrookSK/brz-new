@@ -2541,6 +2541,13 @@ JS;
                     if ($moeda === '') {
                         $moeda = 'BRL';
                     }
+                    // Normalizar aliases para valores canônicos (USD/BRL)
+                    if (in_array($moeda, ['US$', 'USD$', 'US'], true) || str_contains($moeda, 'DOLAR') || str_contains($moeda, 'DÓLAR')) {
+                        $moeda = 'USD';
+                    }
+                    if (in_array($moeda, ['R$', 'BRL$'], true) || str_contains($moeda, 'REAL') || str_contains($moeda, 'REAIS')) {
+                        $moeda = 'BRL';
+                    }
                     $p['moeda'] = $moeda;
 
                     $taxaConversao = null;
@@ -3050,9 +3057,9 @@ JS;
                             <div class="tab-pane fade" id="pedidos-dolar" role="tabpanel">
                                 <div class="row">';
                 
-                // Filtrar pedidos em USD
+                // Filtrar pedidos em USD (normalizar para tolerar variações como 'usd', ' USD ')
                 $pedidosUSD = array_filter($pedidos, function($pedido) {
-                    return $pedido['moeda'] === 'USD';
+                    return strtoupper(trim((string) ($pedido['moeda'] ?? ''))) === 'USD';
                 });
                 
                 foreach ($pedidosUSD as $pedido) {
@@ -3172,7 +3179,7 @@ JS;
                                 <div class="row">';
                 
                 $pedidosBRL = array_filter($pedidos, function($pedido) {
-                    return $pedido['moeda'] === 'BRL';
+                    return strtoupper(trim((string) ($pedido['moeda'] ?? ''))) !== 'USD';
                 });
                 
                 foreach ($pedidosBRL as $pedido) {
@@ -4131,6 +4138,13 @@ HTML;
             // Determinar moeda de exibição para todo o pedido
             $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'USD')));
             if ($moedaPedido === '') $moedaPedido = 'USD';
+            // Normalizar aliases (US$, DOLAR, R$, REAL) para valores canônicos
+            if (in_array($moedaPedido, ['US$', 'USD$', 'US'], true) || str_contains($moedaPedido, 'DOLAR') || str_contains($moedaPedido, 'DÓLAR')) {
+                $moedaPedido = 'USD';
+            }
+            if (in_array($moedaPedido, ['R$', 'BRL$'], true) || str_contains($moedaPedido, 'REAL') || str_contains($moedaPedido, 'REAIS')) {
+                $moedaPedido = 'BRL';
+            }
             $taxaConvPedido = (float) ($pedido['taxa_conversao'] ?? 1);
             if ($taxaConvPedido <= 0) $taxaConvPedido = 1;
             $exibirEmBrl = ($moedaPedido === 'BRL');
@@ -6342,11 +6356,17 @@ LINKSCRIPT;
     }
 
     private function formatarMoeda($valor, $moeda) {
-        if ($moeda === 'USD') {
-            return '$ ' . number_format($valor, 2, '.', ',');
-        } else {
-            return 'R$ ' . number_format($valor, 2, ',', '.');
+        // Normalizar a moeda para evitar que variações (ex.: 'usd', ' USD ', 'US$',
+        // 'DOLAR') caiam no formato BRL por engano. Um pedido em dólar deve sempre
+        // exibir em US$.
+        $m = strtoupper(trim((string) $moeda));
+        if (in_array($m, ['US$', 'USD$', 'USD', 'US'], true) || str_contains($m, 'DOLAR') || str_contains($m, 'DÓLAR')) {
+            $m = 'USD';
         }
+        if ($m === 'USD') {
+            return 'US$ ' . number_format((float) $valor, 2, '.', ',');
+        }
+        return 'R$ ' . number_format((float) $valor, 2, ',', '.');
     }
 
     private function getStatusLabel(string $status): string {
