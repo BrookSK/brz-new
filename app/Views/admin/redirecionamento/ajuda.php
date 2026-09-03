@@ -22,7 +22,7 @@ $title = 'Como Funciona - Guia do Redirecionador';
                     ['icon'=>'fa-credit-card','title'=>'3. Pague','desc'=>'O valor é calculado pela tabela de pesos. Pague via Stripe (cartão).'],
                     ['icon'=>'fa-tag','title'=>'4. Gere a etiqueta','desc'=>'Após o pagamento, clique em "Gerar Etiqueta". O rastreio é criado automaticamente.'],
                     ['icon'=>'fa-print','title'=>'5. Imprima e cole','desc'=>'Baixe/imprima a etiqueta e cole na caixa do pacote.'],
-                    ['icon'=>'fa-calendar-check','title'=>'6. Agende a coleta','desc'=>'Agende a coleta na aba "Coletas". Nós vamos buscar o pacote.'],
+                    ['icon'=>'fa-calendar-check','title'=>'6. Coleta ou envio','desc'=>'Agende a coleta na aba "Coletas" ou envie o pacote você mesmo para a nossa sede.'],
                     ['icon'=>'fa-weight-hanging','title'=>'7. Verificação','desc'=>'Conferimos peso e dimensões reais. Se houver diferença, cobramos ou reembolsamos.'],
                     ['icon'=>'fa-plane','title'=>'8. Envio e entrega','desc'=>'O pacote é enviado ao Brasil. Acompanhe pelo código de rastreio.'],
                 ];
@@ -157,6 +157,30 @@ $title = 'Como Funciona - Guia do Redirecionador';
                         <li>Aguarde a confirmação do admin</li>
                         <li>No dia agendado, tenha o pacote pronto para retirada</li>
                     </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enviar para a sede -->
+        <div class="accordion-item border-0 shadow-sm mb-3">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secEnvioSede">
+                    <i class="fas fa-dolly me-2 text-primary"></i>Enviar o pacote para a sede
+                </button>
+            </h2>
+            <div id="secEnvioSede" class="accordion-collapse collapse" data-bs-parent="#accordionAjuda">
+                <div class="accordion-body">
+                    <p>Se preferir não aguardar a coleta, você mesmo pode despachar o pacote para a nossa sede:</p>
+                    <ol>
+                        <li>Gere e cole a etiqueta na caixa</li>
+                        <li>Envie o pacote para o nosso endereço de recebimento (abaixo)</li>
+                        <li>Vá em <strong>Envios</strong>, abra o envio e clique em <strong>"Enviei à sede"</strong></li>
+                        <li>Informe o rastreio (opcional) e confirme — nossa equipe é notificada na hora</li>
+                    </ol>
+                    <div class="alert alert-info small py-2 mb-0">
+                        <i class="fas fa-map-marker-alt me-2"></i><strong>Endereço de recebimento:</strong>
+                        <?= htmlspecialchars($enderecoSede ?? '1227 W Broad St, Saint Pauls, NC 28384', ENT_QUOTES, 'UTF-8') ?>
+                    </div>
                 </div>
             </div>
         </div>

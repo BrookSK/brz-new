@@ -111,9 +111,9 @@
 
                     <!-- Foto -->
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">Foto do Produto *</label>
-                        <input type="file" name="foto" class="form-control" accept="image/*" <?= !$editavel ? 'disabled' : '' ?> <?= !$pacote ? 'required' : '' ?>>
-                        <small class="form-text text-muted">JPG, PNG, WebP ou GIF. Max 5MB.</small>
+                        <label class="form-label fw-bold">Foto do Produto</label>
+                        <input type="file" name="foto" class="form-control" accept="image/*" <?= !$editavel ? 'disabled' : '' ?>>
+                        <small class="form-text text-muted">Opcional. JPG, PNG, WebP ou GIF. Max 5MB. Se não enviar, usamos uma imagem padrão.</small>
                     </div>
 
                     <!-- Foto existente -->

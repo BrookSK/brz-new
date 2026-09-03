@@ -7,6 +7,9 @@ use App\Services\EmailService;
 use App\Core\Request;
 
 class AdminPacotesRecebidosController extends Controller {
+    /** Imagem padrão usada quando o pacote é cadastrado sem foto */
+    const FOTO_PADRAO = '/assets/img/produto-sem-imagem.svg';
+
     private $model;
     private $connection;
 
@@ -133,10 +136,17 @@ class AdminPacotesRecebidosController extends Controller {
             return;
         }
 
-        // Upload de foto
+        // Upload de foto (opcional)
         $fotoUrl = $params['foto_url_existente'] ?? ($existente['foto_url'] ?? null);
         if (!empty($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
-            $fotoUrl = $this->handleUpload($_FILES['foto']);
+            $enviada = $this->handleUpload($_FILES['foto']);
+            if ($enviada) {
+                $fotoUrl = $enviada;
+            }
+        }
+        // Foto padrão quando nenhuma imagem foi enviada/preenchida
+        if (empty($fotoUrl)) {
+            $fotoUrl = self::FOTO_PADRAO;
         }
 
         $data = [

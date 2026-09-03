@@ -281,6 +281,7 @@ $router->get('/admin/redirecionamento/envios/{id}',                     'AdminRe
 $router->post('/admin/redirecionamento/envios/{id}/peso-real',          'AdminRedirecionamentoController', 'envioAtualizarPeso');
 $router->post('/admin/redirecionamento/envios/{id}/tracking',           'AdminRedirecionamentoController', 'envioSalvarTracking');
 $router->post('/admin/redirecionamento/envios/{id}/coletado',           'AdminRedirecionamentoController', 'envioMarcarColetado');
+$router->post('/admin/redirecionamento/envios/{id}/enviado-sede',       'AdminRedirecionamentoController', 'envioMarcarEnviadoSede');
 $router->post('/admin/redirecionamento/envios/marcar-pago',             'AdminRedirecionamentoController', 'envioMarcarPago');
 $router->post('/admin/redirecionamento/envios/{id}/entregue',           'AdminRedirecionamentoController', 'envioMarcarEntregue');
 $router->get('/admin/redirecionamento/divergencias',                    'AdminRedirecionamentoController', 'divergencias');
@@ -298,6 +299,7 @@ $router->post('/admin/redirecionamento/tabela-pesos/salvar',            'AdminRe
 $router->post('/admin/redirecionamento/tabela-pesos/excluir',           'AdminRedirecionamentoController', 'tabelaPesosExcluir');
 $router->post('/admin/redirecionamento/configuracao/salvar',            'AdminRedirecionamentoController', 'configuracaoSalvar');
 $router->get('/admin/redirecionamento/tabela-pesos/calcular',           'AdminRedirecionamentoController', 'calcularSimulador');
+$router->get('/admin/redirecionamento/tabela-pesos/pdf',                'AdminRedirecionamentoController', 'tabelaPesosPdf');
 $router->get('/admin/redirecionamento/pagamentos',                      'AdminRedirecionamentoController', 'pagamentos');
 $router->get('/admin/redirecionamento/comprovantes',                    'AdminRedirecionamentoController', 'comprovantes');
 $router->post('/admin/redirecionamento/comprovantes/upload',            'AdminRedirecionamentoController', 'uploadComprovante');

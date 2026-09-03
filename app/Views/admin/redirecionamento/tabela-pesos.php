@@ -12,6 +12,9 @@ $_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
             <h1 class="h2 mb-1">Tabela de Pesos e Preços</h1>
             <div class="text-muted small">Controla toda a cobrança do redirecionamento</div>
         </div>
+        <a href="/admin/redirecionamento/tabela-pesos/pdf" target="_blank" class="btn btn-outline-danger">
+            <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+        </a>
     </div>
 
     <!-- Simulador -->
@@ -116,7 +119,12 @@ $_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
                 <div class="col-md-6">
                     <label class="form-label">Emails de notificação de coletas</label>
                     <input type="text" class="form-control" id="cfgEmailsColeta" value="<?= htmlspecialchars($emailsColeta ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="email1@exemplo.com, email2@exemplo.com">
-                    <div class="form-text">Separados por vírgula. Recebem aviso quando um redirecionador agenda coleta.</div>
+                    <div class="form-text">Separados por vírgula. Recebem aviso quando um redirecionador agenda coleta ou envia para a sede.</div>
+                </div>
+                <div class="col-md-10">
+                    <label class="form-label">Endereço de recebimento (sede)</label>
+                    <input type="text" class="form-control" id="cfgEnderecoSede" value="<?= htmlspecialchars($enderecoSede ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="1227 W Broad St, Saint Pauls, NC 28384">
+                    <div class="form-text">Endereço exibido ao redirecionador (na página pública e no painel) quando ele opta por enviar o pacote em vez de agendar coleta.</div>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="button" class="btn btn-primary w-100" id="btnSalvarProvedor">Salvar</button>
@@ -160,7 +168,13 @@ document.getElementById('btnSalvarProvedor')?.addEventListener('click', async ()
     const fd2 = new FormData();
     fd2.append('chave', 'redirecionamento_emails_coleta');
     fd2.append('valor', emails);
-    const r = await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd2});
+    await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd2});
+
+    // Salvar endereço da sede
+    const fd3 = new FormData();
+    fd3.append('chave', 'redirecionamento_endereco_sede');
+    fd3.append('valor', document.getElementById('cfgEnderecoSede').value);
+    const r = await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd3});
     const j = await r.json();
 
     document.getElementById('msgProvedor').innerHTML = j.ok

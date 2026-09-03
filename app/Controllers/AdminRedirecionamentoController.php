@@ -442,6 +442,8 @@ class AdminRedirecionamentoController extends Controller {
             'etiqueta_gerada_em' => "DATETIME DEFAULT NULL",
             'etiqueta_gerada_por' => "INT DEFAULT NULL",
             'wp_post_id_etiqueta' => "INT DEFAULT NULL COMMENT 'ID do post (package) no WordPress Etiquetas'",
+            'enviado_sede_em' => "DATETIME DEFAULT NULL COMMENT 'Quando o redirecionador marcou que enviou o pacote para a sede'",
+            'envio_sede_tracking' => "VARCHAR(100) DEFAULT NULL COMMENT 'Rastreio informado pelo redirecionador ao enviar para a sede'",
         ]);
 
         // Seed da tabela de pesos se vazia
@@ -807,7 +809,18 @@ class AdminRedirecionamentoController extends Controller {
         $st=$db->prepare($sql); $st->execute($params);
         $envios=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $reds=$db->query("SELECT id,nome FROM redirecionadores ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
-        $this->view('admin/redirecionamento/envios',['envios'=>$envios,'redirecionadores'=>$reds,'filtroStatus'=>$filtroStatus,'filtroRed'=>$filtroRed,'filtroData'=>$filtroData]);
+        $this->view('admin/redirecionamento/envios',['envios'=>$envios,'redirecionadores'=>$reds,'filtroStatus'=>$filtroStatus,'filtroRed'=>$filtroRed,'filtroData'=>$filtroData,'enderecoSede'=>$this->getEnderecoSede()]);
+    }
+
+    /** Endereço de recebimento (sede EUA), configurável em configuracoes_sistema. */
+    private function getEnderecoSede(): string {
+        $fallback = '1227 W Broad St, Saint Pauls, NC 28384';
+        try {
+            $st = $this->pdo()->prepare("SELECT valor FROM configuracoes_sistema WHERE chave='redirecionamento_endereco_sede' LIMIT 1");
+            $st->execute();
+            $val = trim((string) ($st->fetchColumn() ?: ''));
+            return $val !== '' ? $val : $fallback;
+        } catch (\Exception $e) { return $fallback; }
     }
 
     public function envioNovo(Request $request) {
@@ -917,6 +930,85 @@ class AdminRedirecionamentoController extends Controller {
         $this->adminOnly(); $this->migrar();
         $id=(int)$request->getParam('id',0);
         $this->pdo()->prepare("UPDATE redirecionamento_envios SET status='coletado' WHERE id=?")->execute([$id]);
+        $this->json(['ok'=>true]);
+    }
+
+    /**
+     * O redirecionador marca que ELE enviou o pacote para a nossa sede
+     * (em vez de agendar coleta). Notifica o admin igual ao fluxo de coleta.
+     */
+    public function envioMarcarEnviadoSede(Request $request) {
+        $this->auth(); $this->migrar();
+        $id = (int)$request->getParam('id', 0);
+        $tracking = trim((string)$request->getParam('tracking_code', ''));
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'Envio inválido']); return; }
+        $db = $this->pdo();
+
+        // Carrega o envio (com nome do redirecionador e cliente)
+        $st = $db->prepare("SELECT e.*, r.nome AS redirecionador_nome, r.id AS red_id, c.nome AS cliente_nome
+            FROM redirecionamento_envios e
+            LEFT JOIN redirecionadores r ON r.id = e.redirecionador_id
+            LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id
+            WHERE e.id = ? LIMIT 1");
+        $st->execute([$id]);
+        $envio = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+
+        // Se for um redirecionador logado, garante que o envio é dele
+        $redFixo = $this->getRedirecionadorFixo();
+        if ($redFixo && (int)($redFixo['id'] ?? 0) > 0) {
+            if ((int)$envio['redirecionador_id'] !== (int)$redFixo['id']) {
+                $this->json(['ok'=>false,'msg'=>'Este envio não pertence a você.']); return;
+            }
+        }
+
+        $db->prepare("UPDATE redirecionamento_envios SET status='coletado', enviado_sede_em=NOW(), envio_sede_tracking=? WHERE id=?")
+           ->execute([$tracking !== '' ? $tracking : null, $id]);
+
+        // Produtos do envio (para detalhar na notificação)
+        $stP = $db->prepare("SELECT descricao, quantidade FROM redirecionamento_produtos_envio WHERE envio_id=?");
+        $stP->execute([$id]);
+        $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $produtosTxt = '';
+        foreach ($produtos as $p) {
+            $produtosTxt .= '<tr><td style="padding:4px 0;color:#4a4a4a;font-size:13px">'
+                . htmlspecialchars((string)($p['descricao'] ?? ''), ENT_QUOTES, 'UTF-8')
+                . '</td><td style="padding:4px 0;text-align:right;font-weight:600">x' . (int)($p['quantidade'] ?? 1) . '</td></tr>';
+        }
+        if ($produtosTxt === '') {
+            $produtosTxt = '<tr><td colspan="2" style="padding:4px 0;color:#9ca3af;font-size:13px">Sem produtos detalhados</td></tr>';
+        }
+
+        $clienteNome = (string)($envio['cliente_nome'] ?? $envio['destinatario_nome'] ?? '—');
+        $pedidoCli   = (string)($envio['id_pedido_cliente'] ?? '—');
+        $trackingTxt = $tracking !== '' ? htmlspecialchars($tracking, ENT_QUOTES, 'UTF-8') : 'Não informado';
+
+        $assunto = "📦 Pacote enviado à sede - Envio #{$id}";
+        $corpo = '<table style="width:100%;border-collapse:collapse;margin:8px 0">
+            <tr><td style="padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px">
+                <strong style="color:#1e40af">📦 O redirecionador enviou o pacote para a nossa sede</strong>
+            </td></tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Redirecionador</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars((string)($envio['redirecionador_nome'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#' . $id . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Cliente final</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($clienteNome, ENT_QUOTES, 'UTF-8') . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">ID do pedido</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($pedidoCli, ENT_QUOTES, 'UTF-8') . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Rastreio do envio à sede</td><td style="padding:6px 0;font-weight:600">' . $trackingTxt . '</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Pagamento</td><td style="padding:6px 0;font-weight:600">' . (($envio['status_pagamento'] ?? '') === 'pago' ? 'Pago ✅' : 'Pendente') . '</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:13px;color:#6b7280">Produtos:</div>
+        <table style="width:100%;border-collapse:collapse;margin:4px 0 16px">' . $produtosTxt . '</table>
+        <p style="color:#6b7280;font-size:13px;margin-top:16px">Aguarde a chegada do pacote na sede para conferência e prosseguimento do envio.</p>';
+
+        // Notificar mesmos destinatários da coleta
+        $emailsConfig = $this->getEmailsColetaConfig($db);
+        foreach ($emailsConfig as $email) {
+            $this->enviarEmailNotificacao($email, $assunto, $corpo);
+        }
+        $emails = $this->getEmailsNotificacao();
+        $this->enviarEmailNotificacao($emails['fabiana'] ?? '', $assunto, $corpo);
+
         $this->json(['ok'=>true]);
     }
 
@@ -1180,14 +1272,161 @@ class AdminRedirecionamentoController extends Controller {
         $tabela=$db->query("SELECT * FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $provedorEtiqueta = 'wexpress';
         $emailsColeta = '';
+        $enderecoSede = '1227 W Broad St, Saint Pauls, NC 28384';
         try {
-            $st = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('redirecionamento_provedor_etiqueta','redirecionamento_emails_coleta')");
+            $st = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('redirecionamento_provedor_etiqueta','redirecionamento_emails_coleta','redirecionamento_endereco_sede')");
             $st->execute();
             $cfgs = $st->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
             $provedorEtiqueta = trim((string) ($cfgs['redirecionamento_provedor_etiqueta'] ?? 'wexpress'));
             $emailsColeta = trim((string) ($cfgs['redirecionamento_emails_coleta'] ?? ''));
+            if (!empty($cfgs['redirecionamento_endereco_sede'])) {
+                $enderecoSede = trim((string) $cfgs['redirecionamento_endereco_sede']);
+            }
         } catch (\Exception $e) {}
-        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela,'provedorEtiqueta'=>$provedorEtiqueta,'emailsColeta'=>$emailsColeta]);
+        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela,'provedorEtiqueta'=>$provedorEtiqueta,'emailsColeta'=>$emailsColeta,'enderecoSede'=>$enderecoSede]);
+    }
+
+    /**
+     * Exporta a tabela de pesos e preços em PDF (com a logo), pronto para compartilhar.
+     */
+    public function tabelaPesosPdf(Request $request) {
+        $this->auth(); $this->migrar();
+        $db = $this->pdo();
+        $tabela = $db->query("SELECT * FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $logoSrc = $this->getLogoParaPdf();
+        $dataGeracao = date('d/m/Y');
+
+        $linhas = '';
+        foreach ($tabela as $row) {
+            $peso  = number_format((float)$row['peso_ate_kg'], 3, ',', '.');
+            $valor = number_format((float)$row['valor_usd'], 2, ',', '.');
+            $linhas .= '<tr><td class="peso">até ' . $peso . ' kg</td><td class="valor">US$ ' . $valor . '</td></tr>';
+        }
+        if ($linhas === '') {
+            $linhas = '<tr><td colspan="2" style="text-align:center;color:#888;padding:20px">Tabela sem faixas cadastradas.</td></tr>';
+        }
+
+        $logoHtml = $logoSrc !== ''
+            ? '<img src="' . htmlspecialchars($logoSrc, ENT_QUOTES, 'UTF-8') . '" alt="Braziliana" class="logo">'
+            : '<div class="logo-fallback">Braziliana</div>';
+
+        $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
+            @page { margin: 28px 32px; }
+            * { font-family: "DejaVu Sans", sans-serif; }
+            body { color: #1a1a1a; font-size: 13px; }
+            .header { text-align: center; border-bottom: 3px solid #0b1f3a; padding-bottom: 16px; margin-bottom: 24px; }
+            .logo { max-height: 70px; width: auto; margin-bottom: 8px; }
+            .logo-fallback { font-size: 26px; font-weight: bold; color: #0b1f3a; margin-bottom: 8px; }
+            .header h1 { font-size: 20px; color: #0b1f3a; margin: 8px 0 4px; }
+            .header .sub { color: #6b7280; font-size: 12px; }
+            table.tabela { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            table.tabela thead th { background: #0b1f3a; color: #fff; padding: 10px 14px; text-align: left; font-size: 13px; }
+            table.tabela tbody td { padding: 8px 14px; border-bottom: 1px solid #e5e7eb; }
+            table.tabela tbody tr:nth-child(even) { background: #f8fafc; }
+            td.valor { font-weight: bold; text-align: right; color: #0b1f3a; }
+            th.valor-h { text-align: right; }
+            .obs { margin-top: 22px; padding: 12px 16px; background: #f0f9ff; border-left: 4px solid #0ea5e9; font-size: 11px; color: #334155; }
+            .footer { margin-top: 28px; text-align: center; color: #9ca3af; font-size: 10px; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+        </style></head><body>
+            <div class="header">
+                ' . $logoHtml . '
+                <h1>Tabela de Pesos e Preços</h1>
+                <div class="sub">Serviço de Redirecionamento de Pacotes &middot; Valores em dólar (USD) &middot; Emitido em ' . $dataGeracao . '</div>
+            </div>
+            <table class="tabela">
+                <thead><tr><th>Faixa de peso</th><th class="valor-h">Valor (USD)</th></tr></thead>
+                <tbody>' . $linhas . '</tbody>
+            </table>
+            <div class="obs">
+                <strong>Como funciona:</strong> o valor do envio é calculado pela faixa de peso do pacote.
+                O peso máximo é de 30 kg por pacote. Após a conferência, se o peso real for diferente do informado,
+                a diferença é cobrada ou reembolsada.
+            </div>
+            <div class="footer">Braziliana Shop &middot; Serviço de Redirecionamento de Pacotes</div>
+        </body></html>';
+
+        $this->outputPdf($html, 'tabela-pesos-precos');
+    }
+
+    /**
+     * Resolve a logo (configurada no banco ou asset estático) como src utilizável em PDF.
+     * Retorna data-URI para arquivos locais ou a própria URL http(s).
+     */
+    private function getLogoParaPdf(): string {
+        // 1) Logo configurada no banco (mesma lógica do menu/site)
+        $raw = '';
+        try {
+            $db = $this->pdo();
+            $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave IN ('logo_admin','logo')) OR chave IN ('layout_logo_admin','layout_logo') ORDER BY (chave='logo_admin' OR chave='layout_logo_admin') DESC LIMIT 1");
+            $st->execute();
+            $raw = trim((string) ($st->fetchColumn() ?: ''));
+        } catch (\Exception $e) { $raw = ''; }
+
+        $lower = strtolower($raw);
+        if ($raw === '' || in_array($lower, ['0','null','none','false','undefined'], true)) {
+            $raw = '';
+        }
+
+        // URLs http(s) ou data-URI podem ser usadas direto (dompdf com isRemoteEnabled)
+        if ($raw !== '' && (stripos($raw, 'http://') === 0 || stripos($raw, 'https://') === 0 || stripos($raw, 'data:') === 0)) {
+            return $raw;
+        }
+
+        // Caminho local: resolver arquivo físico e converter para data-URI
+        $candidatos = [];
+        if ($raw !== '') {
+            $path = '/' . ltrim($raw, '/');
+            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+            if ($docRoot !== '') {
+                $candidatos[] = $docRoot . str_replace('/', DIRECTORY_SEPARATOR, $path);
+            }
+            $candidatos[] = __DIR__ . '/../../public' . str_replace('/', DIRECTORY_SEPARATOR, $path);
+        }
+        // Fallbacks estáticos conhecidos
+        $candidatos[] = __DIR__ . '/../../public/assets/img/logo.png';
+        $candidatos[] = __DIR__ . '/../../public/assets/img/correiosLogoDeitado.png';
+
+        foreach ($candidatos as $file) {
+            $dataUri = $this->arquivoParaDataUri($file);
+            if ($dataUri !== '') return $dataUri;
+        }
+        return '';
+    }
+
+    /** Converte um arquivo de imagem local em data-URI (vazio se não existir). */
+    private function arquivoParaDataUri(string $path): string {
+        if ($path === '' || !is_file($path)) return '';
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = 'image/png';
+        if ($ext === 'jpg' || $ext === 'jpeg') $mime = 'image/jpeg';
+        elseif ($ext === 'gif') $mime = 'image/gif';
+        elseif ($ext === 'svg') $mime = 'image/svg+xml';
+        elseif ($ext === 'webp') $mime = 'image/webp';
+        $bin = @file_get_contents($path);
+        if ($bin === false || $bin === null || $bin === '') return '';
+        return 'data:' . $mime . ';base64,' . base64_encode($bin);
+    }
+
+    /** Gera e envia um PDF a partir de HTML usando dompdf (fallback: imprime HTML). */
+    private function outputPdf(string $html, string $filenameBase): void {
+        $filenameBase = $filenameBase !== '' ? $filenameBase : 'documento';
+        if (class_exists('Dompdf\\Dompdf')) {
+            $dompdf = new \Dompdf\Dompdf([
+                'isRemoteEnabled' => true,
+                'isHtml5ParserEnabled' => true,
+            ]);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $filenameBase . '.pdf"');
+            echo $dompdf->output();
+            exit;
+        }
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $html;
+        exit;
     }
 
     public function tabelaPesosSalvar(Request $request) {
@@ -1203,7 +1442,7 @@ class AdminRedirecionamentoController extends Controller {
         $this->adminOnly(); $this->migrar();
         $chave = trim((string) $request->getParam('chave', ''));
         $valor = trim((string) $request->getParam('valor', ''));
-        $chavesPermitidas = ['redirecionamento_provedor_etiqueta', 'redirecionamento_emails_coleta'];
+        $chavesPermitidas = ['redirecionamento_provedor_etiqueta', 'redirecionamento_emails_coleta', 'redirecionamento_endereco_sede'];
         if (!in_array($chave, $chavesPermitidas, true)) { $this->json(['ok'=>false,'msg'=>'Chave não permitida']); return; }
         $db = $this->pdo();
 
@@ -1445,7 +1684,7 @@ class AdminRedirecionamentoController extends Controller {
      */
     public function ajuda(Request $request) {
         $this->auth();
-        $this->view('admin/redirecionamento/ajuda');
+        $this->view('admin/redirecionamento/ajuda', ['enderecoSede' => $this->getEnderecoSede()]);
     }
 
     /**

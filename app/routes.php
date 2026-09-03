@@ -45,6 +45,7 @@ $router->post('/cobranca/calcular', 'CobrancaController', 'calcular');
 $router->get('/rastreamento', 'RastreamentoController', 'index');
 $router->get('/faq', 'FaqController', 'index');
 $router->get('/como-funciona', 'ComoFuncionaController', 'index');
+$router->get('/seja-redirecionador', 'RedirecionadorController', 'index');
 $router->get('/status-pedido', 'StatusPedidosController', 'index');
 $router->get('/como-funciona-clube', 'ClubeController', 'comoFuncionaClube');
 $router->get('/contato', 'ContatoController', 'index');
