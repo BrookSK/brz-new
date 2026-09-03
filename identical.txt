@@ -1,0 +1,4 @@
+admin.settings.banner_desktop	Banner Desktop (1149x436)
+admin.settings.banner_mobile	Banner Mobile (391x333)
+admin.settings.carne_group	Carnê Braziliana
+---TOTAL: 3

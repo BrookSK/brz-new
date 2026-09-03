@@ -1356,33 +1356,33 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-entrega" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações de Entrega</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.shipping_title', 'Configurações de Entrega') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-3">
-                                                <label class="form-label">Moeda Padrão</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_default_currency', 'Moeda Padrão') . '</label>
                                                 <select class="form-select" name="entrega_moeda_padrao">
-                                                    <option value="USD" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'USD' ? 'selected' : '') . '>USD - Dólar Americano</option>
-                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'BRL' ? 'selected' : '') . '>BRL - Real Brasileiro</option>
+                                                    <option value="USD" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'USD' ? 'selected' : '') . '>USD - ' . __('admin.settings.shipping_currency_usd_name', 'Dólar Americano') . '</option>
+                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'BRL' ? 'selected' : '') . '>BRL - ' . __('admin.settings.shipping_currency_brl_name', 'Real Brasileiro') . '</option>
                                                 </select>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Taxa de Serviço (USD por kg)</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_service_fee_kg', 'Taxa de Serviço (USD por kg)') . '</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
                                                     <input type="text" class="form-control" name="entrega_taxa_servico_kg" value="' . $this->getConfigValue($config, 'entrega', 'taxa_servico_kg', '39') . '">
                                                 </div>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Frete Grátis Acima de</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_free_above', 'Frete Grátis Acima de') . '</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
                                                     <input type="text" class="form-control" name="entrega_frete_gratis_acima" value="' . $this->getConfigValue($config, 'entrega', 'frete_gratis_acima', '0') . '">
                                                 </div>
-                                                <small class="text-muted">Deixe como 0 para frete sempre grátis</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_free_above_hint', 'Deixe como 0 para frete sempre grátis') . '</small>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Valor Padrão do Frete (USD por kg)</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_default_value_kg', 'Valor Padrão do Frete (USD por kg)') . '</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
                                                     <input type="text" class="form-control" name="entrega_frete_padrao" value="' . $this->getConfigValue($config, 'entrega', 'frete_padrao', '15') . '">
@@ -1390,48 +1390,48 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="mb-3">
-                                                <label class="form-label">Custo fixo interno por item (USD)</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_internal_fixed_cost_item', 'Custo fixo interno por item (USD)') . '</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
                                                     <input type="text" class="form-control" name="entrega_custo_envio_por_item_usd" value="' . $this->getConfigValue($config, 'entrega', 'custo_envio_por_item_usd', '0') . '">
                                                 </div>
-                                                <small class="text-muted">Usado nos relatórios para calcular custo interno de envio (custo por item x quantidade total de itens do pedido).</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_internal_fixed_cost_item_hint', 'Usado nos relatórios para calcular custo interno de envio (custo por item x quantidade total de itens do pedido).') . '</small>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Prazo Padrão (dias)</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_default_deadline_days', 'Prazo Padrão (dias)') . '</label>
                                                 <input type="number" class="form-control" name="entrega_prazo_padrao" value="' . $this->getConfigValue($config, 'entrega', 'prazo_padrao', '30') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">CEP de Origem</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_origin_zip', 'CEP de Origem') . '</label>
                                                 <input type="text" class="form-control" name="entrega_cep_origem" value="' . $this->getConfigValue($config, 'entrega', 'cep_origem', '') . '">
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="entrega_calcular_automatico" value="1" ' . ($this->getConfigValue($config, 'entrega', 'calcular_automatico', '1') === '1' ? 'checked' : '') . '>
-                                                <label class="form-check-label">Calcular frete automaticamente</label>
+                                                <label class="form-check-label">' . __('admin.settings.shipping_auto_calculate', 'Calcular frete automaticamente') . '</label>
                                             </div>
 
                                             <hr>
 
-                                            <h6 class="mb-3">W-Express (Etiquetas)</h6>
+                                            <h6 class="mb-3">W-Express (' . __('admin.settings.shipping_labels', 'Etiquetas') . ')</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ativo</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_active', 'Ativo') . '</label>
                                                         <div class="form-check form-switch">
                                                             <input class="form-check-input" type="checkbox" id="wexpress_enabled" name="entrega_wexpress_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="wexpress_enabled">Habilitar W-Express</label>
+                                                            <label class="form-check-label" for="wexpress_enabled">' . __('admin.settings.shipping_enable_wexpress', 'Habilitar W-Express') . '</label>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ambiente</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_environment', 'Ambiente') . '</label>
                                                         <select class="form-select" name="entrega_wexpress_ambiente">
                                                             <option value="sandbox" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_ambiente', 'sandbox') === 'sandbox' ? 'selected' : '') . '>Sandbox</option>
-                                                            <option value="production" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                            <option value="production" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_ambiente', '') === 'production' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_production', 'Produção') . '</option>
                                                         </select>
-                                                        <small class="text-muted">A API do Swagger usa sandbox.wexpress.me</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_wexpress_swagger_hint', 'A API do Swagger usa sandbox.wexpress.me') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1439,12 +1439,12 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">API Key</label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" name="entrega_wexpress_api_key" value="' . $this->getConfigValue($config, 'entrega', 'wexpress_api_key', '') . '" placeholder="Cole a API Key da W-Express">
+                                                    <input type="password" class="form-control" name="entrega_wexpress_api_key" value="' . $this->getConfigValue($config, 'entrega', 'wexpress_api_key', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_wexpress_api_key_ph', 'Cole a API Key da W-Express'), ENT_QUOTES, 'UTF-8') . '">
                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </div>
-                                                <small class="text-muted">Solicite a chave por e-mail conforme a documentação da W-Express</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_wexpress_api_key_hint', 'Solicite a chave por e-mail conforme a documentação da W-Express') . '</small>
                                             </div>
 
                                             <div class="mb-3">
@@ -1460,22 +1460,22 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Sender (JSON)</label>
                                                 <textarea class="form-control" name="entrega_wexpress_sender_json" rows="6" placeholder="{\n  \"first_name\": \"Tim\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'wexpress_sender_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
-                                                <small class="text-muted">Dados do remetente (EUA). Pode colar o objeto sender do exemplo oficial da W-Express.</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_wexpress_sender_hint', 'Dados do remetente (EUA). Pode colar o objeto sender do exemplo oficial da W-Express.') . '</small>
                                             </div>
 
                                             <hr>
 
-                                            <h6 class="mb-3">Correios (Etiquetas - Provider)</h6>
+                                            <h6 class="mb-3">Correios (' . __('admin.settings.shipping_labels_provider', 'Etiquetas - Provider') . ')</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Provider de etiqueta</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_label_provider', 'Provider de etiqueta') . '</label>
                                                         <select class="form-select" name="entrega_correios_provider">
                                                             <option value="sigep" ' . ($this->getConfigValue($config, 'entrega', 'correios_provider', 'sigep') === 'sigep' ? 'selected' : '') . '>SIGEP (SOAP)</option>
                                                             <option value="prepostagem_v3" ' . ($this->getConfigValue($config, 'entrega', 'correios_provider', '') === 'prepostagem_v3' ? 'selected' : '') . '>Pré-Postagem v3 (REST)</option>
                                                         </select>
-                                                        <small class="text-muted">Escolha como o sistema vai gerar etiquetas dos Correios (SIGEP legado ou Pré-Postagem v3).</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_label_provider_hint', 'Escolha como o sistema vai gerar etiquetas dos Correios (SIGEP legado ou Pré-Postagem v3).') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6"></div>
@@ -1486,32 +1486,32 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="mb-3">
                                                         <label class="form-label">Token (Pré-Postagem v3)</label>
                                                         <div class="input-group">
-                                                            <input type="password" class="form-control" name="entrega_correios_prepostagem_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_token', '') . '" placeholder="Bearer token (Cartão de Postagem)">
+                                                            <input type="password" class="form-control" name="entrega_correios_prepostagem_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_token', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_bearer_posting_card_ph', 'Bearer token (Cartão de Postagem)'), ENT_QUOTES, 'UTF-8') . '">
                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
                                                         </div>
-                                                        <small class="text-muted">A API Pré-Postagem exige autorização via Cartão de Postagem.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_prepostagem_hint', 'A API Pré-Postagem exige autorização via Cartão de Postagem.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <div class="mb-3">
-                                                        <label class="form-label">IdCorreios (opcional)</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_idcorreios_optional', 'IdCorreios (opcional)') . '</label>
                                                         <input type="text" class="form-control" name="entrega_correios_prepostagem_id_correios" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_id_correios', '') . '" placeholder="IdCorreios">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Código do serviço (Pré-Postagem)</label>
-                                                        <input type="text" class="form-control" name="entrega_correios_prepostagem_codigo_servico" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_codigo_servico', '') . '" placeholder="Ex.: 03220">
+                                                        <label class="form-label">' . __('admin.settings.shipping_service_code_prepostagem', 'Código do serviço (Pré-Postagem)') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_prepostagem_codigo_servico" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_codigo_servico', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_eg_prefix', 'Ex.:') . ' 03220', ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div class="mb-3">
-                                                <label class="form-label">Remetente (JSON - Pré-Postagem)</label>
+                                                <label class="form-label">' . __('admin.settings.shipping_sender_json_prepostagem', 'Remetente (JSON - Pré-Postagem)') . '</label>
                                                 <textarea class="form-control" name="entrega_correios_prepostagem_sender_json" rows="6" placeholder="{\n  \"nome\": \"Fulano\",\n  \"cpfCnpj\": \"00000000000\",\n  \"endereco\": {\n    \"cep\": \"00000000\",\n    \"logradouro\": \"Rua\",\n    \"numero\": \"123\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"Cidade\",\n    \"uf\": \"SP\"\n  }\n}">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_prepostagem_sender_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
-                                                <small class="text-muted">Estrutura compatível com o schema RemetenteDTO / EnderecoRemetenteDTO da API Pré-Postagem.</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_prepostagem_schema_hint', 'Estrutura compatível com o schema RemetenteDTO / EnderecoRemetenteDTO da API Pré-Postagem.') . '</small>
                                             </div>
 
                                             <hr>
@@ -1521,21 +1521,21 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ativo</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_active', 'Ativo') . '</label>
                                                         <div class="form-check form-switch">
                                                             <input class="form-check-input" type="checkbox" id="sigep_enabled" name="entrega_sigep_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'sigep_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="sigep_enabled">Habilitar SIGEP Web</label>
+                                                            <label class="form-check-label" for="sigep_enabled">' . __('admin.settings.shipping_enable_sigep', 'Habilitar SIGEP Web') . '</label>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ambiente</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_environment', 'Ambiente') . '</label>
                                                         <select class="form-select" name="entrega_sigep_ambiente">
-                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'sigep_ambiente', 'homologacao') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
-                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'sigep_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'sigep_ambiente', 'homologacao') === 'homologacao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_homologation', 'Homologação') . '</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'sigep_ambiente', '') === 'producao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_production', 'Produção') . '</option>
                                                         </select>
-                                                        <small class="text-muted">Use Homologação até validar contrato/cartão e serviços.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_sigep_homolog_hint', 'Use Homologação até validar contrato/cartão e serviços.') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1543,15 +1543,15 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Usuário</label>
-                                                        <input type="text" class="form-control" name="entrega_sigep_usuario" value="' . $this->getConfigValue($config, 'entrega', 'sigep_usuario', '') . '" placeholder="Usuário SIGEP">
+                                                        <label class="form-label">' . __('admin.settings.shipping_user', 'Usuário') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_usuario" value="' . $this->getConfigValue($config, 'entrega', 'sigep_usuario', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_sigep_user_ph', 'Usuário SIGEP'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Senha</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_password', 'Senha') . '</label>
                                                         <div class="input-group">
-                                                            <input type="password" class="form-control" name="entrega_sigep_senha" value="' . $this->getConfigValue($config, 'entrega', 'sigep_senha', '') . '" placeholder="Senha SIGEP">
+                                                            <input type="password" class="form-control" name="entrega_sigep_senha" value="' . $this->getConfigValue($config, 'entrega', 'sigep_senha', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_sigep_password_ph', 'Senha SIGEP'), ENT_QUOTES, 'UTF-8') . '">
                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
@@ -1563,20 +1563,20 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Contrato</label>
-                                                        <input type="text" class="form-control" name="entrega_sigep_numero_contrato" value="' . $this->getConfigValue($config, 'entrega', 'sigep_numero_contrato', '') . '" placeholder="Número do contrato">
+                                                        <label class="form-label">' . __('admin.settings.shipping_contract', 'Contrato') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_numero_contrato" value="' . $this->getConfigValue($config, 'entrega', 'sigep_numero_contrato', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_contract_number_ph', 'Número do contrato'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Cartão de Postagem</label>
-                                                        <input type="text" class="form-control" name="entrega_sigep_cartao_postagem" value="' . $this->getConfigValue($config, 'entrega', 'sigep_cartao_postagem', '') . '" placeholder="Cartão de postagem">
+                                                        <label class="form-label">' . __('admin.settings.shipping_posting_card', 'Cartão de Postagem') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_cartao_postagem" value="' . $this->getConfigValue($config, 'entrega', 'sigep_cartao_postagem', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_posting_card_ph', 'Cartão de postagem'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
                                                         <label class="form-label">CNPJ</label>
-                                                        <input type="text" class="form-control" name="entrega_sigep_cnpj" value="' . $this->getConfigValue($config, 'entrega', 'sigep_cnpj', '') . '" placeholder="CNPJ do contrato">
+                                                        <input type="text" class="form-control" name="entrega_sigep_cnpj" value="' . $this->getConfigValue($config, 'entrega', 'sigep_cnpj', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_contract_cnpj_ph', 'CNPJ do contrato'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                             </div>
@@ -1584,42 +1584,42 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Serviço</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_service', 'Serviço') . '</label>
                                                         <select class="form-select" name="entrega_sigep_servico">
                                                             <option value="PAC" ' . ($this->getConfigValue($config, 'entrega', 'sigep_servico', 'PAC') === 'PAC' ? 'selected' : '') . '>PAC</option>
                                                             <option value="SEDEX" ' . ($this->getConfigValue($config, 'entrega', 'sigep_servico', '') === 'SEDEX' ? 'selected' : '') . '>SEDEX</option>
                                                         </select>
-                                                        <small class="text-muted">Você pode ajustar quando tiver o contrato em mãos.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_sigep_service_hint', 'Você pode ajustar quando tiver o contrato em mãos.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Código do Serviço no Contrato</label>
-                                                        <input type="text" class="form-control" name="entrega_sigep_servico_codigo" value="' . $this->getConfigValue($config, 'entrega', 'sigep_servico_codigo', '') . '" placeholder="Ex.: 04162 (depende do contrato)">
+                                                        <label class="form-label">' . __('admin.settings.shipping_service_code_contract', 'Código do Serviço no Contrato') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_servico_codigo" value="' . $this->getConfigValue($config, 'entrega', 'sigep_servico_codigo', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_service_code_contract_ph', 'Ex.: 04162 (depende do contrato)'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div class="d-flex gap-2 flex-wrap">
                                                 <button type="button" class="btn btn-outline-primary" onclick="testarSigepAPI()">
-                                                    <i class="fas fa-plug"></i> Testar SIGEP
+                                                    <i class="fas fa-plug"></i> ' . __('admin.settings.shipping_test_sigep', 'Testar SIGEP') . '
                                                 </button>
-                                                <small class="text-muted align-self-center">Executa um teste de solicita\u00E7\u00E3o de etiqueta via SIGEP e mostra o retorno.</small>
+                                                <small class="text-muted align-self-center">' . __('admin.settings.shipping_test_sigep_hint', 'Executa um teste de solicitação de etiqueta via SIGEP e mostra o retorno.') . '</small>
                                             </div>
 
                                             <hr>
 
-                                            <h6 class="mb-3">Correios (Rastreamento)</h6>
+                                            <h6 class="mb-3">Correios (' . __('admin.settings.shipping_tracking', 'Rastreamento') . ')</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ativo</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_active', 'Ativo') . '</label>
                                                         <div class="form-check form-switch">
                                                             <input class="form-check-input" type="checkbox" id="correios_tracking_enabled" name="entrega_correios_tracking_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'correios_tracking_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="correios_tracking_enabled">Habilitar rastreamento via API</label>
+                                                            <label class="form-check-label" for="correios_tracking_enabled">' . __('admin.settings.shipping_enable_tracking_api', 'Habilitar rastreamento via API') . '</label>
                                                         </div>
-                                                        <small class="text-muted">Ative apenas quando tiver o token/API key e o endpoint.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_enable_tracking_api_hint', 'Ative apenas quando tiver o token/API key e o endpoint.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6"></div>
@@ -1628,21 +1628,21 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Usuário (Meu Correios - Token)</label>
-                                                        <input type="text" class="form-control" name="entrega_correios_token_usuario" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_usuario', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Usuário do Meu Correios">
-                                                        <small class="text-muted">Usado para gerar automaticamente o token (Authorization: Basic). Se vazio, o sistema tenta reutilizar o usuário do SIGEP.</small>
+                                                        <label class="form-label">' . __('admin.settings.shipping_user_meu_correios_token', 'Usuário (Meu Correios - Token)') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_token_usuario" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_usuario', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_meu_correios_user_ph', 'Usuário do Meu Correios'), ENT_QUOTES, 'UTF-8') . '">
+                                                        <small class="text-muted">' . __('admin.settings.shipping_correios_token_user_hint', 'Usado para gerar automaticamente o token (Authorization: Basic). Se vazio, o sistema tenta reutilizar o usuário do SIGEP.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Senha / Código de acesso (Meu Correios - Token)</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_password_access_code_meu_correios', 'Senha / Código de acesso (Meu Correios - Token)') . '</label>
                                                         <div class="input-group">
-                                                            <input type="password" class="form-control" name="entrega_correios_token_senha" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_senha', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Senha/Código de acesso do Meu Correios">
+                                                            <input type="password" class="form-control" name="entrega_correios_token_senha" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_senha', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_meu_correios_password_ph', 'Senha/Código de acesso do Meu Correios'), ENT_QUOTES, 'UTF-8') . '">
                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
                                                         </div>
-                                                        <small class="text-muted">Muitas vezes esta credencial é diferente da senha do SIGEP. Necessária para auto-renovar token.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_correios_token_password_hint', 'Muitas vezes esta credencial é diferente da senha do SIGEP. Necessária para auto-renovar token.') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1650,13 +1650,13 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ambiente (Token)</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_environment_token', 'Ambiente (Token)') . '</label>
                                                         <select class="form-select" name="entrega_correios_token_ambiente">
-                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === '' ? 'selected' : '') . '>Seguir SIGEP</option>
-                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
-                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === '' ? 'selected' : '') . '>' . __('admin.settings.shipping_follow_sigep', 'Seguir SIGEP') . '</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'homologacao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_homologation', 'Homologação') . '</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'producao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_production', 'Produção') . '</option>
                                                         </select>
-                                                        <small class="text-muted">Força onde o sistema vai gerar o token (api/apihom). Se vazio, segue o ambiente do SIGEP ou a Base URL do rastreio.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_token_env_hint', 'Força onde o sistema vai gerar o token (api/apihom). Se vazio, segue o ambiente do SIGEP ou a Base URL do rastreio.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-8"></div>
@@ -1665,31 +1665,31 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Token / API Key</label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" name="entrega_correios_tracking_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_token', '') . '" placeholder="Cole o token/API key">
+                                                    <input type="password" class="form-control" name="entrega_correios_tracking_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_token', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_paste_token_api_key_ph', 'Cole o token/API key'), ENT_QUOTES, 'UTF-8') . '">
                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </div>
-                                                <small class="text-muted">O sistema usa automaticamente o endpoint do Packet Service conforme o ambiente selecionado em SIGEP (Homologação/Produção).</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_tracking_token_hint', 'O sistema usa automaticamente o endpoint do Packet Service conforme o ambiente selecionado em SIGEP (Homologação/Produção).') . '</small>
                                             </div>
 
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ambiente (CEP)</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_environment_cep', 'Ambiente (CEP)') . '</label>
                                                         <select class="form-select" name="entrega_correios_cep_ambiente">
-                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === '' ? 'selected' : '') . '>Seguir SIGEP</option>
-                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
-                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === '' ? 'selected' : '') . '>' . __('admin.settings.shipping_follow_sigep', 'Seguir SIGEP') . '</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === 'homologacao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_homologation', 'Homologação') . '</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === 'producao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_production', 'Produção') . '</option>
                                                         </select>
-                                                        <small class="text-muted">Usado para consulta de CEP (Busca CEP). Se vazio, segue o ambiente do SIGEP.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_cep_env_hint', 'Usado para consulta de CEP (Busca CEP). Se vazio, segue o ambiente do SIGEP.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-8">
                                                     <div class="mb-3">
                                                         <label class="form-label">Base URL (CEP)</label>
                                                         <input type="text" class="form-control" name="entrega_correios_cep_base_url" value="' . $this->getConfigValue($config, 'entrega', 'correios_cep_base_url', '') . '" placeholder="https://api.correios.com.br/cep">
-                                                        <small class="text-muted">Opcional. Se vazio, o sistema usa a URL padrão do ambiente selecionado.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_cep_base_url_hint', 'Opcional. Se vazio, o sistema usa a URL padrão do ambiente selecionado.') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1697,12 +1697,12 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Token (CEP - Busca CEP)</label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" name="entrega_correios_cep_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_cep_token', '') . '" placeholder="Bearer token (API Busca CEP)">
+                                                    <input type="password" class="form-control" name="entrega_correios_cep_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_cep_token', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_cep_bearer_ph', 'Bearer token (API Busca CEP)'), ENT_QUOTES, 'UTF-8') . '">
                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </div>
-                                                <small class="text-muted">Se preenchido, este token será usado apenas para consulta de CEP. Se vazio, o sistema reutiliza o token do Rastreamento.</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_cep_token_hint', 'Se preenchido, este token será usado apenas para consulta de CEP. Se vazio, o sistema reutiliza o token do Rastreamento.') . '</small>
                                             </div>
 
                                             <hr>
@@ -1712,10 +1712,10 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ambiente</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_environment', 'Ambiente') . '</label>
                                                         <select class="form-select" name="entrega_correios_packet_ambiente">
-                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_packet_ambiente', 'homologacao') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
-                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_packet_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_packet_ambiente', 'homologacao') === 'homologacao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_homologation', 'Homologação') . '</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_packet_ambiente', '') === 'producao' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_production', 'Produção') . '</option>
                                                         </select>
                                                     </div>
                                                 </div>
@@ -1745,23 +1745,23 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Cartão de postagem</label>
-                                                        <input type="text" class="form-control" name="entrega_correios_packet_cartao_postagem" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_packet_cartao_postagem', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Ex.: 0076772055">
-                                                        <small class="text-muted">Usado para autenticar e gerar o token do PACKET.</small>
+                                                        <label class="form-label">' . __('admin.settings.shipping_posting_card', 'Cartão de Postagem') . '</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_packet_cartao_postagem" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_packet_cartao_postagem', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_eg_prefix', 'Ex.:') . ' 0076772055', ENT_QUOTES, 'UTF-8') . '">
+                                                        <small class="text-muted">' . __('admin.settings.shipping_packet_card_hint', 'Usado para autenticar e gerar o token do PACKET.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6"></div>
                                             </div>
 
-                                <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
+                                <h6 class="mb-3">ShipStation (UPS) - ' . __('admin.settings.shipping_abroad', 'Exterior') . '</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ativo</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_active', 'Ativo') . '</label>
                                                         <div class="form-check form-switch">
                                                             <input class="form-check-input" type="checkbox" id="shipstation_enabled" name="entrega_shipstation_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'shipstation_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="shipstation_enabled">Habilitar ShipStation (UPS)</label>
+                                                            <label class="form-check-label" for="shipstation_enabled">' . __('admin.settings.shipping_enable_shipstation', 'Habilitar ShipStation (UPS)') . '</label>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1773,7 +1773,7 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">API Key</label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" name="entrega_shipstation_api_key" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_api_key', '') . '" placeholder="Cole a API key da ShipStation">
+                                                    <input type="password" class="form-control" name="entrega_shipstation_api_key" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_api_key', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_shipstation_api_key_ph', 'Cole a API key da ShipStation'), ENT_QUOTES, 'UTF-8') . '">
                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
@@ -1783,7 +1783,7 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">From Address (JSON)</label>
                                                 <textarea class="form-control" name="entrega_shipstation_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', '')) !== '' ? (string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', '') : '{"name":"Fabiana Bond","company_name":"Braziliana LLC","phone":"8432228518","email":"fabiana@brazilianashop.com","address_line1":"1227 W Broad St","address_line2":"","city_locality":"Saint Pauls","state_province":"NC","postal_code":"28384-9200","country_code":"US"}'), ENT_QUOTES, 'UTF-8') . '</textarea>
-                                                <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela ShipStation.</small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_shipstation_from_hint', 'Endereço do remetente (EUA) no formato esperado pela ShipStation.') . '</small>
                                             </div>
 
                                             <div class="row">
@@ -1843,24 +1843,24 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                 <hr class="my-4">
-                                <h6 class="mb-3">Shippo (Internacional) - Mundo todo exceto Brasil</h6>
+                                <h6 class="mb-3">Shippo (' . __('admin.settings.shipping_international', 'Internacional') . ') - ' . __('admin.settings.shipping_worldwide_except_brazil', 'Mundo todo exceto Brasil') . '</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ativo</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_active', 'Ativo') . '</label>
                                                         <div class="form-check form-switch">
                                                             <input class="form-check-input" type="checkbox" id="shippo_enabled" name="shippo_enabled" value="1" ' . ($this->getConfigValue($config, 'shippo', 'enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="shippo_enabled">Habilitar Shippo</label>
+                                                            <label class="form-check-label" for="shippo_enabled">' . __('admin.settings.shipping_enable_shippo', 'Habilitar Shippo') . '</label>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Ambiente</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_environment', 'Ambiente') . '</label>
                                                         <select class="form-select" name="shippo_ambiente">
-                                                            <option value="production" ' . ($this->getConfigValue($config, 'shippo', 'ambiente', 'production') === 'production' ? 'selected' : '') . '>Produção</option>
-                                                            <option value="test" ' . ($this->getConfigValue($config, 'shippo', 'ambiente', 'production') === 'test' ? 'selected' : '') . '>Teste (Sandbox)</option>
+                                                            <option value="production" ' . ($this->getConfigValue($config, 'shippo', 'ambiente', 'production') === 'production' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_production', 'Produção') . '</option>
+                                                            <option value="test" ' . ($this->getConfigValue($config, 'shippo', 'ambiente', 'production') === 'test' ? 'selected' : '') . '>' . __('admin.settings.shipping_env_test_sandbox', 'Teste (Sandbox)') . '</option>
                                                         </select>
                                                     </div>
                                                 </div>
@@ -1874,22 +1874,22 @@ class AdminConfiguracoesController extends Controller {
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </div>
-                                                <small class="text-muted">Token da API Shippo. Obtenha em <a href="https://apps.goshippo.com/settings/api" target="_blank">goshippo.com/settings/api</a></small>
+                                                <small class="text-muted">' . __('admin.settings.shipping_shippo_token_hint', 'Token da API Shippo. Obtenha em') . ' <a href="https://apps.goshippo.com/settings/api" target="_blank">goshippo.com/settings/api</a></small>
                                             </div>
 
-                                            <h6 class="mb-2 mt-4 small text-muted">Endereço do Remetente (From Address)</h6>
+                                            <h6 class="mb-2 mt-4 small text-muted">' . __('admin.settings.shipping_sender_address_from', 'Endereço do Remetente (From Address)') . '</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Nome</label>
-                                                        <input type="text" class="form-control" name="shippo_sender_name" value="' . $this->getConfigValue($config, 'shippo', 'sender_name', 'Braziliana Shop') . '" placeholder="Nome do remetente">
+                                                        <label class="form-label">' . __('admin.settings.shipping_name', 'Nome') . '</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_name" value="' . $this->getConfigValue($config, 'shippo', 'sender_name', 'Braziliana Shop') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_sender_name_ph', 'Nome do remetente'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Empresa</label>
-                                                        <input type="text" class="form-control" name="shippo_sender_company" value="' . $this->getConfigValue($config, 'shippo', 'sender_company', 'Braziliana Shop LLC') . '" placeholder="Nome da empresa">
+                                                        <label class="form-label">' . __('admin.settings.shipping_company', 'Empresa') . '</label>
+                                                        <input type="text" class="form-control" name="shippo_sender_company" value="' . $this->getConfigValue($config, 'shippo', 'sender_company', 'Braziliana Shop LLC') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_company_name_ph', 'Nome da empresa'), ENT_QUOTES, 'UTF-8') . '">
                                                     </div>
                                                 </div>
                                             </div>
@@ -1897,13 +1897,13 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-8">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Endereço (Linha 1)</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_address_line1', 'Endereço (Linha 1)') . '</label>
                                                         <input type="text" class="form-control" name="shippo_sender_street1" value="' . $this->getConfigValue($config, 'shippo', 'sender_street1', '') . '" placeholder="1227 W Broad St">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Complemento</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_address_complement', 'Complemento') . '</label>
                                                         <input type="text" class="form-control" name="shippo_sender_street2" value="' . $this->getConfigValue($config, 'shippo', 'sender_street2', '') . '" placeholder="Suite, Apt, etc.">
                                                     </div>
                                                 </div>
@@ -1912,13 +1912,13 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Cidade</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_city', 'Cidade') . '</label>
                                                         <input type="text" class="form-control" name="shippo_sender_city" value="' . $this->getConfigValue($config, 'shippo', 'sender_city', '') . '" placeholder="Saint Pauls">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Estado</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_state', 'Estado') . '</label>
                                                         <input type="text" class="form-control" name="shippo_sender_state" value="' . $this->getConfigValue($config, 'shippo', 'sender_state', '') . '" placeholder="NC" maxlength="2">
                                                     </div>
                                                 </div>
@@ -1933,13 +1933,13 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">País</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_country', 'País') . '</label>
                                                         <input type="text" class="form-control" name="shippo_sender_country" value="' . $this->getConfigValue($config, 'shippo', 'sender_country', 'US') . '" placeholder="US" maxlength="2">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Telefone</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_phone', 'Telefone') . '</label>
                                                         <input type="text" class="form-control" name="shippo_sender_phone" value="' . $this->getConfigValue($config, 'shippo', 'sender_phone', '') . '" placeholder="+1 843 222 8518">
                                                     </div>
                                                 </div>
@@ -1951,22 +1951,22 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                             </div>
 
-                                <h6 class="mb-2 mt-4 small text-muted">Configuração de Frete (Carrier / Serviço)</h6>
-                                <p class="text-muted small">Defina o carrier e serviço padrão para geração de etiquetas em massa. Se preenchido, o sistema usará este serviço diretamente ao invés de cotar todas as opções.</p>
+                                <h6 class="mb-2 mt-4 small text-muted">' . __('admin.settings.shipping_freight_config_carrier_service', 'Configuração de Frete (Carrier / Serviço)') . '</h6>
+                                <p class="text-muted small">' . __('admin.settings.shipping_freight_config_hint', 'Defina o carrier e serviço padrão para geração de etiquetas em massa. Se preenchido, o sistema usará este serviço diretamente ao invés de cotar todas as opções.') . '</p>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Carrier Account ID</label>
-                                                        <input type="text" class="form-control" name="shippo_carrier_account" value="' . $this->getConfigValue($config, 'shippo', 'carrier_account', '') . '" placeholder="Ex: 078870331023437cb917f5187429b093">
-                                                        <small class="text-muted">ID da carrier account configurada na Shippo (USPS, UPS, FedEx, etc.)</small>
+                                                        <input type="text" class="form-control" name="shippo_carrier_account" value="' . $this->getConfigValue($config, 'shippo', 'carrier_account', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_eg_prefix_alt', 'Ex:') . ' 078870331023437cb917f5187429b093', ENT_QUOTES, 'UTF-8') . '">
+                                                        <small class="text-muted">' . __('admin.settings.shipping_carrier_account_hint', 'ID da carrier account configurada na Shippo (USPS, UPS, FedEx, etc.)') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Service Level Token</label>
-                                                        <input type="text" class="form-control" name="shippo_servicelevel_token" value="' . $this->getConfigValue($config, 'shippo', 'servicelevel_token', '') . '" placeholder="Ex: usps_priority, ups_ground, fedex_ground...">
-                                                        <small class="text-muted">Token do nível de serviço. <a href="https://docs.goshippo.com/docs/reference/serviceleveltoken/" target="_blank">Ver lista completa</a></small>
+                                                        <input type="text" class="form-control" name="shippo_servicelevel_token" value="' . $this->getConfigValue($config, 'shippo', 'servicelevel_token', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_eg_prefix_alt', 'Ex:') . ' usps_priority, ups_ground, fedex_ground...', ENT_QUOTES, 'UTF-8') . '">
+                                                        <small class="text-muted">' . __('admin.settings.shipping_servicelevel_hint', 'Token do nível de serviço.') . ' <a href="https://docs.goshippo.com/docs/reference/serviceleveltoken/" target="_blank">' . __('admin.settings.shipping_see_full_list', 'Ver lista completa') . '</a></small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1974,30 +1974,30 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Formato da Etiqueta</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_label_format', 'Formato da Etiqueta') . '</label>
                                                         <select class="form-select" name="shippo_label_file_type">
-                                                            <option value="PDF_4x6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', 'PDF_4x6') === 'PDF_4x6' ? 'selected' : '') . '>PDF 4x6 (uma etiqueta por página)</option>
-                                                            <option value="PDF_A4" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A4' ? 'selected' : '') . '>PDF A4 (uma etiqueta por página)</option>
-                                                            <option value="PDF" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF' ? 'selected' : '') . '>PDF 8.5x11 (duas etiquetas por página)</option>
+                                                            <option value="PDF_4x6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', 'PDF_4x6') === 'PDF_4x6' ? 'selected' : '') . '>PDF 4x6 (' . __('admin.settings.shipping_one_label_per_page', 'uma etiqueta por página') . ')</option>
+                                                            <option value="PDF_A4" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A4' ? 'selected' : '') . '>PDF A4 (' . __('admin.settings.shipping_one_label_per_page', 'uma etiqueta por página') . ')</option>
+                                                            <option value="PDF" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF' ? 'selected' : '') . '>PDF 8.5x11 (' . __('admin.settings.shipping_two_labels_per_page', 'duas etiquetas por página') . ')</option>
                                                             <option value="PDF_A6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A6' ? 'selected' : '') . '>PDF A6</option>
                                                             <option value="PNG" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PNG' ? 'selected' : '') . '>PNG</option>
-                                                            <option value="ZPLII" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'ZPLII' ? 'selected' : '') . '>ZPL II (Térmica)</option>
+                                                            <option value="ZPLII" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'ZPLII' ? 'selected' : '') . '>ZPL II (' . __('admin.settings.shipping_thermal', 'Térmica') . ')</option>
                                                         </select>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Modo de Geração em Massa</label>
+                                                        <label class="form-label">' . __('admin.settings.shipping_bulk_generation_mode', 'Modo de Geração em Massa') . '</label>
                                                         <select class="form-select" name="shippo_massa_mode">
-                                                            <option value="single_call" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', 'single_call') === 'single_call' ? 'selected' : '') . '>Single Call (direto com carrier/serviço)</option>
-                                                            <option value="cheapest" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', '') === 'cheapest' ? 'selected' : '') . '>Mais barato (cotar e escolher menor preço)</option>
+                                                            <option value="single_call" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', 'single_call') === 'single_call' ? 'selected' : '') . '>Single Call (' . __('admin.settings.shipping_direct_carrier_service', 'direto com carrier/serviço') . ')</option>
+                                                            <option value="cheapest" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', '') === 'cheapest' ? 'selected' : '') . '>' . __('admin.settings.shipping_cheapest', 'Mais barato (cotar e escolher menor preço)') . '</option>
                                                         </select>
-                                                        <small class="text-muted">Single Call requer Carrier Account e Service Level preenchidos.</small>
+                                                        <small class="text-muted">' . __('admin.settings.shipping_single_call_hint', 'Single Call requer Carrier Account e Service Level preenchidos.') . '</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Contents Type (Alfândega)</label>
+                                                        <label class="form-label">Contents Type (' . __('admin.settings.shipping_customs', 'Alfândega') . ')</label>
                                                         <select class="form-select" name="shippo_contents_type">
                                                             <option value="MERCHANDISE" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', 'MERCHANDISE') === 'MERCHANDISE' ? 'selected' : '') . '>MERCHANDISE</option>
                                                             <option value="GIFT" ' . ($this->getConfigValue($config, 'shippo', 'contents_type', '') === 'GIFT' ? 'selected' : '') . '>GIFT</option>
@@ -2016,19 +2016,19 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-seo" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações SEO</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.seo_title', 'Configurações SEO') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-3">
-                                                <label class="form-label">Meta Title Padrão</label>
+                                                <label class="form-label">' . __('admin.settings.seo_meta_title', 'Meta Title Padrão') . '</label>
                                                 <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'Braziliana - Produtos de Qualidade') . '">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Meta Description Padrão</label>
+                                                <label class="form-label">' . __('admin.settings.seo_meta_description', 'Meta Description Padrão') . '</label>
                                                 <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na Braziliana') . '</textarea>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Palavras-chave</label>
+                                                <label class="form-label">' . __('admin.settings.seo_keywords', 'Palavras-chave') . '</label>
                                                 <input type="text" class="form-control" name="seo_keywords" value="' . $this->getConfigValue($config, 'seo', 'keywords', '') . '">
                                             </div>
                                             <div class="mb-3">
@@ -2041,7 +2041,7 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="sitemap_gerado" ' . ($this->getConfigValue($config, 'seo', 'sitemap_gerado', '1') === '1' ? 'checked' : '') . '>
-                                                <label class="form-check-label">Gerar Sitemap automaticamente</label>
+                                                <label class="form-check-label">' . __('admin.settings.seo_generate_sitemap', 'Gerar Sitemap automaticamente') . '</label>
                                             </div>
                                         </div>
                                     </div>
@@ -2051,7 +2051,7 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-assessoria" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações da Assessoria (ScrapingBee + ChatGPT)</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.advisory_title', 'Configurações da Assessoria (ScrapingBee + ChatGPT)') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="row">
@@ -2060,7 +2060,7 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="mb-3">
                                                         <label class="form-label">API Key</label>
                                                         <div class="input-group">
-                                                            <input type="password" class="form-control" name="scrapingbee_api_key" value="' . $this->getConfigValue($config, 'scrapingbee', 'api_key', '') . '" placeholder="Cole a API Key do ScrapingBee">
+                                                            <input type="password" class="form-control" name="scrapingbee_api_key" value="' . $this->getConfigValue($config, 'scrapingbee', 'api_key', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.advisory_scrapingbee_api_key_ph', 'Cole a API Key do ScrapingBee'), ENT_QUOTES, 'UTF-8') . '">
                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
@@ -2073,14 +2073,14 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="mb-3">
                                                         <label class="form-label">API Key</label>
                                                         <div class="input-group">
-                                                            <input type="password" class="form-control" name="chatgpt_api_key" value="' . $this->getConfigValue($config, 'chatgpt', 'api_key', '') . '" placeholder="Cole a API Key do ChatGPT">
+                                                            <input type="password" class="form-control" name="chatgpt_api_key" value="' . $this->getConfigValue($config, 'chatgpt', 'api_key', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.advisory_chatgpt_api_key_ph', 'Cole a API Key do ChatGPT'), ENT_QUOTES, 'UTF-8') . '">
                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
                                                         </div>
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Modelo</label>
+                                                        <label class="form-label">' . __('admin.settings.advisory_model', 'Modelo') . '</label>
                                                         <input type="text" class="form-control" name="chatgpt_model" value="' . $this->getConfigValue($config, 'chatgpt', 'model', 'gpt-3.5-turbo') . '">
                                                     </div>
                                                     <div class="mb-3">
@@ -2092,7 +2092,7 @@ class AdminConfiguracoesController extends Controller {
                                                         <input type="number" class="form-control" name="chatgpt_max_tokens" value="' . $this->getConfigValue($config, 'chatgpt', 'max_tokens', '1000') . '">
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Margem de peso (%%)</label>
+                                                        <label class="form-label">' . __('admin.settings.advisory_weight_margin', 'Margem de peso (%%)') . '</label>
                                                         <input type="number" class="form-control" name="chatgpt_peso_margem" value="' . $this->getConfigValue($config, 'chatgpt', 'peso_margem', '15') . '">
                                                     </div>
                                                 </div>
@@ -2102,16 +2102,16 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-md-12">
-                                                    <h6 class="mb-3">Webhooks da Assessoria</h6>
+                                                    <h6 class="mb-3">' . __('admin.settings.advisory_webhooks', 'Webhooks da Assessoria') . '</h6>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Webhook - Início do processamento do orçamento (URL)</label>
+                                                        <label class="form-label">' . __('admin.settings.advisory_webhook_start', 'Webhook - Início do processamento do orçamento (URL)') . '</label>
                                                         <input type="url" class="form-control" name="assessoria_webhook_inicio_url" value="' . $this->getConfigValue($config, 'assessoria', 'webhook_inicio_url', '') . '" placeholder="https://seu-webhook.com/assessoria/inicio">
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Webhook - Conclusão do processamento do orçamento (URL)</label>
+                                                        <label class="form-label">' . __('admin.settings.advisory_webhook_end', 'Webhook - Conclusão do processamento do orçamento (URL)') . '</label>
                                                         <input type="url" class="form-control" name="assessoria_webhook_conclusao_url" value="' . $this->getConfigValue($config, 'assessoria', 'webhook_conclusao_url', '') . '" placeholder="https://seu-webhook.com/assessoria/concluido">
                                                     </div>
-                                                    <small class="text-muted">O sistema enviará POST em JSON com dados do usuário e do orçamento quando o processamento iniciar e quando finalizar.</small>
+                                                    <small class="text-muted">' . __('admin.settings.advisory_webhook_hint', 'O sistema enviará POST em JSON com dados do usuário e do orçamento quando o processamento iniciar e quando finalizar.') . '</small>
                                                 </div>
                                             </div>
                                         </div>
@@ -2122,7 +2122,7 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-pagamentos" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações de Pagamentos</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.payments_title', 'Configurações de Pagamentos') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="row">
@@ -2132,33 +2132,33 @@ class AdminConfiguracoesController extends Controller {
                                                             <h6 class="mb-0">🇧🇷 Asaas</h6>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox" id="asaas_enabled" name="pagamentos_asaas_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                                <label class="form-check-label" for="asaas_enabled">Ativo</label>
+                                                                <label class="form-check-label" for="asaas_enabled">' . __('admin.settings.payments_active', 'Ativo') . '</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="mb-3">
-                                                                <label class="form-label">Ambiente</label>
+                                                                <label class="form-label">' . __('admin.settings.payments_environment', 'Ambiente') . '</label>
                                                                 <select class="form-select" name="pagamentos_asaas_ambiente">
-                                                                    <option value="sandbox" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox') === 'sandbox' ? 'selected' : '') . '>Sandbox (Testes)</option>
-                                                                    <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                                    <option value="sandbox" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox') === 'sandbox' ? 'selected' : '') . '>' . __('admin.settings.payments_env_sandbox_tests', 'Sandbox (Testes)') . '</option>
+                                                                    <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', '') === 'production' ? 'selected' : '') . '>' . __('admin.settings.payments_env_production', 'Produção') . '</option>
                                                                 </select>
                                                             </div>
                                                             <div class="mb-3">
                                                                 <label class="form-label">API Key</label>
                                                                 <div class="input-group">
-                                                                    <input type="password" class="form-control" name="pagamentos_asaas_api_key" value="' . $this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '') . '" placeholder="Sua API Key do Asaas">
+                                                                    <input type="password" class="form-control" name="pagamentos_asaas_api_key" value="' . $this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.payments_asaas_api_key_ph', 'Sua API Key do Asaas'), ENT_QUOTES, 'UTF-8') . '">
                                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
                                                                 </div>
-                                                                <small class="text-muted">API Key obtida no painel do Asaas</small>
+                                                                <small class="text-muted">' . __('admin.settings.payments_asaas_api_key_hint', 'API Key obtida no painel do Asaas') . '</small>
                                                             </div>
                                                             <div class="d-flex gap-2">
                                                                 <button type="button" class="btn btn-outline-primary" onclick="testarAsaasAPI()">
-                                                                    <i class="fas fa-plug"></i> Testar Conexão
+                                                                    <i class="fas fa-plug"></i> ' . __('admin.settings.payments_test_connection', 'Testar Conexão') . '
                                                                 </button>
                                                                 <button type="button" class="btn btn-outline-info" onclick="verDocumentacaoAsaas()">
-                                                                    <i class="fas fa-book"></i> Documentação
+                                                                    <i class="fas fa-book"></i> ' . __('admin.settings.payments_documentation', 'Documentação') . '
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -2170,15 +2170,15 @@ class AdminConfiguracoesController extends Controller {
                                                             <h6 class="mb-0">💳 Stripe</h6>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox" id="stripe_enabled" name="pagamentos_stripe_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                                <label class="form-check-label" for="stripe_enabled">Ativo</label>
+                                                                <label class="form-check-label" for="stripe_enabled">' . __('admin.settings.payments_active', 'Ativo') . '</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="mb-3">
-                                                                <label class="form-label">Ambiente</label>
+                                                                <label class="form-label">' . __('admin.settings.payments_environment', 'Ambiente') . '</label>
                                                                 <select class="form-select" name="pagamentos_stripe_ambiente">
-                                                                    <option value="test" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test') === 'test' ? 'selected' : '') . '>Test (Chaves de Teste)</option>
-                                                                    <option value="live" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', '') === 'live' ? 'selected' : '') . '>Live (Chaves de Produção)</option>
+                                                                    <option value="test" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test') === 'test' ? 'selected' : '') . '>Test (' . __('admin.settings.payments_test_keys', 'Chaves de Teste') . ')</option>
+                                                                    <option value="live" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', '') === 'live' ? 'selected' : '') . '>Live (' . __('admin.settings.payments_production_keys', 'Chaves de Produção') . ')</option>
                                                                 </select>
                                                             </div>
                                                             <div class="mb-3">
@@ -2189,7 +2189,7 @@ class AdminConfiguracoesController extends Controller {
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
                                                                 </div>
-                                                                <small class="text-muted">Chave pública (pk_test_... ou pk_live_...)</small>
+                                                                <small class="text-muted">' . __('admin.settings.payments_stripe_publishable_hint', 'Chave pública (pk_test_... ou pk_live_...)') . '</small>
                                                             </div>
                                                             <div class="mb-3">
                                                                 <label class="form-label">Secret Key</label>
@@ -2199,7 +2199,7 @@ class AdminConfiguracoesController extends Controller {
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
                                                                 </div>
-                                                                <small class="text-muted">Chave secreta (sk_test_... ou sk_live_...)</small>
+                                                                <small class="text-muted">' . __('admin.settings.payments_stripe_secret_hint', 'Chave secreta (sk_test_... ou sk_live_...)') . '</small>
                                                             </div>
                                                             <div class="mb-3">
                                                                 <label class="form-label">Webhook Signing Secret</label>
@@ -2209,14 +2209,14 @@ class AdminConfiguracoesController extends Controller {
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
                                                                 </div>
-                                                                <small class="text-muted">Signing secret do endpoint de webhook (whsec_...). Necessário para validar o Stripe-Signature.</small>
+                                                                <small class="text-muted">' . __('admin.settings.payments_stripe_webhook_secret_hint', 'Signing secret do endpoint de webhook (whsec_...). Necessário para validar o Stripe-Signature.') . '</small>
                                                             </div>
                                                             <div class="d-flex gap-2">
                                                                 <button type="button" class="btn btn-outline-primary" onclick="testarStripeAPI()">
-                                                                    <i class="fas fa-plug"></i> Testar Conexão
+                                                                    <i class="fas fa-plug"></i> ' . __('admin.settings.payments_test_connection', 'Testar Conexão') . '
                                                                 </button>
                                                                 <button type="button" class="btn btn-outline-info" onclick="verDocumentacaoStripe()">
-                                                                    <i class="fas fa-book"></i> Documentação
+                                                                    <i class="fas fa-book"></i> ' . __('admin.settings.payments_documentation', 'Documentação') . '
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -2231,7 +2231,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <h6 class="mb-0">💱 Câmbio Real</h6>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox" id="cambioreal_enabled" name="pagamentos_cambioreal_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'cambioreal_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                                <label class="form-check-label" for="cambioreal_enabled">Ativo</label>
+                                                                <label class="form-check-label" for="cambioreal_enabled">' . __('admin.settings.payments_active', 'Ativo') . '</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
@@ -2272,7 +2272,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-md-6">
                                                     <div class="card border-info">
                                                         <div class="card-header bg-info bg-opacity-10">
-                                                            <h6 class="mb-0">💱 Câmbio Real Taxas <small class="text-muted">(taxa de serviço e impostos)</small></h6>
+                                                            <h6 class="mb-0">💱 Câmbio Real Taxas <small class="text-muted">(' . __('admin.settings.payments_cambioreal_taxas_subtitle', 'taxa de serviço e impostos') . ')</small></h6>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="mb-3">
@@ -2295,7 +2295,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="mb-0">
                                                                 <label class="form-label">Webhook URL</label>
                                                                 <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/cambioreal-taxas', ENT_QUOTES, 'UTF-8') . '" readonly>
-                                                                <div class="form-text">Configure esta URL no painel da Câmbio Real Taxas antes de criar a APIKey.</div>
+                                                                <div class="form-text">' . __('admin.settings.payments_cambioreal_taxas_webhook_hint', 'Configure esta URL no painel da Câmbio Real Taxas antes de criar a APIKey.') . '</div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2312,7 +2312,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <h6 class="mb-0">🇧🇷 AppMax</h6>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox" id="appmax_enabled" name="pagamentos_appmax_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                                <label class="form-check-label" for="appmax_enabled">Ativo</label>
+                                                                <label class="form-check-label" for="appmax_enabled">' . __('admin.settings.payments_active', 'Ativo') . '</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
@@ -2364,16 +2364,16 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="row">
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Ambiente</label>
+                                                                        <label class="form-label">' . __('admin.settings.payments_environment', 'Ambiente') . '</label>
                                                                         <select class="form-select" name="pagamentos_appmax_ambiente">
-                                                                            <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_ambiente', 'production') === 'production' ? 'selected' : '') . '>Produção</option>
-                                                                            <option value="homolog" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_ambiente', 'production') === 'homolog' ? 'selected' : '') . '>Homologação</option>
+                                                                            <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_ambiente', 'production') === 'production' ? 'selected' : '') . '>' . __('admin.settings.payments_env_production', 'Produção') . '</option>
+                                                                            <option value="homolog" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_ambiente', 'production') === 'homolog' ? 'selected' : '') . '>' . __('admin.settings.payments_env_homologation', 'Homologação') . '</option>
                                                                         </select>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Base URL (opcional)</label>
+                                                                        <label class="form-label">Base URL (' . __('admin.settings.payments_optional', 'opcional') . ')</label>
                                                                         <input type="url" class="form-control" name="pagamentos_appmax_base_url" value="' . $this->getConfigValue($config, 'pagamentos', 'appmax_base_url', '') . '" placeholder="https://admin.appmax.com.br/api/v3">
                                                                     </div>
                                                                 </div>
@@ -2399,7 +2399,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <h6 class="mb-0">💙 Mercado Pago</h6>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox" id="mercadopago_enabled" name="pagamentos_mercadopago_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'mercadopago_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                                <label class="form-check-label" for="mercadopago_enabled">Ativo</label>
+                                                                <label class="form-check-label" for="mercadopago_enabled">' . __('admin.settings.payments_active', 'Ativo') . '</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
@@ -2413,14 +2413,14 @@ class AdminConfiguracoesController extends Controller {
                                                                                 <i class="fas fa-eye"></i>
                                                                             </button>
                                                                         </div>
-                                                                        <small class="text-muted">Use o Access Token da conta/app do Mercado Pago.</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_mp_access_token_hint', 'Use o Access Token da conta/app do Mercado Pago.') . '</small>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Public Key (opcional)</label>
+                                                                        <label class="form-label">Public Key (' . __('admin.settings.payments_optional', 'opcional') . ')</label>
                                                                         <input type="text" class="form-control" name="pagamentos_mercadopago_public_key" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_public_key', '') . '" placeholder="APP_USR-...">
-                                                                        <small class="text-muted">Obrigatória apenas se você for usar SDK/JS do MP no frontend.</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_mp_public_key_hint', 'Obrigatória apenas se você for usar SDK/JS do MP no frontend.') . '</small>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2429,7 +2429,7 @@ class AdminConfiguracoesController extends Controller {
                                                                     <div class="mb-3">
                                                                         <label class="form-label">Client ID (OAuth)</label>
                                                                         <input type="text" class="form-control" name="pagamentos_mercadopago_client_id" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_client_id', '') . '" placeholder="1234567890">
-                                                                        <small class="text-muted">Obrigatório para Marketplace Split (OAuth do vendedor).</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_mp_oauth_seller_hint', 'Obrigatório para Marketplace Split (OAuth do vendedor).') . '</small>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6">
@@ -2441,7 +2441,7 @@ class AdminConfiguracoesController extends Controller {
                                                                                 <i class="fas fa-eye"></i>
                                                                             </button>
                                                                         </div>
-                                                                        <small class="text-muted">Obrigatório para Marketplace Split (OAuth do vendedor).</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_mp_oauth_seller_hint', 'Obrigatório para Marketplace Split (OAuth do vendedor).') . '</small>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2450,18 +2450,18 @@ class AdminConfiguracoesController extends Controller {
                                                                     <div class="mb-3">
                                                                         <label class="form-label">Webhook URL</label>
                                                                         <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/mercadopago', ENT_QUOTES, 'UTF-8') . '" readonly>
-                                                                        <small class="text-muted">Configure esta URL no painel do Mercado Pago para receber notificações.</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_mp_webhook_hint', 'Configure esta URL no painel do Mercado Pago para receber notificações.') . '</small>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                             <div class="row">
                                                                 <div class="col-12">
                                                                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                                                                        <a href="/mercadopago/oauth/start" class="btn btn-sm btn-primary">Conectar Mercado Pago (Conta do Produto)</a>
-                                                                        <small class="text-muted">Faça login e autorize a conta que vai receber o valor do produto (OAuth).</small>
+                                                                        <a href="/mercadopago/oauth/start" class="btn btn-sm btn-primary">' . __('admin.settings.payments_mp_connect_btn', 'Conectar Mercado Pago (Conta do Produto)') . '</a>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_mp_connect_hint', 'Faça login e autorize a conta que vai receber o valor do produto (OAuth).') . '</small>
                                                                         ' . (!empty($this->getConfigValue($config, 'pagamentos', 'mercadopago_seller_access_token', ''))
-                                                                            ? '<span class="badge bg-success">Conectado</span>'
-                                                                            : '<span class="badge bg-secondary">Não conectado</span>') . '
+                                                                            ? '<span class="badge bg-success">' . __('admin.settings.payments_connected', 'Conectado') . '</span>'
+                                                                            : '<span class="badge bg-secondary">' . __('admin.settings.payments_not_connected', 'Não conectado') . '</span>') . '
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2472,11 +2472,11 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-12">
-                                                    <h6 class="mb-3">Webhook - Pedido Manual</h6>
+                                                    <h6 class="mb-3">' . __('admin.settings.payments_webhook_manual_order', 'Webhook - Pedido Manual') . '</h6>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Webhook - Link de Pagamento do Pedido Manual (URL)</label>
+                                                        <label class="form-label">' . __('admin.settings.payments_webhook_manual_order_link_label', 'Webhook - Link de Pagamento do Pedido Manual (URL)') . '</label>
                                                         <input type="url" class="form-control" name="pagamentos_webhook_link_pagamento_pedido_manual_url" value="' . $this->getConfigValue($config, 'pagamentos', 'webhook_link_pagamento_pedido_manual_url', '') . '" placeholder="https://seu-webhook.com/pedidos/manual/link-pagamento">
-                                                        <small class="text-muted">O sistema enviará POST em JSON com dados do pedido, cliente e link de pagamento assim que o link for gerado.</small>
+                                                        <small class="text-muted">' . __('admin.settings.payments_webhook_manual_order_hint', 'O sistema enviará POST em JSON com dados do pedido, cliente e link de pagamento assim que o link for gerado.') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2485,11 +2485,11 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-12">
-                                                    <h6 class="mb-3">Desconto no PIX</h6>
+                                                    <h6 class="mb-3">' . __('admin.settings.payments_pix_discount', 'Desconto no PIX') . '</h6>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Desconto na taxa de serviço para PIX (%)</label>
+                                                        <label class="form-label">' . __('admin.settings.payments_pix_service_fee_discount', 'Desconto na taxa de serviço para PIX (%)') . '</label>
                                                         <input type="number" class="form-control" name="pagamentos_pix_desconto_taxa_servico_percent" value="' . $this->getConfigValue($config, 'pagamentos', 'pix_desconto_taxa_servico_percent', '0') . '" step="0.01" min="0" max="100">
-                                                        <small class="text-muted">Aplicado ao calcular a taxa de serviço quando a forma de pagamento selecionada for PIX.</small>
+                                                        <small class="text-muted">' . __('admin.settings.payments_pix_service_fee_discount_hint', 'Aplicado ao calcular a taxa de serviço quando a forma de pagamento selecionada for PIX.') . '</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2500,37 +2500,36 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-12">
                                                     <div class="card border-success mb-3">
                                                         <div class="card-header bg-success bg-opacity-10">
-                                                            <h6 class="mb-0"><i class="fas fa-tags me-1"></i> Desconto Promocional na Taxa de Serviço (Compra Orgânica)</h6>
+                                                            <h6 class="mb-0"><i class="fas fa-tags me-1"></i> ' . __('admin.settings.payments_promo_service_fee_title', 'Desconto Promocional na Taxa de Serviço (Compra Orgânica)') . '</h6>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="alert alert-info small mb-3">
                                                                 <i class="fas fa-info-circle me-1"></i>
-                                                                Este desconto é aplicado <strong>somente sobre a taxa de serviço</strong> em compras orgânicas reais.
-                                                                Não se aplica a redirecionamentos, vendas manuais ou compras feitas pelo admin em nome do cliente.
+                                                                ' . __('admin.settings.payments_promo_service_fee_info', 'Este desconto é aplicado <strong>somente sobre a taxa de serviço</strong> em compras orgânicas reais. Não se aplica a redirecionamentos, vendas manuais ou compras feitas pelo admin em nome do cliente.') . '
                                                             </div>
                                                             <div class="mb-3">
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox" id="promocao_taxa_servico_ativo" name="promocao_taxa_servico_ativo" value="1" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_ativo', '0') === '1' ? 'checked' : '') . '>
                                                                     <label class="form-check-label" for="promocao_taxa_servico_ativo">
-                                                                        <strong>Ativar desconto na taxa de serviço</strong>
+                                                                        <strong>' . __('admin.settings.payments_promo_service_fee_enable', 'Ativar desconto na taxa de serviço') . '</strong>
                                                                     </label>
                                                                 </div>
                                                             </div>
                                                             <div class="row">
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Tipo de desconto</label>
+                                                                        <label class="form-label">' . __('admin.settings.payments_discount_type', 'Tipo de desconto') . '</label>
                                                                         <select class="form-select" name="promocao_taxa_servico_tipo" id="promocao_taxa_servico_tipo">
-                                                                            <option value="percentual" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_tipo', 'percentual') === 'percentual' ? 'selected' : '') . '>Porcentagem (%)</option>
-                                                                            <option value="fixo" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_tipo', 'percentual') === 'fixo' ? 'selected' : '') . '>Valor fixo (USD)</option>
+                                                                            <option value="percentual" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_tipo', 'percentual') === 'percentual' ? 'selected' : '') . '>' . __('admin.settings.payments_discount_type_percentage', 'Porcentagem (%)') . '</option>
+                                                                            <option value="fixo" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_tipo', 'percentual') === 'fixo' ? 'selected' : '') . '>' . __('admin.settings.payments_discount_type_fixed', 'Valor fixo (USD)') . '</option>
                                                                         </select>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Valor do desconto</label>
+                                                                        <label class="form-label">' . __('admin.settings.payments_discount_value', 'Valor do desconto') . '</label>
                                                                         <input type="number" class="form-control" name="promocao_taxa_servico_valor" id="promocao_taxa_servico_valor" value="' . $this->getConfigValue($config, 'promocao', 'taxa_servico_valor', '0') . '" step="0.01" min="0">
-                                                                        <small class="text-muted" id="promocao_taxa_servico_hint">Ex: 10 = 10% de desconto na taxa de serviço</small>
+                                                                        <small class="text-muted" id="promocao_taxa_servico_hint">' . __('admin.settings.payments_discount_value_hint_percent', 'Ex: 10 = 10% de desconto na taxa de serviço') . '</small>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2570,25 +2569,25 @@ class AdminConfiguracoesController extends Controller {
                                                                     <div class="mb-3">
                                                                         <label class="form-label">Cashback (%)</label>
                                                                         <input type="number" step="0.01" min="0" class="form-control" name="clube_cashback_percent" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'cashback_percent', '0'), ENT_QUOTES, 'UTF-8') . '">
-                                                                        <small class="text-muted">Percentual de cashback em créditos internos (apenas produtos com Clube Ativo).</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_clube_cashback_hint', 'Percentual de cashback em créditos internos (apenas produtos com Clube Ativo).') . '</small>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-4">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Rendimento Normal (%)</label>
+                                                                        <label class="form-label">' . __('admin.settings.payments_clube_yield_normal', 'Rendimento Normal (%)') . '</label>
                                                                         <input type="number" step="0.01" min="0" class="form-control" name="clube_rendimento_percent" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'rendimento_percent', '0'), ENT_QUOTES, 'UTF-8') . '">
-                                                                        <small class="text-muted">Percentual de créditos internos gerados periodicamente para o Clube Normal.</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_clube_yield_normal_hint', 'Percentual de créditos internos gerados periodicamente para o Clube Normal.') . '</small>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-4">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Rendimento Turbo (%)</label>
+                                                                        <label class="form-label">' . __('admin.settings.payments_clube_yield_turbo', 'Rendimento Turbo (%)') . '</label>
                                                                         <input type="number" step="0.01" min="0" class="form-control" name="clube_rendimento_turbo_percent" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'rendimento_turbo_percent', '2'), ENT_QUOTES, 'UTF-8') . '">
-                                                                        <small class="text-muted">Percentual de rendimento para recargas Turbo (permanência mínima de 6 meses).</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_clube_yield_turbo_hint', 'Percentual de rendimento para recargas Turbo (permanência mínima de 6 meses).') . '</small>
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-4">
-                                                                    <label class="form-label">Intervalo do rendimento</label>
+                                                                    <label class="form-label">' . __('admin.settings.payments_clube_yield_interval', 'Intervalo do rendimento') . '</label>
                                                                     <div class="input-group mb-3">
                                                                         <input type="number" min="1" step="1" class="form-control" name="clube_rendimento_intervalo_valor" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'rendimento_intervalo_valor', '30'), ENT_QUOTES, 'UTF-8') . '">
                                                                         <select class="form-select" name="clube_rendimento_intervalo_unidade">
@@ -2600,27 +2599,27 @@ class AdminConfiguracoesController extends Controller {
             $unit = 'dia';
         }
 
-        echo '                                                                <option value="minuto" ' . ($unit === 'minuto' ? 'selected' : '') . '>Minuto(s)</option>
-                                                                            <option value="hora" ' . ($unit === 'hora' ? 'selected' : '') . '>Hora(s)</option>
-                                                                            <option value="dia" ' . ($unit === 'dia' ? 'selected' : '') . '>Dia(s)</option>
-                                                                            <option value="mes" ' . ($unit === 'mes' ? 'selected' : '') . '>Mês(es)</option>
+        echo '                                                                <option value="minuto" ' . ($unit === 'minuto' ? 'selected' : '') . '>' . __('admin.settings.payments_clube_unit_minutes', 'Minuto(s)') . '</option>
+                                                                            <option value="hora" ' . ($unit === 'hora' ? 'selected' : '') . '>' . __('admin.settings.payments_clube_unit_hours', 'Hora(s)') . '</option>
+                                                                            <option value="dia" ' . ($unit === 'dia' ? 'selected' : '') . '>' . __('admin.settings.payments_clube_unit_days', 'Dia(s)') . '</option>
+                                                                            <option value="mes" ' . ($unit === 'mes' ? 'selected' : '') . '>' . __('admin.settings.payments_clube_unit_months', 'Mês(es)') . '</option>
                                                                         </select>
                                                                     </div>
-                                                                    <small class="text-muted">Configura a periodicidade do crédito por permanência.</small>
+                                                                    <small class="text-muted">' . __('admin.settings.payments_clube_interval_hint', 'Configura a periodicidade do crédito por permanência.') . '</small>
                                                                 </div>
                                                             </div>
 
                                                             <div class="row mt-2">
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
-                                                                        <label class="form-label">Cron Secret (Rendimento)</label>
+                                                                        <label class="form-label">Cron Secret (' . __('admin.settings.payments_clube_yield_word', 'Rendimento') . ')</label>
                                                                         <div class="input-group">
-                                                                            <input type="password" class="form-control" name="clube_cron_secret" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'cron_secret', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Token para /cron/clube/rendimento">
+                                                                            <input type="password" class="form-control" name="clube_cron_secret" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'cron_secret', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars(__('admin.settings.payments_clube_cron_secret_ph', 'Token para /cron/clube/rendimento'), ENT_QUOTES, 'UTF-8') . '">
                                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                                 <i class="fas fa-eye"></i>
                                                                             </button>
                                                                         </div>
-                                                                        <small class="text-muted">Usado para proteger o endpoint <code>/cron/clube/rendimento?token=...</code>.</small>
+                                                                        <small class="text-muted">' . __('admin.settings.payments_clube_cron_secret_hint', 'Usado para proteger o endpoint') . ' <code>/cron/clube/rendimento?token=...</code>.</small>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2628,27 +2627,27 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="row mt-2">
                                                                 <div class="col-12">
                                                                     <div class="border rounded p-3 bg-light">
-                                                                        <div class="fw-semibold mb-2">Faixas de desconto progressivo (peso total de produtos com Clube Ativo)</div>
+                                                                        <div class="fw-semibold mb-2">' . __('admin.settings.payments_clube_progressive_title', 'Faixas de desconto progressivo (peso total de produtos com Clube Ativo)') . '</div>
                                                                         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                                                                            <div class="text-muted small">Para cadastrar uma nova faixa: preencha a linha <strong>Nova</strong> abaixo (o <strong>Peso mín</strong> pode ser <strong>0</strong>) e clique em <strong>Salvar Configurações</strong>.</div>
-                                                                            <button type="button" class="btn btn-sm btn-primary" onclick="try{addClubeFaixaNova();}catch(e){}">Adicionar faixa</button>
+                                                                            <div class="text-muted small">' . __('admin.settings.payments_clube_progressive_hint', 'Para cadastrar uma nova faixa: preencha a linha <strong>Nova</strong> abaixo (o <strong>Peso mín</strong> pode ser <strong>0</strong>) e clique em <strong>Salvar Configurações</strong>.') . '</div>
+                                                                            <button type="button" class="btn btn-sm btn-primary" onclick="try{addClubeFaixaNova();}catch(e){}">' . __('admin.settings.payments_clube_add_range', 'Adicionar faixa') . '</button>
                                                                         </div>
                                                                         <div class="table-responsive">
                                                                             <table class="table table-sm align-middle mb-0">
                                                                                 <thead>
                                                                                     <tr>
-                                                                                        <th style="width:80px;">Ativo</th>
-                                                                                        <th style="width:120px;">Ordem</th>
-                                                                                        <th style="width:180px;">Peso mín (kg)</th>
-                                                                                        <th style="width:180px;">Peso máx (kg)</th>
-                                                                                        <th style="width:180px;">Desconto (%)</th>
-                                                                                        <th style="width:120px;">Remover</th>
+                                                                                        <th style="width:80px;">' . __('admin.settings.payments_clube_col_active', 'Ativo') . '</th>
+                                                                                        <th style="width:120px;">' . __('admin.settings.payments_clube_col_order', 'Ordem') . '</th>
+                                                                                        <th style="width:180px;">' . __('admin.settings.payments_clube_col_min_weight', 'Peso mín (kg)') . '</th>
+                                                                                        <th style="width:180px;">' . __('admin.settings.payments_clube_col_max_weight', 'Peso máx (kg)') . '</th>
+                                                                                        <th style="width:180px;">' . __('admin.settings.payments_clube_col_discount', 'Desconto (%)') . '</th>
+                                                                                        <th style="width:120px;">' . __('admin.settings.payments_clube_col_remove', 'Remover') . '</th>
                                                                                     </tr>
                                                                                 </thead>
                                                                                 <tbody>';
 
         if (empty($clubeFaixas)) {
-            echo '<tr><td colspan="6" class="text-center text-muted">Nenhuma faixa cadastrada</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted">' . __('admin.settings.payments_clube_no_ranges', 'Nenhuma faixa cadastrada') . '</td></tr>';
         } else {
             foreach ($clubeFaixas as $fx) {
                 $idFx = (int) ($fx['id'] ?? 0);
@@ -2682,13 +2681,13 @@ class AdminConfiguracoesController extends Controller {
                                                                                     . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[peso_min_kg]" value="0" step="0.001" min="0"></td>'
                                                                                     . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[peso_max_kg]" value="0" step="0.001" min="0"></td>'
                                                                                     . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[percentual_desconto]" value="0" step="0.01" min="0"></td>'
-                                                                                    . '<td class="text-muted small">Nova</td>'
+                                                                                    . '<td class="text-muted small">' . __('admin.settings.payments_clube_new_row', 'Nova') . '</td>'
                                                                                     . '</tr>';
 
         echo '                                                                </tbody>
                                                                             </table>
                                                                         </div>
-                                                                        <div class="text-muted small mt-2">O desconto progressivo será calculado somente com base no peso total dos produtos com Clube Ativo.</div>
+                                                                        <div class="text-muted small mt-2">' . __('admin.settings.payments_clube_progressive_note', 'O desconto progressivo será calculado somente com base no peso total dos produtos com Clube Ativo.') . '</div>
                                                                         <script>
                                                                         (function(){
                                                                             function getFirstByName(n){
@@ -2766,7 +2765,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header">
-                                                            <h6 class="mb-0">📊 Status dos Gateways de Pagamento</h6>
+                                                            <h6 class="mb-0">📊 ' . __('admin.settings.payments_gateways_status', 'Status dos Gateways de Pagamento') . '</h6>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="row">
@@ -2777,12 +2776,12 @@ class AdminConfiguracoesController extends Controller {
                                                                             <strong>Asaas:</strong>
                                                                         </div>
                                                                         <span class="badge bg-' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'success' : 'secondary') . '">
-                                                                            ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'Ativo' : 'Inativo') . '
+                                                                            ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? __('admin.settings.payments_status_active', 'Ativo') : __('admin.settings.payments_status_inactive', 'Inativo')) . '
                                                                         </span>
                                                                     </div>
                                                                     <div class="text-muted small">
-                                                                        Ambiente: ' . ucfirst($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox')) . ' | 
-                                                                        API Key: ' . (empty($this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '')) ? 'Não configurada' : 'Configurada') . '
+                                                                        ' . __('admin.settings.payments_status_environment', 'Ambiente') . ': ' . ucfirst($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox')) . ' | 
+                                                                        API Key: ' . (empty($this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '')) ? __('admin.settings.payments_status_not_configured_f', 'Não configurada') : __('admin.settings.payments_status_configured_f', 'Configurada')) . '
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6">
@@ -2792,12 +2791,12 @@ class AdminConfiguracoesController extends Controller {
                                                                             <strong>Stripe:</strong>
                                                                         </div>
                                                                         <span class="badge bg-' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'success' : 'secondary') . '">
-                                                                            ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'Ativo' : 'Inativo') . '
+                                                                            ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? __('admin.settings.payments_status_active', 'Ativo') : __('admin.settings.payments_status_inactive', 'Inativo')) . '
                                                                         </span>
                                                                     </div>
                                                                     <div class="text-muted small">
-                                                                        Ambiente: ' . ucfirst($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test')) . ' | 
-                                                                        Keys: ' . (empty($this->getConfigValue($config, 'pagamentos', 'stripe_publishable_key', '')) ? 'Não configuradas' : 'Configuradas') . '
+                                                                        ' . __('admin.settings.payments_status_environment', 'Ambiente') . ': ' . ucfirst($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test')) . ' | 
+                                                                        Keys: ' . (empty($this->getConfigValue($config, 'pagamentos', 'stripe_publishable_key', '')) ? __('admin.settings.payments_status_not_configured_pl', 'Não configuradas') : __('admin.settings.payments_status_configured_pl', 'Configuradas')) . '
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2812,53 +2811,53 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-comissoes" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações de Comissões</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.commissions_title', 'Configurações de Comissões') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="row g-3 mb-4">
                                                 <div class="col-md-4">
-                                                    <label class="form-label">Comissão de processamento (Online) %</label>
+                                                    <label class="form-label">' . __('admin.settings.commissions_processing_online', 'Comissão de processamento (Online) %') . '</label>
                                                     <input type="number" step="0.01" min="0" max="100" class="form-control" name="comissao_processamento_percent" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'processamento_percent', $this->getConfigValue($config, 'comissao', 'comissao_processamento_percent', '0')), ENT_QUOTES, 'UTF-8') . '">
-                                                    <small class="text-muted">Percentual aplicado sobre o valor líquido (total - impostos - custo do produto) ao finalizar compras online.</small>
+                                                    <small class="text-muted">' . __('admin.settings.commissions_processing_online_hint', 'Percentual aplicado sobre o valor líquido (total - impostos - custo do produto) ao finalizar compras online.') . '</small>
                                                 </div>
                                             </div>
                                             <div class="row g-3 mb-4">
                                                 <div class="col-md-4">
-                                                    <label class="form-label">Início da 1ª janela</label>
+                                                    <label class="form-label">' . __('admin.settings.commissions_first_window_start', 'Início da 1ª janela') . '</label>
                                                     <input type="date" class="form-control" name="comissao_janela_primeiro_inicio" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'janela_primeiro_inicio', ''), ENT_QUOTES, 'UTF-8') . '">
-                                                    <small class="text-muted">Defina a data de início da primeira janela global.</small>
+                                                    <small class="text-muted">' . __('admin.settings.commissions_first_window_start_hint', 'Defina a data de início da primeira janela global.') . '</small>
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label">Fim da 1ª janela</label>
+                                                    <label class="form-label">' . __('admin.settings.commissions_first_window_end', 'Fim da 1ª janela') . '</label>
                                                     <input type="date" class="form-control" name="comissao_janela_primeiro_fim" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'janela_primeiro_fim', ''), ENT_QUOTES, 'UTF-8') . '">
-                                                    <small class="text-muted">Defina a data de término da primeira janela global.</small>
+                                                    <small class="text-muted">' . __('admin.settings.commissions_first_window_end_hint', 'Defina a data de término da primeira janela global.') . '</small>
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label">Duração das janelas (dias)</label>
+                                                    <label class="form-label">' . __('admin.settings.commissions_window_duration_days', 'Duração das janelas (dias)') . '</label>
                                                     <input type="number" min="1" step="1" class="form-control" name="comissao_janela_duracao_dias" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'janela_duracao_dias', '14'), ENT_QUOTES, 'UTF-8') . '">
-                                                    <small class="text-muted">Após a 1ª janela, as próximas são calculadas automaticamente.</small>
+                                                    <small class="text-muted">' . __('admin.settings.commissions_window_duration_days_hint', 'Após a 1ª janela, as próximas são calculadas automaticamente.') . '</small>
                                                 </div>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Faixas de comissão (Pedidos Manuais)</label>
+                                                <label class="form-label">' . __('admin.settings.commissions_manual_ranges', 'Faixas de comissão (Pedidos Manuais)') . '</label>
                                                 <input type="hidden" name="comissao_manual_faixas" id="comissao_manual_faixas" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]'), ENT_QUOTES, 'UTF-8') . '">
                                                 <div class="table-responsive">
                                                     <table class="table table-sm table-bordered align-middle" id="comissaoManualFaixasTable">
                                                         <thead>
                                                             <tr>
-                                                                <th style="width: 30%">Mínimo (R$)</th>
-                                                                <th style="width: 30%">Máximo (R$)</th>
-                                                                <th style="width: 25%">Comissão (%)</th>
-                                                                <th style="width: 15%">Ações</th>
+                                                                <th style="width: 30%">' . __('admin.settings.commissions_col_min', 'Mínimo (R$)') . '</th>
+                                                                <th style="width: 30%">' . __('admin.settings.commissions_col_max', 'Máximo (R$)') . '</th>
+                                                                <th style="width: 25%">' . __('admin.settings.commissions_col_commission', 'Comissão (%)') . '</th>
+                                                                <th style="width: 15%">' . __('admin.settings.commissions_col_actions', 'Ações') . '</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody id="comissaoManualFaixasBody"></tbody>
                                                     </table>
                                                 </div>
                                                 <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddComissaoFaixa">
-                                                    <i class="fas fa-plus"></i> Adicionar faixa
+                                                    <i class="fas fa-plus"></i> ' . __('admin.settings.commissions_add_range', 'Adicionar faixa') . '
                                                 </button>
-                                                <small class="text-muted d-block mt-2">O faturamento usado é a soma do total faturado de pedidos manuais pagos.</small>
+                                                <small class="text-muted d-block mt-2">' . __('admin.settings.commissions_revenue_hint', 'O faturamento usado é a soma do total faturado de pedidos manuais pagos.') . '</small>
                                             </div>
 
                                             ' . $repComissoesHtml . '
@@ -2872,11 +2871,11 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-sistema" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações do Sistema</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.system_title', 'Configurações do Sistema') . '</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-3">
-                                                <label class="form-label">Fuso Horário</label>
+                                                <label class="form-label">' . __('admin.settings.system_timezone', 'Fuso Horário') . '</label>
                                                 <select class="form-select" name="timezone">
                                                     <option value="America/Sao_Paulo" ' . ($this->getConfigValue($config, 'sistema', 'timezone', 'America/Sao_Paulo') === 'America/Sao_Paulo' ? 'selected' : '') . '>America/São Paulo</option>
                                                     <option value="America/New_York" ' . ($this->getConfigValue($config, 'sistema', 'timezone', '') === 'America/New_York' ? 'selected' : '') . '>America/New York</option>
@@ -2884,7 +2883,7 @@ class AdminConfiguracoesController extends Controller {
                                                 </select>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Idioma Padrão</label>
+                                                <label class="form-label">' . __('admin.settings.system_default_language', 'Idioma Padrão') . '</label>
                                                 <select class="form-select" name="idioma">
                                                     <option value="pt-BR" ' . ($this->getConfigValue($config, 'sistema', 'idioma', 'pt-BR') === 'pt-BR' ? 'selected' : '') . '>Português (Brasil)</option>
                                                     <option value="en-US" ' . ($this->getConfigValue($config, 'sistema', 'idioma', '') === 'en-US' ? 'selected' : '') . '>English (US)</option>
@@ -2892,67 +2891,67 @@ class AdminConfiguracoesController extends Controller {
                                                 </select>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Moeda Padrão</label>
+                                                <label class="form-label">' . __('admin.settings.system_default_currency', 'Moeda Padrão') . '</label>
                                                 <select class="form-select" name="moeda">
-                                                    <option value="USD" ' . ($this->getConfigValue($config, 'sistema', 'moeda', 'USD') === 'USD' ? 'selected' : '') . '>Dólar (USD)</option>
-                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'sistema', 'moeda', '') === 'BRL' ? 'selected' : '') . '>Real (BRL)</option>
+                                                    <option value="USD" ' . ($this->getConfigValue($config, 'sistema', 'moeda', 'USD') === 'USD' ? 'selected' : '') . '>' . __('admin.settings.system_currency_usd', 'Dólar (USD)') . '</option>
+                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'sistema', 'moeda', '') === 'BRL' ? 'selected' : '') . '>' . __('admin.settings.system_currency_brl', 'Real (BRL)') . '</option>
                                                     <option value="EUR" ' . ($this->getConfigValue($config, 'sistema', 'moeda', '') === 'EUR' ? 'selected' : '') . '>Euro (EUR)</option>
                                                 </select>
                                             </div>
 
                                             <div class="mb-3">
-                                                <label class="form-label">Taxa de conversão USD → BRL</label>
+                                                <label class="form-label">' . __('admin.settings.system_usd_brl_rate', 'Taxa de conversão USD → BRL') . '</label>
                                                 <input type="number" step="0.0001" min="0" class="form-control" name="sistema_usd_brl_rate" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'usd_brl_rate', '5.85'), ENT_QUOTES, 'UTF-8') . '">
-                                                <small class="text-muted">Taxa usada no conversor global e para cálculos auxiliares em BRL quando necessário.</small>
+                                                <small class="text-muted">' . __('admin.settings.system_usd_brl_rate_hint', 'Taxa usada no conversor global e para cálculos auxiliares em BRL quando necessário.') . '</small>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="manutencao" ' . ($this->getConfigValue($config, 'sistema', 'manutencao', '0') === '1' ? 'checked' : '') . '>
-                                                <label class="form-check-label">Modo Manutenção</label>
+                                                <label class="form-check-label">' . __('admin.settings.system_maintenance_mode', 'Modo Manutenção') . '</label>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="debug" ' . ($this->getConfigValue($config, 'sistema', 'debug', '0') === '1' ? 'checked' : '') . '>
-                                                <label class="form-check-label">Modo Debug</label>
+                                                <label class="form-check-label">' . __('admin.settings.system_debug_mode', 'Modo Debug') . '</label>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="cache_ativado" ' . ($this->getConfigValue($config, 'sistema', 'cache_ativado', '1') === '1' ? 'checked' : '') . '>
-                                                <label class="form-check-label">Cache Ativado</label>
+                                                <label class="form-check-label">' . __('admin.settings.system_cache_enabled', 'Cache Ativado') . '</label>
                                             </div>
 
                                             <hr class="my-4">
 
                                             <div class="border rounded p-3 bg-light">
-                                                <div class="fw-semibold mb-2"><i class="fas fa-comment-dots me-1"></i>Pop-up de Boas-vindas</div>
-                                                <div class="text-muted small mb-3">Exibe um pop-up de boas-vindas na primeira visita do usuário ao site.</div>
+                                                <div class="fw-semibold mb-2"><i class="fas fa-comment-dots me-1"></i>' . __('admin.settings.system_welcome_popup', 'Pop-up de Boas-vindas') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.system_welcome_popup_hint', 'Exibe um pop-up de boas-vindas na primeira visita do usuário ao site.') . '</div>
 
                                                 <div class="form-check mb-0">
                                                     <input class="form-check-input" type="checkbox" name="sistema_welcome_popup_enabled" value="1" ' . ($this->getConfigValue($config, 'sistema', 'welcome_popup_enabled', '1') === '1' ? 'checked' : '') . '>
-                                                    <label class="form-check-label">Ativar pop-up de boas-vindas</label>
+                                                    <label class="form-check-label">' . __('admin.settings.system_welcome_popup_enable', 'Ativar pop-up de boas-vindas') . '</label>
                                                 </div>
                                             </div>
 
                                             <hr class="my-4">
 
                                             <div class="border rounded p-3 bg-light">
-                                                <div class="fw-semibold mb-2"><i class="fas fa-lock me-1"></i>Bloqueio do Site (Site Lock)</div>
+                                                <div class="fw-semibold mb-2"><i class="fas fa-lock me-1"></i>' . __('admin.settings.system_site_lock', 'Bloqueio do Site (Site Lock)') . '</div>
 
                                                 <div class="form-check mb-3">
                                                     <input class="form-check-input" type="checkbox" name="sistema_site_lock_enabled" value="1" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                    <label class="form-check-label">Ativar senha no site</label>
+                                                    <label class="form-check-label">' . __('admin.settings.system_site_lock_enable', 'Ativar senha no site') . '</label>
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Modo de bloqueio</label>
+                                                    <label class="form-label">' . __('admin.settings.system_site_lock_mode', 'Modo de bloqueio') . '</label>
                                                     <select class="form-select" name="sistema_site_lock_mode" id="siteLockMode">
-                                                        <option value="total" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'total' ? 'selected' : '') . '>Bloquear todo o site</option>
-                                                        <option value="parcial" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'parcial' ? 'selected' : '') . '>Bloquear somente páginas específicas</option>
+                                                        <option value="total" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'total' ? 'selected' : '') . '>' . __('admin.settings.system_site_lock_mode_total', 'Bloquear todo o site') . '</option>
+                                                        <option value="parcial" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'parcial' ? 'selected' : '') . '>' . __('admin.settings.system_site_lock_mode_partial', 'Bloquear somente páginas específicas') . '</option>
                                                     </select>
-                                                    <small class="text-muted">Total: exige senha pra acessar qualquer página. Parcial: só bloqueia as rotas listadas abaixo.</small>
+                                                    <small class="text-muted">' . __('admin.settings.system_site_lock_mode_hint', 'Total: exige senha pra acessar qualquer página. Parcial: só bloqueia as rotas listadas abaixo.') . '</small>
                                                 </div>
 
                                                 <div class="mb-3" id="siteLockBlockedPathsWrapper" style="' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'parcial' ? '' : 'display:none') . '">
-                                                    <label class="form-label">Páginas bloqueadas</label>
+                                                    <label class="form-label">' . __('admin.settings.system_site_lock_blocked_pages', 'Páginas bloqueadas') . '</label>
                                                     <input type="text" class="form-control" name="sistema_site_lock_blocked_paths" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'site_lock_blocked_paths', '/assessoria,/status-pedido'), ENT_QUOTES, 'UTF-8') . '" placeholder="/assessoria,/status-pedido">
-                                                    <small class="text-muted">Rotas separadas por vírgula. Ex: <code>/assessoria,/status-pedido,/redirecionamento</code></small>
+                                                    <small class="text-muted">' . __('admin.settings.system_site_lock_blocked_pages_hint', 'Rotas separadas por vírgula. Ex:') . ' <code>/assessoria,/status-pedido,/redirecionamento</code></small>
                                                 </div>
 
                                                 <script>
@@ -2962,50 +2961,50 @@ class AdminConfiguracoesController extends Controller {
                                                 </script>
 
                                                 <div class="mb-0">
-                                                    <label class="form-label">Senha do site</label>
+                                                    <label class="form-label">' . __('admin.settings.system_site_password', 'Senha do site') . '</label>
                                                     <input type="password" class="form-control" name="sistema_site_lock_password" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'site_lock_password', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="********">
-                                                    <small class="text-muted">Não use a mesma senha do admin. Quem digitar essa senha uma vez fica liberado na sessão.</small>
+                                                    <small class="text-muted">' . __('admin.settings.system_site_password_hint', 'Não use a mesma senha do admin. Quem digitar essa senha uma vez fica liberado na sessão.') . '</small>
                                                 </div>
                                             </div>
 
                                             <hr class="my-4">
 
                                             <div class="border rounded p-3 bg-light">
-                                                <div class="fw-semibold mb-2"><i class="fas fa-magic me-1"></i>Redirecionamento / Assessoria</div>
+                                                <div class="fw-semibold mb-2"><i class="fas fa-magic me-1"></i>' . __('admin.settings.system_redirect_assessoria', 'Redirecionamento / Assessoria') . '</div>
                                                 <div class="form-check mb-0">
                                                     <input class="form-check-input" type="checkbox" name="sistema_assessoria_enabled" value="1" ' . ($this->getConfigValue($config, 'sistema', 'assessoria_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                    <label class="form-check-label">Ativar página de Redirecionamento</label>
+                                                    <label class="form-check-label">' . __('admin.settings.system_redirect_enable', 'Ativar página de Redirecionamento') . '</label>
                                                 </div>
-                                                <small class="text-muted">Quando desativado, exibe mensagem orientando contato via WhatsApp.</small>
+                                                <small class="text-muted">' . __('admin.settings.system_redirect_hint', 'Quando desativado, exibe mensagem orientando contato via WhatsApp.') . '</small>
                                             </div>
 
                                             <hr class="my-4">
 
                                             <div class="border rounded p-3 bg-light">
-                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Usuários (CSV)</div>
-                                                <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. O endereço usa prioridade <strong>Billing</strong> e, se não houver, usa <strong>Shipping</strong>.</div>
+                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>' . __('admin.settings.system_import_users_csv', 'Importação de Usuários (CSV)') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.system_import_users_hint', 'Baixe o modelo, preencha e importe. O endereço usa prioridade <strong>Billing</strong> e, se não houver, usa <strong>Shipping</strong>.') . '</div>
 
                                                 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                                                     <a class="btn btn-outline-primary btn-sm" href="/admin/configuracoes/importar-usuarios/modelo" target="_blank">
-                                                        <i class="fas fa-download me-1"></i>Baixar modelo CSV
+                                                        <i class="fas fa-download me-1"></i>' . __('admin.settings.system_download_csv_template', 'Baixar modelo CSV') . '
                                                     </a>
                                                 </div>
 
                                                 <div class="row g-2 align-items-end">
                                                     <div class="col-md-8">
-                                                        <label class="form-label mb-1">Arquivo CSV</label>
+                                                        <label class="form-label mb-1">' . __('admin.settings.system_csv_file', 'Arquivo CSV') . '</label>
                                                         <input type="file" class="form-control" name="usuarios_import_csv" id="usuarios_import_csv" accept=".csv,text/csv">
                                                     </div>
                                                     <div class="col-md-4">
                                                         <button type="button" class="btn btn-primary w-100" id="btnImportarUsuariosCsv">
-                                                            <i class="fas fa-upload me-1"></i>Importar Usuários
+                                                            <i class="fas fa-upload me-1"></i>' . __('admin.settings.system_import_users_btn', 'Importar Usuários') . '
                                                         </button>
                                                     </div>
                                                 </div>
 
                                                 <div class="mt-3" id="usuariosImportProgressWrap" style="display:none;">
                                                     <div class="d-flex justify-content-between small text-muted mb-1">
-                                                        <span id="usuariosImportProgressLabel">Preparando...</span>
+                                                        <span id="usuariosImportProgressLabel">' . __('admin.settings.system_preparing', 'Preparando...') . '</span>
                                                         <span id="usuariosImportProgressPercent">0%</span>
                                                     </div>
                                                     <div class="progress" style="height: 18px;">
@@ -3016,30 +3015,30 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="border rounded p-3 bg-light mt-3">
-                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Pedidos (CSV)</div>
-                                                <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>
+                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>' . __('admin.settings.system_import_orders_csv', 'Importação de Pedidos (CSV)') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.system_import_generic_hint', 'Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).') . '</div>
 
                                                 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                                                     <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/importar/modelo" target="_blank">
-                                                        <i class="fas fa-download me-1"></i>Baixar modelo CSV
+                                                        <i class="fas fa-download me-1"></i>' . __('admin.settings.system_download_csv_template', 'Baixar modelo CSV') . '
                                                     </a>
                                                 </div>
 
                                                 <div class="row g-2 align-items-end">
                                                     <div class="col-md-8">
-                                                        <label class="form-label mb-1">Arquivo CSV</label>
+                                                        <label class="form-label mb-1">' . __('admin.settings.system_csv_file', 'Arquivo CSV') . '</label>
                                                         <input type="file" class="form-control" name="pedidos_import_csv" id="pedidos_import_csv" accept=".csv,text/csv">
                                                     </div>
                                                     <div class="col-md-4">
                                                         <button type="button" class="btn btn-primary w-100" id="btnImportarPedidosCsv">
-                                                            <i class="fas fa-upload me-1"></i>Importar Pedidos
+                                                            <i class="fas fa-upload me-1"></i>' . __('admin.settings.system_import_orders_btn', 'Importar Pedidos') . '
                                                         </button>
                                                     </div>
                                                 </div>
 
                                                 <div class="mt-3" id="pedidosImportProgressWrap" style="display:none;">
                                                     <div class="d-flex justify-content-between small text-muted mb-1">
-                                                        <span id="pedidosImportProgressLabel">Preparando...</span>
+                                                        <span id="pedidosImportProgressLabel">' . __('admin.settings.system_preparing', 'Preparando...') . '</span>
                                                         <span id="pedidosImportProgressPercent">0%</span>
                                                     </div>
                                                     <div class="progress" style="height: 18px;">
@@ -3050,30 +3049,30 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <div class="border rounded p-3 bg-light mt-3">
-                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Produtos (CSV)</div>
-                                                <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>
+                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>' . __('admin.settings.system_import_products_csv', 'Importação de Produtos (CSV)') . '</div>
+                                                <div class="text-muted small mb-3">' . __('admin.settings.system_import_generic_hint', 'Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).') . '</div>
 
                                                 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                                                     <a class="btn btn-outline-primary btn-sm" href="/admin/produtos/importar/modelo" target="_blank">
-                                                        <i class="fas fa-download me-1"></i>Baixar modelo CSV
+                                                        <i class="fas fa-download me-1"></i>' . __('admin.settings.system_download_csv_template', 'Baixar modelo CSV') . '
                                                     </a>
                                                 </div>
 
                                                 <div class="row g-2 align-items-end">
                                                     <div class="col-md-8">
-                                                        <label class="form-label mb-1">Arquivo CSV</label>
+                                                        <label class="form-label mb-1">' . __('admin.settings.system_csv_file', 'Arquivo CSV') . '</label>
                                                         <input type="file" class="form-control" name="produtos_import_csv" id="produtos_import_csv" accept=".csv,text/csv">
                                                     </div>
                                                     <div class="col-md-4">
                                                         <button type="button" class="btn btn-primary w-100" id="btnImportarProdutosCsv">
-                                                            <i class="fas fa-upload me-1"></i>Importar Produtos
+                                                            <i class="fas fa-upload me-1"></i>' . __('admin.settings.system_import_products_btn', 'Importar Produtos') . '
                                                         </button>
                                                     </div>
                                                 </div>
 
                                                 <div class="mt-3" id="produtosImportProgressWrap" style="display:none;">
                                                     <div class="d-flex justify-content-between small text-muted mb-1">
-                                                        <span id="produtosImportProgressLabel">Preparando...</span>
+                                                        <span id="produtosImportProgressLabel">' . __('admin.settings.system_preparing', 'Preparando...') . '</span>
                                                         <span id="produtosImportProgressPercent">0%</span>
                                                     </div>
                                                     <div class="progress" style="height: 18px;">
@@ -3090,36 +3089,36 @@ class AdminConfiguracoesController extends Controller {
                                 <div class="tab-pane fade" id="v-pills-demandas" role="tabpanel">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h5 class="mb-0">Configurações de Demandas (TI)</h5>
+                                            <h5 class="mb-0">' . __('admin.settings.demands_title', 'Configurações de Demandas (TI)') . '</h5>
                                         </div>
                                         <div class="card-body">
-                                            <h6 class="fw-bold small mb-3"><i class="fas fa-lock me-2"></i>Acesso ao Painel</h6>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-lock me-2"></i>' . __('admin.settings.demands_panel_access', 'Acesso ao Painel') . '</h6>
                                             <div class="mb-3">
-                                                <label class="form-label">Senha do Painel de Demandas</label>
-                                                <input type="text" class="form-control" name="demandas_senha_painel" value="' . htmlspecialchars($demandasConfig['demandas_senha_painel'], ENT_QUOTES, 'UTF-8') . '" placeholder="Deixe vazio para desativar">
-                                                <small class="text-muted">Se preenchida, será exigida ao acessar o painel de demandas.</small>
+                                                <label class="form-label">' . __('admin.settings.demands_panel_password', 'Senha do Painel de Demandas') . '</label>
+                                                <input type="text" class="form-control" name="demandas_senha_painel" value="' . htmlspecialchars($demandasConfig['demandas_senha_painel'], ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars(__('admin.settings.demands_panel_password_ph', 'Deixe vazio para desativar'), ENT_QUOTES, 'UTF-8') . '">
+                                                <small class="text-muted">' . __('admin.settings.demands_panel_password_hint', 'Se preenchida, será exigida ao acessar o painel de demandas.') . '</small>
                                             </div>
 
                                             <hr>
-                                            <h6 class="fw-bold small mb-3"><i class="fas fa-envelope me-2"></i>Notificações por Email</h6>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-envelope me-2"></i>' . __('admin.settings.demands_email_notifications', 'Notificações por Email') . '</h6>
                                             <div class="mb-3">
-                                                <label class="form-label">Emails que recebem novas solicitações</label>
-                                                <textarea class="form-control" name="demandas_emails_notificacao" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com">' . htmlspecialchars($demandasConfig['demandas_emails_notificacao'], ENT_QUOTES, 'UTF-8') . '</textarea>
-                                                <small class="text-muted">Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.</small>
+                                                <label class="form-label">' . __('admin.settings.demands_notification_emails', 'Emails que recebem novas solicitações') . '</label>
+                                                <textarea class="form-control" name="demandas_emails_notificacao" rows="3" placeholder="email1@example.com, email2@example.com">' . htmlspecialchars($demandasConfig['demandas_emails_notificacao'], ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">' . __('admin.settings.demands_notification_emails_hint', 'Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.') . '</small>
                                             </div>
 
                                             <hr>
                                             <h6 class="fw-bold small mb-3"><i class="fas fa-plug me-2"></i>Webhook</h6>
                                             <div class="mb-3">
-                                                <label class="form-label">URL do Webhook</label>
+                                                <label class="form-label">' . __('admin.settings.demands_webhook_url', 'URL do Webhook') . '</label>
                                                 <input type="url" class="form-control" name="demandas_webhook_url" value="' . htmlspecialchars($demandasConfig['demandas_webhook_url'], ENT_QUOTES, 'UTF-8') . '" placeholder="https://hooks.slack.com/...">
-                                                <small class="text-muted">Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.</small>
+                                                <small class="text-muted">' . __('admin.settings.demands_webhook_url_hint', 'Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.') . '</small>
                                             </div>
 
                                             <hr>
-                                            <h6 class="fw-bold small mb-3"><i class="fas fa-bell me-2"></i>Notificações Push (no Admin)</h6>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-bell me-2"></i>' . __('admin.settings.demands_push_notifications', 'Notificações Push (no Admin)') . '</h6>
                                             <div class="mb-3">
-                                                <label class="form-label">Usuários que recebem notificações</label>
+                                                <label class="form-label">' . __('admin.settings.demands_notification_users', 'Usuários que recebem notificações') . '</label>
                                                 <select class="form-select" name="demandas_usuarios_notificacao[]" multiple size="6">';
 
         $idsNotifDemandas = array_filter(array_map('intval', explode(',', $demandasConfig['demandas_usuarios_notificacao'])));
@@ -3129,7 +3128,7 @@ class AdminConfiguracoesController extends Controller {
         }
 
         echo '                                </select>
-                                                <small class="text-muted">Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.</small>
+                                                <small class="text-muted">' . __('admin.settings.demands_notification_users_hint', 'Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.') . '</small>
                                             </div>
                                         </div>
                                     </div>
@@ -3139,7 +3138,7 @@ class AdminConfiguracoesController extends Controller {
                             
                             <div class="d-flex justify-content-end mt-4" id="admin-config-salvar-geral">
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Salvar Configurações
+                                    <i class="fas fa-save"></i> ' . __('admin.settings.save_settings_btn', 'Salvar Configurações') . '
                                 </button>
                             </div>
                     </form>
