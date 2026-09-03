@@ -4668,6 +4668,29 @@ HTML;
 
                 $final = array_merge($keptItems, $newItems);
                 $json = json_encode(array_values($final), JSON_UNESCAPED_UNICODE);
+
+                // DEBUG TEMPORARIO: diagnostico do "Trocar imagem" dos banners
+                try {
+                    $dbg = [
+                        'uploadDir' => $uploadDir,
+                        'uploadDir_exists' => $uploadDir !== '' ? is_dir($uploadDir) : false,
+                        'uploadDir_writable' => $uploadDir !== '' ? is_writable($uploadDir) : false,
+                        'webDir' => $webDir,
+                        'keepDesktop' => $keepDesktop,
+                        'keepMobile' => $keepMobile,
+                        'keepIdx' => $keepIdx,
+                        'keptOrigIdx' => $keptOrigIdx,
+                        'FILES_replace_desktop' => $_FILES['layout_banners_replace_desktop'] ?? null,
+                        'FILES_replace_mobile' => $_FILES['layout_banners_replace_mobile'] ?? null,
+                        'final' => $final,
+                    ];
+                    @file_put_contents(
+                        rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? __DIR__), '/\\') . '/storage/banner_debug.log',
+                        date('c') . ' ' . json_encode($dbg, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n",
+                        FILE_APPEND
+                    );
+                } catch (\Throwable $t) {}
+
                 if ($bannersLang === 'en') {
                     $request->setParam('layout_banners_en', $json);
                 } else {
