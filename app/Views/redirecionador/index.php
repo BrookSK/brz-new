@@ -26,9 +26,12 @@ $tabelaPesos = is_array($tabelaPesos ?? null) ? $tabelaPesos : [];
     <div class="container">
         <div class="row align-items-center g-4">
             <div class="col-lg-6">
-                <h2 class="fw-bold mb-3">O que é o redirecionamento?</h2>
-                <p class="text-muted">Se você vende ou revende produtos para clientes no Brasil, o programa de redirecionadores da Braziliana coloca toda a nossa estrutura de envio internacional à sua disposição.</p>
-                <p class="text-muted">Você tem acesso a um <strong>painel exclusivo</strong> onde cadastra seus clientes, cria os envios, acompanha os pagamentos e gera as etiquetas. Nós recebemos o pacote, conferimos, despachamos ao Brasil e entregamos ao destinatário final, tudo com rastreio.</p>
+                <h2 class="fw-bold mb-3">Redirecione seus envios para o Brasil com a Braziliana Global</h2>
+                <p class="text-muted">Se você já trabalha com redirecionamento de produtos importados e busca uma solução eficiente para enviar seus pacotes ao Brasil, a Braziliana Global coloca nossa estrutura logística à sua disposição.</p>
+                <p class="text-muted">Você tem acesso a um <strong>painel exclusivo</strong>, onde cadastra seus clientes, cria os envios, acompanha os pagamentos e gera as etiquetas de cada pacote.</p>
+                <p class="text-muted">A partir da nossa sede, nós cuidamos do processo de envio internacional até o Brasil. Para a etapa final da entrega (last mile), contamos com uma operação integrada aos Correios do Brasil, que realizam a entrega diretamente no endereço do destinatário, com rastreamento.</p>
+                <p class="text-muted">Nosso preço é calculado por quilo, e a cubagem não interfere no valor do envio, proporcionando mais previsibilidade na hora de calcular seus custos.</p>
+                <p class="text-muted">A tabela de preços da Braziliana Global contempla o transporte da nossa sede até o endereço final no Brasil. O envio do pacote até a nossa sede possui custo local separado, quando não houver acordo específico.</p>
                 <a href="/contato" class="btn btn-primary mt-2"><i class="fas fa-user-plus me-2"></i>Falar com a equipe</a>
             </div>
             <div class="col-lg-6">
