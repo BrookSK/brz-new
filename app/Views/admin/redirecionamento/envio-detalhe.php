@@ -5,6 +5,7 @@ $envio = $envio ?? [];
 $produtos = is_array($produtos ?? null) ? $produtos : [];
 $pagamentos = is_array($pagamentos ?? null) ? $pagamentos : [];
 $stripePublicKey = $stripePublicKey ?? '';
+$isRedirecionador = !empty($isRedirecionador);
 
 $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['Aguard. pagamento','warning'],'pago'=>['Pago','success'],'etiqueta_gerada'=>['Etiqueta gerada','info'],'coletado'=>['Coletado','primary'],'entregue'=>['Entregue','dark'],'divergencia'=>['Divergência','danger'],'cancelado'=>['Cancelado','secondary']];
 [$sl,$sc] = $statusLabels[$envio['status']??'rascunho'] ?? ['?','secondary'];
@@ -86,6 +87,7 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
         </div>
 
         <!-- Ações admin -->
+<?php if (!$isRedirecionador): ?>
         <div class="col-md-6">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -101,6 +103,7 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
                 </div>
             </div>
         </div>
+<?php endif; ?>
 
         <!-- Etiqueta / tracking -->
         <div class="col-md-6">

@@ -965,12 +965,21 @@ class AdminRedirecionamentoController extends Controller {
         $st->execute([$id]);
         $envio=$st->fetch(\PDO::FETCH_ASSOC);
         if (!$envio) { $this->redirect('/admin/redirecionamento/envios'); return; }
+
+        // Segurança: um redirecionador só pode abrir os próprios envios.
+        $redFixo = $this->getRedirecionadorFixo();
+        $isRedirecionador = ($redFixo !== null);
+        if ($isRedirecionador && (int)($envio['redirecionador_id'] ?? 0) !== (int)($redFixo['id'] ?? 0)) {
+            $this->redirect('/admin/redirecionamento/envios');
+            return;
+        }
+
         $stP=$db->prepare("SELECT * FROM redirecionamento_produtos_envio WHERE envio_id=?"); $stP->execute([$id]);
         $produtos=$stP->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $stPag=$db->prepare("SELECT * FROM redirecionamento_pagamentos WHERE envio_id=? ORDER BY id DESC"); $stPag->execute([$id]);
         $pagamentos=$stPag->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $stripeKeys=$this->getStripeKeys();
-        $this->view('admin/redirecionamento/envio-detalhe',['envio'=>$envio,'produtos'=>$produtos,'pagamentos'=>$pagamentos,'stripePublicKey'=>$stripeKeys['public']]);
+        $this->view('admin/redirecionamento/envio-detalhe',['envio'=>$envio,'produtos'=>$produtos,'pagamentos'=>$pagamentos,'stripePublicKey'=>$stripeKeys['public'],'isRedirecionador'=>$isRedirecionador]);
     }
 
     public function envioAtualizarPeso(Request $request) {
@@ -1010,14 +1019,18 @@ class AdminRedirecionamentoController extends Controller {
     public function enviosSede(Request $request) {
         $this->auth(); $this->migrar();
         $db = $this->pdo();
-        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+        $redFixo = $this->getRedirecionadorFixo();
+        $redId = $redFixo !== null ? (int)($redFixo['id'] ?? 0) : 0;
 
-        $st = $db->query("SELECT s.*, r.nome AS redirecionador_nome, e.id_pedido_cliente, e.status AS envio_status, e.status_pagamento
+        $sqlReg = "SELECT s.*, r.nome AS redirecionador_nome, e.id_pedido_cliente, e.status AS envio_status, e.status_pagamento
             FROM redirecionamento_envios_sede s
             LEFT JOIN redirecionadores r ON r.id = s.redirecionador_id
-            LEFT JOIN redirecionamento_envios e ON e.id = s.envio_id
-            ORDER BY s.created_at DESC");
-        $registros = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
+            LEFT JOIN redirecionamento_envios e ON e.id = s.envio_id";
+        $paramsReg = [];
+        if ($redFixo !== null) { $sqlReg .= " WHERE s.redirecionador_id=?"; $paramsReg[] = $redId; }
+        $sqlReg .= " ORDER BY s.created_at DESC";
+        $st = $db->prepare($sqlReg); $st->execute($paramsReg);
+        $registros = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         // Envios disponíveis para registrar envio à sede (pago/etiqueta_gerada, sem coleta nem envio-sede pendente)
         $sqlEnvios = "SELECT e.id, e.id_pedido_cliente, r.nome AS redirecionador_nome
@@ -1027,12 +1040,8 @@ class AdminRedirecionamentoController extends Controller {
               AND e.id NOT IN (SELECT envio_id FROM redirecionamento_coletas WHERE status IN ('agendado','confirmado'))
               AND e.id NOT IN (SELECT envio_id FROM redirecionamento_envios_sede WHERE status = 'enviado')";
         $paramsEnvios = [];
-        if ($perfil === 'redirecionador') {
-            $uid = (int)($_SESSION['usuario_id'] ?? 0);
-            $stR = $db->prepare("SELECT id FROM redirecionadores WHERE usuario_id=? LIMIT 1");
-            $stR->execute([$uid]);
-            $redId = (int)($stR->fetchColumn() ?: 0);
-            if ($redId) { $sqlEnvios .= " AND e.redirecionador_id=?"; $paramsEnvios[] = $redId; }
+        if ($redFixo !== null) {
+            $sqlEnvios .= " AND e.redirecionador_id=?"; $paramsEnvios[] = $redId;
         }
         $sqlEnvios .= " ORDER BY e.id DESC LIMIT 200";
         $stE = $db->prepare($sqlEnvios); $stE->execute($paramsEnvios);
@@ -1353,16 +1362,20 @@ class AdminRedirecionamentoController extends Controller {
     public function divergencias(Request $request) {
         $this->auth(); $this->migrar();
         $db=$this->pdo();
-        $st=$db->query("SELECT e.id AS envio_id,e.valor_cobrado_usd,e.valor_correto_usd,
+        $redFixo = $this->getRedirecionadorFixo();
+        $sql = "SELECT e.id AS envio_id,e.valor_cobrado_usd,e.valor_correto_usd,
                             (e.valor_correto_usd - e.valor_cobrado_usd) AS diferenca,
                             e.status,r.nome AS redirecionador_nome,
                             p.status AS status_pag, p.comprovante_url, p.id AS pag_id
                         FROM redirecionamento_envios e
                         LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id
                         LEFT JOIN redirecionamento_pagamentos p ON p.envio_id=e.id AND p.tipo IN ('diferenca','reembolso')
-                        WHERE e.status='divergencia'
-                        ORDER BY e.id DESC");
-        $divergencias=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+                        WHERE e.status='divergencia'";
+        $params = [];
+        if ($redFixo !== null) { $sql .= " AND e.redirecionador_id=?"; $params[] = (int)($redFixo['id'] ?? 0); }
+        $sql .= " ORDER BY e.id DESC";
+        $st=$db->prepare($sql); $st->execute($params);
+        $divergencias=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $this->view('admin/redirecionamento/divergencias',['divergencias'=>$divergencias]);
     }
 
@@ -1695,8 +1708,13 @@ class AdminRedirecionamentoController extends Controller {
     public function pagamentos(Request $request) {
         $this->auth(); $this->migrar();
         $db=$this->pdo();
-        $st=$db->query("SELECT p.*,r.nome AS redirecionador_nome FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id=p.envio_id LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id ORDER BY p.id DESC");
-        $pagamentos=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $redFixo = $this->getRedirecionadorFixo();
+        $sql = "SELECT p.*,r.nome AS redirecionador_nome FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id=p.envio_id LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id";
+        $params = [];
+        if ($redFixo !== null) { $sql .= " WHERE e.redirecionador_id=?"; $params[] = (int)($redFixo['id'] ?? 0); }
+        $sql .= " ORDER BY p.id DESC";
+        $st=$db->prepare($sql); $st->execute($params);
+        $pagamentos=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $this->view('admin/redirecionamento/pagamentos',['pagamentos'=>$pagamentos]);
     }
 
@@ -1705,8 +1723,13 @@ class AdminRedirecionamentoController extends Controller {
     public function comprovantes(Request $request) {
         $this->auth(); $this->migrar();
         $db=$this->pdo();
-        $st=$db->query("SELECT p.*,r.nome AS redirecionador_nome FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id=p.envio_id LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id WHERE p.comprovante_url IS NOT NULL ORDER BY p.id DESC");
-        $comprovantes=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $redFixo = $this->getRedirecionadorFixo();
+        $sql = "SELECT p.*,r.nome AS redirecionador_nome FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id=p.envio_id LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id WHERE p.comprovante_url IS NOT NULL";
+        $params = [];
+        if ($redFixo !== null) { $sql .= " AND e.redirecionador_id=?"; $params[] = (int)($redFixo['id'] ?? 0); }
+        $sql .= " ORDER BY p.id DESC";
+        $st=$db->prepare($sql); $st->execute($params);
+        $comprovantes=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $this->view('admin/redirecionamento/comprovantes',['comprovantes'=>$comprovantes]);
     }
 
@@ -1715,9 +1738,15 @@ class AdminRedirecionamentoController extends Controller {
     public function coletas(Request $request) {
         $this->auth(); $this->migrar();
         $db=$this->pdo();
-        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
-        $st=$db->query("SELECT c.*,r.nome AS redirecionador_nome,e.id_pedido_cliente FROM redirecionamento_coletas c LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id LEFT JOIN redirecionamento_envios e ON e.id=c.envio_id ORDER BY c.data_agendada ASC,c.horario ASC");
-        $coletas=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $redFixo = $this->getRedirecionadorFixo();
+        $redId = $redFixo !== null ? (int)($redFixo['id'] ?? 0) : 0;
+
+        $sqlColetas = "SELECT c.*,r.nome AS redirecionador_nome,e.id_pedido_cliente FROM redirecionamento_coletas c LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id LEFT JOIN redirecionamento_envios e ON e.id=c.envio_id";
+        $paramsColetas = [];
+        if ($redFixo !== null) { $sqlColetas .= " WHERE c.redirecionador_id=?"; $paramsColetas[] = $redId; }
+        $sqlColetas .= " ORDER BY c.data_agendada ASC,c.horario ASC";
+        $st=$db->prepare($sqlColetas); $st->execute($paramsColetas);
+        $coletas=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
 
         // Envios disponíveis para agendar (sem coleta pendente/confirmada)
         $sqlEnvios = "SELECT e.id, e.id_pedido_cliente, r.nome AS redirecionador_nome
@@ -1727,12 +1756,8 @@ class AdminRedirecionamentoController extends Controller {
                 SELECT envio_id FROM redirecionamento_coletas WHERE status IN ('agendado','confirmado')
             )";
         $paramsEnvios = [];
-        if ($perfil === 'redirecionador') {
-            $uid = (int)($_SESSION['usuario_id'] ?? 0);
-            $stR = $db->prepare("SELECT id FROM redirecionadores WHERE usuario_id=? LIMIT 1");
-            $stR->execute([$uid]);
-            $redId = (int)($stR->fetchColumn() ?: 0);
-            if ($redId) { $sqlEnvios .= " AND e.redirecionador_id=?"; $paramsEnvios[] = $redId; }
+        if ($redFixo !== null) {
+            $sqlEnvios .= " AND e.redirecionador_id=?"; $paramsEnvios[] = $redId;
         }
         $sqlEnvios .= " ORDER BY e.id DESC LIMIT 200";
         $stE = $db->prepare($sqlEnvios); $stE->execute($paramsEnvios);
