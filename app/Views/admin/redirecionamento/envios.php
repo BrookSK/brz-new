@@ -6,6 +6,7 @@ $redirecionadores = is_array($redirecionadores ?? null) ? $redirecionadores : []
 $filtroStatus = $filtroStatus ?? '';
 $filtroRed = (int)($filtroRed ?? 0);
 $filtroData = $filtroData ?? '';
+$isRedirecionador = !empty($isRedirecionador);
 
 $statusLabels = [
     'rascunho'=>['Rascunho','secondary'],
@@ -40,6 +41,7 @@ $statusLabels = [
                         <?php endforeach; ?>
                     </select>
                 </div>
+<?php if (!$isRedirecionador): ?>
                 <div class="col-md-3">
                     <label class="form-label small">Redirecionador</label>
                     <select class="form-select form-select-sm" name="redirecionador_id">
@@ -49,6 +51,7 @@ $statusLabels = [
                         <?php endforeach; ?>
                     </select>
                 </div>
+<?php endif; ?>
                 <div class="col-md-3">
                     <label class="form-label small">Data</label>
                     <input class="form-control form-control-sm" type="date" name="data" value="<?= htmlspecialchars($filtroData,ENT_QUOTES,'UTF-8') ?>">
@@ -69,7 +72,7 @@ $statusLabels = [
                         <tr>
                             <th class="ps-3">#</th>
                             <th>ID pedido cliente</th>
-                            <th>Redirecionador</th>
+                            <?php if (!$isRedirecionador): ?><th>Redirecionador</th><?php endif; ?>
                             <th>Cliente final</th>
                             <th>Peso inf. / real</th>
                             <th>Valor cobrado</th>
@@ -81,7 +84,7 @@ $statusLabels = [
                     </thead>
                     <tbody>
                         <?php if (empty($envios)): ?>
-                        <tr><td colspan="10" class="text-center text-muted py-4">Nenhum envio encontrado.</td></tr>
+                        <tr><td colspan="<?= $isRedirecionador ? 9 : 10 ?>" class="text-center text-muted py-4">Nenhum envio encontrado.</td></tr>
                         <?php else: foreach ($envios as $e):
                             [$sl,$sc] = $statusLabels[$e['status']??'rascunho'] ?? ['?','secondary'];
                             $pagLabel = ['pendente'=>'Pendente','pago'=>'Pago','falhou'=>'Falhou','reembolsado'=>'Reembolsado'][$e['status_pagamento']??'pendente'] ?? '-';
@@ -90,7 +93,7 @@ $statusLabels = [
                         <tr>
                             <td class="ps-3"><?= (int)$e['id'] ?></td>
                             <td><?= htmlspecialchars($e['id_pedido_cliente']??'',ENT_QUOTES,'UTF-8') ?></td>
-                            <td><?= htmlspecialchars($e['redirecionador_nome']??'',ENT_QUOTES,'UTF-8') ?></td>
+                            <?php if (!$isRedirecionador): ?><td><?= htmlspecialchars($e['redirecionador_nome']??'',ENT_QUOTES,'UTF-8') ?></td><?php endif; ?>
                             <td><?= htmlspecialchars($e['cliente_nome']??$e['destinatario_nome']??'',ENT_QUOTES,'UTF-8') ?></td>
                             <td><?= number_format((float)($e['peso_kg']??0),2,',','.') ?> / <?= $e['peso_real_kg']?number_format((float)$e['peso_real_kg'],2,',','.'):'—' ?> kg</td>
                             <td>US$ <?= number_format((float)($e['valor_cobrado_usd']??0),2,',','.') ?></td>

@@ -625,15 +625,54 @@ class AdminRedirecionamentoController extends Controller {
         $this->migrar();
         $db = $this->pdo();
         $kpis = ['total_envios'=>0,'pendentes_pagamento'=>0,'aguardando_coleta'=>0,'divergencias_peso'=>0,'valores_a_receber'=>0.0,'valores_a_devolver'=>0.0];
+
+        // Se o usuário logado for redirecionador, os KPIs consideram apenas os envios dele.
+        $redFixo = $this->getRedirecionadorFixo();
+        $isRedirecionador = ($redFixo !== null);
+        $redId = $isRedirecionador ? (int)($redFixo['id'] ?? 0) : 0;
+
+        // Cláusula extra e parâmetros para restringir por redirecionador (quando aplicável).
+        $condEnv = $isRedirecionador ? " AND redirecionador_id=?" : "";      // sobre redirecionamento_envios
+        $paramEnv = $isRedirecionador ? [$redId] : [];
+        // Para pagamentos, restringe via subquery de envios do redirecionador.
+        $condPag = $isRedirecionador
+            ? " AND envio_id IN (SELECT id FROM redirecionamento_envios WHERE redirecionador_id=?)"
+            : "";
+        $paramPag = $isRedirecionador ? [$redId] : [];
+
         try {
-            $kpis['total_envios'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios")->fetchColumn();
-            $kpis['pendentes_pagamento'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios WHERE status_pagamento='pendente' AND status NOT IN ('rascunho','cancelado')")->fetchColumn();
-            $kpis['aguardando_coleta'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios WHERE status='pago'")->fetchColumn();
-            $kpis['divergencias_peso'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios WHERE status='divergencia'")->fetchColumn();
-            $kpis['valores_a_receber'] = (float)($db->query("SELECT COALESCE(SUM(valor_usd),0) FROM redirecionamento_pagamentos WHERE tipo='diferenca' AND status='pendente'")->fetchColumn() ?: 0);
-            $kpis['valores_a_devolver'] = (float)($db->query("SELECT COALESCE(SUM(ABS(valor_usd)),0) FROM redirecionamento_pagamentos WHERE tipo='reembolso' AND status='pendente'")->fetchColumn() ?: 0);
+            $q = function(string $sql, array $params) use ($db) {
+                $st = $db->prepare($sql);
+                $st->execute($params);
+                return $st->fetchColumn();
+            };
+
+            $kpis['total_envios'] = (int)$q(
+                "SELECT COUNT(*) FROM redirecionamento_envios WHERE 1=1{$condEnv}",
+                $paramEnv
+            );
+            $kpis['pendentes_pagamento'] = (int)$q(
+                "SELECT COUNT(*) FROM redirecionamento_envios WHERE status_pagamento='pendente' AND status NOT IN ('rascunho','cancelado'){$condEnv}",
+                $paramEnv
+            );
+            $kpis['aguardando_coleta'] = (int)$q(
+                "SELECT COUNT(*) FROM redirecionamento_envios WHERE status='pago'{$condEnv}",
+                $paramEnv
+            );
+            $kpis['divergencias_peso'] = (int)$q(
+                "SELECT COUNT(*) FROM redirecionamento_envios WHERE status='divergencia'{$condEnv}",
+                $paramEnv
+            );
+            $kpis['valores_a_receber'] = (float)($q(
+                "SELECT COALESCE(SUM(valor_usd),0) FROM redirecionamento_pagamentos WHERE tipo='diferenca' AND status='pendente'{$condPag}",
+                $paramPag
+            ) ?: 0);
+            $kpis['valores_a_devolver'] = (float)($q(
+                "SELECT COALESCE(SUM(ABS(valor_usd)),0) FROM redirecionamento_pagamentos WHERE tipo='reembolso' AND status='pendente'{$condPag}",
+                $paramPag
+            ) ?: 0);
         } catch (\Exception $e) {}
-        $this->view('admin/redirecionamento/dashboard', ['kpis' => $kpis]);
+        $this->view('admin/redirecionamento/dashboard', ['kpis' => $kpis, 'isRedirecionador' => $isRedirecionador]);
     }
 
     // ─── REDIRECIONADORES ─────────────────────────────────────────────────────
@@ -810,6 +849,14 @@ class AdminRedirecionamentoController extends Controller {
         $filtroStatus = trim((string)$request->getParam('status',''));
         $filtroRed    = (int)$request->getParam('redirecionador_id',0);
         $filtroData   = trim((string)$request->getParam('data',''));
+
+        // Se o usuário logado for um redirecionador, ele só pode ver os próprios envios.
+        $redFixo = $this->getRedirecionadorFixo();
+        $isRedirecionador = ($redFixo !== null);
+        if ($isRedirecionador) {
+            $filtroRed = (int)($redFixo['id'] ?? 0);
+        }
+
         $sql = "SELECT e.*,
                     r.nome AS redirecionador_nome,
                     c.nome AS cliente_nome
@@ -819,13 +866,21 @@ class AdminRedirecionamentoController extends Controller {
                 WHERE 1=1";
         $params=[];
         if ($filtroStatus!=='') { $sql.=" AND e.status=?"; $params[]=$filtroStatus; }
-        if ($filtroRed>0)        { $sql.=" AND e.redirecionador_id=?"; $params[]=$filtroRed; }
+        if ($isRedirecionador) {
+            // Força o vínculo com o redirecionador logado (mesmo que id=0, garante lista vazia
+            // em vez de expor os envios de todos).
+            $sql.=" AND e.redirecionador_id=?"; $params[]=$filtroRed;
+        } elseif ($filtroRed>0) {
+            $sql.=" AND e.redirecionador_id=?"; $params[]=$filtroRed;
+        }
         if ($filtroData!=='')    { $sql.=" AND DATE(e.created_at)=?"; $params[]=$filtroData; }
         $sql.=" ORDER BY e.id DESC";
         $st=$db->prepare($sql); $st->execute($params);
         $envios=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
-        $reds=$db->query("SELECT id,nome FROM redirecionadores ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
-        $this->view('admin/redirecionamento/envios',['envios'=>$envios,'redirecionadores'=>$reds,'filtroStatus'=>$filtroStatus,'filtroRed'=>$filtroRed,'filtroData'=>$filtroData,'enderecoSede'=>$this->getEnderecoSede()]);
+        $reds = $isRedirecionador
+            ? []
+            : ($db->query("SELECT id,nome FROM redirecionadores ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[]);
+        $this->view('admin/redirecionamento/envios',['envios'=>$envios,'redirecionadores'=>$reds,'filtroStatus'=>$filtroStatus,'filtroRed'=>$filtroRed,'filtroData'=>$filtroData,'enderecoSede'=>$this->getEnderecoSede(),'isRedirecionador'=>$isRedirecionador]);
     }
 
     /** Endereço de recebimento (sede EUA), configurável em configuracoes_sistema. */
