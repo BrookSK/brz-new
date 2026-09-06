@@ -731,6 +731,19 @@ class AdminShippoController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
 
+        // Cada pedido faz chamadas de rede à API Shippo (createShipment + purchaseLabel),
+        // que podem levar vários segundos. Ao processar múltiplos pedidos em série, o tempo
+        // padrão de execução (30s) pode ser estourado, matando o script no meio e devolvendo
+        // HTML de erro no lugar do JSON (quebra o r.json() no front). Elevamos o limite.
+        @set_time_limit(600);
+        @ini_set('max_execution_time', '600');
+
+        // Buffer de saída: garante que nenhum warning/notice do PHP contamine a resposta JSON.
+        // Descartamos qualquer saída acidental logo antes de emitir o JSON final.
+        if (function_exists('ob_get_level') && ob_get_level() === 0) {
+            ob_start();
+        }
+
         $body = json_decode(file_get_contents('php://input'), true) ?: [];
         $pedidoIds = $body['pedido_ids'] ?? [];
 
@@ -972,6 +985,11 @@ class AdminShippoController extends Controller {
                 $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.save_failed', 'Falha ao salvar: ') . $e->getMessage()];
             }
             } // fim else (modo cotação)
+        }
+
+        // Descarta qualquer saída acidental (warnings/notices) acumulada no buffer antes do JSON.
+        if (function_exists('ob_get_level') && ob_get_level() > 0) {
+            @ob_clean();
         }
 
         $this->json(['success' => true, 'results' => $results]);

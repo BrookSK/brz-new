@@ -274,46 +274,58 @@ async function gerarEtiquetasShippoSelecionadas() {
     var btn = document.getElementById('btnGerarShippo');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + <?= json_encode(__('admin.shippo.generating','Gerando...')) ?>; }
 
-    // Overlay
+    // Textos usados no overlay de progresso.
+    var txtGerando = <?= json_encode(__('admin.shippo.generating_via_shippo','Gerando etiquetas via Shippo...')) ?>;
+    var txtNaoFeche = <?= json_encode(__('admin.shippo.do_not_close','Não feche esta página')) ?>;
+
+    // Overlay com progresso (done/total).
     var overlay = document.createElement('div');
     overlay.id = 'massaOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div style="font-size:1.1rem;font-weight:600;color:#333;">' + <?= json_encode(__('admin.shippo.generating_via_shippo','Gerando etiquetas via Shippo...')) ?> + '</div><div class="text-muted small mt-2">' + <?= json_encode(__('admin.shippo.do_not_close','Não feche esta página')) ?> + '</div></div>';
     document.body.appendChild(overlay);
-
-    try {
-        var r = await fetch('/admin/shippo/gerar-etiquetas-massa', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pedido_ids: ids })
-        });
-        var data = await r.json();
-
-        var ov = document.getElementById('massaOverlay');
-        if (ov) ov.remove();
-
-        if (data && data.results) {
-            var ok = 0, erros = [];
-            data.results.forEach(function(res) {
-                if (res.success) {
-                    ok++;
-                } else {
-                    erros.push('#' + res.pedido_id + ': ' + (res.error || <?= json_encode(__('admin.shippo.error_generic','erro')) ?>));
-                }
-            });
-
-            var msg = <?= json_encode(__('admin.shippo.labels_generated_success','{n} etiqueta(s) gerada(s) com sucesso.')) ?>.replace('{n}', ok);
-            if (erros.length > 0) msg += '\n\n' + <?= json_encode(__('admin.shippo.errors_count','Erros ({n}):')) ?>.replace('{n}', erros.length) + '\n' + erros.slice(0, 10).join('\n');
-            alert(msg);
-            if (ok > 0) setTimeout(function() { location.reload(); }, 1000);
-        } else {
-            alert(<?= json_encode(__('admin.shippo.error_prefix','Erro:')) ?> + ' ' + ((data && data.error) || <?= json_encode(__('admin.shippo.unexpected_response','Resposta inesperada')) ?>));
-        }
-    } catch (e) {
-        var ov = document.getElementById('massaOverlay');
-        if (ov) ov.remove();
-        alert(<?= json_encode(__('admin.shippo.network_error','Erro de rede:')) ?> + ' ' + e.message);
+    function renderOverlay(done, total) {
+        overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div style="font-size:1.1rem;font-weight:600;color:#333;">' + txtGerando + '</div><div style="font-size:.95rem;color:#555;margin-top:6px;">' + done + ' / ' + total + '</div><div class="text-muted small mt-2">' + txtNaoFeche + '</div></div>';
     }
+    renderOverlay(0, ids.length);
+
+    // Processa em LOTES de 1 pedido por requisição. Cada requisição é curta, então nunca
+    // chega perto de um timeout (PHP ou servidor web), independente de quantos pedidos
+    // forem selecionados (3, 30, 300...). Os resultados são acumulados no cliente.
+    var ok = 0, erros = [];
+    for (var i = 0; i < ids.length; i++) {
+        renderOverlay(i, ids.length);
+        try {
+            var r = await fetch('/admin/shippo/gerar-etiquetas-massa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pedido_ids: [ids[i]] })
+            });
+            var data = await r.json();
+
+            if (data && data.results) {
+                data.results.forEach(function(res) {
+                    if (res.success) {
+                        ok++;
+                    } else {
+                        erros.push('#' + res.pedido_id + ': ' + (res.error || <?= json_encode(__('admin.shippo.error_generic','erro')) ?>));
+                    }
+                });
+            } else {
+                erros.push('#' + ids[i] + ': ' + ((data && data.error) || <?= json_encode(__('admin.shippo.unexpected_response','Resposta inesperada')) ?>));
+            }
+        } catch (e) {
+            erros.push('#' + ids[i] + ': ' + e.message);
+        }
+    }
+    renderOverlay(ids.length, ids.length);
+
+    var ov = document.getElementById('massaOverlay');
+    if (ov) ov.remove();
+
+    var msg = <?= json_encode(__('admin.shippo.labels_generated_success','{n} etiqueta(s) gerada(s) com sucesso.')) ?>.replace('{n}', ok);
+    if (erros.length > 0) msg += '\n\n' + <?= json_encode(__('admin.shippo.errors_count','Erros ({n}):')) ?>.replace('{n}', erros.length) + '\n' + erros.slice(0, 10).join('\n');
+    alert(msg);
+    if (ok > 0) { setTimeout(function() { location.reload(); }, 1000); }
 
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText">' + <?= json_encode(__('admin.shippo.generate_labels','Gerar Etiquetas')) ?> + '</span>'; updateBtnGerarShippo(); }
 }
