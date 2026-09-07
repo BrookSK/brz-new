@@ -91,15 +91,16 @@ class CheckoutController extends Controller {
         try {
             $cupomModel = new Cupom();
             $res = $cupomModel->validar($codigo, $subtotalProdutos, $usuarioId);
-            if (empty($res['valido'])) {
-                // Cupom deixou de ser válido (expirou, subtotal mudou etc.): descarta.
+            $desconto = round((float) ($res['desconto'] ?? 0), 2);
+            if (empty($res['valido']) || $desconto <= 0) {
+                // Cupom deixou de ser válido (expirou, subtotal mudou, sem desconto): descarta.
                 unset($_SESSION[self::CUPOM_SESSION_KEY]);
                 return null;
             }
             return [
                 'cupom_id' => (int) ($res['cupom']['id'] ?? 0),
                 'cupom_codigo' => (string) ($res['cupom']['codigo'] ?? $codigo),
-                'desconto' => round((float) $res['desconto'], 2),
+                'desconto' => $desconto,
             ];
         } catch (\Throwable $e) {
             return null;

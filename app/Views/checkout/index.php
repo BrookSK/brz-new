@@ -992,13 +992,17 @@
 
                                 <?php if (empty($isPaymentLink)): ?>
                                 <!-- Cupom de desconto -->
+                                <?php
+                                    // Só considera "cupom aplicado" quando há código E desconto efetivo (> 0).
+                                    $temCupom = !empty($cupom_aplicado) && (float) ($cupom_desconto ?? 0) > 0;
+                                ?>
                                 <div class="mt-2 mb-2" id="cupom-box">
                                     <label class="form-label small mb-1"><i class="fas fa-ticket-alt me-1"></i><?= __('checkout.coupon', 'Cupom de desconto') ?></label>
-                                    <div class="input-group input-group-sm" id="cupom-input-group" <?= !empty($cupom_aplicado) ? 'style="display:none;"' : '' ?>>
+                                    <div class="input-group input-group-sm" id="cupom-input-group" <?= $temCupom ? 'style="display:none;"' : '' ?>>
                                         <input type="text" class="form-control text-uppercase" id="cupom-codigo" placeholder="<?= __('checkout.coupon_placeholder', 'Digite o código') ?>">
                                         <button class="btn btn-outline-primary" type="button" id="btn-aplicar-cupom"><?= __('checkout.coupon_apply', 'Aplicar') ?></button>
                                     </div>
-                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1" <?= empty($cupom_aplicado) ? 'style="display:none;"' : '' ?>>
+                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1" <?= $temCupom ? '' : 'style="display:none;"' ?>>
                                         <span class="text-success">
                                             <i class="fas fa-check-circle me-1"></i>
                                             <?= __('checkout.coupon_applied', 'Cupom') ?>: <strong id="cupom-aplicado-codigo"><?= htmlspecialchars((string) ($cupom_aplicado ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
@@ -1007,7 +1011,7 @@
                                     </div>
                                     <div id="cupom-msg" class="small mt-1"></div>
                                 </div>
-                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row" <?= empty($cupom_desconto) ? 'style="display:none;"' : '' ?>>
+                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row" <?= $temCupom ? '' : 'style="display:none;"' ?>>
                                     <span><i class="fas fa-tags me-1"></i><?= __('checkout.coupon_discount', 'Desconto do cupom') ?></span>
                                     <span>-<span id="cupom-desconto" class="cart-currency" data-original-value="<?= (float) ($cupom_desconto ?? 0) ?>"><?= number_format((float) ($cupom_desconto ?? 0), 2, '.', ',') ?></span></span>
                                 </div>
