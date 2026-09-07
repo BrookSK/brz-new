@@ -998,23 +998,28 @@
                                 ?>
                                 <div class="mt-2 mb-2" id="cupom-box">
                                     <label class="form-label small mb-1"><i class="fas fa-ticket-alt me-1"></i><?= __('checkout.coupon', 'Cupom de desconto') ?></label>
-                                    <div class="input-group input-group-sm" id="cupom-input-group" <?= $temCupom ? 'style="display:none;"' : '' ?>>
+                                    <?php if (!$temCupom): ?>
+                                    <div class="input-group input-group-sm" id="cupom-input-group">
                                         <input type="text" class="form-control text-uppercase" id="cupom-codigo" placeholder="<?= __('checkout.coupon_placeholder', 'Digite o código') ?>">
                                         <button class="btn btn-outline-primary" type="button" id="btn-aplicar-cupom"><?= __('checkout.coupon_apply', 'Aplicar') ?></button>
                                     </div>
-                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1" <?= $temCupom ? '' : 'style="display:none;"' ?>>
+                                    <?php else: ?>
+                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1">
                                         <span class="text-success">
                                             <i class="fas fa-check-circle me-1"></i>
                                             <?= __('checkout.coupon_applied', 'Cupom') ?>: <strong id="cupom-aplicado-codigo"><?= htmlspecialchars((string) ($cupom_aplicado ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
                                         </span>
                                         <button type="button" class="btn btn-sm btn-link text-danger p-0" id="btn-remover-cupom"><?= __('checkout.coupon_remove', 'Remover') ?></button>
                                     </div>
+                                    <?php endif; ?>
                                     <div id="cupom-msg" class="small mt-1"></div>
                                 </div>
-                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row" <?= $temCupom ? '' : 'style="display:none;"' ?>>
+                                <?php if ($temCupom): ?>
+                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row">
                                     <span><i class="fas fa-tags me-1"></i><?= __('checkout.coupon_discount', 'Desconto do cupom') ?></span>
                                     <span>-<span id="cupom-desconto" class="cart-currency" data-original-value="<?= (float) ($cupom_desconto ?? 0) ?>"><?= number_format((float) ($cupom_desconto ?? 0), 2, '.', ',') ?></span></span>
                                 </div>
+                                <?php endif; ?>
                                 <?php endif; ?>
 
                                 <?php if (!$isPaymentLink && (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube))): ?>
