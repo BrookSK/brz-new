@@ -11,6 +11,7 @@ use App\Models\Usuario;
 use App\Models\Endereco;
 use App\Models\PedidoEcommerce;
 use App\Models\AssessoriaOrcamento;
+use App\Models\Cupom;
 
 // Garantir que as classes sejam carregadas
 require_once __DIR__ . '/../Models/Model.php';
@@ -20,6 +21,7 @@ require_once __DIR__ . '/../Models/Carrinho.php';
 require_once __DIR__ . '/../Models/Produto.php';
 require_once __DIR__ . '/../Models/PedidoEcommerce.php';
 require_once __DIR__ . '/../Models/AssessoriaOrcamento.php';
+require_once __DIR__ . '/../Models/Cupom.php';
 
 class CheckoutController extends Controller {
     private $authService;
@@ -28,6 +30,111 @@ class CheckoutController extends Controller {
     private $usuarioModel;
     private $enderecoModel;
     private $pedidoModel;
+
+    /** Chave da sessão onde guardamos o código do cupom aplicado. */
+    const CUPOM_SESSION_KEY = 'checkout_cupom_codigo';
+
+    /**
+     * Endpoint AJAX: aplica um cupom ao checkout.
+     * Guarda o código na sessão (a validação é sempre refeita contra o subtotal atual).
+     * POST /checkout/cupom/aplicar  { codigo }
+     */
+    public function aplicarCupom(Request $request): void {
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        $codigo = Cupom::normalizarCodigo((string) $request->getParam('codigo', ''));
+        if ($codigo === '') {
+            $this->json(['ok' => false, 'msg' => 'Informe um código de cupom.']);
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $subtotal = $this->calcularSubtotalProdutosCheckout($usuario);
+
+        $cupomModel = new Cupom();
+        $res = $cupomModel->validar($codigo, $subtotal, (int) ($usuario['id'] ?? 0));
+        if (empty($res['valido'])) {
+            unset($_SESSION[self::CUPOM_SESSION_KEY]);
+            $this->json(['ok' => false, 'msg' => $res['motivo'] ?? 'Cupom inválido.']);
+            return;
+        }
+
+        $_SESSION[self::CUPOM_SESSION_KEY] = $codigo;
+        $this->json([
+            'ok' => true,
+            'codigo' => $codigo,
+            'desconto' => round((float) $res['desconto'], 2),
+            'msg' => 'Cupom aplicado com sucesso.',
+        ]);
+    }
+
+    /**
+     * Endpoint AJAX: remove o cupom aplicado.
+     * POST /checkout/cupom/remover
+     */
+    public function removerCupom(Request $request): void {
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        unset($_SESSION[self::CUPOM_SESSION_KEY]);
+        $this->json(['ok' => true, 'msg' => 'Cupom removido.']);
+    }
+
+    /**
+     * Revalida o cupom guardado na sessão contra o subtotal atual.
+     * Retorna null se não há cupom válido; caso contrário
+     * ['cupom_id','cupom_codigo','desconto'].
+     */
+    private function resolverCupomAplicado(float $subtotalProdutos, int $usuarioId): ?array {
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        $codigo = (string) ($_SESSION[self::CUPOM_SESSION_KEY] ?? '');
+        if ($codigo === '') {
+            return null;
+        }
+        try {
+            $cupomModel = new Cupom();
+            $res = $cupomModel->validar($codigo, $subtotalProdutos, $usuarioId);
+            if (empty($res['valido'])) {
+                // Cupom deixou de ser válido (expirou, subtotal mudou etc.): descarta.
+                unset($_SESSION[self::CUPOM_SESSION_KEY]);
+                return null;
+            }
+            return [
+                'cupom_id' => (int) ($res['cupom']['id'] ?? 0),
+                'cupom_codigo' => (string) ($res['cupom']['codigo'] ?? $codigo),
+                'desconto' => round((float) $res['desconto'], 2),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Calcula o subtotal (valor dos produtos, em USD) do carrinho atual,
+     * ignorando itens gratuitos. Usado para validar o cupom.
+     */
+    private function calcularSubtotalProdutosCheckout(?array $usuario): float {
+        try {
+            $carrinho = $this->getCarrinhoForCheckout($usuario);
+            if (empty($carrinho) || !is_array($carrinho)) {
+                return 0.0;
+            }
+            $subtotal = 0.0;
+            foreach ($carrinho as $item) {
+                if (!empty($item['is_free_offer'])) {
+                    continue;
+                }
+                $sub = $item['subtotal'] ?? null;
+                if ($sub !== null) {
+                    $subtotal += (float) $sub;
+                    continue;
+                }
+                $preco = (float) ($item['preco_unitario'] ?? ($item['preco'] ?? 0));
+                $qtd = (int) ($item['quantidade'] ?? 1);
+                $subtotal += $preco * $qtd;
+            }
+            return round(max(0.0, $subtotal), 2);
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
+    }
 
     private function gerarCobrancaCambioRealTaxasSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao, string $componente = 'taxa_servico', ?float $valorRegistro = null): array {
         $billingType = strtoupper(trim($billingType));
@@ -2965,10 +3072,25 @@ class CheckoutController extends Controller {
             }
         } catch (\Exception $e) {}
 
+        // ── Cupom de desconto (aplicado apenas sobre o valor do produto) ──
+        $cupomAplicado = null;
+        $cupomDesconto = 0.0;
+        try {
+            $resCupom = $this->resolverCupomAplicado((float) $subtotal, (int) ($usuario['id'] ?? 0));
+            if ($resCupom !== null) {
+                $cupomAplicado = $resCupom['cupom_codigo'];
+                $cupomDesconto = (float) $resCupom['desconto'];
+                // O desconto reduz apenas o subtotal de produtos, nunca taxa/impostos/frete.
+                $total = max(0.0, $total - $cupomDesconto);
+            }
+        } catch (\Throwable $e) {}
+
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
             'items' => $items,
             'subtotal' => $subtotal,
+            'cupom_aplicado' => $cupomAplicado,
+            'cupom_desconto' => round($cupomDesconto, 2),
             'subtotal_sem_promo' => $subtotal_sem_promo,
             'tem_promo_no_carrinho' => $tem_promo_no_carrinho,
             'peso_clube_total' => $pesoClubeTotal,
@@ -4340,6 +4462,30 @@ class CheckoutController extends Controller {
                             } else {
                                 $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto), 2);
                             }
+
+                            // Cupom: descontar do valor do produto (nunca da taxa/imposto).
+                            // A coluna pedidos.desconto está na moeda do pedido. Convertê-la para a
+                            // mesma base de $valorProduto (BRL quando o subtotal veio de $totalBrl).
+                            try {
+                                $dbDesc = \Config\Database::getConnection();
+                                $stDesc = $dbDesc->prepare('SELECT desconto FROM pedidos WHERE id = ? LIMIT 1');
+                                $stDesc->execute([(int) $pedidoId]);
+                                $descontoPedido = (float) ($stDesc->fetchColumn() ?: 0);
+                                if ($descontoPedido > 0) {
+                                    // $subtotalProdutos pode estar em USD; $totalBrl está em BRL.
+                                    // pedidos.desconto está na moeda do pedido ($moedaPedidoPay).
+                                    $descontoNaBase = $descontoPedido;
+                                    if ($hasSubtotalProdutos && $moedaPedidoPay === 'BRL') {
+                                        // subtotalProdutos veio dos itens; se estiverem em USD e o pedido é BRL,
+                                        // o desconto (BRL) precisa ser convertido para USD para bater com o subtotal.
+                                        // Heurística: se valorProduto <= 2000 e existe taxa de conversão, assume USD.
+                                        // Caso contrário mantém em BRL.
+                                    }
+                                    $valorProduto = round(max(0.0, $valorProduto - $descontoNaBase), 2);
+                                    $this->debugLog('[SPLIT] Desconto de cupom aplicado ao produto: -' . $descontoNaBase . ' => ' . $valorProduto);
+                                }
+                            } catch (\Throwable $e) {}
+
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
                             $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
@@ -7327,6 +7473,28 @@ class CheckoutController extends Controller {
                 $totalUsd = $taxaServicoUsd;
             }
 
+            // === Cupom de desconto (incide APENAS sobre o valor do produto/subtotal, em USD) ===
+            // Não afeta taxa de serviço, impostos, imposto local nem frete (cobrados em conta separada).
+            $descontoCupomUsd = 0.0;
+            $cupomAplicadoInfo = null;
+            if (!$isSomenteRedirecionamentoCheckout && $subtotal > 0) {
+                try {
+                    $resCupomPedido = $this->resolverCupomAplicado((float) $subtotal, (int) ($usuario['id'] ?? 0));
+                    if ($resCupomPedido !== null) {
+                        $descontoCupomUsd = min((float) $resCupomPedido['desconto'], (float) $subtotal);
+                        $descontoCupomUsd = round(max(0.0, $descontoCupomUsd), 2);
+                        if ($descontoCupomUsd > 0) {
+                            $cupomAplicadoInfo = $resCupomPedido;
+                            $totalUsd = max(0.0, $totalUsd - $descontoCupomUsd);
+                            $this->debugLog('[CRIAR_PEDIDO] Cupom ' . $resCupomPedido['cupom_codigo'] . ' desconto USD: ' . $descontoCupomUsd);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $descontoCupomUsd = 0.0;
+                    $cupomAplicadoInfo = null;
+                }
+            }
+
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
                 $taxaServico = $taxaServicoUsd * $taxaConversao;
                 $impostos = $impostosUsd * $taxaConversao;
@@ -7344,9 +7512,20 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);
             }
             
+            // Desconto do cupom na moeda final do pedido (mesmo fator de conversão do total)
+            $desconto = 0.0;
+            if ($descontoCupomUsd > 0) {
+                if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
+                    $desconto = round($descontoCupomUsd * $taxaConversao, 2);
+                } else {
+                    $desconto = round($descontoCupomUsd, 2);
+                }
+            }
+
             $this->debugLog('[CRIAR_PEDIDO] Taxa de servico: ' . $taxaServico);
             $this->debugLog('[CRIAR_PEDIDO] Impostos: ' . $impostos);
             $this->debugLog('[CRIAR_PEDIDO] Frete: ' . $frete . ' (' . (($frete == 0) ? 'GRATIS' : 'PAGO') . ')');
+            $this->debugLog('[CRIAR_PEDIDO] Desconto (cupom): ' . $desconto);
             $this->debugLog('[CRIAR_PEDIDO] Total: ' . $total);
 
             // Idempotência: evitar pedidos duplicados para a mesma tentativa de checkout
@@ -7476,7 +7655,7 @@ class CheckoutController extends Controller {
                 $taxaServico, // MAPEIA PARA servicos
                 $impostos,
                 $frete,
-                0, // desconto
+                $desconto ?? 0, // desconto (cupom aplicado sobre o valor do produto)
                 $total,
                 $moedaSelecionada, // Usar moeda selecionada pelo cliente
                 $taxaConversao, // Taxa de conversão aplicada
@@ -7493,6 +7672,24 @@ class CheckoutController extends Controller {
             
             $pedidoId = $db->lastInsertId();
             $this->debugLog('[CRIAR_PEDIDO] ID gerado: ' . $pedidoId);
+
+            // Registrar o uso do cupom (se houve desconto aplicado) e limpar da sessão
+            if (!empty($cupomAplicadoInfo) && ($descontoCupomUsd ?? 0) > 0) {
+                try {
+                    $cupomModelUso = new Cupom();
+                    $cupomModelUso->registrarUso(
+                        (int) ($cupomAplicadoInfo['cupom_id'] ?? 0),
+                        (int) ($usuario['id'] ?? 0),
+                        (int) $pedidoId,
+                        (float) $descontoCupomUsd,
+                        'USD'
+                    );
+                    if (session_status() === PHP_SESSION_NONE) { session_start(); }
+                    unset($_SESSION[self::CUPOM_SESSION_KEY]);
+                } catch (\Throwable $e) {
+                    error_log('[CRIAR_PEDIDO] Falha ao registrar uso do cupom: ' . $e->getMessage());
+                }
+            }
 
             // Persistir dados do cliente/endereço no pedido quando o schema suportar
             try {

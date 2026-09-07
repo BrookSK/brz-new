@@ -84,6 +84,14 @@ $router->get('/admin/pedidos-wp/export', 'AdminPedidosWpController', 'exportCsv'
 $router->get('/admin/pedidos-wp/export-xlsx', 'AdminPedidosWpController', 'exportXlsx');
  $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
 
+// Cupons de desconto
+$router->get('/admin/cupons', 'AdminCuponsController', 'index');
+$router->get('/admin/cupons/novo', 'AdminCuponsController', 'novo');
+$router->get('/admin/cupons/editar/{id}', 'AdminCuponsController', 'editar');
+$router->post('/admin/cupons/salvar', 'AdminCuponsController', 'salvar');
+$router->post('/admin/cupons/excluir/{id}', 'AdminCuponsController', 'excluir');
+$router->post('/admin/cupons/toggle/{id}', 'AdminCuponsController', 'toggle');
+
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');
 $router->get('/admin/usuarios/detalhes/{id}', 'AdminUsuariosController', 'detalhes');

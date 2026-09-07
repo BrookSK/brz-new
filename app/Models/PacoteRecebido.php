@@ -68,10 +68,26 @@ class PacoteRecebido extends Model {
             $params[':data_fim'] = $filtros['data_fim'];
         }
         if (!empty($filtros['busca'])) {
-            $where[] = '(p.nome LIKE :busca OR p.fornecedor LIKE :busca2 OR CAST(p.numero_suite AS CHAR) LIKE :busca3)';
-            $params[':busca'] = '%' . $filtros['busca'] . '%';
-            $params[':busca2'] = '%' . $filtros['busca'] . '%';
-            $params[':busca3'] = '%' . $filtros['busca'] . '%';
+            $termo = trim((string) $filtros['busca']);
+            $like = '%' . $termo . '%';
+            // Busca ampla: nome/fornecedor do produto, cliente (nome/email),
+            // suite, ID do pacote e ID do pedido vinculado.
+            $where[] = '('
+                . 'p.nome LIKE :busca_nome'
+                . ' OR p.fornecedor LIKE :busca_forn'
+                . ' OR u.nome LIKE :busca_cli_nome'
+                . ' OR u.email LIKE :busca_cli_email'
+                . ' OR CAST(p.numero_suite AS CHAR) LIKE :busca_suite'
+                . ' OR CAST(p.id AS CHAR) LIKE :busca_pacote_id'
+                . ' OR CAST(p.pedido_id AS CHAR) LIKE :busca_pedido_id'
+                . ')';
+            $params[':busca_nome'] = $like;
+            $params[':busca_forn'] = $like;
+            $params[':busca_cli_nome'] = $like;
+            $params[':busca_cli_email'] = $like;
+            $params[':busca_suite'] = $like;
+            $params[':busca_pacote_id'] = $like;
+            $params[':busca_pedido_id'] = $like;
         }
 
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';

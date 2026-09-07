@@ -164,6 +164,8 @@ class AdminPacotesRecebidosController extends Controller {
 
         if ($id > 0) {
             $this->model->update($id, $data);
+            // Refletir a edição nos itens de carrinho que já referenciam este pacote
+            $this->sincronizarPacoteNoCarrinho($id, $data);
             $this->setFlash('Pacote atualizado com sucesso.', 'success');
         } else {
             $data['status'] = 'pendente';
@@ -178,6 +180,76 @@ class AdminPacotesRecebidosController extends Controller {
         }
 
         $this->redirect('/admin/pacotes-recebidos');
+    }
+
+    /**
+     * Sincroniza os dados editáveis do pacote (nome, peso, foto) nos itens de
+     * carrinho que já referenciam este pacote, para que a edição no admin
+     * reflita imediatamente no carrinho do cliente.
+     *
+     * Identifica os itens tanto pela coluna pacote_id quanto pelo produto_id
+     * virtual usado na auto-adição (999990 + id do pacote).
+     */
+    private function sincronizarPacoteNoCarrinho(int $pacoteId, array $data): void {
+        if ($pacoteId <= 0) {
+            return;
+        }
+
+        try {
+            // Descobrir colunas disponíveis em carrinho_items
+            $cols = [];
+            try {
+                $st = $this->connection->query('DESCRIBE carrinho_items');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+            if (empty($cols)) {
+                return;
+            }
+
+            // Monta apenas os SETs para colunas que existem de fato
+            $sets = [];
+            $vals = [];
+            if (in_array('nome_item', $cols, true)) {
+                $sets[] = 'nome_item = ?';
+                $vals[] = (string) ($data['nome'] ?? '');
+            }
+            if (in_array('peso_kg', $cols, true)) {
+                $sets[] = 'peso_kg = ?';
+                $vals[] = (float) ($data['peso_kg'] ?? 0);
+            }
+            if (in_array('foto_url', $cols, true)) {
+                $sets[] = 'foto_url = ?';
+                $vals[] = $data['foto_url'] ?? null;
+            }
+
+            if (empty($sets)) {
+                return; // Nada que possa ser sincronizado neste schema
+            }
+
+            // Condição de identificação do item vinculado ao pacote
+            $conds = [];
+            $condVals = [];
+            if (in_array('pacote_id', $cols, true)) {
+                $conds[] = 'pacote_id = ?';
+                $condVals[] = $pacoteId;
+            }
+            // produto_id virtual usado na auto-adição
+            $conds[] = 'produto_id = ?';
+            $condVals[] = 999990 + abs($pacoteId);
+            // produto_id negativo (legado)
+            $conds[] = 'produto_id = ?';
+            $condVals[] = -1 * abs($pacoteId);
+
+            $sql = 'UPDATE carrinho_items SET ' . implode(', ', $sets)
+                 . ' WHERE (' . implode(' OR ', $conds) . ')';
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute(array_merge($vals, $condVals));
+        } catch (\Throwable $e) {
+            error_log('[PacotesRecebidos] Erro ao sincronizar pacote #' . $pacoteId . ' no carrinho: ' . $e->getMessage());
+        }
     }
 
     /**

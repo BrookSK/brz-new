@@ -529,6 +529,60 @@
                     sel.addEventListener('change', computeMissingFiltered);
                 }
 
+                // ── Cupom de desconto ──
+                (function() {
+                    var btnAplicar = document.getElementById('btn-aplicar-cupom');
+                    var btnRemover = document.getElementById('btn-remover-cupom');
+                    var inputCodigo = document.getElementById('cupom-codigo');
+                    var msgEl = document.getElementById('cupom-msg');
+
+                    function setMsg(txt, ok) {
+                        if (!msgEl) return;
+                        msgEl.textContent = txt || '';
+                        msgEl.className = 'small mt-1 ' + (ok ? 'text-success' : 'text-danger');
+                    }
+
+                    if (btnAplicar && inputCodigo) {
+                        var aplicar = function() {
+                            var codigo = (inputCodigo.value || '').trim();
+                            if (!codigo) { setMsg('Informe um código.', false); return; }
+                            btnAplicar.disabled = true;
+                            setMsg('Validando...', true);
+                            var fd = new FormData();
+                            fd.append('codigo', codigo);
+                            fetch('/checkout/cupom/aplicar', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                                .then(function(r) { return r.json(); })
+                                .then(function(j) {
+                                    if (j && j.ok) {
+                                        // Recarrega para o backend recalcular os valores com o desconto
+                                        window.location.reload();
+                                    } else {
+                                        btnAplicar.disabled = false;
+                                        setMsg((j && j.msg) ? j.msg : 'Cupom inválido.', false);
+                                    }
+                                })
+                                .catch(function() {
+                                    btnAplicar.disabled = false;
+                                    setMsg('Erro ao validar o cupom.', false);
+                                });
+                        };
+                        btnAplicar.addEventListener('click', aplicar);
+                        inputCodigo.addEventListener('keydown', function(e) {
+                            if (e.key === 'Enter') { e.preventDefault(); aplicar(); }
+                        });
+                    }
+
+                    if (btnRemover) {
+                        btnRemover.addEventListener('click', function() {
+                            btnRemover.disabled = true;
+                            fetch('/checkout/cupom/remover', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                                .then(function(r) { return r.json(); })
+                                .then(function() { window.location.reload(); })
+                                .catch(function() { window.location.reload(); });
+                        });
+                    }
+                })();
+
                 // Telefone: separar DDI e número
                 var telefoneHidden = document.getElementById('telefone');
                 var ddiSel = document.getElementById('telefone_ddi');
@@ -936,6 +990,29 @@
                                     </div>
                                 <?php endif; ?>
 
+                                <?php if (empty($isPaymentLink)): ?>
+                                <!-- Cupom de desconto -->
+                                <div class="mt-2 mb-2" id="cupom-box">
+                                    <label class="form-label small mb-1"><i class="fas fa-ticket-alt me-1"></i><?= __('checkout.coupon', 'Cupom de desconto') ?></label>
+                                    <div class="input-group input-group-sm" id="cupom-input-group" <?= !empty($cupom_aplicado) ? 'style="display:none;"' : '' ?>>
+                                        <input type="text" class="form-control text-uppercase" id="cupom-codigo" placeholder="<?= __('checkout.coupon_placeholder', 'Digite o código') ?>">
+                                        <button class="btn btn-outline-primary" type="button" id="btn-aplicar-cupom"><?= __('checkout.coupon_apply', 'Aplicar') ?></button>
+                                    </div>
+                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1" <?= empty($cupom_aplicado) ? 'style="display:none;"' : '' ?>>
+                                        <span class="text-success">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            <?= __('checkout.coupon_applied', 'Cupom') ?>: <strong id="cupom-aplicado-codigo"><?= htmlspecialchars((string) ($cupom_aplicado ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
+                                        </span>
+                                        <button type="button" class="btn btn-sm btn-link text-danger p-0" id="btn-remover-cupom"><?= __('checkout.coupon_remove', 'Remover') ?></button>
+                                    </div>
+                                    <div id="cupom-msg" class="small mt-1"></div>
+                                </div>
+                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row" <?= empty($cupom_desconto) ? 'style="display:none;"' : '' ?>>
+                                    <span><i class="fas fa-tags me-1"></i><?= __('checkout.coupon_discount', 'Desconto do cupom') ?></span>
+                                    <span>-<span id="cupom-desconto" class="cart-currency" data-original-value="<?= (float) ($cupom_desconto ?? 0) ?>"><?= number_format((float) ($cupom_desconto ?? 0), 2, '.', ',') ?></span></span>
+                                </div>
+                                <?php endif; ?>
+
                                 <?php if (!$isPaymentLink && (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube))): ?>
                                     <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
                                         <div class="fw-semibold mb-1" style="color:#0b1f3a;"><?= __('cart.club', 'Clube Brasiliana') ?></div>
@@ -1048,7 +1125,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6><?= __('cart.total', 'Total') ?>:</h6>
-                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0))), 2, '.', ',') ?></h6>
+                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0) - ($cupom_desconto ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0) - ($cupom_desconto ?? 0))), 2, '.', ',') ?></h6>
                             </div>
                             <div class="alert alert-success small py-2 d-none" id="pix-brl-info">
                                 <i class="fas fa-qrcode me-1"></i>
