@@ -225,9 +225,18 @@ class AdminShippoController extends Controller {
             $pesoMedidasFilter .= " AND COALESCE(p.comprimento, 0) > 0";
         }
 
-        // Observação: NÃO excluímos pedidos que já possuem etiqueta. A regra do
-        // negócio pede listar TODOS os pedidos internacionais em Caixa Fechada
-        // com peso e medidas preenchidos, prontos para gerar (ou regerar) etiqueta.
+        // ─── Filtro: EXCLUIR pedidos que já possuem etiqueta Shippo gerada ───
+        // Um pedido cuja etiqueta já foi gerada aparece na seção "Pacotes gerados
+        // (com etiqueta)" e NÃO deve continuar listado em "Pedidos internacionais".
+        // Para regerar, existe o botão de remover/regerar na tabela de gerados.
+        $semEtiquetaFilter = '';
+        if ($this->tableExists('shippo_etiquetas')) {
+            $semEtiquetaFilter = " AND NOT EXISTS (
+                SELECT 1 FROM shippo_etiquetas se
+                WHERE se.pedido_id = p.id
+            )";
+        }
+
         $sql = "
             SELECT p.id AS pedido_id, {$colUserNome} AS cliente_nome, p.usuario_id, p.created_at
                    {$extraSelect},
@@ -237,6 +246,7 @@ class AdminShippoController extends Controller {
             WHERE {$baseWhere}
               {$paisFilter}
               {$pesoMedidasFilter}
+              {$semEtiquetaFilter}
             ORDER BY p.created_at DESC
             LIMIT 200
         ";
@@ -262,6 +272,19 @@ class AdminShippoController extends Controller {
                 $stIntl = $this->connection->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$baseWhere} {$paisFilter}");
                 $stIntl->execute();
                 $this->lastDiag['internacionais'] = (int) $stIntl->fetchColumn();
+            } catch (\Exception $e) {}
+            try {
+                // 2b) Internacionais em caixa fechada que JÁ possuem etiqueta gerada
+                //     (por isso saem da lista de disponíveis).
+                if ($this->tableExists('shippo_etiquetas')) {
+                    $stJa = $this->connection->prepare("
+                        SELECT COUNT(*) FROM pedidos p
+                        WHERE {$baseWhere} {$paisFilter}
+                          AND EXISTS (SELECT 1 FROM shippo_etiquetas se WHERE se.pedido_id = p.id)
+                    ");
+                    $stJa->execute();
+                    $this->lastDiag['ja_com_etiqueta'] = (int) $stJa->fetchColumn();
+                }
             } catch (\Exception $e) {}
             // 3) Internacionais em caixa fechada que ainda NÃO têm peso/medidas completos
             //    (ficam de fora da lista até serem preenchidos).
