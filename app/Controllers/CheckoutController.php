@@ -4465,25 +4465,34 @@ class CheckoutController extends Controller {
                             }
 
                             // Cupom: descontar do valor do produto (nunca da taxa/imposto).
-                            // A coluna pedidos.desconto está na moeda do pedido. Convertê-la para a
-                            // mesma base de $valorProduto (BRL quando o subtotal veio de $totalBrl).
+                            // IMPORTANTE: $valorProduto pode estar em USD (vindo da soma dos
+                            // pedido_itens) enquanto pedidos.desconto está na moeda do pedido (ex: BRL).
+                            // Para evitar erro de moeda, aplicamos o desconto de forma PROPORCIONAL:
+                            // calculamos a fração (desconto / subtotal do pedido) — que é adimensional —
+                            // e aplicamos essa fração ao $valorProduto, seja qual for a moeda dele.
+                            // Fração de desconto do cupom (0 a 1) sobre o valor do produto.
+                            // Fica disponível para aplicar também no $amountUsd do PIX mais abaixo.
+                            $fracaoDescontoProduto = 0.0;
                             try {
                                 $dbDesc = \Config\Database::getConnection();
-                                $stDesc = $dbDesc->prepare('SELECT desconto FROM pedidos WHERE id = ? LIMIT 1');
+                                $stDesc = $dbDesc->prepare('SELECT desconto, subtotal FROM pedidos WHERE id = ? LIMIT 1');
                                 $stDesc->execute([(int) $pedidoId]);
-                                $descontoPedido = (float) ($stDesc->fetchColumn() ?: 0);
-                                if ($descontoPedido > 0) {
-                                    // $subtotalProdutos pode estar em USD; $totalBrl está em BRL.
-                                    // pedidos.desconto está na moeda do pedido ($moedaPedidoPay).
-                                    $descontoNaBase = $descontoPedido;
-                                    if ($hasSubtotalProdutos && $moedaPedidoPay === 'BRL') {
-                                        // subtotalProdutos veio dos itens; se estiverem em USD e o pedido é BRL,
-                                        // o desconto (BRL) precisa ser convertido para USD para bater com o subtotal.
-                                        // Heurística: se valorProduto <= 2000 e existe taxa de conversão, assume USD.
-                                        // Caso contrário mantém em BRL.
+                                $rowDesc = $stDesc->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                $descontoPedido = (float) ($rowDesc['desconto'] ?? 0);
+                                $subtotalPedido = (float) ($rowDesc['subtotal'] ?? 0);
+
+                                if ($descontoPedido > 0 && $valorProduto > 0) {
+                                    if ($subtotalPedido > 0) {
+                                        // Fração de desconto sobre o subtotal (mesma moeda -> adimensional).
+                                        $fracaoDescontoProduto = min(1.0, $descontoPedido / $subtotalPedido);
+                                        $descontoNaBase = round($valorProduto * $fracaoDescontoProduto, 2);
+                                    } else {
+                                        // Fallback: subtrai direto (com teto no próprio valorProduto).
+                                        $descontoNaBase = min($descontoPedido, $valorProduto);
+                                        $fracaoDescontoProduto = $valorProduto > 0 ? min(1.0, $descontoNaBase / $valorProduto) : 0.0;
                                     }
                                     $valorProduto = round(max(0.0, $valorProduto - $descontoNaBase), 2);
-                                    $this->debugLog('[SPLIT] Desconto de cupom aplicado ao produto: -' . $descontoNaBase . ' => ' . $valorProduto);
+                                    $this->debugLog('[SPLIT] Desconto de cupom (proporcional) aplicado ao produto: -' . $descontoNaBase . ' => ' . $valorProduto);
                                 }
                             } catch (\Throwable $e) {}
 
@@ -4637,6 +4646,14 @@ class CheckoutController extends Controller {
                                             $tx = 1.0;
                                         }
                                         $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                    }
+
+                                    // Aplicar o desconto do cupom também ao valor em USD do PIX.
+                                    // O $amountUsd é recalculado a partir dos itens (valor cheio), então
+                                    // precisa receber a mesma fração de desconto aplicada ao produto.
+                                    if (isset($fracaoDescontoProduto) && $fracaoDescontoProduto > 0 && $amountUsd > 0) {
+                                        $amountUsd = round($amountUsd * (1 - $fracaoDescontoProduto), 2);
+                                        $this->debugLog('[SPLIT][PIX] amountUsd com desconto de cupom: ' . $amountUsd);
                                     }
 
                                     if ($amountUsd <= 0) {

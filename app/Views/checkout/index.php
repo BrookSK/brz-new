@@ -423,7 +423,7 @@
 
                 if (br) {
                     window.checkoutOriginalValues.impostos = (window.checkoutBaseValues.impostosCalculado || window.checkoutBaseValues.impostos || 0);
-                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0) + (window.checkoutBaseValues.impostosCalculado || window.checkoutBaseValues.impostos || 0) + (window.checkoutBaseValues.impostoLocal || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0) + (window.checkoutBaseValues.impostosCalculado || window.checkoutBaseValues.impostos || 0) + (window.checkoutBaseValues.impostoLocal || 0) - (window.checkoutBaseValues.cupomDesconto || 0);
                     if (impostosRow) {
                         impostosRow.classList.remove('d-none');
                     }
@@ -435,7 +435,7 @@
                     }
                 } else {
                     window.checkoutOriginalValues.impostos = 0;
-                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0) + (window.checkoutBaseValues.impostoLocal || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0) + (window.checkoutBaseValues.impostoLocal || 0) - (window.checkoutBaseValues.cupomDesconto || 0);
                     if (impostosEl) {
                         impostosEl.setAttribute('data-original-value', '0');
                         impostosEl.textContent = '0';
@@ -536,36 +536,84 @@
                     var inputCodigo = document.getElementById('cupom-codigo');
                     var msgEl = document.getElementById('cupom-msg');
 
+                    var inputGroup = document.getElementById('cupom-input-group');
+                    var aplicadoBox = document.getElementById('cupom-aplicado-box');
+                    var codigoLabel = document.getElementById('cupom-aplicado-codigo');
+                    var descontoRow = document.getElementById('cupom-desconto-row');
+                    var descontoEl = document.getElementById('cupom-desconto');
+
                     function setMsg(txt, ok) {
                         if (!msgEl) return;
                         msgEl.textContent = txt || '';
                         msgEl.className = 'small mt-1 ' + (ok ? 'text-success' : 'text-danger');
                     }
 
+                    function moedaAtual() {
+                        var mh = document.getElementById('moeda_hidden');
+                        var cur = (mh && mh.value) ? mh.value.toUpperCase() : 'BRL';
+                        return (cur === 'USD') ? 'USD' : 'BRL';
+                    }
+
+                    // Reaplica a conversão de preços na moeda atual (recalcula total com/sem cupom).
+                    function refazerPrecos() {
+                        try {
+                            // syncImpostosRules recalcula originalValues.total (subtraindo o cupom);
+                            // updatePrices converte tudo para a moeda atual.
+                            if (typeof syncImpostosRules === 'function') { syncImpostosRules(); }
+                            else if (typeof updatePrices === 'function') { updatePrices(moedaAtual()); }
+                        } catch (e) {}
+                    }
+
+                    // descontoUsd: valor do desconto em USD (moeda base). 0 = sem cupom.
+                    function setCupomEstado(codigo, descontoUsd) {
+                        descontoUsd = Number(descontoUsd) || 0;
+                        var ativo = !!codigo && descontoUsd > 0;
+
+                        // Guarda o desconto na base de valores para a conversão de moeda usar.
+                        if (window.checkoutBaseValues) {
+                            window.checkoutBaseValues.cupomDesconto = ativo ? descontoUsd : 0;
+                        }
+                        if (window.checkoutOriginalValues) {
+                            window.checkoutOriginalValues.cupomDesconto = ativo ? descontoUsd : 0;
+                        }
+
+                        // Alterna UI
+                        if (inputGroup) inputGroup.style.display = ativo ? 'none' : '';
+                        if (aplicadoBox) aplicadoBox.style.display = ativo ? '' : 'none';
+                        if (descontoRow) descontoRow.style.display = ativo ? '' : 'none';
+                        if (ativo && codigoLabel) codigoLabel.textContent = codigo;
+                        if (descontoEl) descontoEl.setAttribute('data-original-value', ativo ? descontoUsd : 0);
+
+                        // Recalcula total e converte o desconto para a moeda atual
+                        refazerPrecos();
+                    }
+
+                    function aplicar() {
+                        var codigo = (inputCodigo.value || '').trim();
+                        if (!codigo) { setMsg('Informe um código.', false); return; }
+                        btnAplicar.disabled = true;
+                        setMsg('Validando...', true);
+                        var fd = new FormData();
+                        fd.append('codigo', codigo);
+                        fetch('/checkout/cupom/aplicar', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                            .then(function(r) { return r.json(); })
+                            .then(function(j) {
+                                btnAplicar.disabled = false;
+                                if (j && j.ok) {
+                                    setMsg('', true);
+                                    // desconto vem em USD (moeda base)
+                                    setCupomEstado(j.codigo || codigo, j.desconto);
+                                } else {
+                                    setMsg((j && j.msg) ? j.msg : 'Cupom inválido.', false);
+                                }
+                            })
+                            .catch(function() {
+                                btnAplicar.disabled = false;
+                                setMsg('Erro ao validar o cupom.', false);
+                            });
+                    }
+
                     if (btnAplicar && inputCodigo) {
-                        var aplicar = function() {
-                            var codigo = (inputCodigo.value || '').trim();
-                            if (!codigo) { setMsg('Informe um código.', false); return; }
-                            btnAplicar.disabled = true;
-                            setMsg('Validando...', true);
-                            var fd = new FormData();
-                            fd.append('codigo', codigo);
-                            fetch('/checkout/cupom/aplicar', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                                .then(function(r) { return r.json(); })
-                                .then(function(j) {
-                                    if (j && j.ok) {
-                                        // Recarrega para o backend recalcular os valores com o desconto
-                                        window.location.reload();
-                                    } else {
-                                        btnAplicar.disabled = false;
-                                        setMsg((j && j.msg) ? j.msg : 'Cupom inválido.', false);
-                                    }
-                                })
-                                .catch(function() {
-                                    btnAplicar.disabled = false;
-                                    setMsg('Erro ao validar o cupom.', false);
-                                });
-                        };
                         btnAplicar.addEventListener('click', aplicar);
                         inputCodigo.addEventListener('keydown', function(e) {
                             if (e.key === 'Enter') { e.preventDefault(); aplicar(); }
@@ -577,8 +625,16 @@
                             btnRemover.disabled = true;
                             fetch('/checkout/cupom/remover', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                                 .then(function(r) { return r.json(); })
-                                .then(function() { window.location.reload(); })
-                                .catch(function() { window.location.reload(); });
+                                .then(function() {
+                                    btnRemover.disabled = false;
+                                    setMsg('', true);
+                                    if (inputCodigo) inputCodigo.value = '';
+                                    setCupomEstado('', 0);
+                                })
+                                .catch(function() {
+                                    btnRemover.disabled = false;
+                                    setMsg('Erro ao remover o cupom.', false);
+                                });
                         });
                     }
                 })();
@@ -785,6 +841,13 @@
                                                 if (stored && (stored === 'BRL' || stored === 'USD')) current = stored;
                                                 radios.forEach(function(r) { r.checked = (r.value === current); });
                                                 updateLabels(current);
+                                                if (moedaHidden) moedaHidden.value = current;
+
+                                                // Aplicar de fato a moeda restaurada (converte os preços).
+                                                // Adiado para garantir que updatePrices já esteja definido.
+                                                setTimeout(function() {
+                                                    try { setCurrency(current); } catch (e) {}
+                                                }, 0);
                                             }
 
                                             if (document.readyState === 'loading') {
@@ -998,29 +1061,24 @@
                                 ?>
                                 <div class="mt-2 mb-2" id="cupom-box">
                                     <label class="form-label small mb-1"><i class="fas fa-ticket-alt me-1"></i><?= __('checkout.coupon', 'Cupom de desconto') ?></label>
-                                    <?php if (!$temCupom): ?>
-                                    <div class="input-group input-group-sm" id="cupom-input-group">
+                                    <div class="input-group input-group-sm" id="cupom-input-group" <?= $temCupom ? 'style="display:none;"' : '' ?>>
                                         <input type="text" class="form-control text-uppercase" id="cupom-codigo" placeholder="<?= __('checkout.coupon_placeholder', 'Digite o código') ?>">
                                         <button class="btn btn-outline-primary" type="button" id="btn-aplicar-cupom"><?= __('checkout.coupon_apply', 'Aplicar') ?></button>
                                     </div>
-                                    <?php else: ?>
-                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1">
+                                    <div id="cupom-aplicado-box" class="d-flex justify-content-between align-items-center small mt-1" <?= $temCupom ? '' : 'style="display:none;"' ?>>
                                         <span class="text-success">
                                             <i class="fas fa-check-circle me-1"></i>
                                             <?= __('checkout.coupon_applied', 'Cupom') ?>: <strong id="cupom-aplicado-codigo"><?= htmlspecialchars((string) ($cupom_aplicado ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
                                         </span>
                                         <button type="button" class="btn btn-sm btn-link text-danger p-0" id="btn-remover-cupom"><?= __('checkout.coupon_remove', 'Remover') ?></button>
                                     </div>
-                                    <?php endif; ?>
                                     <div id="cupom-msg" class="small mt-1"></div>
                                 </div>
-                                <?php if ($temCupom): ?>
-                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row">
+                                <div class="d-flex justify-content-between text-success" id="cupom-desconto-row" <?= $temCupom ? '' : 'style="display:none;"' ?>>
                                     <span><i class="fas fa-tags me-1"></i><?= __('checkout.coupon_discount', 'Desconto do cupom') ?></span>
                                     <span>-<span id="cupom-desconto" class="cart-currency" data-original-value="<?= (float) ($cupom_desconto ?? 0) ?>"><?= number_format((float) ($cupom_desconto ?? 0), 2, '.', ',') ?></span></span>
                                 </div>
-                                <?php endif; ?>
-                                <?php endif; ?>
+                                <?php endif; /* fim: empty($isPaymentLink) */ ?>
 
                                 <?php if (!$isPaymentLink && (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube))): ?>
                                     <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
@@ -2789,6 +2847,7 @@ function updatePrices(currency) {
             impostos: <?= ($impostos ?? 0) ?>,
             impostosCalculado: <?= ($impostos_calculado ?? $impostos ?? 0) ?>,
             impostoLocal: <?= ($imposto_local ?? 0) ?>,
+            cupomDesconto: <?= (float) ($cupom_desconto ?? 0) ?>,
             total: <?= ($total ?? 0) ?>
         };
     }
@@ -2808,6 +2867,7 @@ function updatePrices(currency) {
         taxaServicoDesconto: (originalValues.taxaServicoDesconto || 0) * rate,
         impostos: originalValues.impostos * rate,
         impostoLocal: (originalValues.impostoLocal || 0) * rate,
+        cupomDesconto: (originalValues.cupomDesconto || 0) * rate,
         total: originalValues.total * rate
     };
     
@@ -2823,6 +2883,7 @@ function updatePrices(currency) {
             taxaServicoDesconto: document.getElementById('taxa-servico-desconto'),
             impostos: document.getElementById('impostos'),
             impostoLocal: document.getElementById('imposto-local'),
+            cupomDesconto: document.getElementById('cupom-desconto'),
             total: document.getElementById('total')
         };
 
