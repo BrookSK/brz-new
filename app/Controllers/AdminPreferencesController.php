@@ -48,30 +48,7 @@ class AdminPreferencesController extends Controller {
         $idioma = trim((string) $request->getParam('idioma', 'pt-BR'));
         $moeda = strtoupper(trim((string) $request->getParam('moeda', 'USD')));
 
-        // Validar
-        if (!in_array($idioma, ['pt-BR', 'en'], true)) $idioma = 'pt-BR';
-        if (!in_array($moeda, ['USD', 'BRL'], true)) $moeda = 'USD';
-
-        // Upsert
-        $st = $this->db->prepare("SELECT id FROM admin_user_preferences WHERE usuario_id = ? LIMIT 1");
-        $st->execute([$uid]);
-        $exists = $st->fetchColumn();
-
-        if ($exists) {
-            $this->db->prepare("UPDATE admin_user_preferences SET idioma = ?, moeda = ?, configurado = 1 WHERE usuario_id = ?")->execute([$idioma, $moeda, $uid]);
-        } else {
-            $this->db->prepare("INSERT INTO admin_user_preferences (usuario_id, idioma, moeda, configurado) VALUES (?, ?, ?, 1)")->execute([$uid, $idioma, $moeda]);
-        }
-
-        // Atualizar sessão
-        $_SESSION['admin_pref_idioma'] = $idioma;
-        $_SESSION['admin_pref_moeda'] = $moeda;
-        $_SESSION['admin_pref_configurado'] = 1;
-
-        // Atualizar locale do I18n
-        if (class_exists('\\App\\Core\\I18n')) {
-            \App\Core\I18n::setLocale($idioma === 'en' ? 'en' : 'pt-BR');
-        }
+        self::savePreference($uid, $idioma, $moeda);
 
         echo json_encode(['ok' => true]);
         exit;
@@ -93,6 +70,46 @@ class AdminPreferencesController extends Controller {
         $prefs = $this->getPreferences($uid);
         echo json_encode(['ok' => true, 'prefs' => $prefs]);
         exit;
+    }
+
+    /**
+     * Persistir preferências de idioma/moeda de um usuário (fonte única de verdade).
+     * Usado tanto pelo popup do admin quanto pelo seletor de idioma do site.
+     * Atualiza banco + sessão + locale do I18n.
+     */
+    public static function savePreference(int $userId, string $idioma, string $moeda): bool {
+        $idioma = trim($idioma);
+        $moeda = strtoupper(trim($moeda));
+        if (!in_array($idioma, ['pt-BR', 'en'], true)) $idioma = 'pt-BR';
+        if (!in_array($moeda, ['USD', 'BRL'], true)) $moeda = 'USD';
+
+        $ok = false;
+        if ($userId > 0) {
+            try {
+                $db = \Config\Database::getConnection();
+                $st = $db->prepare("SELECT id FROM admin_user_preferences WHERE usuario_id = ? LIMIT 1");
+                $st->execute([$userId]);
+                if ($st->fetchColumn()) {
+                    $db->prepare("UPDATE admin_user_preferences SET idioma = ?, moeda = ?, configurado = 1 WHERE usuario_id = ?")->execute([$idioma, $moeda, $userId]);
+                } else {
+                    $db->prepare("INSERT INTO admin_user_preferences (usuario_id, idioma, moeda, configurado) VALUES (?, ?, ?, 1)")->execute([$userId, $idioma, $moeda]);
+                }
+                $ok = true;
+            } catch (\Exception $e) {
+                $ok = false;
+            }
+        }
+
+        // Sessão (vale também para visitante anônimo)
+        $_SESSION['admin_pref_idioma'] = $idioma;
+        $_SESSION['admin_pref_moeda'] = $moeda;
+        $_SESSION['admin_pref_configurado'] = 1;
+
+        if (class_exists('\\App\\Core\\I18n')) {
+            \App\Core\I18n::setLocale($idioma === 'en' ? 'en' : 'pt-BR');
+        }
+
+        return $ok;
     }
 
     /**

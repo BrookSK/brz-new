@@ -7188,6 +7188,7 @@ return [
     'admin.order_status.installment' => 'Installment',
     'admin.order_status.customs' => 'Customs',
     'admin.order_status.packaging' => 'Packaging',
+    'admin.order_status.cancelled' => 'Cancelled',
     'admin.calendar.br_carnival' => 'Carnival',
     'admin.calendar.br_womens_day' => 'Women\'s Day',
     'admin.calendar.br_consumer_day' => 'Consumer Day',

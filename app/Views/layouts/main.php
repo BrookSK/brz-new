@@ -1420,14 +1420,17 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
         const __USD_BRL_RATE__ = <?= \App\Core\ExchangeRate::getUsdToBrl() ?>;
         
         <?php
-        // Se admin está logado, injetar preferências para sincronizar com o site
-        $__adminLogado = in_array(($_SESSION['usuario_perfil'] ?? ''), ['admin','suporte','vendedor'], true);
-        if ($__adminLogado && !empty($_SESSION['admin_pref_moeda'])):
+        // Preferência de MOEDA como fonte única (vale para qualquer visitante,
+        // logado ou não). Idioma e moeda são independentes: só aplicamos aqui
+        // quando o usuário escolheu explicitamente uma moeda. Sem escolha, o site
+        // segue o padrão atual (Real / BRL).
+        $__prefMoeda = strtoupper((string) ($_SESSION['admin_pref_moeda'] ?? ''));
+        if (in_array($__prefMoeda, ['USD', 'BRL'], true)):
         ?>
-        window.ADMIN_PREF_MOEDA = '<?= $_SESSION['admin_pref_moeda'] ?>';
+        window.ADMIN_PREF_MOEDA = '<?= $__prefMoeda ?>';
         window.USD_BRL_RATE = __USD_BRL_RATE__;
-        // Sincronizar preferência do admin com localStorage do site
-        try { localStorage.setItem('selected_currency', '<?= $_SESSION['admin_pref_moeda'] === 'BRL' ? 'BRL' : 'USD' ?>'); } catch(e){}
+        // Sincronizar a moeda escolhida com o localStorage do site
+        try { localStorage.setItem('selected_currency', '<?= $__prefMoeda ?>'); } catch(e){}
         <?php endif; ?>
 
         // Variáveis globais
@@ -1441,8 +1444,12 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             init: function() {
                 console.log('=== INICIANDO SISTEMA DE CONVERSÃO INLINE ===');
                 
-                // Recuperar moeda salva
-                this.currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
+                // Moeda escolhida pelo usuário tem prioridade; sem escolha, mantém o padrão (BRL)
+                if (window.ADMIN_PREF_MOEDA) {
+                    this.currentCurrency = (String(window.ADMIN_PREF_MOEDA).toUpperCase() === 'BRL') ? 'BRL' : 'USD';
+                } else {
+                    this.currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
+                }
                 console.log('Moeda inicial:', this.currentCurrency);
 
                 // Garantir que o header reflita a moeda inicial antes de atualizar preços
