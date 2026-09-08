@@ -7168,6 +7168,26 @@ class CheckoutController extends Controller {
                     }
                 } catch (\Exception $e) {
                 }
+
+                // Fallback robusto: se a taxa não veio válida (<=1.01), NÃO podemos gravar
+                // valores em USD rotulados como BRL. Buscar a taxa central (ExchangeRate).
+                if ($taxaConversao <= 1.01) {
+                    try {
+                        $rFb = (float) \App\Core\ExchangeRate::getUsdToBrl();
+                        if ($rFb > 1.01) {
+                            $taxaConversao = $rFb;
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                }
+
+                // Se AINDA assim não há taxa válida, é mais seguro tratar o pedido como USD
+                // (valores permanecem na moeda base de cálculo) do que gravar valores USD
+                // com o rótulo BRL, o que corromperia a exibição.
+                if ($taxaConversao <= 1.01) {
+                    $this->debugLog('[CRIAR_PEDIDO] Taxa USD->BRL indisponível; revertendo moeda para USD para preservar coerência valor<->moeda.');
+                    $moedaSelecionada = 'USD';
+                }
             }
 
             // Calcular em USD (mesma regra do carrinho/checkout)
@@ -7341,7 +7361,23 @@ class CheckoutController extends Controller {
                 $frete = $freteUsd;
                 $impostoLocal = $impostoLocalUsd;
                 $total = $totalUsd;
+                // Pedido em USD: valores permanecem na moeda base (USD) e a taxa é sempre 1.
+                // Isso garante a invariante "valores gravados estão na moeda do pedido".
+                $taxaConversao = 1.0;
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);
+            }
+
+            // === Salvaguarda de coerência valor<->moeda ===
+            // Invariante do sistema: os valores gravados DEVEM estar na moeda do pedido.
+            // - moeda=USD  => taxa_conversao = 1 e valores em USD
+            // - moeda=BRL  => taxa_conversao > 1.01 e valores em BRL (USD * taxa)
+            // Se algo violar isso, registramos para auditoria (não silenciar corrupção).
+            if ($moedaSelecionada === 'USD' && $taxaConversao > 1.01) {
+                $this->debugLog('[CRIAR_PEDIDO][ALERTA] Pedido USD com taxa>1 detectado; forçando taxa=1.');
+                $taxaConversao = 1.0;
+            }
+            if ($moedaSelecionada === 'BRL' && $taxaConversao <= 1.01) {
+                $this->debugLog('[CRIAR_PEDIDO][ALERTA] Pedido BRL sem taxa válida após cálculo; valores podem estar em USD.');
             }
             
             $this->debugLog('[CRIAR_PEDIDO] Taxa de servico: ' . $taxaServico);
