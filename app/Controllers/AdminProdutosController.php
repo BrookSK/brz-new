@@ -5692,6 +5692,114 @@ HTML;
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        // O editor legado é montado inline neste controller. Este catálogo atende tanto
+        // os textos estáticos quanto os elementos criados pelos scripts de imagens/brindes.
+        $editorTranslations = [
+            'Editar Produto' => __('admin.product_editor.title', 'Editar Produto'),
+            'Voltar' => __('admin.product_editor.back', 'Voltar'),
+            'Nome *' => __('admin.product_editor.name_required', 'Nome *'),
+            'Loja *' => __('admin.product_editor.store_required', 'Loja *'),
+            'Pesquisar loja...' => __('admin.product_editor.search_store', 'Pesquisar loja...'),
+            'Selecione...' => __('admin.product_editor.select', 'Selecione...'),
+            'Selecione a loja onde este produto está disponível' => __('admin.product_editor.store_help', 'Selecione a loja onde este produto está disponível'),
+            'NCM' => __('admin.product_editor.ncm', 'NCM'),
+            'Pesquisar NCM...' => __('admin.product_editor.search_ncm', 'Pesquisar NCM...'),
+            'Opcional' => __('admin.product_editor.optional', 'Opcional'),
+            'Descrição Curta' => __('admin.product_editor.short_description', 'Descrição Curta'),
+            'Descrição Completa' => __('admin.product_editor.full_description', 'Descrição Completa'),
+            'Categoria' => __('admin.product_editor.category', 'Categoria'),
+            'Foto de Capa' => __('admin.product_editor.cover_photo', 'Foto de Capa'),
+            'Capa' => __('admin.product_editor.cover', 'Capa'),
+            'Sem capa' => __('admin.product_editor.no_cover', 'Sem capa'),
+            'Escolher arquivo' => __('admin.product_editor.file_choose', 'Escolher arquivo'),
+            'Nenhum arquivo selecionado' => __('admin.product_editor.file_none_selected', 'Nenhum arquivo selecionado'),
+            '{n} arquivos selecionados' => __('admin.product_editor.file_selected_count', '{n} arquivos selecionados'),
+            'Enviar capa' => __('admin.product_editor.send_cover', 'Enviar capa'),
+            'Remover capa' => __('admin.product_editor.remove_cover', 'Remover capa'),
+            'A foto de capa é usada como imagem principal do produto' => __('admin.product_editor.cover_help', 'A foto de capa é usada como imagem principal do produto'),
+            'Galeria de Fotos' => __('admin.product_editor.photo_gallery', 'Galeria de Fotos'),
+            'Foto' => __('admin.product_editor.photo', 'Foto'),
+            'Remover' => __('admin.product_editor.remove', 'Remover'),
+            'Enviar fotos' => __('admin.product_editor.send_photos', 'Enviar fotos'),
+            'Salvar ordem' => __('admin.product_editor.save_order', 'Salvar ordem'),
+            'Variações' => __('admin.product_editor.variations', 'Variações'),
+            'Desmarcar todas as opções' => __('admin.product_editor.clear_options', 'Desmarcar todas as opções'),
+            'Salvar atributos/opções' => __('admin.product_editor.save_attributes', 'Salvar atributos/opções'),
+            'Gerar todas' => __('admin.product_editor.generate_all', 'Gerar todas'),
+            'Apagar e gerar' => __('admin.product_editor.replace_and_generate', 'Apagar e gerar'),
+            'Apagar todas' => __('admin.product_editor.delete_all', 'Apagar todas'),
+            'Variações cadastradas' => __('admin.product_editor.registered_variations', 'Variações cadastradas'),
+            'Estoque' => __('admin.product_editor.stock', 'Estoque'),
+            'Preço variação' => __('admin.product_editor.variation_price', 'Preço variação'),
+            'Criar individual' => __('admin.product_editor.create_individual', 'Criar individual'),
+            'Nenhuma variação criada ainda.' => __('admin.product_editor.no_variations', 'Nenhuma variação criada ainda.'),
+            'Variação' => __('admin.product_editor.variation', 'Variação'),
+            'Preço (override)' => __('admin.product_editor.price_override', 'Preço (override)'),
+            'Ativa' => __('admin.product_editor.active_female', 'Ativa'),
+            'Salvar variações' => __('admin.product_editor.save_variations', 'Salvar variações'),
+            'Galeria por variação (SKU)' => __('admin.product_editor.variation_gallery', 'Galeria por variação (SKU)'),
+            'Para habilitar variações, rode a migration 061_create_produto_variacoes_schema.sql no banco.' => __('admin.product_editor.variations_migration', 'Para habilitar variações, rode a migration 061_create_produto_variacoes_schema.sql no banco.'),
+            'Use atributos e opções para gerar variações simples ou compostas. Você pode gerar todas, apagar e também criar variações individuais.' => __('admin.product_editor.variations_help', 'Use atributos e opções para gerar variações simples ou compostas. Você pode gerar todas, apagar e também criar variações individuais.'),
+            'Preço (USD) *' => __('admin.product_editor.price_usd_required', 'Preço (USD) *'),
+            'Preço de Custo (USD)' => __('admin.product_editor.cost_price_usd', 'Preço de Custo (USD)'),
+            'Preço Promocional (USD)' => __('admin.product_editor.sale_price_usd', 'Preço Promocional (USD)'),
+            'Data Limite da Promoção' => __('admin.product_editor.sale_end_date', 'Data Limite da Promoção'),
+            'Após essa data, o preço volta ao valor normal automaticamente.' => __('admin.product_editor.sale_end_help', 'Após essa data, o preço volta ao valor normal automaticamente.'),
+            'Estoque Mínimo' => __('admin.product_editor.min_stock', 'Estoque Mínimo'),
+            'Peso (kg)' => __('admin.product_editor.weight_kg', 'Peso (kg)'),
+            'Status' => __('admin.product_editor.status', 'Status'),
+            'Rascunho' => __('admin.product_editor.status_draft', 'Rascunho'),
+            'Publicado' => __('admin.product_editor.status_published', 'Publicado'),
+            'Arquivado' => __('admin.product_editor.status_archived', 'Arquivado'),
+            'Ativo' => __('admin.product_editor.active', 'Ativo'),
+            'Inativo' => __('admin.product_editor.inactive', 'Inativo'),
+            'Destaque' => __('admin.product_editor.featured', 'Destaque'),
+            'Sim' => __('admin.product_editor.yes', 'Sim'),
+            'Não' => __('admin.product_editor.no', 'Não'),
+            'Clube Ativo' => __('admin.product_editor.club_active', 'Clube Ativo'),
+            'Elegível para Oferta Gratuita' => __('admin.product_editor.free_offer_eligible', 'Elegível para Oferta Gratuita'),
+            'Se ativo, este produto poderá ser oferecido gratuitamente no carrinho' => __('admin.product_editor.free_offer_help', 'Se ativo, este produto poderá ser oferecido gratuitamente no carrinho'),
+            'Ocultar em todo o site' => __('admin.product_editor.hide_from_site', 'Ocultar em todo o site'),
+            'Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.' => __('admin.product_editor.hide_from_site_help', 'Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.'),
+            'Braziliana Outlet' => __('admin.product_editor.outlet', 'Braziliana Outlet'),
+            'Se ativo, o produto aparece na página Braziliana Outlet.' => __('admin.product_editor.outlet_help', 'Se ativo, o produto aparece na página Braziliana Outlet.'),
+            'Imposto Local (%)' => __('admin.product_editor.local_tax', 'Imposto Local (%)'),
+            'Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.' => __('admin.product_editor.local_tax_help', 'Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.'),
+            'Brinde Vinculado' => __('admin.product_editor.linked_gift', 'Brinde Vinculado'),
+            'Quando este produto for adicionado ao carrinho, o brinde será incluído automaticamente (preço $0, taxa e impostos normais — impostos BR devolvidos na carteira).' => __('admin.product_editor.linked_gift_help', 'Quando este produto for adicionado ao carrinho, o brinde será incluído automaticamente (preço $0, taxa e impostos normais — impostos BR devolvidos na carteira).'),
+            'Buscar produto para brinde...' => __('admin.product_editor.search_gift', 'Buscar produto para brinde...'),
+            'Início' => __('admin.product_editor.start_date', 'Início'),
+            'Fim' => __('admin.product_editor.end_date', 'Fim'),
+            'Salvar Brinde' => __('admin.product_editor.save_gift', 'Salvar Brinde'),
+            'Salvar Alterações' => __('admin.product_editor.save_changes', 'Salvar Alterações'),
+            'Nenhum brinde configurado.' => __('admin.product_editor.no_gift', 'Nenhum brinde configurado.'),
+            'até' => __('admin.product_editor.until', 'até'),
+            'Erro ao carregar brindes.' => __('admin.product_editor.error_load_gifts', 'Erro ao carregar brindes.'),
+            'Nenhum produto encontrado.' => __('admin.product_editor.no_products_found', 'Nenhum produto encontrado.'),
+            'Produto #' => __('admin.product_editor.product_number_prefix', 'Produto #'),
+            'Promoção' => __('admin.product_editor.promotion', 'Promoção'),
+            'Erro:' => __('admin.product_editor.error_prefix', 'Erro:'),
+            'Ex: 19,90' => __('admin.product_editor.example_variation_price', 'Ex: 19,90'),
+            'Ex: 8' => __('admin.product_editor.example_local_tax', 'Ex: 8'),
+            'Falha no upload' => __('admin.product_editor.upload_failed', 'Falha no upload'),
+            'Erro ao enviar capa' => __('admin.product_editor.error_send_cover', 'Erro ao enviar capa'),
+            'Falha ao remover capa' => __('admin.product_editor.remove_cover_failed', 'Falha ao remover capa'),
+            'Erro ao remover capa' => __('admin.product_editor.error_remove_cover', 'Erro ao remover capa'),
+            'Erro ao enviar fotos' => __('admin.product_editor.error_send_photos', 'Erro ao enviar fotos'),
+            'Erro ao enviar fotos da variação' => __('admin.product_editor.error_send_variation_photos', 'Erro ao enviar fotos da variação'),
+            'Erro ao salvar' => __('admin.product_editor.error_saving', 'Erro ao salvar'),
+            'Erro de conexão' => __('admin.product_editor.connection_error', 'Erro de conexão'),
+            'Remover esta foto?' => __('admin.product_editor.confirm_remove_photo', 'Remover esta foto?'),
+            'Remover esta foto da variação?' => __('admin.product_editor.confirm_remove_variation_photo', 'Remover esta foto da variação?'),
+            'Remover a foto de capa deste produto?' => __('admin.product_editor.confirm_remove_cover', 'Remover a foto de capa deste produto?'),
+            'Remover este brinde?' => __('admin.product_editor.confirm_remove_gift', 'Remover este brinde?'),
+            'Selecione um produto brinde' => __('admin.product_editor.select_gift_product', 'Selecione um produto brinde'),
+            'Informe data de início e fim' => __('admin.product_editor.enter_start_end_dates', 'Informe data de início e fim'),
+            'Gerar variações com base nas opções selecionadas?' => __('admin.product_editor.confirm_generate_variations', 'Gerar variações com base nas opções selecionadas?'),
+            'Isso vai apagar e recriar as variações. Continuar?' => __('admin.product_editor.confirm_replace_variations', 'Isso vai apagar e recriar as variações. Continuar?'),
+            'Apagar todas as variações deste produto?' => __('admin.product_editor.confirm_delete_variations', 'Apagar todas as variações deste produto?'),
+        ];
+
         if ($request->getParam('debug_loja')) {
             echo '<pre style="padding:12px;background:#fff;border:1px solid #ddd;max-width:100%;overflow:auto">';
             var_dump([
@@ -5712,6 +5820,10 @@ HTML;
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
     #secao-variacoes,.variacoes-wrap{display:none!important;}
+    .product-editor-file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+    .product-editor-file-picker{display:flex;flex:1 1 260px;align-items:center;gap:.75rem;min-width:0;}
+    .product-editor-file-picker__button{flex:0 0 auto;}
+    .product-editor-file-picker__name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     </style>
     <script>document.addEventListener("DOMContentLoaded",function(){
         // Esconder o div.mb-3 que contém label "Variações"
@@ -6243,6 +6355,7 @@ HTML;
 
         renderAdminScripts();
 
+        echo '<script>window.PRODUCT_EDITOR_I18N = ' . json_encode($editorTranslations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';window.PRODUCT_EDITOR_LOCALE = ' . json_encode(\App\Core\I18n::getLocaleHtml()) . ';</script>';
         echo '<script>const BRINDE_PRODUTO_ID = ' . (int) $id . ';</script>';
 
         echo <<<'HTMLSCRIPT'
@@ -6336,6 +6449,7 @@ HTML;
                             if (btnRemoverCapa) btnRemoverCapa.disabled = false;
                         }
                         capaFile.value = '';
+                        capaFile.dispatchEvent(new Event('change'));
                     } catch (e) {
                         alert(e.message || 'Erro ao enviar capa');
                     } finally {
@@ -6405,6 +6519,7 @@ HTML;
                             galeriaRow.appendChild(col);
                         });
                         galeriaFiles.value = '';
+                        galeriaFiles.dispatchEvent(new Event('change'));
                     } catch (e) {
                         alert(e.message || 'Erro ao enviar fotos');
                     } finally {
@@ -6467,6 +6582,7 @@ HTML;
                             row.appendChild(col);
                         });
                         input.value = '';
+                        input.dispatchEvent(new Event('change'));
                     } catch (e) {
                         alert(e.message || 'Erro ao enviar fotos da variação');
                     } finally {
@@ -6599,6 +6715,132 @@ HTML;
                 .catch(() => alert('Erro de conexão'))
                 .finally(() => { salvarBtn.disabled = false; });
             });
+        })();
+        // Traduz também os textos adicionados dinamicamente pelos scripts de galeria e brindes.
+        (function() {
+            const translations = window.PRODUCT_EDITOR_I18N || {};
+            const sources = Object.keys(translations).sort((a, b) => b.length - a.length);
+            if (sources.length === 0) return;
+
+            const translate = function(value) {
+                let text = String(value || '');
+                sources.forEach(function(source) {
+                    if (text.indexOf(source) !== -1) {
+                        text = text.split(source).join(translations[source]);
+                    }
+                });
+                return text;
+            };
+
+            const translateTextNode = function(node) {
+                const original = node.nodeValue;
+                const translated = translate(original);
+                if (translated !== original) node.nodeValue = translated;
+            };
+
+            const translateElement = function(element) {
+                if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+                ['placeholder', 'title', 'alt', 'aria-label'].forEach(function(attribute) {
+                    if (element.hasAttribute(attribute)) {
+                        const original = element.getAttribute(attribute);
+                        const translated = translate(original);
+                        if (translated !== original) element.setAttribute(attribute, translated);
+                    }
+                });
+            };
+
+            const applyTranslations = function(root) {
+                const scope = root && root.nodeType === Node.ELEMENT_NODE ? root : document.body;
+                if (!scope) return;
+                translateElement(scope);
+                scope.querySelectorAll('*').forEach(translateElement);
+                const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+                let node;
+                while ((node = walker.nextNode())) {
+                    const parent = node.parentElement;
+                    if (!parent || ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parent.tagName)) continue;
+                    translateTextNode(node);
+                }
+            };
+
+            const nativeAlert = window.alert;
+            const nativeConfirm = window.confirm;
+            window.alert = function(message) { return nativeAlert.call(window, translate(message)); };
+            window.confirm = function(message) { return nativeConfirm.call(window, translate(message)); };
+
+            document.documentElement.lang = window.PRODUCT_EDITOR_LOCALE || 'pt-BR';
+            document.title = translate('Editar Produto') + ' - Braziliana Admin';
+
+            const filePickerLabels = {
+                choose: translations['Escolher arquivo'] || 'Escolher arquivo',
+                empty: translations['Nenhum arquivo selecionado'] || 'Nenhum arquivo selecionado',
+                multiple: translations['{n} arquivos selecionados'] || '{n} arquivos selecionados'
+            };
+            const fileInputSelector = '#capaFile, #galeriaFiles, [id^="varGaleriaFiles_"]';
+
+            const updateFilePicker = function(input, nameElement) {
+                const fileCount = input.files ? input.files.length : 0;
+                let label = filePickerLabels.empty;
+                if (fileCount === 1) {
+                    label = input.files[0].name;
+                } else if (fileCount > 1) {
+                    label = filePickerLabels.multiple.replace('{n}', fileCount);
+                }
+                nameElement.textContent = label;
+                nameElement.title = label;
+            };
+
+            const enhanceFileInput = function(input) {
+                if (!input || input.dataset.productEditorFilePicker === 'true') return;
+                input.dataset.productEditorFilePicker = 'true';
+                input.classList.add('product-editor-file-input');
+                input.setAttribute('tabindex', '-1');
+                input.setAttribute('aria-label', filePickerLabels.choose);
+
+                const picker = document.createElement('div');
+                picker.className = 'product-editor-file-picker';
+                if (input.style.maxWidth) picker.style.maxWidth = input.style.maxWidth;
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn-outline-secondary product-editor-file-picker__button';
+                button.textContent = filePickerLabels.choose;
+                button.setAttribute('aria-controls', input.id);
+
+                const nameElement = document.createElement('span');
+                nameElement.className = 'text-muted product-editor-file-picker__name';
+                nameElement.setAttribute('aria-live', 'polite');
+
+                picker.append(button, nameElement);
+                input.insertAdjacentElement('afterend', picker);
+                button.addEventListener('click', function() { input.click(); });
+                input.addEventListener('change', function() { updateFilePicker(input, nameElement); });
+                updateFilePicker(input, nameElement);
+            };
+
+            const enhanceFileInputs = function(root) {
+                if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+                if (root.matches(fileInputSelector)) enhanceFileInput(root);
+                root.querySelectorAll(fileInputSelector).forEach(enhanceFileInput);
+            };
+
+            applyTranslations(document.body);
+            enhanceFileInputs(document.body);
+
+            if (typeof MutationObserver !== 'undefined') {
+                const observer = new MutationObserver(function(records) {
+                    records.forEach(function(record) {
+                        record.addedNodes.forEach(function(node) {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                applyTranslations(node);
+                                enhanceFileInputs(node);
+                            }
+                            if (node.nodeType === Node.TEXT_NODE) translateTextNode(node);
+                        });
+                    });
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
         })();
 </script>
 HTMLSCRIPT;

@@ -1726,7 +1726,7 @@ class AdminComprasController extends Controller {
                         if (todasCheck.checked || count === 0) {
                             applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>' . htmlspecialchars(__('admin.purchases.apply', 'Aplicar'), ENT_QUOTES, 'UTF-8') . '";
                         } else {
-                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>' . htmlspecialchars(__('admin.purchases.apply', 'Aplicar'), ENT_QUOTES, 'UTF-8') . ' (" + count + " ' . htmlspecialchars(__('admin.purchases.store', 'loja'), ENT_QUOTES, 'UTF-8') . '" + (count > 1 ? "s" : "") + ")";
+                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>' . htmlspecialchars(__('admin.purchases.apply', 'Aplicar'), ENT_QUOTES, 'UTF-8') . ' (" + "' . htmlspecialchars(__('admin.purchases.stores_selected', '{n} lojas selecionadas'), ENT_QUOTES, 'UTF-8') . '".replace("{n}", String(count)) + ")";
                         }
                         // Mostrar o botão sempre que houver mudança pendente
                         applyBtn.classList.remove("d-none");
@@ -1870,6 +1870,17 @@ class AdminComprasController extends Controller {
                                 
                                 $__mesAtual = '';
                                 $__meses = ['01'=>__('admin.purchases.month_01', 'Janeiro'),'02'=>__('admin.purchases.month_02', 'Fevereiro'),'03'=>__('admin.purchases.month_03', 'Março'),'04'=>__('admin.purchases.month_04', 'Abril'),'05'=>__('admin.purchases.month_05', 'Maio'),'06'=>__('admin.purchases.month_06', 'Junho'),'07'=>__('admin.purchases.month_07', 'Julho'),'08'=>__('admin.purchases.month_08', 'Agosto'),'09'=>__('admin.purchases.month_09', 'Setembro'),'10'=>__('admin.purchases.month_10', 'Outubro'),'11'=>__('admin.purchases.month_11', 'Novembro'),'12'=>__('admin.purchases.month_12', 'Dezembro')];
+                                $statusLabels = [
+                                    'pendente' => __('admin.purchases.status_pending', 'Pendente'),
+                                    'comprado' => __('admin.purchases.status_purchased', 'Comprado'),
+                                    'cancelado' => __('admin.purchases.status_cancelled', 'Cancelado'),
+                                ];
+                                $priorityLabels = [
+                                    'urgente' => __('admin.purchases.priority_urgent', 'Urgente'),
+                                    'alta' => __('admin.purchases.priority_high', 'Alta'),
+                                    'media' => __('admin.purchases.priority_medium', 'Média'),
+                                    'baixa' => __('admin.purchases.priority_low', 'Baixa'),
+                                ];
 
                                 foreach ($compras as $item) {
                                     // Separação por mês quando filtro Carnê está ativo
@@ -1889,6 +1900,9 @@ class AdminComprasController extends Controller {
                                                    ($item['status'] == 'comprado' ? 'success' : 'danger');
                                     $prioridade_class = $item['prioridade'] == 'urgente' ? 'danger' : 
                                                        ($item['prioridade'] == 'alta' ? 'warning' : 'info');
+
+                                    $statusLabel = $statusLabels[(string) ($item['status'] ?? '')] ?? (string) ($item['status'] ?? '');
+                                    $priorityLabel = $priorityLabels[(string) ($item['prioridade'] ?? '')] ?? (string) ($item['prioridade'] ?? '');
 
                                     $qf = (int) ($item['quantidade_faltante'] ?? 0);
                                     if ($qf <= 0) {
@@ -1990,14 +2004,14 @@ class AdminComprasController extends Controller {
                                         . '<td>'
                                         . '<div class="d-flex gap-2 align-items-center">' . $imgTag . '<div>'
                                         . '<strong>' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '</strong>'
-                                        . '<br><small class="text-muted">ID: ' . (int) $item['produto_id'] . '</small>'
+                                        . '<br><small class="text-muted">' . __('admin.purchases.id_label', 'ID:') . ' ' . (int) $item['produto_id'] . '</small>'
                                         . ((!empty($item['tipo_compra']) && $item['tipo_compra'] === 'carne') ? ' <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-file-invoice-dollar me-1"></i>' . __('admin.purchases.badge_carne', 'Carnê') . '</span>' : '')
                                         . '</div></div>'
                                         . '</td>'
                                         . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">' . __('admin.purchases.no_store', 'Sem loja') . '</span>') . '</td>'
                                         . '<td><span class="badge bg-primary">' . $qf . '</span></td>'
-                                        . '<td><span class="badge bg-' . $status_class . '">' . ucfirst((string) $item['status']) . '</span></td>'
-                                        . '<td><span class="badge bg-' . $prioridade_class . '">' . ucfirst((string) $item['prioridade']) . '</span></td>'
+                                        . '<td><span class="badge bg-' . $status_class . '">' . htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') . '</span></td>'
+                                        . '<td><span class="badge bg-' . $prioridade_class . '">' . htmlspecialchars($priorityLabel, ENT_QUOTES, 'UTF-8') . '</span></td>'
                                         . '<td>' . (!empty($item['data_solicitacao']) ? date('d/m/Y', strtotime((string) $item['data_solicitacao'])) : '-') . '</td>'
                                         . '<td>'
                                         . '<div class="btn-group btn-group-sm">'
@@ -2026,6 +2040,8 @@ class AdminComprasController extends Controller {
                             $mStatusClass = $mStatus == 'pendente' ? 'warning' : ($mStatus == 'comprado' ? 'success' : 'danger');
                             $mPrioridade = (string) ($mItem['prioridade'] ?? '');
                             $mPrioClass = $mPrioridade == 'urgente' ? 'danger' : ($mPrioridade == 'alta' ? 'warning' : 'info');
+                            $mStatusLabel = $statusLabels[$mStatus] ?? $mStatus;
+                            $mPriorityLabel = $priorityLabels[$mPrioridade] ?? $mPrioridade;
                             $mImgUrl = $this->resolveProdutoImagem($mItem);
                             $mImgTag = $mImgUrl
                                 ? '<img src="' . htmlspecialchars($mImgUrl) . '" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" title="' . htmlspecialchars(__('admin.purchases.click_to_zoom', 'Clique para ampliar'), ENT_QUOTES, 'UTF-8') . '">'
@@ -2075,10 +2091,10 @@ class AdminComprasController extends Controller {
                                     <div style="flex:1;min-width:0;">
                                         <div class="fw-semibold small" style="word-break:break-word;">' . htmlspecialchars($mProdNome) . '</div>
                                         <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:10px;">
-                                            <span class="text-muted">ID: ' . (int) $mItem['produto_id'] . '</span>
+                                            <span class="text-muted">' . __('admin.purchases.id_label', 'ID:') . ' ' . (int) $mItem['produto_id'] . '</span>
                                             <span class="badge bg-primary">' . $mQf . ' ' . __('admin.purchases.unit_abbr', 'un') . '</span>
-                                            <span class="badge bg-' . $mStatusClass . '">' . ucfirst($mStatus) . '</span>
-                                            <span class="badge bg-' . $mPrioClass . '">' . ucfirst($mPrioridade) . '</span>
+                                            <span class="badge bg-' . $mStatusClass . '">' . htmlspecialchars($mStatusLabel, ENT_QUOTES, 'UTF-8') . '</span>
+                                            <span class="badge bg-' . $mPrioClass . '">' . htmlspecialchars($mPriorityLabel, ENT_QUOTES, 'UTF-8') . '</span>
                                         </div>
                                         ' . $mActionsHtml . '
                                     </div>
@@ -2096,7 +2112,7 @@ class AdminComprasController extends Controller {
                                 <form method="POST" action="/admin/estoque/compras/definir-loja">
                                     <div class="modal-header">
                                         <h5 class="modal-title">' . __('admin.purchases.modal_set_store_title', 'Definir loja do produto') . '</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="modal_produto_id" value="">
@@ -2124,7 +2140,7 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <div class="modal-header">
                                     <h5 class="modal-title">' . __('admin.purchases.modal_related_orders_title', 'Pedidos relacionados') . '</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-2 text-muted" id="pedidos_produto_nome"></div>
@@ -2334,7 +2350,7 @@ class AdminComprasController extends Controller {
                                     <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                                     <div class="modal-header">
                                         <h5 class="modal-title">' . __('admin.purchases.reopen_items', 'Reabrir itens') . '</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="alert alert-secondary mb-0">
@@ -2372,7 +2388,7 @@ class AdminComprasController extends Controller {
                                 <form method="POST" action="/admin/estoque/compras/remover-item">
                                     <div class="modal-header">
                                         <h5 class="modal-title">' . __('admin.purchases.modal_remove_title', 'Remover item da lista') . '</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="remover_produto_id" value="">
@@ -2416,7 +2432,7 @@ class AdminComprasController extends Controller {
                                 <form method="POST" action="/admin/estoque/compras/reabrir">
                                     <div class="modal-header">
                                         <h5 class="modal-title">' . __('admin.purchases.modal_reopen_item_title', 'Reabrir item') . '</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="reabrir_produto_id" value="">
@@ -2453,7 +2469,7 @@ class AdminComprasController extends Controller {
                                 <form method="POST" action="/admin/estoque/compras/concluir">
                                     <div class="modal-header">
                                         <h5 class="modal-title">' . __('admin.purchases.modal_complete_item_title', 'Concluir item') . '</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="concluir_produto_id" value="">
@@ -2528,7 +2544,7 @@ class AdminComprasController extends Controller {
                                     <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                                     <div class="modal-header">
                                         <h5 class="modal-title">' . __('admin.purchases.modal_complete_purchases_title', 'Concluir compras') . '</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' . htmlspecialchars(__('admin.purchases.close', 'Fechar'), ENT_QUOTES, 'UTF-8') . '"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="alert alert-success">

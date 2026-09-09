@@ -56,6 +56,13 @@
                                 'finalizada' => 'secondary', 'cancelada' => 'danger',
                                 default => 'secondary'
                             };
+                            $statusLabel = match($p['status']) {
+                                'ativa' => __('admin.scheduled_promos.status_active_label', 'Ativa'),
+                                'agendada' => __('admin.scheduled_promos.status_scheduled_label', 'Agendada'),
+                                'finalizada' => __('admin.scheduled_promos.status_finished_label', 'Finalizada'),
+                                'cancelada' => __('admin.scheduled_promos.status_cancelled_label', 'Cancelada'),
+                                default => ucfirst($p['status'])
+                            };
                         ?>
                         <tr>
                             <td class="fw-semibold"><?= htmlspecialchars($p['nome']) ?></td>
@@ -67,7 +74,7 @@
                             <td class="small"><?= date('d/m/Y H:i', strtotime($p['inicio'])) ?></td>
                             <td class="small"><?= date('d/m/Y H:i', strtotime($p['fim'])) ?></td>
                             <td><span class="badge bg-light text-dark"><?= __('admin.scheduled_promos.products_count', '{n} produtos', ['n' => (int) $p['total_produtos']]) ?></span></td>
-                            <td><span class="badge bg-<?= $statusCor ?>"><?= ucfirst($p['status']) ?></span></td>
+                            <td><span class="badge bg-<?= $statusCor ?>"><?= $statusLabel ?></span></td>
                             <td class="small text-muted"><?= htmlspecialchars((string) ($p['criado_por_nome'] ?? '-')) ?></td>
                             <td class="text-end">
                                 <?php if (in_array($p['status'], ['agendada', 'ativa'])): ?>
@@ -89,12 +96,19 @@
                         'finalizada' => 'secondary', 'cancelada' => 'danger',
                         default => 'secondary'
                     };
+                    $statusLabel = match($p['status']) {
+                        'ativa' => __('admin.scheduled_promos.status_active_label', 'Ativa'),
+                        'agendada' => __('admin.scheduled_promos.status_scheduled_label', 'Agendada'),
+                        'finalizada' => __('admin.scheduled_promos.status_finished_label', 'Finalizada'),
+                        'cancelada' => __('admin.scheduled_promos.status_cancelled_label', 'Cancelada'),
+                        default => ucfirst($p['status'])
+                    };
                 ?>
                 <div class="card border-0 shadow-sm mb-2">
                     <div class="card-body py-2 px-3">
                         <div class="d-flex justify-content-between align-items-start mb-1">
                             <div class="fw-semibold" style="word-break:break-word;"><?= htmlspecialchars($p['nome']) ?></div>
-                            <span class="badge bg-<?= $statusCor ?> ms-2"><?= ucfirst($p['status']) ?></span>
+                            <span class="badge bg-<?= $statusCor ?> ms-2"><?= $statusLabel ?></span>
                         </div>
                         <div class="d-flex flex-wrap gap-2 small text-muted">
                             <span><span class="badge bg-info"><?= $p['desconto_tipo'] === 'percentual' ? $p['desconto_valor'] . '%' : 'US$ ' . number_format((float) $p['desconto_valor'], 2) ?></span></span>
@@ -184,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (calEl) {
         var cal = new FullCalendar.Calendar(calEl, {
             initialView: 'dayGridMonth',
-            locale: 'pt-br',
+            locale: <?= json_encode(\App\Core\I18n::getLocale() === 'en' ? 'en' : 'pt-br') ?>,
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
             events: <?= json_encode($eventosCalendario, JSON_UNESCAPED_UNICODE) ?>,
             eventClick: function(info) {

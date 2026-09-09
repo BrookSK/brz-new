@@ -1,6 +1,12 @@
 <?php
 $grupos = is_array($grupos ?? null) ? $grupos : [];
 ?>
+<style>
+.purchase-group-file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+.purchase-group-file-picker{display:flex;align-items:center;gap:.75rem;min-width:0;}
+.purchase-group-file-picker__button{flex:0 0 auto;}
+.purchase-group-file-picker__name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+</style>
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
@@ -154,7 +160,11 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                 <hr>
                 <div class="mb-3">
                     <label class="form-label"><?= __('admin.purchase_groups.group_banner', 'Banner do grupo') ?></label>
-                    <input class="form-control" type="file" id="grupoBanner" accept="image/*">
+                    <input class="form-control purchase-group-file-input" type="file" id="grupoBanner" accept="image/*" tabindex="-1" aria-label="<?= htmlspecialchars(__('admin.purchase_groups.file_choose', 'Escolher arquivo'), ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="purchase-group-file-picker">
+                        <button type="button" class="btn btn-outline-secondary purchase-group-file-picker__button" id="grupoBannerChoose" aria-controls="grupoBanner"><?= __('admin.purchase_groups.file_choose', 'Escolher arquivo') ?></button>
+                        <span class="text-muted purchase-group-file-picker__name" id="grupoBannerStatus" aria-live="polite"><?= __('admin.purchase_groups.file_none_selected', 'Nenhum arquivo selecionado') ?></span>
+                    </div>
                     <input type="hidden" id="grupoBannerKeep" value="">
                     <div id="grupoBannerPreview" class="mt-2" style="display:none">
                         <img id="grupoBannerImg" src="" style="max-height:100px;border-radius:8px" alt="Banner">
@@ -191,6 +201,20 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
 
 <script>
 // ── Novo/Editar grupo ──────────────────────────────────────────────────────
+const grupoBannerInput = document.getElementById('grupoBanner');
+const grupoBannerStatus = document.getElementById('grupoBannerStatus');
+const grupoBannerEmptyLabel = <?= json_encode(__('admin.purchase_groups.file_none_selected', 'Nenhum arquivo selecionado'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+function atualizarStatusBannerGrupo() {
+    const file = grupoBannerInput.files && grupoBannerInput.files[0];
+    const label = file ? file.name : grupoBannerEmptyLabel;
+    grupoBannerStatus.textContent = label;
+    grupoBannerStatus.title = label;
+}
+
+document.getElementById('grupoBannerChoose').addEventListener('click', () => grupoBannerInput.click());
+atualizarStatusBannerGrupo();
+
 document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     document.getElementById('grupoId').value = '';
     document.getElementById('grupoNome').value = '';
@@ -202,6 +226,7 @@ document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     document.getElementById('grupoAtivoWrap').style.display = 'none';
     document.getElementById('grupoClubeOnly').checked = false;
     document.getElementById('grupoBanner').value = '';
+    atualizarStatusBannerGrupo();
     document.getElementById('grupoBannerKeep').value = '';
     document.getElementById('grupoBannerPreview').style.display = 'none';
     document.getElementById('modalGrupoTitulo').textContent = '<?= htmlspecialchars(__('admin.purchase_groups.new_group_modal', 'Novo grupo de compras'), ENT_QUOTES, 'UTF-8') ?>';
@@ -226,6 +251,7 @@ document.querySelectorAll('.btn-editar').forEach(btn => {
         document.getElementById('grupoAtivoWrap').style.display = '';
         document.getElementById('grupoClubeOnly').checked = btn.dataset.clubeOnly === '1';
         document.getElementById('grupoBanner').value = '';
+        atualizarStatusBannerGrupo();
         const bannerVal = btn.dataset.banner || '';
         document.getElementById('grupoBannerKeep').value = bannerVal;
         if (bannerVal) {
@@ -273,10 +299,12 @@ document.getElementById('btnSalvarGrupo').addEventListener('click', async () => 
 // ── Toggle ativo ───────────────────────────────────────────────────────────
 document.getElementById('grupoBannerRemover').addEventListener('click', () => {
     document.getElementById('grupoBanner').value = '';
+    atualizarStatusBannerGrupo();
     document.getElementById('grupoBannerKeep').value = '';
     document.getElementById('grupoBannerPreview').style.display = 'none';
 });
 document.getElementById('grupoBanner').addEventListener('change', function() {
+    atualizarStatusBannerGrupo();
     if (this.files && this.files[0]) {
         const reader = new FileReader();
         reader.onload = e => {

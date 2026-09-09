@@ -1,5 +1,88 @@
 <?php $title = __('admin.installment.detail_title', 'Detalhe Carnê #{id} - Admin', ['id' => $carne['id']]); ?>
 <?php ob_start(); ?>
+<?php
+// Valores de carnê e parcelas são persistidos em BRL. A preferência altera somente a apresentação.
+$displayCurrency = strtoupper((string) ($_SESSION['admin_pref_moeda'] ?? '')) === 'USD' ? 'USD' : 'BRL';
+$formatDisplayMoney = static function ($brl) use ($displayCurrency): string {
+    $value = (float) ($brl ?? 0);
+    if ($displayCurrency === 'USD') {
+        return '$ ' . number_format(\App\Core\ExchangeRate::convertBrlToUsd($value), 2, '.', ',');
+    }
+
+    return 'R$ ' . number_format($value, 2, ',', '.');
+};
+
+$planStatusLabels = [
+    'aguardando_primeira_parcela' => __('admin.installment.status_awaiting_first', 'Aguardando 1ª Parcela'),
+    'ativo' => __('admin.installment.status_active', 'Ativo'),
+    'em_andamento' => __('admin.installment.status_in_progress', 'Em Andamento'),
+    'com_atraso' => __('admin.installment.status_overdue', 'Com Atraso'),
+    'quitado' => __('admin.installment.status_paid_off', 'Quitado'),
+    'inadimplente' => __('admin.installment.status_defaulted', 'Inadimplente'),
+    'liberado_envio' => __('admin.installment.status_released_shipping', 'Liberado p/ Envio'),
+    'encerrado' => __('admin.installment.status_closed', 'Encerrado'),
+    'cancelado' => __('admin.installment.status_cancelled', 'Cancelado'),
+];
+$installmentStatusLabels = [
+    'aguardando_pagamento' => __('admin.installment.status_awaiting_payment', 'Aguardando pagamento'),
+    'pendente' => __('admin.installment.status_pending', 'Pendente'),
+    'paga' => __('admin.installment.status_paid', 'Paga'),
+    'parcialmente_paga' => __('admin.installment.status_partially_paid', 'Parcialmente paga'),
+    'vencida' => __('admin.installment.status_expired_installment', 'Vencida'),
+    'em_atraso' => __('admin.installment.status_overdue_installment', 'Em atraso'),
+    'reemitida' => __('admin.installment.status_reissued', 'Reemitida'),
+];
+$internalPurchaseStatusLabels = [
+    'aguardando_compra' => __('admin.installment.purchase_status_awaiting', 'Aguardando compra'),
+    'comprado' => __('admin.installment.purchase_status_purchased', 'Comprado'),
+    'recebido' => __('admin.installment.purchase_status_received', 'Recebido'),
+    'produto_indisponivel' => __('admin.installment.purchase_status_unavailable', 'Produto indisponível'),
+];
+$notificationChannelLabels = [
+    'email' => __('admin.installment.notification_channel_email', 'E-mail'),
+    'webhook' => __('admin.installment.notification_channel_webhook', 'Webhook'),
+];
+$notificationEventLabels = [
+    'carne_criado' => __('admin.installment.event_plan_created', 'Carnê Criado'),
+    'pagamento_confirmado' => __('admin.installment.event_payment_confirmed', 'Pagamento Confirmado'),
+    'parcela_paga' => __('admin.installment.event_installment_paid', 'Parcela Paga'),
+    'carne_quitado' => __('admin.installment.event_plan_paid_off', 'Carnê Quitado'),
+    'envio_liberado' => __('admin.installment.event_shipping_released', 'Envio Liberado'),
+    'parcela_proxima_vencimento' => __('admin.installment.event_upcoming_due', 'Próximo Vencimento'),
+    'parcela_em_atraso_juros' => __('admin.installment.event_overdue', 'Parcela em Atraso'),
+    'aviso_cancelamento' => __('admin.installment.event_cancellation_notice', 'Aviso de Cancelamento'),
+    'carne_cancelado' => __('admin.installment.event_plan_cancelled', 'Carnê Cancelado'),
+];
+$historyDescription = static function (array $entry) use ($formatDisplayMoney): string {
+    $type = (string) ($entry['tipo'] ?? '');
+    $fallback = (string) ($entry['descricao'] ?? '');
+    $installment = 0;
+    if (preg_match('/parcela\s*#?\s*(\d+)/iu', $fallback, $matches)) {
+        $installment = (int) $matches[1];
+    }
+
+    $labels = [
+        'carne_criado' => __('admin.installment.history_plan_created', 'Carnê criado.'),
+        'parcela_paga' => $installment > 0 ? __('admin.installment.history_installment_paid', 'Parcela #{n} quitada.', ['n' => $installment]) : __('admin.installment.history_installment_paid_generic', 'Parcela quitada.'),
+        'boleto_pago' => __('admin.installment.history_payment_received', 'Pagamento de parcela recebido.'),
+        'boleto_reemitido' => __('admin.installment.history_payment_reissued', 'Cobrança reemitida.'),
+        'compra_liberada' => __('admin.installment.history_internal_purchase_released', 'Primeira parcela paga. Compra interna liberada.'),
+        'produto_comprado' => __('admin.installment.history_product_purchased', 'Produto marcado como comprado internamente.'),
+        'produto_recebido' => __('admin.installment.history_product_received', 'Produto marcado como recebido internamente.'),
+        'compra_desfeita' => __('admin.installment.history_internal_purchase_reverted', 'Status da compra interna revertido.'),
+        'carne_quitado' => __('admin.installment.history_plan_paid_off', 'Todas as parcelas foram pagas. Envio liberado.'),
+        'envio_liberado' => __('admin.installment.history_shipping_released', 'Envio liberado pelo admin.'),
+        'cobranca_enviada' => __('admin.installment.history_charge_sent', 'Cobrança enviada.'),
+        'pagamento_manual' => __('admin.installment.history_manual_payment', 'Parcela marcada como paga manualmente.'),
+        'credito_carteira' => __('admin.installment.history_wallet_credit_generated', 'Crédito gerado na carteira.'),
+        'link_diferenca' => __('admin.installment.history_difference_link_generated', 'Link de pagamento da diferença gerado.'),
+        'carne_cancelado' => __('admin.installment.history_plan_cancelled', 'Carnê cancelado.'),
+        'aviso_cancelamento' => __('admin.installment.history_cancellation_notice_sent', 'Aviso de cancelamento enviado.'),
+    ];
+
+    return $labels[$type] ?? $fallback;
+};
+?>
 
 <div class="container-fluid">
     <a href="/admin/carnes" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left"></i> <?= __('admin.installment.back', 'Voltar') ?></a>
@@ -12,7 +95,7 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><?= __('admin.installment.plan_order_heading', 'Carnê #{cid} — Pedido #{pid}', ['cid' => $carne['id'], 'pid' => $carne['pedido_id']]) ?></h5>
                     <span class="badge bg-<?= $carne['status'] === 'quitado' ? 'success' : ($carne['status'] === 'com_atraso' ? 'danger' : 'primary') ?> fs-6">
-                        <?= ucfirst(str_replace('_', ' ', $carne['status'])) ?>
+                        <?= $planStatusLabels[$carne['status']] ?? ucfirst(str_replace('_', ' ', $carne['status'])) ?>
                     </span>
                 </div>
                 <div class="card-body">
@@ -22,9 +105,9 @@
                             <p><strong><?= __('admin.installment.email', 'Email:') ?></strong> <?= htmlspecialchars($carne['cliente_email']) ?></p>
                         </div>
                         <div class="col-md-4">
-                            <p><strong><?= __('admin.installment.total_label', 'Total:') ?></strong> R$ <?= number_format($carne['total_geral'], 2, ',', '.') ?></p>
-                            <p><strong><?= __('admin.installment.products_label', 'Produtos:') ?></strong> R$ <?= number_format($carne['total_produtos'], 2, ',', '.') ?></p>
-                            <p><strong><?= __('admin.installment.fees_label', 'Taxas:') ?></strong> R$ <?= number_format($carne['total_taxas'], 2, ',', '.') ?></p>
+                            <p><strong><?= __('admin.installment.total_label', 'Total:') ?></strong> <?= $formatDisplayMoney($carne['total_geral']) ?></p>
+                            <p><strong><?= __('admin.installment.products_label', 'Produtos:') ?></strong> <?= $formatDisplayMoney($carne['total_produtos']) ?></p>
+                            <p><strong><?= __('admin.installment.fees_label', 'Taxas:') ?></strong> <?= $formatDisplayMoney($carne['total_taxas']) ?></p>
                         </div>
                         <div class="col-md-4">
                             <p><strong><?= __('admin.installment.installments_label', 'Parcelas:') ?></strong> <?= $carne['quantidade_parcelas'] ?>x</p>
@@ -49,10 +132,10 @@
                                 <tr>
                                     <td><?= $p['numero_parcela'] ?></td>
                                     <td><?= date('d/m/Y', strtotime($p['vencimento'])) ?></td>
-                                    <td>R$ <?= number_format($p['valor_total'], 2, ',', '.') ?></td>
-                                    <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_produtos'], 2, ',', '.') ?> <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?></span></td>
-                                    <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?> <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?></span></td>
-                                    <td><span class="badge bg-<?= $p['status'] === 'paga' ? 'success' : ($p['status'] === 'em_atraso' ? 'danger' : 'secondary') ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span></td>
+                                    <td><?= $formatDisplayMoney($p['valor_total']) ?></td>
+                                    <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>"><?= $formatDisplayMoney($p['valor_produtos']) ?> <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?></span></td>
+                                    <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>"><?= $formatDisplayMoney($p['valor_taxas']) ?> <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?></span></td>
+                                    <td><span class="badge bg-<?= $p['status'] === 'paga' ? 'success' : ($p['status'] === 'em_atraso' ? 'danger' : 'secondary') ?>"><?= $installmentStatusLabels[$p['status']] ?? ucfirst(str_replace('_', ' ', $p['status'])) ?></span></td>
                                     <td>
                                         <form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-warning" title="<?= htmlspecialchars(__('admin.installment.reissue', 'Reemitir'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-redo"></i></button></form>
                                         <?php if (in_array($p['status'], ['pendente', 'aguardando_pagamento', 'vencida', 'em_atraso'])): ?>
@@ -147,8 +230,8 @@
                                         $stCarne = round($stCarne * $taxaConvCarne, 2);
                                     }
                                     ?>
-                                    <td class="text-end"><?= $puCarne > 0 ? 'R$ ' . number_format($puCarne, 2, ',', '.') : '-' ?></td>
-                                    <td class="text-end"><?= $stCarne > 0 ? 'R$ ' . number_format($stCarne, 2, ',', '.') : '-' ?></td>
+                                    <td class="text-end"><?= $puCarne > 0 ? $formatDisplayMoney($puCarne) : '-' ?></td>
+                                    <td class="text-end"><?= $stCarne > 0 ? $formatDisplayMoney($stCarne) : '-' ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -292,10 +375,13 @@
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0"><?= __('admin.installment.internal_purchase_title', 'Compra Interna') ?></h6></div>
                 <div class="card-body">
-                    <p><strong><?= __('admin.installment.status_label', 'Status:') ?></strong> <span class="badge bg-info"><?= ucfirst(str_replace('_', ' ', $compraInterna['status'])) ?></span></p>
+                    <p><strong><?= __('admin.installment.status_label', 'Status:') ?></strong> <span class="badge bg-info"><?= $internalPurchaseStatusLabels[$compraInterna['status']] ?? ucfirst(str_replace('_', ' ', $compraInterna['status'])) ?></span></p>
                     <?php if ($compraInterna['comprado_em']): ?><p><strong><?= __('admin.installment.purchased_at', 'Comprado em:') ?></strong> <?= date('d/m/Y H:i', strtotime($compraInterna['comprado_em'])) ?></p><?php endif; ?>
                     <?php if ($compraInterna['recebido_em']): ?><p><strong><?= __('admin.installment.received_at', 'Recebido em:') ?></strong> <?= date('d/m/Y H:i', strtotime($compraInterna['recebido_em'])) ?></p><?php endif; ?>
-                    <?php if ($compraInterna['produto_indisponivel']): ?><div class="alert alert-danger small"><?= __('admin.installment.product_unavailable_action', 'Produto indisponível — Ação: {a}', ['a' => $compraInterna['acao_indisponibilidade']]) ?></div><?php endif; ?>
+                    <?php if ($compraInterna['produto_indisponivel']): ?>
+                        <?php $unavailableAction = $compraInterna['acao_indisponibilidade'] === 'credito_carteira' ? __('admin.installment.unavailable_action_wallet_credit', 'Crédito na carteira') : ($compraInterna['acao_indisponibilidade'] === 'link_diferenca' ? __('admin.installment.unavailable_action_difference_link', 'Link de pagamento da diferença') : $compraInterna['acao_indisponibilidade']); ?>
+                        <div class="alert alert-danger small"><?= __('admin.installment.product_unavailable_action', 'Produto indisponível — Ação: {a}', ['a' => $unavailableAction]) ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -306,7 +392,7 @@
                     <ul class="list-group list-group-flush">
                         <?php foreach ($historico as $h): ?>
                         <li class="list-group-item small">
-                            <strong><?= date('d/m H:i', strtotime($h['created_at'])) ?></strong> — <?= htmlspecialchars($h['descricao']) ?>
+                            <strong><?= date('d/m H:i', strtotime($h['created_at'])) ?></strong> — <?= htmlspecialchars($historyDescription($h)) ?>
                             <?php if (!empty($h['usuario_nome'])): ?><br><span class="text-muted"><?= __('admin.installment.by', 'por') ?> <?= htmlspecialchars($h['usuario_nome']) ?></span><?php endif; ?>
                         </li>
                         <?php endforeach; ?>
@@ -320,8 +406,8 @@
                     <ul class="list-group list-group-flush">
                         <?php foreach ($notificacoes as $n): ?>
                         <li class="list-group-item small">
-                            <span class="badge bg-<?= $n['status'] === 'enviado' ? 'success' : ($n['status'] === 'erro' ? 'danger' : 'warning') ?>"><?= $n['canal'] ?></span>
-                            <?= htmlspecialchars($n['evento']) ?> — <?= date('d/m H:i', strtotime($n['created_at'])) ?>
+                            <span class="badge bg-<?= $n['status'] === 'enviado' ? 'success' : ($n['status'] === 'erro' ? 'danger' : 'warning') ?>"><?= $notificationChannelLabels[$n['canal']] ?? $n['canal'] ?></span>
+                            <?= htmlspecialchars($notificationEventLabels[$n['evento']] ?? $n['evento']) ?> — <?= date('d/m H:i', strtotime($n['created_at'])) ?>
                         </li>
                         <?php endforeach; ?>
                     </ul>

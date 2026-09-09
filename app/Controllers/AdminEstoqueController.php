@@ -1690,7 +1690,12 @@ class AdminEstoqueController extends Controller {
             $dispClass  = ($disponivel < 0) ? 'danger' : 'secondary';
             $dispBadge  = '<span class="badge bg-' . $dispClass . '">' . $disponivel . '</span>';
             $statusClass = ($status === 'critico' || $status === 'reposicao') ? 'danger' : ($status === 'baixo' ? 'warning' : 'success');
-            $statusLabel = $status === 'reposicao' ? __('admin.inventory.status_replenishment', 'Reposicao') : ucfirst($status);
+            $statusLabel = [
+                'critico' => __('admin.inventory.status_critical', 'Crítico'),
+                'baixo' => __('admin.inventory.status_low', 'Baixo'),
+                'normal' => __('admin.inventory.status_normal', 'Normal'),
+                'reposicao' => __('admin.inventory.status_replenishment', 'Reposição'),
+            ][$status] ?? ucfirst($status);
 
             echo '<tr>
                 <td><div class="d-flex gap-2 align-items-center">' . $imgTag . '<div><strong>' . htmlspecialchars($produtoNome) . '</strong><br><small class="text-muted">ID: ' . $produtoId . '</small></div></div></td>
@@ -1726,7 +1731,12 @@ class AdminEstoqueController extends Controller {
             $status      = (string)($item['status_estoque'] ?? '');
             if ($reservado > $qtd) $status = 'reposicao';
             $statusClass = ($status === 'critico' || $status === 'reposicao') ? 'danger' : ($status === 'baixo' ? 'warning' : 'success');
-            $statusLabel = $status === 'reposicao' ? __('admin.inventory.status_replenishment', 'Reposicao') : ucfirst($status);
+            $statusLabel = [
+                'critico' => __('admin.inventory.status_critical', 'Crítico'),
+                'baixo' => __('admin.inventory.status_low', 'Baixo'),
+                'normal' => __('admin.inventory.status_normal', 'Normal'),
+                'reposicao' => __('admin.inventory.status_replenishment', 'Reposição'),
+            ][$status] ?? ucfirst($status);
 
             echo '<div class="border-bottom py-2">
                 <div class="d-flex justify-content-between align-items-start">
@@ -2649,9 +2659,14 @@ class AdminEstoqueController extends Controller {
                 if ($tipo === 'entrada') $badge = 'bg-success';
                 if ($tipo === 'saida') $badge = 'bg-danger';
                 if ($tipo === 'ajuste') $badge = 'bg-warning';
+                $tipoLabel = [
+                    'entrada' => __('admin.inventory.log_type_entry', 'Entrada'),
+                    'saida' => __('admin.inventory.log_type_exit', 'Saída'),
+                    'ajuste' => __('admin.inventory.log_type_adjustment', 'Ajuste'),
+                ][$tipo] ?? $tipo;
                 echo '<div class="mb-3">'
                     . '<div class="d-flex justify-content-between">'
-                    . '<span class="badge ' . $badge . '">' . htmlspecialchars($tipo) . '</span>'
+                    . '<span class="badge ' . $badge . '">' . htmlspecialchars($tipoLabel) . '</span>'
                     . '<span class="text-muted small">' . ($data !== '' ? date('d/m/Y H:i', strtotime($data)) : '-') . '</span>'
                     . '</div>'
                     . '<div class="small">' . __('admin.inventory.log_qty', 'Qtd:') . ' ' . htmlspecialchars($qtd) . ' (' . __('admin.inventory.log_from', 'de') . ' ' . htmlspecialchars($ant) . ' ' . __('admin.inventory.log_to', 'para') . ' ' . htmlspecialchars($nov) . ')</div>'
