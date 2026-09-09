@@ -2788,11 +2788,11 @@ JS;
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . htmlspecialchars((class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocaleHtml() : 'pt-BR'), ENT_QUOTES, 'UTF-8') . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.orders.page_title', 'Pedidos'), ENT_QUOTES, 'UTF-8') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -3006,12 +3006,12 @@ JS;
                                     </div>
                                     <div class="col-12 col-lg-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? __('common.not_informed', 'Não informado')) . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
                                         ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">' . __('admin.orders.user_id', 'UID') . ': <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
@@ -3020,10 +3020,14 @@ JS;
                                             // Fonte única de moeda: card (total + badge) sempre coerentes.
                                             $mo = $this->normalizarMoeda($pedido['moeda'] ?? null);
                                             $ehBrl = ($mo === 'BRL');
+                                            $valor = (float) ($pedido['total'] ?? 0);
+                                            $dataValue = $ehBrl
+                                                ? ' data-value-brl="' . $valor . '"'
+                                                : ' data-value-usd="' . $valor . '"';
                                             return '
-                                            <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'] ?? 0, $mo) . '</h5>
+                                            <h5 class="mb-0 text-primary text-nowrap"' . $dataValue . '>' . $this->formatarMoeda($valor, $mo) . '</h5>
                                             <small class="text-muted">' . __('admin.orders.order_total', 'Total do Pedido') . '</small>
-                                            <div class="mt-1"><span class="badge ' . ($ehBrl ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . __('admin.orders.currency_label', 'Moeda') . ($ehBrl ? ': R$' : ': US$') . '</span></div>
+                                            <div class="mt-1"><span class="badge ' . ($ehBrl ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . __('admin.orders.order_currency', 'Moeda do pedido') . ($ehBrl ? ': R$' : ': US$') . '</span></div>
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap);
                                         })() . '
                                         </div>
@@ -3132,18 +3136,18 @@ JS;
                                     </div>
                                     <div class="col-12 col-lg-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? __('common.not_informed', 'Não informado')) . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
                                         ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">' . __('admin.orders.user_id', 'UID') . ': <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-success text-nowrap">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
+                                            <h5 class="mb-0 text-success text-nowrap" data-value-usd="' . (float) ($pedido['total'] ?? 0) . '">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
                                             <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (USD)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
@@ -3252,18 +3256,18 @@ JS;
                                     </div>
                                     <div class="col-12 col-lg-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? __('common.not_informed', 'Não informado')) . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
                                         ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">' . __('admin.orders.user_id', 'UID') . ': <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
+                                            <h5 class="mb-0 text-info text-nowrap" data-value-brl="' . (float) ($pedido['total'] ?? 0) . '">R$ ' . number_format((float) ($pedido['total'] ?? 0), 2, ',', '.') . '</h5>
                                             <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (BRL)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
@@ -3345,11 +3349,29 @@ JS;
     </div>
 HTML;
 
+    $bulkI18n = json_encode([
+        'clearSelection' => __('admin.orders.bulk.clear_selection', 'Limpar seleção'),
+        'changeStatusPlaceholder' => __('admin.orders.bulk.change_status_placeholder', 'Alterar status para...'),
+        'apply' => __('admin.orders.bulk.apply', 'Aplicar em massa'),
+        'selectedOrder' => __('admin.orders.bulk.selected_order', 'pedido selecionado'),
+        'selectedOrders' => __('admin.orders.bulk.selected_orders', 'pedidos selecionados'),
+        'selectOrder' => __('admin.orders.bulk.select_order', 'Selecionar pedido #{id}'),
+        'orderFallback' => __('admin.orders.bulk.order_fallback', 'Pedido #{id}'),
+        'confirmClear' => __('admin.orders.bulk.confirm_clear', 'Limpar toda a seleção em massa?'),
+        'confirmChangeStatus' => __('admin.orders.bulk.confirm_change_status', 'Alterar o status de {count} pedido(s) para "{status}"?'),
+        'applying' => __('admin.orders.bulk.applying', 'Aplicando...'),
+        'statusUpdated' => __('admin.orders.bulk.status_updated', 'Status atualizado com sucesso para {count} pedido(s).'),
+        'unknownError' => __('admin.orders.bulk.unknown_error', 'Falha desconhecida'),
+        'errorPrefix' => __('common.error', 'Erro'),
+        'networkError' => __('admin.orders.bulk.network_error', 'Erro de rede: {error}'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     // Renderizar scripts
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        var bulkI18n = ' . $bulkI18n . ';
         function handlePedidosTabMobile(val) {
             if (val === "carne") { window.location.href = "/admin/pedidos?fp=carne"; return; }
             if (val === "parcial") { window.location.href = "/admin/pedidos?fp=parcial"; return; }
@@ -3449,7 +3471,7 @@ HTML;
             var bar = document.createElement("div");
             bar.id = "bulkBar";
             bar.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:#1a5276;color:#fff;padding:12px 24px;display:none;align-items:center;justify-content:space-between;z-index:9999;box-shadow:0 -4px 16px rgba(0,0,0,.2);gap:12px;flex-wrap:wrap;";
-            bar.innerHTML = \'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span id="bulkCount" style="font-weight:600;font-size:1rem;"></span><button type="button" id="bulkClearBtn" class="btn btn-sm btn-outline-light">Limpar seleção</button></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><select id="bulkStatusSelect" class="form-select form-select-sm" style="width:auto;min-width:180px;"><option value="">Alterar status para...</option>\' + document.querySelector("[name=status]").innerHTML + \'</select><button type="button" id="bulkApplyBtn" class="btn btn-sm btn-warning fw-bold" disabled><i class="fas fa-check-double me-1"></i>Aplicar em massa</button></div>\';
+            bar.innerHTML = \'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span id="bulkCount" style="font-weight:600;font-size:1rem;"></span><button type="button" id="bulkClearBtn" class="btn btn-sm btn-outline-light">\' + bulkI18n.clearSelection + \'</button></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><select id="bulkStatusSelect" class="form-select form-select-sm" style="width:auto;min-width:180px;"><option value="">\' + bulkI18n.changeStatusPlaceholder + \'</option>\' + document.querySelector("[name=status]").innerHTML + \'</select><button type="button" id="bulkApplyBtn" class="btn btn-sm btn-warning fw-bold" disabled><i class="fas fa-check-double me-1"></i>\' + bulkI18n.apply + \'</button></div>\';
             document.body.appendChild(bar);
 
             var bulkCount = document.getElementById("bulkCount");
@@ -3461,7 +3483,7 @@ HTML;
                 var n = getCount();
                 if (n > 0) {
                     bar.style.display = "flex";
-                    bulkCount.textContent = n + " pedido" + (n > 1 ? "s" : "") + " selecionado" + (n > 1 ? "s" : "");
+                    bulkCount.textContent = n + " " + (n === 1 ? bulkI18n.selectedOrder : bulkI18n.selectedOrders);
                 } else {
                     bar.style.display = "none";
                 }
@@ -3491,7 +3513,7 @@ HTML;
                 cb.className = "form-check-input bulk-check";
                 cb.dataset.pid = pid;
                 cb.style.cssText = "width:20px;height:20px;cursor:pointer;margin-bottom:6px;";
-                cb.title = "Selecionar pedido #" + pid;
+                cb.title = bulkI18n.selectOrder.replace("{id}", pid);
                 wrapper.insertBefore(cb, wrapper.firstChild);
 
                 var sel = getSelecao();
@@ -3501,7 +3523,7 @@ HTML;
                 cb.addEventListener("change", function(){
                     var s = getSelecao();
                     if (cb.checked) {
-                        s[pid] = (h6.closest(".card-body").querySelector("h6.mb-1") || {}).textContent || "Pedido #" + pid;
+                        s[pid] = (h6.closest(".card-body").querySelector("h6.mb-1") || {}).textContent || bulkI18n.orderFallback.replace("{id}", pid);
                     } else {
                         delete s[pid];
                     }
@@ -3511,7 +3533,7 @@ HTML;
             });
 
             bulkClearBtn.addEventListener("click", function(){
-                if (!confirm("Limpar toda a seleção em massa?")) return;
+                if (!confirm(bulkI18n.confirmClear)) return;
                 setSelecao({});
                 updateBar();
             });
@@ -3525,10 +3547,13 @@ HTML;
                 var ids = Object.keys(sel).map(Number);
                 var status = bulkStatusSelect.value;
                 if (!ids.length || !status) return;
-                if (!confirm("Alterar o status de " + ids.length + " pedido(s) para \\"" + bulkStatusSelect.options[bulkStatusSelect.selectedIndex].text + "\\"?")) return;
+                var confirmMessage = bulkI18n.confirmChangeStatus
+                    .replace("{count}", ids.length)
+                    .replace("{status}", bulkStatusSelect.options[bulkStatusSelect.selectedIndex].text);
+                if (!confirm(confirmMessage)) return;
 
                 bulkApplyBtn.disabled = true;
-                bulkApplyBtn.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Aplicando...\';
+                bulkApplyBtn.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>\' + bulkI18n.applying;
 
                 fetch("/admin/pedidos/atualizar-status-massa", {
                     method: "POST",
@@ -3539,18 +3564,18 @@ HTML;
                 .then(function(data){
                     if (data.success) {
                         setSelecao({});
-                        sessionStorage.setItem("brz_pedidos_flash", "Status atualizado com sucesso para " + data.affected + " pedido(s).");
+                        sessionStorage.setItem("brz_pedidos_flash", bulkI18n.statusUpdated.replace("{count}", data.affected));
                         location.reload();
                     } else {
-                        alert("Erro: " + (data.error || "Falha desconhecida"));
+                        alert(bulkI18n.errorPrefix + ": " + (data.error || bulkI18n.unknownError));
                         bulkApplyBtn.disabled = false;
-                        bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>Aplicar em massa\';
+                        bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>\' + bulkI18n.apply;
                     }
                 })
                 .catch(function(err){
-                    alert("Erro de rede: " + err.message);
+                    alert(bulkI18n.networkError.replace("{error}", err.message));
                     bulkApplyBtn.disabled = false;
-                    bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>Aplicar em massa\';
+                    bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>\' + bulkI18n.apply;
                 });
             });
 
@@ -6348,7 +6373,7 @@ LINKSCRIPT;
 
         $html = '<div class="mt-1" style="font-size:.72rem;">';
         $html .= '<div class="progress" style="height:6px;border-radius:3px;"><div class="progress-bar ' . $barColor . '" style="width:' . $pct . '%"></div></div>';
-        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' parcelas &middot; R$ ' . number_format($valorPago, 2, ',', '.') . '</span>';
+        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' ' . __('admin.orders.installments', 'parcelas') . ' &middot; <span data-value-brl="' . $valorPago . '">R$ ' . number_format($valorPago, 2, ',', '.') . '</span></span>';
         $html .= '</div>';
         return $html;
     }
