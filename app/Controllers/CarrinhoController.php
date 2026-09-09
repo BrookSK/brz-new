@@ -69,6 +69,27 @@ class CarrinhoController extends Controller {
         return true;
     }
 
+    /**
+     * Verifica o estado ativo/inativo testando várias formas possíveis da chave.
+     * Se qualquer uma das chaves candidatas estiver marcada na sessão, usa o valor dela.
+     * Caso nenhuma exista, considera ativo (padrão).
+     */
+    private function resolveItemAtivoTolerante(array $candidatos): bool {
+        try {
+            if (!isset($_SESSION['carrinho_itens_ativos']) || !is_array($_SESSION['carrinho_itens_ativos'])) {
+                return true;
+            }
+            foreach ($candidatos as $cand) {
+                $cand = (string) $cand;
+                if (array_key_exists($cand, $_SESSION['carrinho_itens_ativos'])) {
+                    return (bool) $_SESSION['carrinho_itens_ativos'][$cand];
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+        return true;
+    }
+
     private function setItemAtivoInSession(string $itemKey, bool $ativo): void {
         try {
             if (!isset($_SESSION['carrinho_itens_ativos']) || !is_array($_SESSION['carrinho_itens_ativos'])) {
@@ -229,8 +250,14 @@ class CarrinhoController extends Controller {
                     $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
                     $varIdPacote = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? 0));
 
-                    $itemKeySession = ((string) $pid) . ':' . ((string) $varIdPacote);
-                    $isAtivoSession = $this->getItemAtivoFromSession($itemKeySession);
+                    // A chave de ativo pode ter sido salva com formatos diferentes de variação
+                    // (0, id do pacote, etc.). Checamos todas as variações possíveis para não
+                    // considerar ativo um item que o cliente desativou.
+                    $isAtivoSession = $this->resolveItemAtivoTolerante([
+                        ((string) $pid) . ':' . ((string) $varIdPacote),
+                        ((string) $pid) . ':0',
+                        (string) $pid,
+                    ]);
 
                     $out[$key] = [
                         'produto_id' => $pid,
@@ -1144,7 +1171,16 @@ class CarrinhoController extends Controller {
         }
 
         foreach ($carrinho as $k => $item) {
-            $ativo = $this->getItemAtivoFromSession((string) $k);
+            // Determinar se o item está ativo.
+            // Preferir o flag já resolvido em $item['ativo'] (calculado com a chave
+            // correta produto_id:variacao_id em getCarrinhoFromDb). Só cair no
+            // getItemAtivoFromSession($k) como fallback quando o flag não existir
+            // (ex.: carrinho vindo da sessão, cuja chave já é produto_id:variacao_id).
+            if (array_key_exists('ativo', $item)) {
+                $ativo = (bool) $item['ativo'];
+            } else {
+                $ativo = $this->getItemAtivoFromSession((string) $k);
+            }
             if (!$ativo) {
                 continue;
             }

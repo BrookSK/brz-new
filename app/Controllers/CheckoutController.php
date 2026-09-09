@@ -2448,8 +2448,24 @@ class CheckoutController extends Controller {
                         }
                         $ativosMap = (isset($_SESSION['carrinho_itens_ativos']) && is_array($_SESSION['carrinho_itens_ativos'])) ? $_SESSION['carrinho_itens_ativos'] : [];
                         $out = array_filter($out, function ($v, $k) use ($ativosMap) {
-                            if (is_array($ativosMap) && array_key_exists((string) $k, $ativosMap)) {
-                                return (bool) $ativosMap[(string) $k];
+                            if (!is_array($ativosMap) || empty($ativosMap)) {
+                                return true;
+                            }
+                            // A chave de ativo pode ter sido salva com formatos diferentes
+                            // dependendo do produto_variacao_id (0, id do pacote, etc.).
+                            // Verificamos todas as variações possíveis da chave.
+                            $pid = (int) ($v['produto_id'] ?? 0);
+                            $pvId = (int) ($v['produto_variacao_id'] ?? 0);
+                            $candidatos = [
+                                (string) $k,
+                                $pid . ':' . $pvId,
+                                $pid . ':0',
+                                (string) $pid,
+                            ];
+                            foreach ($candidatos as $cand) {
+                                if (array_key_exists($cand, $ativosMap)) {
+                                    return (bool) $ativosMap[$cand];
+                                }
                             }
                             return true;
                         }, ARRAY_FILTER_USE_BOTH);
