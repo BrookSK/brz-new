@@ -1917,6 +1917,7 @@ return [
     'admin.orders_manual.create_order' => 'Create Manual Order',
     'admin.orders_manual.created_success' => 'Manual order created successfully:',
     'admin.orders_manual.save_draft' => 'Save as draft',
+    'admin.orders_manual.keep_draft' => 'Keep as draft',
     'admin.orders_manual.drafts' => 'Drafts',
     'admin.orders_manual.drafts_empty' => 'No drafts saved yet.',
     'admin.orders_manual.drafts_delete_confirm' => 'Delete this draft? This action cannot be undone.',

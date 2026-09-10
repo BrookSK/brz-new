@@ -757,7 +757,7 @@ class AdminPedidosManualController extends Controller {
                         <i class="fas fa-save"></i> ' . __('admin.orders_manual.create_order', 'Criar Pedido Manual') . '
                     </button>
                     <button type="button" class="btn btn-outline-primary" id="btnSalvarRascunho" onclick="salvarRascunho()">
-                        <i class="fas fa-file-alt"></i> ' . __('admin.orders_manual.save_draft', 'Salvar em rascunho') . '
+                        <i class="fas fa-file-alt"></i> ' . ($isRascunhoEdicao ? __('admin.orders_manual.keep_draft', 'Manter como rascunho') : __('admin.orders_manual.save_draft', 'Salvar em rascunho')) . '
                     </button>
                     <button type="button" class="btn btn-outline-secondary" id="btnGerarMensagemOrcamento" onclick="gerarMensagemOrcamento()">
                         <i class="fas fa-comment-dots"></i> ' . __('admin.orders_manual.generate_quote_message', 'Gerar mensagem de orçamento') . '

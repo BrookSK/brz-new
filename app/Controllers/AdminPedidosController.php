@@ -2853,6 +2853,9 @@ JS;
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary">
                             <i class="fas fa-plus me-1"></i>' . __('admin.orders.new_manual_order', 'Novo Pedido Manual') . '
                         </a>
+                        <a href="/admin/pedidos/rascunhos" class="btn btn-outline-primary">
+                            <i class="fas fa-file-alt me-1"></i>' . __('admin.orders_manual.drafts', 'Rascunhos') . '
+                        </a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary">
                             <i class="fas fa-percentage me-1"></i>' . __('admin.orders.my_commissions', 'Minhas Comissões') . '
                         </a>
@@ -2878,6 +2881,7 @@ JS;
                 <div id="pedidosActionsCollapse" class="d-none d-md-none mb-3">
                     <div class="d-flex flex-wrap gap-2">
                         <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>' . __('admin.orders.new_order', 'Novo Pedido') . '</a>
+                        <a href="/admin/pedidos/rascunhos" class="btn btn-sm btn-outline-primary"><i class="fas fa-file-alt me-1"></i>' . __('admin.orders_manual.drafts', 'Rascunhos') . '</a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>' . __('admin.orders.commissions', 'Comissões') . '</a>
                         <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>' . __('admin.orders.trash', 'Lixeira') . '</a>
                         <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>' . __('admin.orders.archived', 'Arquivados') . '</a>
