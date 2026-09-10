@@ -286,6 +286,24 @@ class PedidoManualService {
     }
 
     /**
+     * Wrapper de criação de endereço de entrega.
+     * - Fluxo NORMAL ($rascunho = false): comportamento idêntico ao anterior (propaga exceções).
+     * - RASCUNHO ($rascunho = true): endereço é opcional; qualquer falha ao criar o endereço
+     *   é ignorada e o rascunho é salvo sem endereço vinculado (retorna 0).
+     */
+    private function criarEnderecoEntregaComTolerancia(int $clienteId, ?array $enderecoEntrega, bool $rascunho): int {
+        if (!$rascunho) {
+            return $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+        }
+        try {
+            return $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+        } catch (\Exception $e) {
+            error_log('[PEDIDO_MANUAL] Rascunho: falha ao criar endereço (ignorada): ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
      * Cria um registro na tabela enderecos a partir dos campos de endereço
      * armazenados na tabela usuarios (preenchidos via "Meus Dados").
      */
@@ -1388,7 +1406,7 @@ class PedidoManualService {
 
                         if ($enderecoMudou) {
                             // Criar novo endereço com os dados do formulário (não alterar o cadastro do cliente)
-                            $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+                            $enderecoEntregaId = $this->criarEnderecoEntregaComTolerancia($clienteId, $enderecoEntrega, $rascunho);
                         } else {
                             $enderecoEntregaId = $enderecoExistenteId;
                         }
@@ -1401,13 +1419,21 @@ class PedidoManualService {
             }
 
             if ($enderecoEntregaId <= 0) {
-                $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+                $enderecoEntregaId = $this->criarEnderecoEntregaComTolerancia($clienteId, $enderecoEntrega, $rascunho);
             }
 
             // Fallback: se ainda não tem endereço e o formulário veio vazio,
             // tentar criar a partir dos dados de endereço da tabela usuarios ("Meus Dados").
             if ($enderecoEntregaId <= 0) {
-                $enderecoEntregaId = $this->criarEnderecoAPartirDoUsuario($clienteId);
+                try {
+                    $enderecoEntregaId = $this->criarEnderecoAPartirDoUsuario($clienteId);
+                } catch (\Exception $e) {
+                    // Em rascunho nunca bloqueamos por endereço; no fluxo normal preservamos o comportamento.
+                    if (!$rascunho) {
+                        throw $e;
+                    }
+                    $enderecoEntregaId = 0;
+                }
             }
 
             if ($enderecoEntregaId <= 0) {
