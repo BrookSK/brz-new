@@ -200,7 +200,13 @@ class ShippoService {
      * @param array $customsDeclaration Declaração aduaneira (para envios internacionais)
      * @return array ['success' => bool, 'data' => [...rates...], 'shipment_id' => string]
      */
-    public function createShipment(array $addressFrom, array $addressTo, array $parcel, array $customsDeclaration = []): array {
+    public function createShipment(
+        array $addressFrom,
+        array $addressTo,
+        array $parcel,
+        array $customsDeclaration = [],
+        array $carrierAccounts = []
+    ): array {
         $payload = [
             'address_from' => $addressFrom,
             'address_to' => $addressTo,
@@ -212,6 +218,13 @@ class ShippoService {
 
         if (!empty($customsDeclaration)) {
             $payload['customs_declaration'] = $customsDeclaration;
+        }
+
+        // Restringe as cotações às contas selecionadas pelo operador. Sem isso,
+        // a Shippo pode devolver rates de qualquer carrier habilitada na conta.
+        $carrierAccounts = array_values(array_filter(array_map('strval', $carrierAccounts)));
+        if (!empty($carrierAccounts)) {
+            $payload['carrier_accounts'] = $carrierAccounts;
         }
 
         $result = $this->post('/shipments', $payload);
@@ -233,10 +246,10 @@ class ShippoService {
      * Compra uma etiqueta (Transaction) com base em um rate_id.
      *
      * @param string $rateId ID do rate escolhido
-     * @param string $labelFileType Tipo do arquivo (PDF, PDF_4x6, PNG, ZPLII)
+     * @param string $labelFileType Tipo do arquivo (PDF Letter 8.5x11, PNG, ZPLII)
      * @return array ['success' => bool, 'tracking_number' => string, 'label_url' => string, ...]
      */
-    public function purchaseLabel(string $rateId, string $labelFileType = 'PDF_4x6'): array {
+    public function purchaseLabel(string $rateId, string $labelFileType = 'PDF'): array {
         $payload = [
             'rate' => $rateId,
             'label_file_type' => $labelFileType,
@@ -295,7 +308,7 @@ class ShippoService {
         string $servicelevelToken,
         string $carrierAccount,
         array $customsDeclaration = [],
-        string $labelFileType = 'PDF_4x6'
+        string $labelFileType = 'PDF'
     ): array {
         $shipment = [
             'address_from' => $addressFrom,

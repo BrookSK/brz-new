@@ -53,45 +53,200 @@ class AdminShippoController extends Controller {
         return '';
     }
 
+    /**
+     * Retorna exclusivamente as Carrier Accounts Shippo habilitadas para emissão.
+     * A chave interna é controlada pelo servidor; IDs informados pelo navegador nunca
+     * são aceitos como autorização para cobrar em uma conta.
+     */
+    private function getConfiguredCarrierAccounts(): array {
+        $cfg = $this->svc->getShippoConfig();
+        $accounts = [];
+        foreach (['fedex' => 'FedEx', 'ups' => 'UPS'] as $key => $name) {
+            $enabled = (string) ($cfg['shippo_' . $key . '_enabled'] ?? '0') === '1';
+            $accountId = trim((string) ($cfg['shippo_' . $key . '_carrier_account'] ?? ''));
+            if (!$enabled || $accountId === '') {
+                continue;
+            }
+
+            $accounts[$key] = [
+                'key' => $key,
+                'name' => $name,
+                'carrier_account' => $accountId,
+                'servicelevel_token' => trim((string) ($cfg['shippo_' . $key . '_servicelevel_token'] ?? '')),
+            ];
+        }
+        return $accounts;
+    }
+
+    private function getCarrierAccount(string $carrierKey): ?array {
+        $carrierKey = strtolower(trim($carrierKey));
+        $accounts = $this->getConfiguredCarrierAccounts();
+        return $accounts[$carrierKey] ?? null;
+    }
+
+    private function filterRatesForCarrierAccount(array $rates, string $carrierAccountId): array {
+        return array_values(array_filter($rates, static function($rate) use ($carrierAccountId): bool {
+            if (!is_array($rate)) {
+                return false;
+            }
+            $rateAccount = $rate['carrier_account'] ?? '';
+            if (is_array($rateAccount)) {
+                $rateAccount = $rateAccount['object_id'] ?? $rateAccount['id'] ?? '';
+            }
+            return is_string($rateAccount) && hash_equals($carrierAccountId, $rateAccount);
+        }));
+    }
+
+    private function rememberRateSelection(string $shipmentId, int $pedidoId, array $carrierAccount, array $rates): void {
+        if ($shipmentId === '') {
+            return;
+        }
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+        if (!isset($_SESSION['shippo_rate_selections']) || !is_array($_SESSION['shippo_rate_selections'])) {
+            $_SESSION['shippo_rate_selections'] = [];
+        }
+
+        foreach ($_SESSION['shippo_rate_selections'] as $key => $selection) {
+            if (!is_array($selection) || (int) ($selection['expires_at'] ?? 0) < time()) {
+                unset($_SESSION['shippo_rate_selections'][$key]);
+            }
+        }
+
+        $allowedRates = [];
+        foreach ($rates as $rate) {
+            if (!is_array($rate) || empty($rate['object_id'])) {
+                continue;
+            }
+            $allowedRates[(string) $rate['object_id']] = $rate;
+        }
+
+        $_SESSION['shippo_rate_selections'][$shipmentId] = [
+            'pedido_id' => $pedidoId,
+            'carrier_key' => $carrierAccount['key'],
+            'carrier_account' => $carrierAccount['carrier_account'],
+            'rates' => $allowedRates,
+            'expires_at' => time() + 1800,
+        ];
+    }
+
+    private function getRememberedRateSelection(string $shipmentId, int $pedidoId, string $carrierKey, string $rateId): ?array {
+        if ($shipmentId === '') {
+            return null;
+        }
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return null;
+        }
+        $selection = $_SESSION['shippo_rate_selections'][$shipmentId] ?? null;
+        if (!is_array($selection) || (int) ($selection['expires_at'] ?? 0) < time()) {
+            unset($_SESSION['shippo_rate_selections'][$shipmentId]);
+            return null;
+        }
+        if ((int) ($selection['pedido_id'] ?? 0) !== $pedidoId
+            || !hash_equals((string) ($selection['carrier_key'] ?? ''), $carrierKey)
+            || !isset($selection['rates'][$rateId])) {
+            return null;
+        }
+        return $selection;
+    }
+
+    private function forgetRateSelection(string $shipmentId): void {
+        if ($shipmentId !== '' && isset($_SESSION['shippo_rate_selections'][$shipmentId])) {
+            unset($_SESSION['shippo_rate_selections'][$shipmentId]);
+        }
+    }
+
+    private function persistShippoLabel(int $pedidoId, string $shipmentId, string $rateId, array $carrierAccount, array $rate, array $result): void {
+        $this->ensureShippoEtiquetasTable();
+
+        $carrier = (string) ($rate['provider'] ?? '');
+        $serviceLevel = (string) ($rate['servicelevel_name'] ?? ($rate['servicelevel']['name'] ?? ''));
+        $rateAmount = (float) ($rate['amount'] ?? 0);
+        $rateCurrency = (string) ($rate['currency'] ?? 'USD');
+        $isTest = !empty($result['data']['test']) ? 1 : 0;
+
+        $stDel = $this->connection->prepare('DELETE FROM shippo_etiquetas WHERE pedido_id = ?');
+        $stDel->execute([$pedidoId]);
+
+        $stIns = $this->connection->prepare("\n            INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, carrier_key, carrier_account_id, service_level, rate_amount, rate_currency, label_file_type, status, is_test, last_request_json, last_response_json, created_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PDF', 'gerada', ?, ?, ?, NOW())\n        ");
+        $stIns->execute([
+            $pedidoId,
+            $shipmentId,
+            (string) ($result['transaction_id'] ?? ''),
+            $rateId,
+            (string) ($result['tracking_number'] ?? ''),
+            (string) ($result['tracking_url'] ?? ''),
+            (string) ($result['label_url'] ?? ''),
+            $carrier,
+            (string) $carrierAccount['key'],
+            (string) $carrierAccount['carrier_account'],
+            $serviceLevel,
+            $rateAmount,
+            $rateCurrency,
+            $isTest,
+            json_encode([
+                'carrier_key' => $carrierAccount['key'],
+                'carrier_account' => $carrierAccount['carrier_account'],
+                'label_file_type' => 'PDF',
+            ]),
+            json_encode($result['data'] ?? []),
+        ]);
+    }
+
     // ─── Tabela de Etiquetas Shippo ──────────────────────────────────────────────
 
     private function ensureShippoEtiquetasTable(): void {
         try {
-            if ($this->tableExists('shippo_etiquetas')) {
-                return;
+            if (!$this->tableExists('shippo_etiquetas')) {
+                $sql = "CREATE TABLE IF NOT EXISTS shippo_etiquetas (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    pedido_id INT NOT NULL,
+                    shipment_id VARCHAR(200) NULL,
+                    transaction_id VARCHAR(200) NULL,
+                    rate_id VARCHAR(200) NULL,
+                    tracking_number VARCHAR(200) NULL,
+                    tracking_url VARCHAR(500) NULL,
+                    label_url VARCHAR(500) NULL,
+                    carrier VARCHAR(100) NULL,
+                    carrier_key VARCHAR(30) NULL,
+                    carrier_account_id VARCHAR(200) NULL,
+                    service_level VARCHAR(100) NULL,
+                    rate_amount DECIMAL(10,2) NULL,
+                    rate_currency VARCHAR(10) DEFAULT 'USD',
+                    label_file_type VARCHAR(32) NULL,
+                    status VARCHAR(30) DEFAULT 'gerada',
+                    is_test TINYINT(1) NOT NULL DEFAULT 0,
+                    last_request_json LONGTEXT NULL,
+                    last_response_json LONGTEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NULL DEFAULT NULL,
+                    UNIQUE KEY uniq_shippo_etiquetas_pedido_id (pedido_id),
+                    KEY idx_shippo_etiquetas_tracking_number (tracking_number),
+                    KEY idx_shippo_etiquetas_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+                $this->connection->exec($sql);
             }
-            $sql = "CREATE TABLE IF NOT EXISTS shippo_etiquetas (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                pedido_id INT NOT NULL,
-                shipment_id VARCHAR(200) NULL,
-                transaction_id VARCHAR(200) NULL,
-                rate_id VARCHAR(200) NULL,
-                tracking_number VARCHAR(200) NULL,
-                tracking_url VARCHAR(500) NULL,
-                label_url VARCHAR(500) NULL,
-                carrier VARCHAR(100) NULL,
-                service_level VARCHAR(100) NULL,
-                rate_amount DECIMAL(10,2) NULL,
-                rate_currency VARCHAR(10) DEFAULT 'USD',
-                status VARCHAR(30) DEFAULT 'gerada',
-                is_test TINYINT(1) NOT NULL DEFAULT 0,
-                last_request_json LONGTEXT NULL,
-                last_response_json LONGTEXT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                UNIQUE KEY uniq_shippo_etiquetas_pedido_id (pedido_id),
-                KEY idx_shippo_etiquetas_tracking_number (tracking_number),
-                KEY idx_shippo_etiquetas_status (status)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-            $this->connection->exec($sql);
         } catch (\Exception $e) {
+            return;
         }
 
-        // Migração leve: garantir coluna is_test em tabelas já existentes.
+        // Migrações leves para instalações que já possuíam a tabela.
         try {
             $cols = $this->getTableColumns('shippo_etiquetas');
-            if (!empty($cols) && !in_array('is_test', $cols, true)) {
-                $this->connection->exec("ALTER TABLE shippo_etiquetas ADD COLUMN is_test TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
+            $missingColumns = [
+                'is_test' => 'TINYINT(1) NOT NULL DEFAULT 0',
+                'carrier_key' => 'VARCHAR(30) NULL',
+                'carrier_account_id' => 'VARCHAR(200) NULL',
+                'label_file_type' => 'VARCHAR(32) NULL',
+            ];
+            foreach ($missingColumns as $column => $definition) {
+                if (!in_array($column, $cols, true)) {
+                    $this->connection->exec('ALTER TABLE shippo_etiquetas ADD COLUMN ' . $column . ' ' . $definition);
+                }
             }
         } catch (\Exception $e) {
         }
@@ -486,10 +641,12 @@ class AdminShippoController extends Controller {
 
         $pedidos = $this->getPedidosSemEtiqueta();
         $etiquetas = $this->getEtiquetasGeradas();
+        $carrierAccounts = $this->getConfiguredCarrierAccounts();
 
         $this->view('admin/shippo', [
             'pedidos' => $pedidos,
             'etiquetas' => $etiquetas,
+            'carrierAccounts' => $carrierAccounts,
             'diag' => $this->lastDiag,
             'sidebarActive' => 'shippo',
         ]);
@@ -525,10 +682,12 @@ class AdminShippoController extends Controller {
             $etiqueta = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
         } catch (\Exception $e) {}
 
+        $carrierAccounts = $this->getConfiguredCarrierAccounts();
         $this->view('admin/shippo-pedido', [
             'pedido' => $pedido,
             'itens' => $itens,
             'etiqueta' => $etiqueta,
+            'carrierAccounts' => $carrierAccounts,
             'sidebarActive' => 'shippo',
         ]);
     }
@@ -542,11 +701,18 @@ class AdminShippoController extends Controller {
         $auth->requerPerfis(['admin', 'vendedor']);
 
         $id = (int) $request->param('id');
+        $body = $request->getBody();
+        $carrierKey = strtolower(trim((string) ($body['carrier_key'] ?? '')));
+        $carrierAccount = $this->getCarrierAccount($carrierKey);
+
         if ($id <= 0) {
             $this->json(['success' => false, 'error' => __('admin.shippo.invalid_order_id', 'ID do pedido inválido.')], 400);
             return;
         }
-
+        if (!$carrierAccount) {
+            $this->json(['success' => false, 'error' => 'Selecione uma Carrier Account FedEx ou UPS ativa e configurada.'], 400);
+            return;
+        }
         if (!$this->svc->isConfigured()) {
             $this->json(['success' => false, 'error' => __('admin.shippo.not_configured_add_token', 'Shippo não configurado. Adicione o token em Configurações.')], 400);
             return;
@@ -558,19 +724,17 @@ class AdminShippoController extends Controller {
             return;
         }
 
-        // País destino não pode ser Brasil
         $pais = strtoupper(trim((string) ($pedido['_pais'] ?? '')));
         if (in_array($pais, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
             $this->json(['success' => false, 'error' => __('admin.shippo.no_brazil_shipping', 'Shippo não atende envios para o Brasil. Use Correio Internacional.')], 400);
             return;
         }
 
-        // Validar endereço mínimo exigido pela Shippo (evita erro genérico "incomplete address").
         $faltando = [];
         if (trim((string) ($pedido['_endereco'] ?? '')) === '') $faltando[] = __('admin.shippo.field_address_street', 'endereço/rua');
-        if (trim((string) ($pedido['_cidade'] ?? '')) === '')   $faltando[] = __('admin.shippo.field_city', 'cidade');
-        if (trim((string) ($pedido['_cep'] ?? '')) === '')      $faltando[] = __('admin.shippo.field_zip', 'CEP/ZIP');
-        if ($pais === '')                                        $faltando[] = __('admin.shippo.field_country', 'país');
+        if (trim((string) ($pedido['_cidade'] ?? '')) === '') $faltando[] = __('admin.shippo.field_city', 'cidade');
+        if (trim((string) ($pedido['_cep'] ?? '')) === '') $faltando[] = __('admin.shippo.field_zip', 'CEP/ZIP');
+        if ($pais === '') $faltando[] = __('admin.shippo.field_country', 'país');
         if (!empty($faltando)) {
             $this->json([
                 'success' => false,
@@ -579,10 +743,7 @@ class AdminShippoController extends Controller {
             return;
         }
 
-        // Montar endereço de origem
         $addressFrom = $this->svc->getDefaultAddressFrom();
-
-        // Montar endereço de destino
         $addressTo = [
             'name' => (string) ($pedido['cliente_nome'] ?? ''),
             'street1' => (string) ($pedido['_endereco'] ?? ''),
@@ -590,22 +751,15 @@ class AdminShippoController extends Controller {
             'city' => (string) ($pedido['_cidade'] ?? ''),
             'state' => (string) ($pedido['_estado'] ?? ''),
             'zip' => (string) ($pedido['_cep'] ?? ''),
-            'country' => $pais ?: 'US',
+            'country' => $pais,
             'phone' => (string) ($pedido['cliente_telefone'] ?? ''),
             'email' => (string) ($pedido['cliente_email'] ?? ''),
         ];
 
-        // Montar parcel (dimensões e peso)
-        $peso = (float) ($pedido['peso_total'] ?? 0);
-        $altura = (float) ($pedido['altura'] ?? 0);
-        $largura = (float) ($pedido['largura'] ?? 0);
-        $comprimento = (float) ($pedido['comprimento'] ?? 0);
-
-        if ($peso <= 0) $peso = 0.5;
-        if ($altura <= 0) $altura = 10;
-        if ($largura <= 0) $largura = 10;
-        if ($comprimento <= 0) $comprimento = 10;
-
+        $peso = max(0.5, (float) ($pedido['peso_total'] ?? 0));
+        $altura = max(10, (float) ($pedido['altura'] ?? 0));
+        $largura = max(10, (float) ($pedido['largura'] ?? 0));
+        $comprimento = max(10, (float) ($pedido['comprimento'] ?? 0));
         $parcel = [
             'length' => (string) $comprimento,
             'width' => (string) $largura,
@@ -615,32 +769,39 @@ class AdminShippoController extends Controller {
             'mass_unit' => 'kg',
         ];
 
-        // Declaração aduaneira (envio internacional)
         $itens = $this->getItensPedido($id);
-        $customsDeclaration = [];
-        if (!empty($itens)) {
-            $customsDeclaration = $this->svc->buildCustomsDeclaration($itens);
-        } else {
-            $customsDeclaration = $this->svc->buildCustomsDeclaration([
-                ['description' => 'Merchandise', 'quantity' => 1, 'net_weight' => (string) $peso, 'value_amount' => '50.00']
+        $customsDeclaration = !empty($itens)
+            ? $this->svc->buildCustomsDeclaration($itens)
+            : $this->svc->buildCustomsDeclaration([
+                ['description' => 'Merchandise', 'quantity' => 1, 'net_weight' => (string) $peso, 'value_amount' => '50.00'],
             ]);
-        }
 
-        // Criar shipment para obter rates
-        $result = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customsDeclaration);
-
+        $result = $this->svc->createShipment(
+            $addressFrom,
+            $addressTo,
+            $parcel,
+            $customsDeclaration,
+            [(string) $carrierAccount['carrier_account']]
+        );
         if (!$result['success']) {
             $this->json(['success' => false, 'error' => $result['error'] ?? __('admin.shippo.create_shipment_failed', 'Falha ao criar shipment.')], 400);
             return;
         }
 
-        // Salvar shipment_id e retornar rates para o frontend
-        $rates = $result['rates'] ?? [];
-        $shipmentId = $result['shipment_id'] ?? '';
+        $shipmentId = (string) ($result['shipment_id'] ?? '');
+        $rates = $this->filterRatesForCarrierAccount($result['rates'] ?? [], (string) $carrierAccount['carrier_account']);
+        if (empty($rates)) {
+            $this->json(['success' => false, 'error' => 'Nenhuma tarifa disponível para a conta ' . $carrierAccount['name'] . ' selecionada. Escolha a outra conta ou revise o destino e o serviço.'], 400);
+            return;
+        }
 
+        $this->rememberRateSelection($shipmentId, $id, $carrierAccount, $rates);
         $this->json([
             'success' => true,
             'shipment_id' => $shipmentId,
+            'carrier_key' => $carrierAccount['key'],
+            'carrier_name' => $carrierAccount['name'],
+            'label_file_type' => 'PDF',
             'rates' => $rates,
             'pedido_id' => $id,
         ]);
@@ -654,63 +815,35 @@ class AdminShippoController extends Controller {
         $auth->requerPerfis(['admin', 'vendedor']);
 
         $id = (int) $request->param('id');
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
-        $rateId = (string) ($body['rate_id'] ?? '');
+        $body = $request->getBody();
+        $rateId = trim((string) ($body['rate_id'] ?? ''));
+        $shipmentId = trim((string) ($body['shipment_id'] ?? ''));
+        $carrierKey = strtolower(trim((string) ($body['carrier_key'] ?? '')));
 
-        if ($id <= 0 || $rateId === '') {
+        if ($id <= 0 || $rateId === '' || $shipmentId === '' || $carrierKey === '') {
             $this->json(['success' => false, 'error' => __('admin.shippo.invalid_order_or_rate', 'Pedido ou rate inválido.')], 400);
             return;
         }
 
-        // Comprar etiqueta
-        $result = $this->svc->purchaseLabel($rateId, 'PDF_4x6');
+        $selection = $this->getRememberedRateSelection($shipmentId, $id, $carrierKey, $rateId);
+        $carrierAccount = $this->getCarrierAccount($carrierKey);
+        if (!$selection || !$carrierAccount
+            || !hash_equals((string) $carrierAccount['carrier_account'], (string) ($selection['carrier_account'] ?? ''))) {
+            $this->json(['success' => false, 'error' => 'A cotação expirou ou não pertence à Carrier Account selecionada. Busque as opções novamente.'], 409);
+            return;
+        }
 
+        $rate = $selection['rates'][$rateId];
+        $result = $this->svc->purchaseLabel($rateId, 'PDF');
         if (!$result['success']) {
             $this->json(['success' => false, 'error' => $result['error'] ?? __('admin.shippo.purchase_label_failed', 'Falha ao comprar etiqueta.')], 400);
             return;
         }
 
-        // Salvar no banco
-        $this->ensureShippoEtiquetasTable();
+        // A transação foi comprada; impedir repetição acidental do mesmo rate.
+        $this->forgetRateSelection($shipmentId);
         try {
-            // Deletar anterior se existir
-            $stDel = $this->connection->prepare("DELETE FROM shippo_etiquetas WHERE pedido_id = ?");
-            $stDel->execute([$id]);
-
-            $stIns = $this->connection->prepare("
-                INSERT INTO shippo_etiquetas (pedido_id, shipment_id, transaction_id, rate_id, tracking_number, tracking_url, label_url, carrier, service_level, rate_amount, rate_currency, status, is_test, last_response_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gerada', ?, ?, NOW())
-            ");
-
-            $isTest = !empty($result['data']['test']) ? 1 : 0;
-            $rateData = $result['rate'] ?? [];
-            $carrier = '';
-            $serviceLevel = '';
-            $rateAmount = 0;
-            $rateCurrency = 'USD';
-
-            if (is_array($rateData)) {
-                $carrier = (string) ($rateData['provider'] ?? '');
-                $serviceLevel = (string) ($rateData['servicelevel_name'] ?? ($rateData['servicelevel']['name'] ?? ''));
-                $rateAmount = (float) ($rateData['amount'] ?? 0);
-                $rateCurrency = (string) ($rateData['currency'] ?? 'USD');
-            }
-
-            $stIns->execute([
-                $id,
-                (string) ($body['shipment_id'] ?? ''),
-                $result['transaction_id'] ?? '',
-                $rateId,
-                $result['tracking_number'] ?? '',
-                $result['tracking_url'] ?? '',
-                $result['label_url'] ?? '',
-                $carrier,
-                $serviceLevel,
-                $rateAmount,
-                $rateCurrency,
-                $isTest,
-                json_encode($result['data'] ?? []),
-            ]);
+            $this->persistShippoLabel($id, $shipmentId, $rateId, $carrierAccount, $rate, $result);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => __('admin.shippo.label_saved_failed', 'Etiqueta gerada mas falhou ao salvar: ') . $e->getMessage()], 500);
             return;
@@ -721,6 +854,8 @@ class AdminShippoController extends Controller {
             'tracking_number' => $result['tracking_number'] ?? '',
             'label_url' => $result['label_url'] ?? '',
             'tracking_url' => $result['tracking_url'] ?? '',
+            'carrier_key' => $carrierAccount['key'],
+            'label_file_type' => 'PDF',
         ]);
     }
 
@@ -767,8 +902,15 @@ class AdminShippoController extends Controller {
             ob_start();
         }
 
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $request->getBody();
         $pedidoIds = $body['pedido_ids'] ?? [];
+        $carrierKey = strtolower(trim((string) ($body['carrier_key'] ?? '')));
+        $selectedCarrierAccount = $this->getCarrierAccount($carrierKey);
+
+        if (!$selectedCarrierAccount) {
+            $this->json(['success' => false, 'error' => 'Selecione uma Carrier Account FedEx ou UPS ativa e configurada.'], 400);
+            return;
+        }
 
         if (!is_array($pedidoIds) || empty($pedidoIds)) {
             $this->json(['success' => false, 'error' => __('admin.shippo.no_order_selected', 'Nenhum pedido selecionado.')], 400);
@@ -848,44 +990,28 @@ class AdminShippoController extends Controller {
                 ? $this->svc->buildCustomsDeclaration($itens)
                 : $this->svc->buildCustomsDeclaration([['description' => 'Merchandise', 'quantity' => 1, 'net_weight' => (string) $peso, 'value_amount' => '50.00']]);
 
-            // Verificar modo de geração configurado
-            $cfg = $this->svc->getShippoConfig();
-            $massaMode = (string) ($cfg['shippo_massa_mode'] ?? 'cheapest');
-            $carrierAccount = (string) ($cfg['shippo_carrier_account'] ?? '');
-            $servicelevelToken = (string) ($cfg['shippo_servicelevel_token'] ?? '');
-            $labelFileType = (string) ($cfg['shippo_label_file_type'] ?? 'PDF_4x6');
+            // A conta é escolhida pelo operador no lote; a preferência de serviço é opcional.
+            $massaMode = (string) ($this->svc->getShippoConfig()['shippo_massa_mode'] ?? 'cheapest');
+            $carrierAccount = (string) $selectedCarrierAccount['carrier_account'];
+            $servicelevelToken = (string) $selectedCarrierAccount['servicelevel_token'];
 
             if ($massaMode === 'single_call' && $carrierAccount !== '' && $servicelevelToken !== '') {
                 // Fluxo 2 etapas com carrier/service pré-definido: cria shipment (PURCHASE) → filtra rate pelo service level → compra
-                $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
+                $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs, [$carrierAccount]);
                 if (!$shipResult['success']) {
                     $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? __('admin.shippo.shipment_failed', 'Falha no shipment.')];
                     continue;
                 }
 
-                $rates = $shipResult['rates'] ?? [];
+                $rates = $this->filterRatesForCarrierAccount($shipResult['rates'] ?? [], $carrierAccount);
                 // Filtrar pelo service level configurado
                 $matchedRate = null;
                 foreach ($rates as $rate) {
                     $rateService = $rate['servicelevel']['token'] ?? ($rate['servicelevel_token'] ?? '');
-                    $rateCarrier = $rate['carrier_account'] ?? '';
                     if (strtolower($rateService) === strtolower($servicelevelToken)) {
                         $matchedRate = $rate;
                         break;
                     }
-                }
-                // Se não encontrou pelo service level exato, tentar pelo carrier account
-                if (!$matchedRate) {
-                    foreach ($rates as $rate) {
-                        if (($rate['carrier_account'] ?? '') === $carrierAccount) {
-                            $matchedRate = $rate;
-                            break;
-                        }
-                    }
-                }
-                // Fallback: pegar o primeiro disponível
-                if (!$matchedRate && !empty($rates)) {
-                    $matchedRate = $rates[0];
                 }
 
                 if (!$matchedRate) {
@@ -899,7 +1025,7 @@ class AdminShippoController extends Controller {
                     continue;
                 }
 
-                $labelResult = $this->svc->purchaseLabel($rateId, $labelFileType ?: 'PDF_4x6');
+                $labelResult = $this->svc->purchaseLabel($rateId, 'PDF');
                 if (!$labelResult['success']) {
                     $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? __('admin.shippo.label_generation_failed', 'Falha ao gerar etiqueta.')];
                     continue;
@@ -942,13 +1068,13 @@ class AdminShippoController extends Controller {
                 }
             } else {
                 // Modo cotação: cria shipment, pega rates, escolhe o mais barato
-                $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
+                $shipResult = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs, [$carrierAccount]);
                 if (!$shipResult['success']) {
                     $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $shipResult['error'] ?? __('admin.shippo.shipment_failed', 'Falha no shipment.')];
                     continue;
                 }
 
-                $rates = $shipResult['rates'] ?? [];
+                $rates = $this->filterRatesForCarrierAccount($shipResult['rates'] ?? [], $carrierAccount);
                 if (empty($rates)) {
                     $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.no_rate_available', 'Nenhuma rate disponível.')];
                     continue;
@@ -966,7 +1092,7 @@ class AdminShippoController extends Controller {
             }
 
             // Comprar etiqueta
-            $labelResult = $this->svc->purchaseLabel($rateId, $labelFileType ?: 'PDF_4x6');
+            $labelResult = $this->svc->purchaseLabel($rateId, 'PDF');
             if (!$labelResult['success']) {
                 $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $labelResult['error'] ?? __('admin.shippo.label_generation_failed', 'Falha ao gerar etiqueta.')];
                 continue;
@@ -1008,6 +1134,22 @@ class AdminShippoController extends Controller {
                 $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.save_failed', 'Falha ao salvar: ') . $e->getMessage()];
             }
             } // fim else (modo cotação)
+        }
+
+        // Completa a trilha de auditoria nas etiquetas emitidas em massa.
+        try {
+            $stAudit = $this->connection->prepare('UPDATE shippo_etiquetas SET carrier_key = ?, carrier_account_id = ?, label_file_type = ? WHERE pedido_id = ?');
+            foreach ($results as $batchResult) {
+                if (!empty($batchResult['success']) && !empty($batchResult['pedido_id'])) {
+                    $stAudit->execute([
+                        $selectedCarrierAccount['key'],
+                        $selectedCarrierAccount['carrier_account'],
+                        'PDF',
+                        (int) $batchResult['pedido_id'],
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
         }
 
         // Descarta qualquer saída acidental (warnings/notices) acumulada no buffer antes do JSON.
@@ -1080,7 +1222,7 @@ class AdminShippoController extends Controller {
             ? $this->svc->buildCustomsDeclaration($itens)
             : $this->svc->buildCustomsDeclaration([['description' => 'Merchandise', 'quantity' => 1, 'net_weight' => (string) $peso, 'value_amount' => '50.00']]);
 
-        $result = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs);
+        $result = $this->svc->createShipment($addressFrom, $addressTo, $parcel, $customs, [$carrierAccount]);
 
         if (!$result['success']) {
             $this->json(['success' => false, 'error' => $result['error'] ?? __('admin.shippo.failure', 'Falha.')], 400);

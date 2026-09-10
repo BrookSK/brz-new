@@ -3,6 +3,7 @@
     $pedido = isset($pedido) && is_array($pedido) ? $pedido : [];
     $itens = isset($itens) && is_array($itens) ? $itens : [];
     $etiqueta = isset($etiqueta) && is_array($etiqueta) ? $etiqueta : null;
+    $carrierAccounts = isset($carrierAccounts) && is_array($carrierAccounts) ? $carrierAccounts : [];
 
     $pid = (int) ($pedido['id'] ?? 0);
     $clienteNome = (string) ($pedido['cliente_nome'] ?? '-');
@@ -166,12 +167,31 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted small mb-3">
-                            <?= __('admin.shippo.generate_help','Clique no botão abaixo para consultar as opções de frete disponíveis via Shippo. Após receber as cotações, escolha a que preferir para gerar a etiqueta.') ?>
+                            Selecione a Carrier Account que será usada neste envio. As tarifas e a etiqueta serão limitadas à conta escolhida.
                         </p>
 
-                        <button class="btn btn-primary" id="btnBuscarRates" onclick="buscarRatesShippo(<?= $pid ?>)">
-                            <i class="fas fa-search me-1"></i><?= __('admin.shippo.search_rates','Buscar Opções de Frete') ?>
-                        </button>
+                        <div class="row align-items-end g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="carrierAccountSelect">Carrier Account</label>
+                                <select class="form-select" id="carrierAccountSelect">
+                                    <option value="">Selecione FedEx ou UPS</option>
+                                    <?php foreach ($carrierAccounts as $carrierAccount): ?>
+                                        <option value="<?= htmlspecialchars((string) $carrierAccount['key'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= htmlspecialchars((string) $carrierAccount['name'], ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-text mb-2">Formato obrigatório: PDF 8.5x11 (duas etiquetas por página).</div>
+                                <button class="btn btn-primary" id="btnBuscarRates" onclick="buscarRatesShippo(<?= $pid ?>)" <?= empty($carrierAccounts) ? 'disabled' : '' ?>>
+                                    <i class="fas fa-search me-1"></i><?= __('admin.shippo.search_rates','Buscar Opções de Frete') ?>
+                                </button>
+                            </div>
+                        </div>
+                        <?php if (empty($carrierAccounts)): ?>
+                            <div class="alert alert-warning mb-0">Nenhuma Carrier Account ativa foi configurada. Cadastre e habilite FedEx ou UPS em Configurações → Entrega → Shippo.</div>
+                        <?php endif; ?>
 
                         <!-- Container para exibir rates -->
                         <div id="ratesContainer" style="display:none;" class="mt-4">
@@ -193,6 +213,7 @@
 
 <script>
 let currentShipmentId = '';
+let currentCarrierKey = '';
 
 function setError(msg) {
     const el = document.getElementById('shippo_error');
@@ -216,6 +237,14 @@ async function buscarRatesShippo(pedidoId) {
     const container = document.getElementById('ratesContainer');
     const list = document.getElementById('ratesList');
 
+    const carrierSelect = document.getElementById('carrierAccountSelect');
+    const carrierKey = carrierSelect ? carrierSelect.value : '';
+    if (!carrierKey) {
+        setError('Selecione a Carrier Account (FedEx ou UPS) antes de buscar as opções de frete.');
+        return;
+    }
+    currentCarrierKey = carrierKey;
+
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + <?= json_encode(__('admin.shippo.querying','Consultando...')) ?>; }
     if (loading) loading.style.display = '';
     if (container) container.style.display = 'none';
@@ -223,7 +252,8 @@ async function buscarRatesShippo(pedidoId) {
     try {
         const r = await fetch('/admin/shippo/pedido/' + pedidoId + '/gerar-etiqueta', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ carrier_key: currentCarrierKey })
         });
         const data = await r.json();
 
@@ -296,7 +326,11 @@ async function confirmarRate(rateId, provider, service, amount, currency) {
         const r = await fetch('/admin/shippo/pedido/' + pedidoId + '/confirmar-etiqueta', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rate_id: rateId, shipment_id: currentShipmentId })
+            body: JSON.stringify({
+                rate_id: rateId,
+                shipment_id: currentShipmentId,
+                carrier_key: currentCarrierKey
+            })
         });
         const data = await r.json();
 

@@ -1951,22 +1951,50 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                             </div>
 
-                                <h6 class="mb-2 mt-4 small text-muted">' . __('admin.settings.shipping_freight_config_carrier_service', 'Configuração de Frete (Carrier / Serviço)') . '</h6>
-                                <p class="text-muted small">' . __('admin.settings.shipping_freight_config_hint', 'Defina o carrier e serviço padrão para geração de etiquetas em massa. Se preenchido, o sistema usará este serviço diretamente ao invés de cotar todas as opções.') . '</p>
+                                <h6 class="mb-2 mt-4 small text-muted">Carrier Accounts Shippo</h6>
+                                <p class="text-muted small">Cadastre e habilite as contas FedEx e UPS. A conta será escolhida obrigatoriamente no momento de emitir cada etiqueta.</p>
 
                                             <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Carrier Account ID</label>
-                                                        <input type="text" class="form-control" name="shippo_carrier_account" value="' . $this->getConfigValue($config, 'shippo', 'carrier_account', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_eg_prefix_alt', 'Ex:') . ' 078870331023437cb917f5187429b093', ENT_QUOTES, 'UTF-8') . '">
-                                                        <small class="text-muted">' . __('admin.settings.shipping_carrier_account_hint', 'ID da carrier account configurada na Shippo (USPS, UPS, FedEx, etc.)') . '</small>
+                                                <div class="col-lg-6 mb-3">
+                                                    <div class="card h-100 border-primary-subtle">
+                                                        <div class="card-body">
+                                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                                <strong>FedEx</strong>
+                                                                <div class="form-check form-switch mb-0">
+                                                                    <input class="form-check-input" type="checkbox" id="shippo_fedex_enabled" name="shippo_fedex_enabled" value="1" ' . ($this->getConfigValue($config, 'shippo', 'fedex_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                    <label class="form-check-label" for="shippo_fedex_enabled">Ativa</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Carrier Account ID</label>
+                                                                <input type="text" class="form-control" name="shippo_fedex_carrier_account" value="' . $this->getConfigValue($config, 'shippo', 'fedex_carrier_account', '') . '" placeholder="Object ID da conta FedEx">
+                                                            </div>
+                                                            <div class="mb-0">
+                                                                <label class="form-label">Service Level Token padrão <span class="text-muted">(opcional)</span></label>
+                                                                <input type="text" class="form-control" name="shippo_fedex_servicelevel_token" value="' . $this->getConfigValue($config, 'shippo', 'fedex_servicelevel_token', '') . '" placeholder="Ex.: fedex_express_saver">
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Service Level Token</label>
-                                                        <input type="text" class="form-control" name="shippo_servicelevel_token" value="' . $this->getConfigValue($config, 'shippo', 'servicelevel_token', '') . '" placeholder="' . htmlspecialchars(__('admin.settings.shipping_eg_prefix_alt', 'Ex:') . ' usps_priority, ups_ground, fedex_ground...', ENT_QUOTES, 'UTF-8') . '">
-                                                        <small class="text-muted">' . __('admin.settings.shipping_servicelevel_hint', 'Token do nível de serviço.') . ' <a href="https://docs.goshippo.com/docs/reference/serviceleveltoken/" target="_blank">' . __('admin.settings.shipping_see_full_list', 'Ver lista completa') . '</a></small>
+                                                <div class="col-lg-6 mb-3">
+                                                    <div class="card h-100 border-warning-subtle">
+                                                        <div class="card-body">
+                                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                                <strong>UPS</strong>
+                                                                <div class="form-check form-switch mb-0">
+                                                                    <input class="form-check-input" type="checkbox" id="shippo_ups_enabled" name="shippo_ups_enabled" value="1" ' . ($this->getConfigValue($config, 'shippo', 'ups_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                    <label class="form-check-label" for="shippo_ups_enabled">Ativa</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Carrier Account ID</label>
+                                                                <input type="text" class="form-control" name="shippo_ups_carrier_account" value="' . $this->getConfigValue($config, 'shippo', 'ups_carrier_account', '') . '" placeholder="Object ID da conta UPS ativa">
+                                                            </div>
+                                                            <div class="mb-0">
+                                                                <label class="form-label">Service Level Token padrão <span class="text-muted">(opcional)</span></label>
+                                                                <input type="text" class="form-control" name="shippo_ups_servicelevel_token" value="' . $this->getConfigValue($config, 'shippo', 'ups_servicelevel_token', '') . '" placeholder="Ex.: ups_ground">
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1975,14 +2003,9 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-md-4">
                                                     <div class="mb-3">
                                                         <label class="form-label">' . __('admin.settings.shipping_label_format', 'Formato da Etiqueta') . '</label>
-                                                        <select class="form-select" name="shippo_label_file_type">
-                                                            <option value="PDF_4x6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', 'PDF_4x6') === 'PDF_4x6' ? 'selected' : '') . '>PDF 4x6 (' . __('admin.settings.shipping_one_label_per_page', 'uma etiqueta por página') . ')</option>
-                                                            <option value="PDF_A4" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A4' ? 'selected' : '') . '>PDF A4 (' . __('admin.settings.shipping_one_label_per_page', 'uma etiqueta por página') . ')</option>
-                                                            <option value="PDF" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF' ? 'selected' : '') . '>PDF 8.5x11 (' . __('admin.settings.shipping_two_labels_per_page', 'duas etiquetas por página') . ')</option>
-                                                            <option value="PDF_A6" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PDF_A6' ? 'selected' : '') . '>PDF A6</option>
-                                                            <option value="PNG" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'PNG' ? 'selected' : '') . '>PNG</option>
-                                                            <option value="ZPLII" ' . ($this->getConfigValue($config, 'shippo', 'label_file_type', '') === 'ZPLII' ? 'selected' : '') . '>ZPL II (' . __('admin.settings.shipping_thermal', 'Térmica') . ')</option>
-                                                        </select>
+                                                        <input type="hidden" name="shippo_label_file_type" value="PDF">
+                                                        <input type="text" class="form-control" value="PDF 8.5x11 (duas etiquetas por página)" readonly>
+                                                        <small class="text-muted">Formato obrigatório para etiquetas Shippo geradas por FedEx e UPS.</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
@@ -1992,7 +2015,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <option value="single_call" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', 'single_call') === 'single_call' ? 'selected' : '') . '>Single Call (' . __('admin.settings.shipping_direct_carrier_service', 'direto com carrier/serviço') . ')</option>
                                                             <option value="cheapest" ' . ($this->getConfigValue($config, 'shippo', 'massa_mode', '') === 'cheapest' ? 'selected' : '') . '>' . __('admin.settings.shipping_cheapest', 'Mais barato (cotar e escolher menor preço)') . '</option>
                                                         </select>
-                                                        <small class="text-muted">' . __('admin.settings.shipping_single_call_hint', 'Single Call requer Carrier Account e Service Level preenchidos.') . '</small>
+                                                        <small class="text-muted">No modo Single Call, o lote usa o Service Level padrão configurado na conta FedEx ou UPS selecionada. Sem serviço padrão, o menor valor da conta selecionada é usado.</small>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
@@ -4875,8 +4898,9 @@ HTML;
                 'desconto' => ['emails_autorizadores']
             ];
 
-            // Shippo fields
-            $configMap['shippo'] = ['enabled', 'ambiente', 'api_token', 'sender_name', 'sender_company', 'sender_street1', 'sender_street2', 'sender_city', 'sender_state', 'sender_zip', 'sender_country', 'sender_phone', 'sender_email', 'carrier_account', 'servicelevel_token', 'label_file_type', 'massa_mode', 'contents_type'];
+            // Shippo fields. As contas legadas permanecem no banco, mas as novas emissões
+            // usam exclusivamente as contas nomeadas FedEx e UPS.
+            $configMap['shippo'] = ['enabled', 'ambiente', 'api_token', 'sender_name', 'sender_company', 'sender_street1', 'sender_street2', 'sender_city', 'sender_state', 'sender_zip', 'sender_country', 'sender_phone', 'sender_email', 'fedex_enabled', 'fedex_carrier_account', 'fedex_servicelevel_token', 'ups_enabled', 'ups_carrier_account', 'ups_servicelevel_token', 'label_file_type', 'massa_mode', 'contents_type'];
             
             $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'assessoria_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo', 'conversao_moeda_ativa', 'enabled'];
 
@@ -4885,14 +4909,21 @@ HTML;
                     $valor = $request->getParam($categoria . '_' . $chave);
 
                     // Checkboxes não enviados no POST quando desmarcados
-                    if ($valor === null && in_array($chave, $checkboxKeys, true)) {
+                    if ($valor === null && (in_array($chave, $checkboxKeys, true)
+                        || ($categoria === 'shippo' && in_array($chave, ['fedex_enabled', 'ups_enabled'], true)))) {
                         $valor = '0';
                     }
 
                     if ($valor !== null) {
                         // Converter checkboxes para 0/1
-                        if (in_array($chave, $checkboxKeys, true)) {
+                        if (in_array($chave, $checkboxKeys, true)
+                            || ($categoria === 'shippo' && in_array($chave, ['fedex_enabled', 'ups_enabled'], true))) {
                             $valor = ($valor === '1' || $valor === 1 || $valor === true) ? '1' : '0';
+                        }
+
+                        // As etiquetas Shippo desta operação são sempre Letter 8.5x11.
+                        if ($categoria === 'shippo' && $chave === 'label_file_type') {
+                            $valor = 'PDF';
                         }
                         
                         // Validar valores específicos

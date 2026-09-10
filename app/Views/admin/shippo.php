@@ -15,6 +15,7 @@
     <?php
         $pedidos = isset($pedidos) && is_array($pedidos) ? $pedidos : [];
         $diag = isset($diag) && is_array($diag) ? $diag : [];
+        $carrierAccounts = isset($carrierAccounts) && is_array($carrierAccounts) ? $carrierAccounts : [];
     ?>
 
     <!-- Pedidos internacionais (todos exceto Brasil) -->
@@ -22,7 +23,15 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <strong><?= __('admin.shippo.intl_orders','Pedidos internacionais (todos, exceto Brasil)') ?></strong>
             <?php if (!empty($pedidos)): ?>
-                <button class="btn btn-sm btn-success" id="btnGerarShippo" style="display:none;" onclick="gerarEtiquetasShippoSelecionadas()"><i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText"><?= __('admin.shippo.generate_labels','Gerar Etiquetas') ?></span></button>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" id="carrierAccountMassa" style="width:190px">
+                        <option value="">Conta para o lote</option>
+                        <?php foreach ($carrierAccounts as $carrierAccount): ?>
+                            <option value="<?= htmlspecialchars((string) $carrierAccount['key'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $carrierAccount['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-sm btn-success" id="btnGerarShippo" style="display:none;" onclick="gerarEtiquetasShippoSelecionadas()" <?= empty($carrierAccounts) ? 'disabled' : '' ?>><i class="fas fa-bolt me-1"></i><span id="btnGerarShippoText"><?= __('admin.shippo.generate_labels','Gerar Etiquetas') ?></span></button>
+                </div>
             <?php endif; ?>
         </div>
         <div class="card-body">
@@ -269,6 +278,12 @@ async function gerarEtiquetasShippoSelecionadas() {
     var checks = document.querySelectorAll('.pedido-check:checked');
     if (checks.length === 0) return;
     var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
+    var carrierSelect = document.getElementById('carrierAccountMassa');
+    var carrierKey = carrierSelect ? carrierSelect.value : '';
+    if (!carrierKey) {
+        alert('Selecione a Carrier Account (FedEx ou UPS) para gerar o lote.');
+        return;
+    }
     if (!confirm(<?= json_encode(__('admin.shippo.confirm_generate','Gerar etiquetas Shippo para {n} pedido(s) selecionados?\n\nO frete será gerado conforme configuração em Configurações > Entrega > Shippo.')) ?>.replace('{n}', ids.length))) return;
 
     var btn = document.getElementById('btnGerarShippo');
@@ -298,7 +313,7 @@ async function gerarEtiquetasShippoSelecionadas() {
             var r = await fetch('/admin/shippo/gerar-etiquetas-massa', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pedido_ids: [ids[i]] })
+                body: JSON.stringify({ pedido_ids: [ids[i]], carrier_key: carrierKey })
             });
             var data = await r.json();
 
