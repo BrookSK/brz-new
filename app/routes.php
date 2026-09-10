@@ -408,6 +408,9 @@ $router->get('/admin/pedidos/novo-manual/clientes', 'AdminPedidosManualControlle
 $router->get('/admin/pedidos/novo-manual/cliente-endereco/{id}', 'AdminPedidosManualController', 'clienteEndereco');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
 $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');
+$router->post('/admin/pedidos/novo-manual/rascunho', 'AdminPedidosManualController', 'criarRascunho');
+$router->post('/admin/pedidos/novo-manual/rascunho/excluir', 'AdminPedidosManualController', 'excluirRascunho');
+$router->get('/admin/pedidos/rascunhos', 'AdminPedidosManualController', 'rascunhos');
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
 $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
 

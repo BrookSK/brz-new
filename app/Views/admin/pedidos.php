@@ -22,6 +22,9 @@ function getOrderStatusLabel($status) {
             <a href="/admin/pedidos/novo-manual" class="btn btn-primary ms-2">
                 <i class="fas fa-plus me-2"></i><?= __('admin.orders.new_manual', 'Novo Pedido Manual') ?>
             </a>
+            <a href="/admin/pedidos/rascunhos" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-file-alt me-2"></i><?= __('admin.orders_manual.drafts', 'Rascunhos') ?>
+            </a>
             <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary ms-2">
                 <i class="fas fa-percentage me-2"></i><?= __('admin.menu.my_commissions', 'Minhas Comissões') ?>
             </a>

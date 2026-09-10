@@ -315,11 +315,13 @@ class AdminPedidosManualController extends Controller {
                 $usuarioCol = in_array('usuario_id', $colsPedidos, true) ? 'usuario_id' : (in_array('user_id', $colsPedidos, true) ? 'user_id' : '');
                 $origemCol = in_array('origem_pedido', $colsPedidos, true) ? 'origem_pedido' : '';
                 $codigoCol = in_array('codigo_pedido', $colsPedidos, true) ? 'codigo_pedido' : (in_array('numero_pedido', $colsPedidos, true) ? 'numero_pedido' : '');
+                $statusCol = in_array('status', $colsPedidos, true) ? 'status' : '';
 
                 $sel = ['id'];
                 if ($usuarioCol !== '') $sel[] = $usuarioCol . ' AS cliente_id';
                 if ($origemCol !== '') $sel[] = $origemCol . ' AS origem_pedido';
                 if ($codigoCol !== '') $sel[] = $codigoCol . ' AS codigo_pedido';
+                if ($statusCol !== '') $sel[] = $statusCol . ' AS status';
 
                 $stmtP = $pdo->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id = :id LIMIT 1');
                 $stmtP->bindValue(':id', (int) $pedidoId, \PDO::PARAM_INT);
@@ -371,6 +373,14 @@ class AdminPedidosManualController extends Controller {
             }
         }
 
+        // Detecta se estamos EDITANDO um rascunho. Nesse caso, ao clicar em "Criar Pedido Manual"
+        // (fluxo normal) o rascunho de origem é efetivado; e ao clicar em "Salvar em rascunho"
+        // o rascunho é atualizado no lugar.
+        $statusExistente = strtolower(trim((string) ($existingPedido['status'] ?? '')));
+        $isRascunhoEdicao = ($pedidoId > 0 && $statusExistente === 'rascunho');
+        // Só tratamos como "pedido criado com sucesso" quando NÃO for edição de rascunho.
+        $mostrarSucessoCriacao = ($pedidoId > 0 && !$isRascunhoEdicao);
+
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
@@ -399,10 +409,13 @@ class AdminPedidosManualController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">' . __('admin.orders_manual.title', 'Novo Pedido Manual') . '</h1>
+                    <h1 class="page-title">' . ($isRascunhoEdicao ? __('admin.orders_manual.edit_draft_title', 'Editar Rascunho') : __('admin.orders_manual.title', 'Novo Pedido Manual')) . '</h1>
                     <div>
                         <a href="/admin/pedidos" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left"></i> ' . __('common.back', 'Voltar') . '
+                        </a>
+                        <a href="/admin/pedidos/rascunhos" class="btn btn-outline-secondary ms-2">
+                            <i class="fas fa-file-alt"></i> ' . __('admin.orders_manual.drafts', 'Rascunhos') . '
                         </a>
                     </div>
                 </div>';
@@ -411,12 +424,15 @@ class AdminPedidosManualController extends Controller {
             echo '<div class="alert alert-danger">' . htmlspecialchars($erro, ENT_QUOTES, 'UTF-8') . '</div>';
         }
 
-        if ($pedidoId > 0) {
+        if ($isRascunhoEdicao) {
+            echo '<div class="alert alert-warning"><i class="fas fa-file-alt me-2"></i>' . __('admin.orders_manual.editing_draft', 'Você está editando um rascunho. Clique em <strong>Salvar em rascunho</strong> para atualizar, ou em <strong>Criar Pedido Manual</strong> para efetivá-lo no fluxo normal.') . '</div>';
+        } elseif ($mostrarSucessoCriacao) {
             echo '<div class="alert alert-success">' . __('admin.orders_manual.created_success', 'Pedido manual criado com sucesso:') . ' <strong>#' . (int) $pedidoId . '</strong></div>';
         }
 
         echo '<form method="POST" action="/admin/pedidos/novo-manual/salvar" id="formPedidoManual">
                 <input type="hidden" name="pedido_manual_token" value="' . htmlspecialchars((string) $formToken, ENT_QUOTES, 'UTF-8') . '">
+                <input type="hidden" name="rascunho_origem_id" id="rascunho_origem_id" value="' . ($isRascunhoEdicao ? (int) $pedidoId : 0) . '">
                 <div class="card mb-4">
                     <div class="card-header"><strong>' . __('admin.orders_manual.customer', 'Cliente') . '</strong></div>
                     <div class="card-body">
@@ -740,11 +756,15 @@ class AdminPedidosManualController extends Controller {
                     <button type="submit" class="btn btn-success" id="btnCriarPedidoManual">
                         <i class="fas fa-save"></i> ' . __('admin.orders_manual.create_order', 'Criar Pedido Manual') . '
                     </button>
+                    <button type="button" class="btn btn-outline-primary" id="btnSalvarRascunho" onclick="salvarRascunho()">
+                        <i class="fas fa-file-alt"></i> ' . __('admin.orders_manual.save_draft', 'Salvar em rascunho') . '
+                    </button>
                     <button type="button" class="btn btn-outline-secondary" id="btnGerarMensagemOrcamento" onclick="gerarMensagemOrcamento()">
                         <i class="fas fa-comment-dots"></i> ' . __('admin.orders_manual.generate_quote_message', 'Gerar mensagem de orçamento') . '
                     </button>
                 </div>
                 <div id="createResult" style="display:none;"></div>
+                <div id="rascunhoResult" style="display:none;"></div>
                 <div id="orcamentoResult" style="display:none;"></div>
             </form>
 
@@ -1624,6 +1644,59 @@ function getPixPct(){
     const p = Number(PIX_DESCONTO_TAXA_SERVICO_PERCENT || 0);
     if (!isFinite(p) || p <= 0) return 0;
     return Math.max(0, Math.min(100, p));
+}
+
+// Salva o pedido atual como RASCUNHO. Diferente do botão verde, NÃO exige campos preenchidos:
+// envia o formulário no estado em que estiver. Reaproveita os mesmos dados do form (FormData),
+// apenas apontando para o endpoint de rascunho.
+function salvarRascunho(){
+    const form = document.getElementById('formPedidoManual');
+    if (!form) return;
+
+    try { calcTotal(); } catch (err) {}
+
+    const box = document.getElementById('rascunhoResult');
+    const btn = document.getElementById('btnSalvarRascunho');
+    let btnOriginalHtml = '';
+    if (btn) {
+        btnOriginalHtml = String(btn.innerHTML || '');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    }
+    if (box) {
+        box.style.display = 'block';
+        box.innerHTML = `<div class="alert alert-info">Salvando rascunho...</div>`;
+    }
+
+    const fd = new FormData(form);
+    fetch('/admin/pedidos/novo-manual/rascunho', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(resp => {
+            if (!resp || !resp.success) {
+                throw new Error((resp && resp.error) ? resp.error : 'Falha ao salvar rascunho');
+            }
+            const novoId = Number(resp.pedido_id || 0);
+            // Ao salvar, passamos a editar este mesmo rascunho (evita criar duplicatas em salvamentos seguintes).
+            const hid = document.getElementById('rascunho_origem_id');
+            if (hid && novoId > 0) hid.value = String(novoId);
+            if (box) {
+                box.innerHTML = `<div class="alert alert-success">Rascunho salvo com sucesso: <strong>#${novoId}</strong>. `
+                    + `<a href="/admin/pedidos/rascunhos">Ver rascunhos</a> · `
+                    + `<a href="/admin/pedidos/novo-manual?pedido_id=${novoId}&rascunho=1">Recarregar edição</a></div>`;
+            }
+        })
+        .catch(err => {
+            if (box) {
+                const msg = err && err.message ? err.message : String(err);
+                box.innerHTML = `<div class="alert alert-danger">Erro ao salvar rascunho: ${escapeHtml(msg)}</div>`;
+            }
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                if (btnOriginalHtml !== '') btn.innerHTML = btnOriginalHtml;
+            }
+        });
 }
 
 function gerarMensagemOrcamento(){
@@ -3409,10 +3482,298 @@ JS;
                 } catch (\Exception $e) {}
             }
 
+            // Promoção de rascunho: se este pedido veio da edição de um rascunho existente,
+            // removemos o rascunho de origem para não deixar duplicata. O pedido recém-criado
+            // já entra no fluxo normal (status 'pendente'), portanto o rascunho não é mais necessário.
+            $rascunhoOrigemId = (int) $request->getParam('rascunho_origem_id', 0);
+            if ($rascunhoOrigemId > 0 && $rascunhoOrigemId !== (int) $pedidoId) {
+                try { $svc->excluirRascunho($rascunhoOrigemId); } catch (\Exception $e) {}
+            }
+
             $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
             $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
             unset($_SESSION['pedido_manual_form_token']);
             $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Salva (ou atualiza) um pedido manual como RASCUNHO.
+     * Reaproveita todo o fluxo de criação de pedido manual (mesmos campos do formulário),
+     * porém com validações relaxadas: pode faltar cliente, itens, tipo de compra, endereço, etc.
+     * O rascunho é gravado como um pedido normal com status 'rascunho', de modo que:
+     *  - NÃO aparece na lista de compras da Fazenda (status fora do whitelist de AdminComprasController);
+     *  - fica disponível para edição na aba "Rascunhos";
+     *  - ao ser efetivado via "Criar Pedido Manual", segue o fluxo normal.
+     */
+    public function criarRascunho(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                @session_start();
+            }
+            // Token: aceitamos o mesmo token do formulário, mas NÃO invalidamos ao salvar rascunho,
+            // pois o usuário pode continuar editando/salvando o rascunho várias vezes na mesma página.
+            $token = (string) $request->getParam('pedido_manual_token', '');
+            $expected = (string) ($_SESSION['pedido_manual_form_token'] ?? '');
+            if ($token === '' || $expected === '' || !hash_equals($expected, $token)) {
+                // Rascunho é tolerante: se o token expirou, ainda assim tentamos salvar.
+                // (Não há efeito colateral financeiro em um rascunho.)
+            }
+
+            $clienteId = (int) $request->getParam('cliente_id', 0);
+            $moeda = (string) $request->getParam('moeda', 'USD');
+            $formaPagamento = (string) $request->getParam('forma_pagamento', '');
+            $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
+            // Em rascunho o tipo de compra é opcional; se inválido, será tratado como null pelo serviço.
+
+            $enderecoEntrega = [
+                'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
+                'endereco' => (string) $request->getParam('endereco_entrega_endereco', ''),
+                'numero' => (string) $request->getParam('endereco_entrega_numero', ''),
+                'complemento' => (string) $request->getParam('endereco_entrega_complemento', ''),
+                'bairro' => (string) $request->getParam('endereco_entrega_bairro', ''),
+                'cidade' => (string) $request->getParam('endereco_entrega_cidade', ''),
+                'estado' => (string) $request->getParam('endereco_entrega_estado', ''),
+                'pais' => (string) $request->getParam('endereco_entrega_pais', 'BR'),
+            ];
+
+            $resumo = [
+                'subtotal_produtos' => (float) str_replace(',', '.', (string) $request->getParam('subtotal_produtos', '0')),
+                'peso_total' => (float) str_replace(',', '.', (string) $request->getParam('peso_total', '0')),
+                'taxa_servico' => (float) str_replace(',', '.', (string) $request->getParam('taxa_servico', '0')),
+                'valor_impostos' => (float) str_replace(',', '.', (string) $request->getParam('valor_impostos', '0')),
+                'imposto_local' => (float) str_replace(',', '.', (string) $request->getParam('imposto_local', '0')),
+                'valor_frete' => (float) str_replace(',', '.', (string) $request->getParam('valor_frete', '0')),
+                'valor_total' => (float) str_replace(',', '.', (string) $request->getParam('valor_total', '0')),
+            ];
+
+            $produtoIds = $request->getParam('produto_id', []);
+            $qtds = $request->getParam('quantidade', []);
+            $vals = $request->getParam('valor_unitario', []);
+            $custos = $request->getParam('produto_custo', []);
+            $ncms = $request->getParam('produto_ncm', []);
+            $jaComprados = $request->getParam('ja_comprado', []);
+
+            if (!is_array($produtoIds)) $produtoIds = [];
+            if (!is_array($qtds)) $qtds = [];
+            if (!is_array($vals)) $vals = [];
+            if (!is_array($custos)) $custos = [];
+            if (!is_array($ncms)) $ncms = [];
+            if (!is_array($jaComprados)) $jaComprados = [];
+
+            // Atualizar custo/NCM de forma tolerante (não bloquear rascunho por dados incompletos).
+            try { $this->validarEAtualizarCustoENcmProdutos($produtoIds, $custos, $ncms); } catch (\Exception $e) {}
+
+            $itens = [];
+            $count = max(count($produtoIds), count($qtds), count($vals));
+            for ($i = 0; $i < $count; $i++) {
+                $pid = (int) ($produtoIds[$i] ?? 0);
+                $q = (int) ($qtds[$i] ?? 0);
+                $v = (float) (is_string(($vals[$i] ?? '')) ? str_replace(',', '.', (string) ($vals[$i] ?? '0')) : ($vals[$i] ?? 0));
+                if ($pid > 0 && $q > 0) {
+                    $itens[] = [
+                        'produto_id' => $pid,
+                        'quantidade' => $q,
+                        'valor_unitario' => $v,
+                        'ja_comprado' => ((int) ($jaComprados[$i] ?? 0)) === 1 ? 1 : 0,
+                    ];
+                }
+            }
+
+            $adminId = null;
+            try {
+                $u = $auth->getUsuarioLogado();
+                $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
+                if (is_array($u) && in_array($perfil, ['admin', 'vendedor'], true)) {
+                    $adminId = (int) ($u['id'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                $adminId = null;
+            }
+
+            $svc = new PedidoManualService();
+            $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
+
+            // Se estamos editando um rascunho existente, removemos o antigo e recriamos
+            // (mantém itens/campos sempre em sincronia com o formulário, sem UPDATE parcial).
+            $rascunhoOrigemId = (int) $request->getParam('rascunho_origem_id', 0);
+            if ($rascunhoOrigemId > 0) {
+                try { $svc->excluirRascunho($rascunhoOrigemId); } catch (\Exception $e) {}
+            }
+
+            $pedidoId = $svc->criarPedidoManual(
+                $clienteId,
+                $moeda,
+                $itens,
+                $resumo,
+                $adminId,
+                $formaPagamento !== '' ? $formaPagamento : null,
+                $enderecoEntrega,
+                $tipoCompra !== '' ? $tipoCompra : null,
+                $semComissao,
+                false,   // limitePesoAtivo irrelevante em rascunho
+                true     // rascunho = true
+            );
+
+            $this->json(['success' => true, 'pedido_id' => (int) $pedidoId, 'rascunho' => true]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Lista os pedidos manuais salvos como rascunho.
+     */
+    public function rascunhos(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        $pdo = \Config\Database::getConnection();
+        $rascunhos = [];
+        try {
+            $cols = [];
+            try {
+                $st = $pdo->query('DESCRIBE pedidos');
+                $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : 'usuario_id');
+            $totalCol = in_array('total', $cols, true) ? 'total' : (in_array('valor_total', $cols, true) ? 'valor_total' : (in_array('valor_total_brl', $cols, true) ? 'valor_total_brl' : ''));
+            $moedaCol = in_array('moeda', $cols, true) ? 'moeda' : (in_array('currency', $cols, true) ? 'currency' : '');
+            $codigoCol = in_array('codigo_pedido', $cols, true) ? 'codigo_pedido' : (in_array('numero_pedido', $cols, true) ? 'numero_pedido' : '');
+            $criadoCol = in_array('created_at', $cols, true) ? 'created_at' : (in_array('data_criacao', $cols, true) ? 'data_criacao' : '');
+            $temDeletedAt = in_array('deleted_at', $cols, true);
+
+            $sel = ['p.id AS id'];
+            $sel[] = 'p.' . $usuarioCol . ' AS usuario_id';
+            if ($totalCol !== '') $sel[] = 'p.' . $totalCol . ' AS total';
+            if ($moedaCol !== '') $sel[] = 'p.' . $moedaCol . ' AS moeda';
+            if ($codigoCol !== '') $sel[] = 'p.' . $codigoCol . ' AS codigo';
+            if ($criadoCol !== '') $sel[] = 'p.' . $criadoCol . ' AS criado_em';
+
+            // Nome/email do cliente (tabela usuarios)
+            $colsUsuarios = [];
+            try {
+                $stU = $pdo->query('DESCRIBE usuarios');
+                $colsUsuarios = $stU ? $stU->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsUsuarios = [];
+            }
+            $nomeUCol = in_array('nome', $colsUsuarios, true) ? 'nome' : (in_array('name', $colsUsuarios, true) ? 'name' : '');
+            $emailUCol = in_array('email', $colsUsuarios, true) ? 'email' : '';
+            if ($nomeUCol !== '') $sel[] = 'u.' . $nomeUCol . ' AS cliente_nome';
+            if ($emailUCol !== '') $sel[] = 'u.' . $emailUCol . ' AS cliente_email';
+
+            $sql = 'SELECT ' . implode(', ', $sel)
+                . ' FROM pedidos p'
+                . ' LEFT JOIN usuarios u ON u.id = p.' . $usuarioCol
+                . " WHERE LOWER(COALESCE(p.status,'')) = 'rascunho'"
+                . ($temDeletedAt ? ' AND p.deleted_at IS NULL' : '')
+                . ' ORDER BY p.id DESC';
+            $st = $pdo->prepare($sql);
+            $st->execute();
+            $rascunhos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $rascunhos = [];
+        }
+
+        $this->renderRascunhos($rascunhos);
+    }
+
+    private function renderRascunhos(array $rascunhos): void {
+        $totalRascunhos = count($rascunhos);
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">';
+        echo '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
+        echo '<title>' . __('admin.orders_manual.drafts', 'Rascunhos') . '</title>';
+        echo '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">';
+        echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">';
+        echo '</head><body class="bg-light">';
+        echo '<div class="container py-4">';
+        echo '<div class="d-flex justify-content-between align-items-center mb-4">';
+        echo '<h3 class="mb-0"><i class="fas fa-file-alt me-2"></i>' . __('admin.orders_manual.drafts', 'Rascunhos') . ' <span class="badge bg-secondary">' . (int) $totalRascunhos . '</span></h3>';
+        echo '<div>';
+        echo '<a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left me-1"></i>' . __('common.back', 'Voltar') . '</a>';
+        echo '<a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus me-1"></i>' . __('admin.orders.new_manual', 'Novo Pedido Manual') . '</a>';
+        echo '</div></div>';
+
+        if ($totalRascunhos === 0) {
+            echo '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>' . __('admin.orders_manual.drafts_empty', 'Nenhum rascunho salvo ainda.') . '</div>';
+        } else {
+            echo '<div class="card border-0 shadow-sm"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle">';
+            echo '<thead class="table-light"><tr>';
+            echo '<th>#</th>';
+            echo '<th>' . __('admin.orders.table.customer', 'Cliente') . '</th>';
+            echo '<th>' . __('admin.orders.table.total', 'Total') . '</th>';
+            echo '<th>' . __('admin.orders.table.date', 'Data') . '</th>';
+            echo '<th class="text-end">' . __('common.actions', 'Ações') . '</th>';
+            echo '</tr></thead><tbody>';
+            foreach ($rascunhos as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                $clienteNome = trim((string) ($r['cliente_nome'] ?? ''));
+                if ($clienteNome === '') {
+                    $uid = (int) ($r['usuario_id'] ?? 0);
+                    $clienteNome = $uid > 0 ? ('Cliente #' . $uid) : __('admin.orders_manual.no_customer', 'Sem cliente');
+                }
+                $moeda = strtoupper(trim((string) ($r['moeda'] ?? 'USD')));
+                $total = (float) ($r['total'] ?? 0);
+                $simbolo = ($moeda === 'BRL') ? 'R$' : ($moeda === 'EUR' ? '€' : '$');
+                $criado = (string) ($r['criado_em'] ?? '');
+                $criadoFmt = $criado !== '' ? date('d/m/Y H:i', strtotime($criado)) : '-';
+
+                echo '<tr>';
+                echo '<td><strong>#' . $id . '</strong></td>';
+                echo '<td>' . htmlspecialchars($clienteNome, ENT_QUOTES, 'UTF-8') . '</td>';
+                echo '<td>' . htmlspecialchars($simbolo . ' ' . number_format($total, 2, ',', '.'), ENT_QUOTES, 'UTF-8') . '</td>';
+                echo '<td>' . htmlspecialchars($criadoFmt, ENT_QUOTES, 'UTF-8') . '</td>';
+                echo '<td class="text-end">';
+                echo '<a href="/admin/pedidos/novo-manual?pedido_id=' . $id . '&rascunho=1" class="btn btn-sm btn-primary"><i class="fas fa-edit me-1"></i>' . __('common.edit', 'Editar') . '</a> ';
+                echo '<button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirRascunho(' . $id . ')"><i class="fas fa-trash"></i></button>';
+                echo '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table></div></div></div>';
+        }
+
+        echo '</div>';
+        echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+        echo "<script>\n";
+        echo "function excluirRascunho(id){\n";
+        echo "  if(!confirm('" . addslashes(__('admin.orders_manual.drafts_delete_confirm', 'Excluir este rascunho? Esta ação não pode ser desfeita.')) . "')) return;\n";
+        echo "  const fd = new FormData(); fd.append('pedido_id', String(id));\n";
+        echo "  fetch('/admin/pedidos/novo-manual/rascunho/excluir', { method: 'POST', body: fd })\n";
+        echo "    .then(r => r.json()).then(resp => { if(resp && resp.success){ window.location.reload(); } else { alert((resp && resp.error) || 'Erro ao excluir'); } })\n";
+        echo "    .catch(() => alert('Erro ao excluir rascunho'));\n";
+        echo "}\n";
+        echo "</script>";
+        echo '</body></html>';
+    }
+
+    /**
+     * Exclui um rascunho (endpoint AJAX usado pela tela de Rascunhos).
+     */
+    public function excluirRascunho(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        try {
+            $pedidoId = (int) $request->getParam('pedido_id', 0);
+            if ($pedidoId <= 0) {
+                throw new \Exception('Rascunho inválido');
+            }
+            $svc = new PedidoManualService();
+            if (!$svc->isRascunho($pedidoId)) {
+                throw new \Exception('Este pedido não é um rascunho.');
+            }
+            $svc->excluirRascunho($pedidoId);
+            $this->json(['success' => true]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
         }

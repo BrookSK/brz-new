@@ -2280,6 +2280,11 @@ JS;
                 $sql .= " AND p.deleted_at IS NULL";
             }
 
+            // Excluir RASCUNHOS de pedidos manuais da lista principal (eles têm aba própria: "Rascunhos").
+            if (in_array('status', $colsPedidos, true)) {
+                $sql .= " AND LOWER(COALESCE(p.status,'')) != 'rascunho'";
+            }
+
             // Excluir pedidos arquivados (cancelados automaticamente por carnê expirado)
             if (in_array('arquivado', $colsPedidos, true)) {
                 $sql .= " AND p.arquivado = 0";
@@ -2639,6 +2644,10 @@ JS;
             $paramsTotal = [];
             if ($temDeletedAt) {
                 $sqlTotal .= " AND p.deleted_at IS NULL";
+            }
+            // Excluir RASCUNHOS da contagem da lista principal (aba própria: "Rascunhos").
+            if (in_array('status', $colsPedidos, true)) {
+                $sqlTotal .= " AND LOWER(COALESCE(p.status,'')) != 'rascunho'";
             }
             if (in_array('arquivado', $colsPedidos, true)) {
                 $sqlTotal .= " AND p.arquivado = 0";
