@@ -84,6 +84,37 @@ class AdminShippoController extends Controller {
         return $accounts[$carrierKey] ?? null;
     }
 
+    /**
+     * Extrai as mensagens de diagnóstico que a Shippo retorna no objeto do
+     * shipment (data['messages']). Quando um envio volta SEM nenhuma rate, a
+     * Shippo normalmente explica o motivo aqui (ex.: CEP inválido, endereço de
+     * origem incompleto, serviço não habilitado na conta do carrier). Sem expor
+     * isso, o operador só via "Nenhuma rate disponível" e não sabia o que ajustar.
+     */
+    private function extractShippoMessages($shipResult): string {
+        $data = is_array($shipResult) ? ($shipResult['data'] ?? []) : [];
+        $msgs = is_array($data) ? ($data['messages'] ?? []) : [];
+        if (!is_array($msgs) || empty($msgs)) {
+            return '';
+        }
+        $parts = [];
+        foreach ($msgs as $m) {
+            if (!is_array($m)) {
+                continue;
+            }
+            $text = trim((string) ($m['text'] ?? ''));
+            $source = trim((string) ($m['source'] ?? ''));
+            $piece = $source !== '' ? ($source . ': ' . $text) : $text;
+            $piece = trim($piece, ': ');
+            if ($piece !== '') {
+                $parts[] = $piece;
+            }
+        }
+        // Remove duplicatas (a Shippo às vezes repete a mesma mensagem por rate).
+        $parts = array_values(array_unique($parts));
+        return implode(' | ', array_slice($parts, 0, 5));
+    }
+
     private function filterRatesForCarrierAccount(array $rates, string $carrierAccountId): array {
         return array_values(array_filter($rates, static function($rate) use ($carrierAccountId): bool {
             if (!is_array($rate)) {
@@ -1015,7 +1046,29 @@ class AdminShippoController extends Controller {
                 }
 
                 if (!$matchedRate) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.no_rate_for_carrier', 'Nenhuma rate disponível para o carrier/serviço configurado.')];
+                    $err = __('admin.shippo.no_rate_for_carrier', 'Nenhuma rate disponível para o carrier/serviço configurado.');
+                    // Se voltaram rates (mas nenhuma bateu com o service level configurado),
+                    // lista os serviços disponíveis para o operador ajustar o token.
+                    if (!empty($rates)) {
+                        $tokens = [];
+                        foreach ($rates as $rate) {
+                            $t = (string) ($rate['servicelevel']['token'] ?? ($rate['servicelevel_token'] ?? ''));
+                            if ($t !== '') {
+                                $tokens[] = $t;
+                            }
+                        }
+                        $tokens = array_values(array_unique($tokens));
+                        if (!empty($tokens)) {
+                            $err .= ' Serviço configurado: "' . $servicelevelToken . '". Disponíveis: ' . implode(', ', $tokens) . '.';
+                        }
+                    } else {
+                        // Nenhuma rate voltou: mostra o motivo que a Shippo informou.
+                        $shippoMsg = $this->extractShippoMessages($shipResult);
+                        if ($shippoMsg !== '') {
+                            $err .= ' (Shippo: ' . $shippoMsg . ')';
+                        }
+                    }
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $err];
                     continue;
                 }
 
@@ -1076,7 +1129,12 @@ class AdminShippoController extends Controller {
 
                 $rates = $this->filterRatesForCarrierAccount($shipResult['rates'] ?? [], $carrierAccount);
                 if (empty($rates)) {
-                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => __('admin.shippo.no_rate_available', 'Nenhuma rate disponível.')];
+                    $shippoMsg = $this->extractShippoMessages($shipResult);
+                    $err = __('admin.shippo.no_rate_available', 'Nenhuma rate disponível.');
+                    if ($shippoMsg !== '') {
+                        $err .= ' (Shippo: ' . $shippoMsg . ')';
+                    }
+                    $results[] = ['pedido_id' => $pid, 'success' => false, 'error' => $err];
                     continue;
                 }
 
