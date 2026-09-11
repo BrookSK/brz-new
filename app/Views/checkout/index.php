@@ -71,6 +71,7 @@
             ddi_example: <?= json_encode(__('auth.ddi_example', 'Ex: 81'), JSON_UNESCAPED_UNICODE) ?>,
             select: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
             free_shipping: <?= json_encode(__('cart.free_shipping', 'Frete grátis'), JSON_UNESCAPED_UNICODE) ?>,
+            shipping_on_request: <?= json_encode(__('checkout.shipping_on_request', 'Sob consulta'), JSON_UNESCAPED_UNICODE) ?>,
             processing_order: <?= json_encode(__('checkout.processing_order', 'Processando seu pedido...'), JSON_UNESCAPED_UNICODE) ?>,
             stripe_not_configured: <?= json_encode(__('checkout.stripe_not_configured', 'Stripe não configurado. Verifique as configurações de pagamento.'), JSON_UNESCAPED_UNICODE) ?>,
             stripe_card_form_error: <?= json_encode(__('checkout.stripe_card_form_error', 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.'), JSON_UNESCAPED_UNICODE) ?>,
@@ -610,16 +611,12 @@
                             updatePaymentMethodsForCurrency(cur);
                         }
 
-                        // Regras de envio por país: quando a categoria de envio muda
-                        // (US / BR / demais países), recarregar o checkout para o
-                        // servidor recalcular método de frete, estimativa (Shippo+30%)
-                        // e o bloqueio de pagamento/atendimento manual.
-                        if (typeof classificarCategoriaEnvio === 'function') {
-                            var novaCategoria = classificarCategoriaEnvio(pais);
-                            var categoriaAtual = (window.CHECKOUT_CATEGORIA_ENVIO || 'BR');
-                            if (novaCategoria !== categoriaAtual) {
-                                window.location.reload();
-                            }
+                        // Regras de envio por país: recalcular método de frete,
+                        // estimativa (Shippo + markup) e o bloqueio de pagamento /
+                        // atendimento manual SEM recarregar a página (para não perder
+                        // o preenchimento de um novo endereço).
+                        if (typeof atualizarEnvioPorPais === 'function') {
+                            atualizarEnvioPorPais(pais);
                         }
                     });
                 }
@@ -1062,9 +1059,7 @@
                                 <div class="d-flex justify-content-between" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
                                     <span>
                                         <?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?>
-                                        <?php if (!empty($metodo_envio)): ?>
-                                            <small class="text-muted d-block" id="metodo-envio-label"><?= htmlspecialchars((string) $metodo_envio, ENT_QUOTES, 'UTF-8') ?></small>
-                                        <?php endif; ?>
+                                        <small class="text-muted d-block" id="metodo-envio-label"><?= htmlspecialchars((string) ($metodo_envio ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
                                     </span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
                                         <?php if (!empty($atendimento_manual)): ?>
@@ -1078,12 +1073,11 @@
                                         <?php endif; ?>
                                     </span>
                                 </div>
-                                <?php if (!empty($atendimento_manual) && is_array($estimativa_frete ?? null) && !empty($estimativa_frete['success'])): ?>
-                                    <div class="small text-muted mt-1" id="frete-estimativa-detalhe">
-                                        <i class="fas fa-info-circle"></i>
-                                        <?= __('checkout.shipping_estimate_note', 'Estimativa de frete internacional (referência). Valor final confirmado pelo atendimento.') ?>
-                                    </div>
-                                <?php endif; ?>
+                                <?php $__showEstDet = (!empty($atendimento_manual) && is_array($estimativa_frete ?? null) && !empty($estimativa_frete['success'])); ?>
+                                <div class="small text-muted mt-1" id="frete-estimativa-detalhe" style="<?= $__showEstDet ? '' : 'display:none;' ?>">
+                                    <i class="fas fa-info-circle"></i>
+                                    <?= __('checkout.shipping_estimate_note', 'Estimativa de frete internacional (referência). Valor final confirmado pelo atendimento.') ?>
+                                </div>
                             </div>
 
                             <hr>
@@ -1171,29 +1165,23 @@
                             </div>
                             <?php endif; ?>
 
-                            <?php if (!empty($atendimento_manual)): ?>
-                                <!-- Demais países: atendimento manual via WhatsApp (pagamento bloqueado) -->
-                                <div class="alert alert-info small" id="atendimento-manual-alert">
-                                    <i class="fas fa-headset"></i>
-                                    <?= __('checkout.manual_service_note', 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após verificarmos se os produtos podem ser enviados para o seu país. Fale com o atendimento para finalizar.') ?>
-                                </div>
-                                <a href="<?= htmlspecialchars((string) ($whatsapp_atendimento_url ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
-                                   target="_blank" rel="noopener"
-                                   class="btn btn-success btn-lg w-100" id="btn-atendimento-whatsapp">
-                                    <i class="fab fa-whatsapp"></i> <?= __('checkout.talk_to_support', 'Falar com o atendimento (WhatsApp)') ?>
-                                </a>
-                                <!-- Botão finalizar oculto: pagamento indisponível para estes destinos -->
-                                <button type="button" class="btn btn-primary btn-lg w-100 d-none" id="btn-finalizar" disabled
-                                        onclick="processarPedidoDireto();">
-                                    <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
-                                </button>
-                            <?php else: ?>
-                                <!-- Botão Finalizar -->
-                                <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= $abaixoMinimo ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
-                                        onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
-                                    <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
-                                </button>
-                            <?php endif; ?>
+                            <?php $__isManual = !empty($atendimento_manual); ?>
+                            <!-- Demais países: atendimento manual via WhatsApp (pagamento bloqueado).
+                                 Estes elementos são alternados dinamicamente por JS (atualizarEnvioPorPais). -->
+                            <div class="alert alert-info small <?= $__isManual ? '' : 'd-none' ?>" id="atendimento-manual-alert">
+                                <i class="fas fa-headset"></i>
+                                <?= __('checkout.manual_service_note', 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após verificarmos se os produtos podem ser enviados para o seu país. Fale com o atendimento para finalizar.') ?>
+                            </div>
+                            <a href="<?= htmlspecialchars((string) ($whatsapp_atendimento_url ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
+                               target="_blank" rel="noopener"
+                               class="btn btn-success btn-lg w-100 <?= $__isManual ? '' : 'd-none' ?>" id="btn-atendimento-whatsapp">
+                                <i class="fab fa-whatsapp"></i> <?= __('checkout.talk_to_support', 'Falar com o atendimento (WhatsApp)') ?>
+                            </a>
+                            <!-- Botão Finalizar -->
+                            <button type="button" class="btn btn-primary btn-lg w-100 <?= $__isManual ? 'd-none' : '' ?>" id="btn-finalizar" <?= ($__isManual || $abaixoMinimo) ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
+                                    onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
+                                <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
+                            </button>
                             
                             <!-- Botão de Teste Inline -->
                             <button type="button" class="btn btn-warning btn-sm w-100 mt-2 d-none" 
@@ -1507,6 +1495,84 @@ function updatePixBrlInfo() {
     if (rateEl) rateEl.textContent = 'Taxa: 1 USD = R$ ' + rate.toFixed(2).replace('.', ',');
 
     box.classList.remove('d-none');
+}
+
+// Recalcula a regra de envio no servidor (US / BR / demais países) e atualiza
+// a UI de frete, método de envio e o botão finalizar/WhatsApp, sem recarregar.
+let __envioPaisReqSeq = 0;
+function atualizarEnvioPorPais(pais) {
+    pais = (pais || (document.getElementById('pais')?.value) || 'BR').toString().toUpperCase();
+
+    var freteEl = document.getElementById('frete');
+    var metodoEl = document.getElementById('metodo-envio-label');
+    var btnFinalizar = document.getElementById('btn-finalizar');
+    var btnWhats = document.getElementById('btn-atendimento-whatsapp');
+    var alertManual = document.getElementById('atendimento-manual-alert');
+    var detalheEstimativa = document.getElementById('frete-estimativa-detalhe');
+
+    // Coletar dados de endereço (ajudam a cotação Shippo para os demais países).
+    var body = new URLSearchParams();
+    body.set('pais', pais);
+    body.set('cep', (document.getElementById('cep')?.value || ''));
+    body.set('endereco', (document.getElementById('endereco')?.value || ''));
+    body.set('cidade', (document.getElementById('cidade')?.value || ''));
+    var estadoEl = document.getElementById('estado');
+    body.set('estado', (estadoEl ? estadoEl.value : ''));
+
+    var seq = ++__envioPaisReqSeq;
+    if (freteEl) { freteEl.textContent = '...'; }
+
+    fetch('/checkout/envio-pais', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body.toString(),
+        credentials: 'same-origin'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (seq !== __envioPaisReqSeq) return; // resposta obsoleta
+        if (!data || !data.success) { return; }
+
+        window.CHECKOUT_CATEGORIA_ENVIO = data.categoria || 'BR';
+        window.CHECKOUT_ATENDIMENTO_MANUAL = !!data.atendimento_manual;
+
+        if (metodoEl) { metodoEl.textContent = data.metodo_envio || ''; }
+
+        // Atualizar valor de frete exibido.
+        if (freteEl) {
+            if (data.atendimento_manual) {
+                if (data.estimativa && data.estimativa.success) {
+                    freteEl.textContent = (data.estimativa.moeda || 'USD') + ' ' + Number(data.estimativa.valor_final).toFixed(2);
+                } else {
+                    freteEl.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.shipping_on_request) ? window.CHECKOUT_I18N.shipping_on_request : 'Sob consulta';
+                }
+                freteEl.setAttribute('data-original-value', (data.estimativa && data.estimativa.success) ? Number(data.estimativa.valor_final) : 0);
+            } else {
+                var f = Number(data.frete || 0);
+                freteEl.textContent = (f <= 0) ? ((window.CHECKOUT_I18N && window.CHECKOUT_I18N.free_shipping) ? window.CHECKOUT_I18N.free_shipping : 'Frete grátis') : ('$' + f.toFixed(2));
+                freteEl.setAttribute('data-original-value', f);
+            }
+        }
+
+        if (detalheEstimativa) {
+            detalheEstimativa.style.display = (data.atendimento_manual && data.estimativa && data.estimativa.success) ? '' : 'none';
+        }
+
+        // Alternar botão Finalizar x botão de atendimento (WhatsApp).
+        if (data.atendimento_manual) {
+            if (btnFinalizar) { btnFinalizar.classList.add('d-none'); btnFinalizar.disabled = true; }
+            if (alertManual) { alertManual.classList.remove('d-none'); }
+            if (btnWhats) {
+                btnWhats.classList.remove('d-none');
+                if (data.whatsapp_url) { btnWhats.setAttribute('href', data.whatsapp_url); }
+            }
+        } else {
+            if (btnFinalizar) { btnFinalizar.classList.remove('d-none'); btnFinalizar.disabled = false; }
+            if (alertManual) { alertManual.classList.add('d-none'); }
+            if (btnWhats) { btnWhats.classList.add('d-none'); }
+        }
+    })
+    .catch(function() { /* silencioso: mantém o estado atual */ });
 }
 
 function atualizarEnderecoPorPais() {
@@ -3396,6 +3462,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('cidade').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.cidade || '') : '';
             document.getElementById('estado').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.estado || '') : '';
             try { atualizarEnderecoPorPais(); } catch (e) {}
+            try { if (typeof atualizarEnvioPorPais === 'function') atualizarEnvioPorPais(document.getElementById('pais') ? document.getElementById('pais').value : 'BR'); } catch (e) {}
         }
 
         function clearEnderecoForm() {
@@ -3451,6 +3518,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     paisEl.value = selectedOption.dataset.pais || 'BR';
                 }
                 try { atualizarEnderecoPorPais(); } catch (e) {}
+                // Recalcular regra de envio (a mudança de país via JS não dispara 'change').
+                try { if (typeof atualizarEnvioPorPais === 'function') atualizarEnvioPorPais(paisEl ? paisEl.value : 'BR'); } catch (e) {}
             }
         }
 

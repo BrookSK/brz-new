@@ -7144,7 +7144,89 @@ class CheckoutController extends Controller {
             $this->json(['error' => 'Erro ao calcular valores: ' . $e->getMessage()], 500);
         }
     }
-    
+
+    /**
+     * Recalcula a regra de envio para um país de destino informado, SEM recarregar
+     * a página. Usado no checkout quando o cliente troca/preenche o país de entrega.
+     *
+     * Retorna a categoria (US/BR/OTHER), o método de envio, o frete/estimativa
+     * (Shippo + markup) e, para os "demais países", a flag de atendimento manual
+     * com o link de WhatsApp já montado a partir do carrinho.
+     */
+    public function calcularEnvioPais(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $dados = $request->getParams();
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+
+        try {
+            $usuario = $this->authService->getUsuarioLogado();
+            $carrinho = $this->getCarrinhoForCheckout(is_array($usuario) ? $usuario : null);
+
+            if (empty($carrinho)) {
+                $this->json(['success' => false, 'error' => 'Carrinho vazio'], 400);
+                return;
+            }
+
+            // Montar itens + peso total (mesma lógica de peso do index()).
+            $itens = [];
+            $pesoTotal = 0.0;
+            foreach ($carrinho as $item) {
+                $qtd = (int) ($item['quantidade'] ?? 1);
+                if ($qtd < 1) $qtd = 1;
+                $pesoUnit = (float) ($item['peso'] ?? ($item['peso_kg'] ?? ($item['weight'] ?? 0)));
+                if ($pesoUnit <= 0) {
+                    $pesoUnit = 0.5;
+                }
+                $pesoTotal += ($pesoUnit * $qtd);
+                $preco = (float) ($item['preco_unitario'] ?? ($item['price'] ?? ($item['preco'] ?? 0)));
+                $itens[] = [
+                    'nome' => (string) ($item['nome'] ?? ($item['name'] ?? 'Produto')),
+                    'quantidade' => $qtd,
+                    'preco' => $preco,
+                    'peso' => $pesoUnit,
+                    'subtotal' => (float) ($item['subtotal'] ?? ($preco * $qtd)),
+                ];
+            }
+
+            $enderecoTo = [
+                'name' => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
+                'endereco' => (string) ($dados['endereco'] ?? ''),
+                'complemento' => (string) ($dados['complemento'] ?? ''),
+                'cidade' => (string) ($dados['cidade'] ?? ''),
+                'estado' => (string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')),
+                'cep' => (string) ($dados['cep'] ?? ''),
+                'country' => $pais,
+                'telefone' => (string) ($usuario['telefone'] ?? ''),
+                'email' => (string) ($usuario['email'] ?? ''),
+            ];
+
+            $envio = $this->resolverEnvioPorPais($pais, $enderecoTo, $itens, (float) $pesoTotal);
+            $estimativa = $envio['estimativa'] ?? null;
+            $whatsappUrl = !empty($envio['atendimento_manual'])
+                ? $this->montarWhatsappAtendimento($itens, $pais, is_array($estimativa) ? $estimativa : null)
+                : '';
+
+            $this->json([
+                'success' => true,
+                'categoria' => (string) $envio['categoria'],
+                'metodo_envio' => (string) $envio['metodo_envio'],
+                'frete' => (float) $envio['frete'],
+                'frete_gratis' => (bool) $envio['frete_gratis'],
+                'atendimento_manual' => (bool) $envio['atendimento_manual'],
+                'estimativa' => $estimativa,
+                'whatsapp_url' => $whatsappUrl,
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Não foi possível calcular o envio para este destino.'], 500);
+        }
+    }
+
     private function criarPedido($dados, $carrinho, $usuario) {
         try {
             $this->debugLog('[CRIAR_PEDIDO] Iniciando criacao do pedido');
