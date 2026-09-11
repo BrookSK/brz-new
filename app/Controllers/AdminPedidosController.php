@@ -3026,11 +3026,8 @@ JS;
                                             $mo = strtoupper(trim((string) ($pedido['moeda'] ?? '')));
                                             $ehBrl = ($mo === 'BRL');
                                             $valor = (float) ($pedido['total'] ?? 0);
-                                            $dataValue = $ehBrl
-                                                ? ' data-value-brl="' . $valor . '"'
-                                                : ' data-value-usd="' . $valor . '"';
                                             return '
-                                            <h5 class="mb-0 text-primary text-nowrap"' . $dataValue . '>' . $this->formatarMoeda($valor, $mo) . '</h5>
+                                            <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($valor, $mo) . '</h5>
                                             <small class="text-muted">' . __('admin.orders.order_total', 'Total do Pedido') . '</small>
                                             <div class="mt-1"><span class="badge ' . ($ehBrl ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . __('admin.orders.order_currency', 'Moeda do pedido') . ($ehBrl ? ': R$' : ': US$') . '</span></div>
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap);
@@ -3152,7 +3149,7 @@ JS;
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-success text-nowrap" data-value-usd="' . (float) ($pedido['total'] ?? 0) . '">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
+                                            <h5 class="mb-0 text-success text-nowrap">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
                                             <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (USD)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
@@ -3272,7 +3269,7 @@ JS;
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-info text-nowrap" data-value-brl="' . (float) ($pedido['total'] ?? 0) . '">R$ ' . number_format((float) ($pedido['total'] ?? 0), 2, ',', '.') . '</h5>
+                                            <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format((float) ($pedido['total'] ?? 0), 2, ',', '.') . '</h5>
                                             <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (BRL)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
@@ -6378,7 +6375,7 @@ LINKSCRIPT;
 
         $html = '<div class="mt-1" style="font-size:.72rem;">';
         $html .= '<div class="progress" style="height:6px;border-radius:3px;"><div class="progress-bar ' . $barColor . '" style="width:' . $pct . '%"></div></div>';
-        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' ' . __('admin.orders.installments', 'parcelas') . ' &middot; <span data-value-brl="' . $valorPago . '">R$ ' . number_format($valorPago, 2, ',', '.') . '</span></span>';
+        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' ' . __('admin.orders.installments', 'parcelas') . ' &middot; <span>R$ ' . number_format($valorPago, 2, ',', '.') . '</span></span>';
         $html .= '</div>';
         return $html;
     }

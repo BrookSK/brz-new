@@ -54,40 +54,40 @@
 
     /**
      * Para elementos que mostram valores em moeda (sem data attribute),
-     * detecta e CONVERTE o valor para a moeda preferida.
+     * adiciona um tooltip/equivalente na moeda alternativa.
      * Detecta padrões: "$ 123.45", "R$ 123,45", "US$ 123.45"
      */
     function addEquivalents() {
-        var selector = 'td, .fw-bold, .fs-5, .kpi-value, .summary-value, .h4, .h5, .card-body .mb-0, span[data-value-brl], span[data-value-usd]';
+        // Selecionar células de tabela e spans com valores monetários que não foram processados
+        var selector = 'td, .fw-bold, .fs-5, .kpi-value, .summary-value';
         document.querySelectorAll(selector).forEach(function(el) {
             if (el.dataset.prefEquiv === '1') return;
-            if (el.querySelector('input, select, button, a, table')) return;
-            if (el.closest('.modal, form, .dropdown-menu, nav')) return;
+            if (el.querySelector('input, select, button, a')) return; // Não processar elementos interativos
+            if (el.closest('.modal, form, .dropdown-menu')) return; // Não processar modais/forms
 
             var text = (el.textContent || '').trim();
-            if (text.length > 40 || text.length < 3) return;
+            if (text.length > 30) return; // Textos muito longos não são valores
 
-            // Detectar padrão USD: $ 123.45 ou US$ 1,234.45
-            var matchUsd = text.match(/^(?:US)?\$\s*([\d,]+\.?\d*)$/);
+            // Detectar padrão USD: $ 123.45 ou $ 1,234.45
+            var matchUsd = text.match(/^\$\s*([\d,]+\.?\d*)$/);
+            if (!matchUsd) matchUsd = text.match(/^US\$\s*([\d,]+\.?\d*)$/);
             
             // Detectar padrão BRL: R$ 123,45 ou R$ 1.234,45
             var matchBrl = text.match(/^R\$\s*([\d.]+,?\d*)$/);
 
             if (matchUsd && prefMoeda === 'BRL') {
                 var val = parseFloat(matchUsd[1].replace(/,/g, '')) || 0;
-                if (val > 0 && val < 10000000) {
+                if (val > 0 && val < 1000000) {
                     var equiv = val * taxa;
-                    el.textContent = fmtBRL(equiv);
-                    el.setAttribute('title', 'Original: $ ' + val.toFixed(2));
+                    el.setAttribute('title', '≈ ' + fmtBRL(equiv));
                     el.dataset.prefEquiv = '1';
                 }
             } else if (matchBrl && prefMoeda === 'USD') {
                 var valStr = matchBrl[1].replace(/\./g, '').replace(',', '.');
-                var val2 = parseFloat(valStr) || 0;
-                if (val2 > 0 && val2 < 100000000) {
-                    var equiv2 = val2 / taxa;
-                    el.textContent = fmtUSD(equiv2);
-                    el.setAttribute('title', 'Original: R$ ' + val2.toFixed(2).replace('.', ','));
+                var val = parseFloat(valStr) || 0;
+                if (val > 0 && val < 10000000) {
+                    var equiv = val / taxa;
+                    el.setAttribute('title', '≈ ' + fmtUSD(equiv));
                     el.dataset.prefEquiv = '1';
                 }
             }
