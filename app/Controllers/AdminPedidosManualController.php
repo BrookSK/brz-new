@@ -441,7 +441,7 @@ class AdminPedidosManualController extends Controller {
                                 <label class="form-label">' . __('admin.orders_manual.customer', 'Cliente') . '</label>
                                 <input type="text" class="form-control" id="cliente_busca" placeholder="' . htmlspecialchars(__('admin.orders_manual.customer_search_placeholder', 'Digite nome, e-mail ou switch...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off" required>
                                 <div id="cliente_busca_results" class="list-group" style="position:relative; z-index: 1050; display:none;"></div>
-                                <select class="form-select" name="cliente_id" id="cliente_id" required style="display:none;">
+                                <select class="form-select" name="cliente_id" id="cliente_id" style="display:none;" aria-hidden="true" tabindex="-1">
                                     <option value="">' . __('common.select', 'Selecione...') . '</option>
                                 </select>
                             </div>
@@ -1101,7 +1101,7 @@ function addItemRow(){
     tr.innerHTML = `
         <td>
             <div class="d-flex align-items-center gap-2 position-relative">
-                <img src="/uploads/produtos/placeholder.jpg" class="rounded border" style="width:34px;height:34px;object-fit:cover" alt="">
+                <img src="/uploads/produtos/placeholder.jpg" class="rounded border" style="width:34px;height:34px;object-fit:cover" alt="" onerror="this.onerror=null;this.src='/uploads/produtos/placeholder.jpg';">
                 <div class="flex-grow-1">
                     <input type="hidden" class="produtoIdInp" name="produto_id[]" value="" required>
                     <input type="text" class="form-control form-control-sm produtoSearch" placeholder="Buscar produto..." autocomplete="off" oninput="onProdutoSearchInput(this)" onfocus="onProdutoSearchInput(this)">
@@ -1375,7 +1375,7 @@ function onProdutoSearchInput(inp){
         const ep = (sp > 0 && sp < rp) ? sp : rp;
         return `
             <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2" onclick="selectProdutoFromSearch(this, ${pid})">
-                <img src="${escapeHtml(img)}" class="rounded border" style="width:40px;height:40px;object-fit:cover" alt="">
+                <img src="${escapeHtml(img)}" class="rounded border" style="width:40px;height:40px;object-fit:cover" alt="" onerror="this.onerror=null;this.src='/uploads/produtos/placeholder.jpg';">
                 <div class="text-start">
                     <div class="fw-semibold">${escapeHtml(String(p.name || ''))}</div>
                     <div class="small text-muted">${sp > 0 && sp < rp ? '<del>R$ ' + formatMoney(rp) + '</del> ' : ''}R$ ${formatMoney(ep)}</div>
@@ -2533,6 +2533,22 @@ document.addEventListener('DOMContentLoaded', function(){
     if (form) {
         form.addEventListener('submit', function(e){
             e.preventDefault();
+
+            // Valida cliente selecionado (o select cliente_id é oculto, por isso
+            // a validação nativa não pode focá-lo; validamos manualmente aqui).
+            const clienteSelEl = document.getElementById('cliente_id');
+            const clienteBuscaEl = document.getElementById('cliente_busca');
+            if (!clienteSelEl || !String(clienteSelEl.value || '').trim()) {
+                if (createBox) {
+                    createBox.style.display = 'block';
+                    createBox.innerHTML = `<div class="alert alert-warning">Selecione um cliente antes de criar o pedido.</div>`;
+                }
+                if (clienteBuscaEl) {
+                    try { clienteBuscaEl.focus(); } catch (err) {}
+                }
+                return false;
+            }
+
             if (!validateProdutosObrigatorios()) {
                 return false;
             }
