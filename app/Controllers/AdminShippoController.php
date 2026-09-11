@@ -684,6 +684,127 @@ class AdminShippoController extends Controller {
     }
 
     /**
+     * Diagnóstico das Carrier Accounts (FedEx/UPS) direto pela API da Shippo.
+     *
+     * Consulta GET /carrier_accounts e cruza o status REAL reportado pela Shippo
+     * (active, test, carrier, object_id) com os IDs configurados no admin. Serve
+     * para descobrir por que uma conta falha ao cotar (ex.: "Rates retrieval
+     * failed"): conta inativa, em modo teste, ou object_id divergente do
+     * configurado. Retorna JSON legível; acesse em /admin/shippo/diagnostico-carriers.
+     */
+    public function diagnosticoCarriers(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+
+        if (!$this->svc->isConfigured()) {
+            $this->json([
+                'success' => false,
+                'error' => 'Shippo API Token não configurado. Preencha o token em Configurações > Entrega > Shippo.',
+            ], 400);
+            return;
+        }
+
+        $cfg = $this->svc->getShippoConfig();
+        $token = (string) ($cfg['shippo_api_token'] ?? '');
+        $tokenMode = strpos($token, 'shippo_test_') === 0
+            ? 'TESTE (shippo_test_)'
+            : (strpos($token, 'shippo_live_') === 0 ? 'PRODUÇÃO (shippo_live_)' : 'desconhecido');
+
+        // IDs configurados no admin (o que o sistema usa ao emitir etiquetas).
+        $configuradas = [
+            'fedex' => trim((string) ($cfg['shippo_fedex_carrier_account'] ?? '')),
+            'ups' => trim((string) ($cfg['shippo_ups_carrier_account'] ?? '')),
+        ];
+
+        $resp = $this->svc->listCarrierAccounts();
+        if (empty($resp['success'])) {
+            $this->json([
+                'success' => false,
+                'error' => 'Falha ao consultar carrier accounts na Shippo: ' . ($resp['error'] ?? 'erro desconhecido'),
+                'http_code' => $resp['http_code'] ?? null,
+                'token_mode' => $tokenMode,
+            ], 502);
+            return;
+        }
+
+        $data = $resp['data'] ?? [];
+        $results = is_array($data['results'] ?? null) ? $data['results'] : (is_array($data) ? $data : []);
+
+        // Normaliza cada conta que a Shippo conhece.
+        $contasShippo = [];
+        foreach ($results as $acc) {
+            if (!is_array($acc)) {
+                continue;
+            }
+            $contasShippo[] = [
+                'carrier' => (string) ($acc['carrier'] ?? ''),
+                'object_id' => (string) ($acc['object_id'] ?? ''),
+                'account_id' => (string) ($acc['account_id'] ?? ''),
+                'active' => (bool) ($acc['active'] ?? false),
+                'test' => (bool) ($acc['test'] ?? false),
+            ];
+        }
+
+        // Cruza cada ID configurado com o que a Shippo reporta.
+        $analise = [];
+        foreach ($configuradas as $key => $configuredId) {
+            $item = [
+                'carrier_configurado' => strtoupper($key),
+                'object_id_configurado' => $configuredId,
+                'encontrada_na_shippo' => false,
+                'active' => null,
+                'test' => null,
+                'diagnostico' => '',
+            ];
+
+            if ($configuredId === '') {
+                $item['diagnostico'] = 'Nenhum Carrier Account ID configurado no admin para ' . strtoupper($key) . '.';
+                $analise[] = $item;
+                continue;
+            }
+
+            $match = null;
+            foreach ($contasShippo as $c) {
+                if ($c['object_id'] === $configuredId) {
+                    $match = $c;
+                    break;
+                }
+            }
+
+            if (!$match) {
+                $item['diagnostico'] = 'O ID configurado NÃO existe na sua conta Shippo (object_id não encontrado). '
+                    . 'Verifique se copiou o Object ID correto em apps.goshippo.com > Settings > Carriers.';
+                $analise[] = $item;
+                continue;
+            }
+
+            $item['encontrada_na_shippo'] = true;
+            $item['active'] = $match['active'];
+            $item['test'] = $match['test'];
+
+            if (!$match['active']) {
+                $item['diagnostico'] = 'Conta ENCONTRADA porém INATIVA na Shippo (active=false). '
+                    . 'Reconecte/ative a conta ' . $match['carrier'] . ' no painel da Shippo. '
+                    . 'Isto explica o erro "Rates retrieval failed".';
+            } elseif ($match['test']) {
+                $item['diagnostico'] = 'Conta ativa, mas em MODO TESTE (test=true). '
+                    . 'Contas de teste podem não retornar tarifas reais. Use uma conta de produção.';
+            } else {
+                $item['diagnostico'] = 'Conta ATIVA e em PRODUÇÃO. Deveria cotar normalmente.';
+            }
+            $analise[] = $item;
+        }
+
+        $this->json([
+            'success' => true,
+            'token_mode' => $tokenMode,
+            'total_contas_na_shippo' => count($contasShippo),
+            'contas_na_shippo' => $contasShippo,
+            'analise_configuracao' => $analise,
+        ]);
+    }
+
+    /**
      * Detalhes de um pedido - com formulário para gerar etiqueta.
      */
     public function pedido(Request $request) {

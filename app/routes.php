@@ -657,6 +657,7 @@ $router->post('/admin/remessa-shipstation/gerar-etiqueta', 'AdminRemessaShipstat
 
 // Shippo - Etiquetas internacionais (mundo todo, exceto Brasil)
 $router->get('/admin/shippo', 'AdminShippoController', 'index');
+$router->get('/admin/shippo/diagnostico-carriers', 'AdminShippoController', 'diagnosticoCarriers');
 $router->get('/admin/shippo/pedido/{id}', 'AdminShippoController', 'pedido');
 $router->post('/admin/shippo/pedido/{id}/gerar-etiqueta', 'AdminShippoController', 'gerarEtiqueta');
 $router->post('/admin/shippo/pedido/{id}/confirmar-etiqueta', 'AdminShippoController', 'confirmarEtiqueta');
