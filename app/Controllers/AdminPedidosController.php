@@ -2546,13 +2546,6 @@ JS;
                     if ($moeda === '') {
                         $moeda = 'BRL';
                     }
-                    // Normalizar aliases para valores canônicos (USD/BRL)
-                    if (in_array($moeda, ['US$', 'USD$', 'US'], true) || str_contains($moeda, 'DOLAR') || str_contains($moeda, 'DÓLAR')) {
-                        $moeda = 'USD';
-                    }
-                    if (in_array($moeda, ['R$', 'BRL$'], true) || str_contains($moeda, 'REAL') || str_contains($moeda, 'REAIS')) {
-                        $moeda = 'BRL';
-                    }
                     $p['moeda'] = $moeda;
 
                     $taxaConversao = null;
@@ -3030,8 +3023,7 @@ JS;
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">' . (function() use ($pedido, $carneInfoMap) {
-                                            // Fonte única de moeda: card (total + badge) sempre coerentes.
-                                            $mo = $this->normalizarMoeda($pedido['moeda'] ?? null);
+                                            $mo = strtoupper(trim((string) ($pedido['moeda'] ?? '')));
                                             $ehBrl = ($mo === 'BRL');
                                             $valor = (float) ($pedido['total'] ?? 0);
                                             $dataValue = $ehBrl
@@ -4178,9 +4170,9 @@ HTML;
                 </div>';
             }
 
-            // Determinar moeda de exibição para todo o pedido (fonte única de verdade,
-            // idêntica à usada no card da listagem — elimina defaults divergentes).
-            $moedaPedido = $this->normalizarMoeda($pedido['moeda'] ?? null);
+            // Determinar moeda de exibição para todo o pedido
+            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'USD')));
+            if ($moedaPedido === '') $moedaPedido = 'USD';
             $taxaConvPedido = (float) ($pedido['taxa_conversao'] ?? 1);
             if ($taxaConvPedido <= 0) $taxaConvPedido = 1;
             $exibirEmBrl = ($moedaPedido === 'BRL');
@@ -6392,51 +6384,11 @@ LINKSCRIPT;
     }
 
     private function formatarMoeda($valor, $moeda) {
-        // Normalizar a moeda para evitar que variações (ex.: 'usd', ' USD ', 'US$',
-        // 'DOLAR') caiam no formato BRL por engano. Um pedido em dólar deve sempre
-        // exibir em US$.
-        $m = $this->normalizarMoeda($moeda);
-        if ($m === 'USD') {
-            return 'US$ ' . number_format((float) $valor, 2, '.', ',');
+        if ($moeda === 'USD') {
+            return '$ ' . number_format($valor, 2, '.', ',');
+        } else {
+            return 'R$ ' . number_format($valor, 2, ',', '.');
         }
-        return 'R$ ' . number_format((float) $valor, 2, ',', '.');
-    }
-
-    /**
-     * Normaliza qualquer variação de moeda ('usd', ' USD ', 'US$', 'DOLAR', 'R$',
-     * 'REAL', vazio/NULL) para o código canônico 'USD' ou 'BRL'.
-     * Fonte única de verdade para TODAS as decisões de moeda na tela de pedidos,
-     * evitando que card e detalhes usem defaults divergentes.
-     */
-    private function normalizarMoeda($moeda): string {
-        $m = strtoupper(trim((string) $moeda));
-        if (in_array($m, ['US$', 'USD$', 'USD', 'US'], true) || str_contains($m, 'DOLAR') || str_contains($m, 'DÓLAR')) {
-            return 'USD';
-        }
-        if (in_array($m, ['R$', 'BRL$', 'BRL', 'BR'], true) || str_contains($m, 'REAL') || str_contains($m, 'REAIS')) {
-            return 'BRL';
-        }
-        // Default seguro: BRL (moeda base da operação) para valores realmente ambíguos.
-        return 'BRL';
-    }
-
-    /**
-     * Decide como um pedido deve ser exibido, com base APENAS na moeda canônica.
-     *
-     * Convenção do sistema: os valores gravados já estão na moeda do pedido
-     * (USD quando moeda='USD'; BRL quando moeda='BRL'). A exibição NÃO adivinha
-     * nem reconverte valores — a integridade dos dados é responsabilidade da
-     * gravação (checkout) e da migration de correção histórica. Assim evitamos
-     * converter por engano um pedido legítimo em dólar de valor alto.
-     *
-     * @return array{moeda:string, exibirEmBrl:bool}
-     */
-    private function resolverExibicaoMoeda(array $pedido): array {
-        $moeda = $this->normalizarMoeda($pedido['moeda'] ?? null);
-        return [
-            'moeda'       => $moeda,
-            'exibirEmBrl' => ($moeda === 'BRL'),
-        ];
     }
 
     private function getStatusLabel(string $status): string {
