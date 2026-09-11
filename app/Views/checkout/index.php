@@ -10,6 +10,17 @@
     <?php endif; ?>
     <script>
         window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
+        // Categoria de envio calculada no servidor (US / BR / OTHER) + flag de atendimento manual.
+        window.CHECKOUT_CATEGORIA_ENVIO = <?= json_encode((string) ($categoria_envio ?? 'BR'), JSON_UNESCAPED_UNICODE) ?>;
+        window.CHECKOUT_ATENDIMENTO_MANUAL = <?= !empty($atendimento_manual) ? 'true' : 'false' ?>;
+        // Classifica um país (ISO-2/nome) na mesma regra do backend.
+        window.classificarCategoriaEnvio = function(pais) {
+            var p = (pais || 'BR').toString().trim().toUpperCase();
+            if (p === '') p = 'BR';
+            if (['BR', 'BRA', 'BRAZIL', 'BRASIL'].indexOf(p) >= 0) return 'BR';
+            if (['US', 'USA', 'EUA', 'UNITED STATES'].indexOf(p) >= 0) return 'US';
+            return 'OTHER';
+        };
         window.IS_PAYMENT_LINK = <?= !empty($is_payment_link) ? 'true' : 'false' ?>;
         window.PAYMENT_LINK_CURRENCY = window.IS_PAYMENT_LINK ? <?= json_encode((string) ($moeda ?? ''), JSON_UNESCAPED_UNICODE) ?> : '';
         window.CAMBIOREAL_RATE_BRL = <?= json_encode((float) ($cambioreal_rate_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
@@ -598,6 +609,18 @@
                         if (typeof updatePaymentMethodsForCurrency === 'function') {
                             updatePaymentMethodsForCurrency(cur);
                         }
+
+                        // Regras de envio por país: quando a categoria de envio muda
+                        // (US / BR / demais países), recarregar o checkout para o
+                        // servidor recalcular método de frete, estimativa (Shippo+30%)
+                        // e o bloqueio de pagamento/atendimento manual.
+                        if (typeof classificarCategoriaEnvio === 'function') {
+                            var novaCategoria = classificarCategoriaEnvio(pais);
+                            var categoriaAtual = (window.CHECKOUT_CATEGORIA_ENVIO || 'BR');
+                            if (novaCategoria !== categoriaAtual) {
+                                window.location.reload();
+                            }
+                        }
                     });
                 }
 
@@ -1037,11 +1060,30 @@
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
-                                    <span><?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?></span>
+                                    <span>
+                                        <?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?>
+                                        <?php if (!empty($metodo_envio)): ?>
+                                            <small class="text-muted d-block" id="metodo-envio-label"><?= htmlspecialchars((string) $metodo_envio, ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php endif; ?>
+                                    </span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
-                                        <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
+                                        <?php if (!empty($atendimento_manual)): ?>
+                                            <?php if (is_array($estimativa_frete ?? null) && !empty($estimativa_frete['success'])): ?>
+                                                <?= htmlspecialchars((string) ($estimativa_frete['moeda'] ?? 'USD'), ENT_QUOTES, 'UTF-8') ?> <?= number_format((float) $estimativa_frete['valor_final'], 2, '.', ',') ?>
+                                            <?php else: ?>
+                                                <?= __('checkout.shipping_on_request', 'Sob consulta') ?>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
+                                        <?php endif; ?>
                                     </span>
                                 </div>
+                                <?php if (!empty($atendimento_manual) && is_array($estimativa_frete ?? null) && !empty($estimativa_frete['success'])): ?>
+                                    <div class="small text-muted mt-1" id="frete-estimativa-detalhe">
+                                        <i class="fas fa-info-circle"></i>
+                                        <?= __('checkout.shipping_estimate_note', 'Estimativa de frete internacional (referência). Valor final confirmado pelo atendimento.') ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
 
                             <hr>
@@ -1129,11 +1171,29 @@
                             </div>
                             <?php endif; ?>
 
-                            <!-- Botão Finalizar -->
-                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= $abaixoMinimo ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
-                                    onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
-                                <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
-                            </button>
+                            <?php if (!empty($atendimento_manual)): ?>
+                                <!-- Demais países: atendimento manual via WhatsApp (pagamento bloqueado) -->
+                                <div class="alert alert-info small" id="atendimento-manual-alert">
+                                    <i class="fas fa-headset"></i>
+                                    <?= __('checkout.manual_service_note', 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após verificarmos se os produtos podem ser enviados para o seu país. Fale com o atendimento para finalizar.') ?>
+                                </div>
+                                <a href="<?= htmlspecialchars((string) ($whatsapp_atendimento_url ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
+                                   target="_blank" rel="noopener"
+                                   class="btn btn-success btn-lg w-100" id="btn-atendimento-whatsapp">
+                                    <i class="fab fa-whatsapp"></i> <?= __('checkout.talk_to_support', 'Falar com o atendimento (WhatsApp)') ?>
+                                </a>
+                                <!-- Botão finalizar oculto: pagamento indisponível para estes destinos -->
+                                <button type="button" class="btn btn-primary btn-lg w-100 d-none" id="btn-finalizar" disabled
+                                        onclick="processarPedidoDireto();">
+                                    <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
+                                </button>
+                            <?php else: ?>
+                                <!-- Botão Finalizar -->
+                                <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= $abaixoMinimo ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
+                                        onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
+                                    <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
+                                </button>
+                            <?php endif; ?>
                             
                             <!-- Botão de Teste Inline -->
                             <button type="button" class="btn btn-warning btn-sm w-100 mt-2 d-none" 
@@ -1747,7 +1807,21 @@ function debugBotaoFinalizar() {
 // Função para processar pedido diretamente
 async function processarPedidoDireto() {
     console.log('🔍 [DIRETO] Processando pedido diretamente...');
-    
+
+    // Bloqueio para "demais países": pagamento indisponível no checkout.
+    // O cliente deve concluir a compra manualmente pelo atendimento (WhatsApp).
+    var paisSelDireto = document.getElementById('pais');
+    var paisDireto = paisSelDireto ? paisSelDireto.value : 'BR';
+    var categoriaDireto = (typeof classificarCategoriaEnvio === 'function')
+        ? classificarCategoriaEnvio(paisDireto)
+        : 'BR';
+    if (categoriaDireto === 'OTHER' || window.CHECKOUT_ATENDIMENTO_MANUAL === true) {
+        var whatsBtn = document.getElementById('btn-atendimento-whatsapp');
+        alert('Para envios fora dos Estados Unidos e do Brasil, a compra é concluída pelo atendimento. Clique em "Falar com o atendimento (WhatsApp)".');
+        if (whatsBtn) { try { whatsBtn.focus(); } catch (e) {} }
+        return;
+    }
+
     const form = document.getElementById('checkout-form');
     const botao = document.getElementById('btn-finalizar');
     const checkbox = document.getElementById('consentimento_legal');

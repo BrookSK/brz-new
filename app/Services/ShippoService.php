@@ -363,6 +363,118 @@ class ShippoService {
     }
 
     /**
+     * Consulta tarifas de frete em tempo real (live rates) e retorna a opção
+     * mais barata normalizada, para uso como ESTIMATIVA no checkout de países
+     * fora dos Estados Unidos e Brasil.
+     *
+     * Fluxo: cria um Shipment (POST /shipments) com origem padrão + destino +
+     * pacote informado e escolhe a menor rate retornada pela Shippo.
+     *
+     * IMPORTANTE: este método retorna apenas uma ESTIMATIVA. O acréscimo de 30%
+     * (regra comercial da Braziliana) deve ser aplicado por quem consome este
+     * método, não aqui, para manter a responsabilidade de cálculo separada.
+     *
+     * @param array $addressTo Endereço de destino (name, street1, city, state, zip, country, ...)
+     * @param array $parcel    Pacote: length, width, height, distance_unit, weight, mass_unit
+     * @param array $customsDeclaration Declaração aduaneira opcional (internacional)
+     * @param array $carrierAccounts    IDs de carrier accounts para restringir a cotação (opcional)
+     * @return array {
+     *   success: bool,
+     *   amount: float,            // valor da tarifa mais barata (moeda original da Shippo)
+     *   currency: string,         // moeda retornada pela Shippo (ex: USD)
+     *   provider: string,         // transportadora (ex: USPS, UPS)
+     *   servicelevel: string,     // nome do serviço (ex: Priority Mail International)
+     *   servicelevel_token: string,
+     *   estimated_days: int|null,
+     *   rate_id: string,
+     *   shipment_id: string,
+     *   rates: array,             // todas as rates disponíveis (normalizadas)
+     *   error?: string
+     * }
+     */
+    public function getLiveRate(
+        array $addressTo,
+        array $parcel,
+        array $customsDeclaration = [],
+        array $carrierAccounts = []
+    ): array {
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'error' => 'Shippo API Token não configurado.'];
+        }
+
+        $addressFrom = $this->getDefaultAddressFrom();
+
+        $result = $this->createShipment(
+            $addressFrom,
+            $addressTo,
+            $parcel,
+            $customsDeclaration,
+            $carrierAccounts
+        );
+
+        if (empty($result['success'])) {
+            return [
+                'success' => false,
+                'error' => $result['error'] ?? 'Falha ao consultar tarifas na Shippo.',
+            ];
+        }
+
+        $rawRates = is_array($result['rates'] ?? null) ? $result['rates'] : [];
+        if (empty($rawRates)) {
+            return [
+                'success' => false,
+                'error' => 'Nenhuma tarifa de frete disponível para o destino informado.',
+                'shipment_id' => (string) ($result['shipment_id'] ?? ''),
+            ];
+        }
+
+        // Normaliza e ordena as rates da mais barata para a mais cara.
+        $rates = [];
+        foreach ($rawRates as $r) {
+            $amount = (float) ($r['amount'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+            $rates[] = [
+                'rate_id' => (string) ($r['object_id'] ?? ''),
+                'amount' => $amount,
+                'currency' => (string) ($r['currency'] ?? 'USD'),
+                'provider' => (string) ($r['provider'] ?? ''),
+                'servicelevel' => (string) ($r['servicelevel']['name'] ?? ($r['servicelevel_name'] ?? '')),
+                'servicelevel_token' => (string) ($r['servicelevel']['token'] ?? ($r['servicelevel_token'] ?? '')),
+                'estimated_days' => isset($r['estimated_days']) ? (int) $r['estimated_days'] : null,
+            ];
+        }
+
+        if (empty($rates)) {
+            return [
+                'success' => false,
+                'error' => 'Nenhuma tarifa de frete válida foi retornada pela Shippo.',
+                'shipment_id' => (string) ($result['shipment_id'] ?? ''),
+            ];
+        }
+
+        usort($rates, static function ($a, $b) {
+            return $a['amount'] <=> $b['amount'];
+        });
+
+        $cheapest = $rates[0];
+
+        return [
+            'success' => true,
+            'amount' => (float) $cheapest['amount'],
+            'currency' => (string) $cheapest['currency'],
+            'provider' => (string) $cheapest['provider'],
+            'servicelevel' => (string) $cheapest['servicelevel'],
+            'servicelevel_token' => (string) $cheapest['servicelevel_token'],
+            'estimated_days' => $cheapest['estimated_days'],
+            'rate_id' => (string) $cheapest['rate_id'],
+            'shipment_id' => (string) ($result['shipment_id'] ?? ''),
+            'rates' => $rates,
+        ];
+    }
+
+    /**
      * Obtém detalhes de um rastreamento.
      */
     public function getTracking(string $carrier, string $trackingNumber): array {

@@ -575,6 +575,10 @@ return [
     'checkout.shipping_address' => 'Endereço de Entrega',
     'checkout.payment_method' => 'Forma de pagamento',
     'checkout.finalize_secure' => 'Finalizar Pedido com Pagamento Seguro',
+    'checkout.shipping_on_request' => 'Sob consulta',
+    'checkout.shipping_estimate_note' => 'Estimativa de frete internacional (referência). Valor final confirmado pelo atendimento.',
+    'checkout.manual_service_note' => 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após verificarmos se os produtos podem ser enviados para o seu país. Fale com o atendimento para finalizar.',
+    'checkout.talk_to_support' => 'Falar com o atendimento (WhatsApp)',
 
     // User panel
     'user.dashboard' => 'Painel',
