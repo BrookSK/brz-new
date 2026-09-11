@@ -34,7 +34,17 @@ class Request {
     public function getParam($key, $default = null) {
         return $this->params[$key] ?? $default;
     }
-    
+
+    /**
+     * Alias de getParam(). Vários controllers acessam parâmetros de rota
+     * (ex.: {id}) via $request->param('id'). Sem este método, a chamada
+     * dispara "Call to undefined method", que aborta a resposta antes do
+     * JSON e quebra o r.json() no front-end.
+     */
+    public function param($key, $default = null) {
+        return $this->getParam($key, $default);
+    }
+
     public function setParam($key, $value) {
         $this->params[$key] = $value;
     }
