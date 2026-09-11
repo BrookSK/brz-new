@@ -987,6 +987,7 @@ return [
     'checkout.shipping_estimate_note' => 'International shipping estimate (for reference). Final amount confirmed by our support team.',
     'checkout.manual_service_note' => 'For destinations outside the United States and Brazil, the purchase is completed manually by our team after we verify the products can be shipped to your country. Contact support to finalize.',
     'checkout.talk_to_support' => 'Talk to support (WhatsApp)',
+    'checkout.save_and_use_address' => 'Save and use this address',
     'checkout.total_weight' => 'Total Weight',
     'checkout.delivery_outside_br_no_taxes' => 'Delivery outside Brazil does not include Brazilian taxes. Local taxation is the customer’s responsibility.',
     'checkout.terms_and_conditions' => 'terms and conditions',

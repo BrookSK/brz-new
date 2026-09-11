@@ -297,6 +297,14 @@
                                         <input type="text" class="form-control" id="estado_text" name="estado_text" style="display:none;" value="<?= htmlspecialchars((string) ($endereco_prefill['estado'] ?? '')) ?>">
                                     </div>
                                 </div>
+                                <?php if (!empty($usuario)): ?>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-success btn-sm" id="btn-salvar-endereco">
+                                        <i class="fas fa-save me-2"></i> <?= __('checkout.save_and_use_address', 'Salvar e usar este endereço') ?>
+                                    </button>
+                                    <span class="ms-2 small" id="salvar-endereco-msg" style="display:none;"></span>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -3534,6 +3542,98 @@ document.addEventListener('DOMContentLoaded', function() {
         btnNovoEndereco.addEventListener('click', function() {
             enderecoSelect.value = '';
             clearEnderecoForm();
+        });
+    }
+
+    // Salvar e usar este endereço: grava via AJAX (sem finalizar o pedido),
+    // insere no seletor e marca como endereço de entrega selecionado.
+    var btnSalvarEndereco = document.getElementById('btn-salvar-endereco');
+    if (btnSalvarEndereco) {
+        btnSalvarEndereco.addEventListener('click', function() {
+            var msgEl = document.getElementById('salvar-endereco-msg');
+            function setMsg(txt, ok) {
+                if (!msgEl) return;
+                msgEl.textContent = txt;
+                msgEl.style.display = txt ? '' : 'none';
+                msgEl.className = 'ms-2 small ' + (ok ? 'text-success' : 'text-danger');
+            }
+
+            var pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+            var estadoEl = document.getElementById('estado');
+            var estadoTextEl = document.getElementById('estado_text');
+            var estadoVal = '';
+            if (estadoEl && estadoEl.offsetParent !== null && estadoEl.value) {
+                estadoVal = estadoEl.value;
+            } else if (estadoTextEl && estadoTextEl.value) {
+                estadoVal = estadoTextEl.value;
+            } else if (estadoEl) {
+                estadoVal = estadoEl.value || '';
+            }
+
+            var payload = new URLSearchParams();
+            payload.set('pais', pais);
+            payload.set('cep', (document.getElementById('cep')?.value || ''));
+            payload.set('endereco', (document.getElementById('endereco')?.value || ''));
+            payload.set('numero', (document.querySelector('input[name="numero"]')?.value || ''));
+            payload.set('complemento', (document.querySelector('input[name="complemento"]')?.value || ''));
+            payload.set('bairro', (document.getElementById('bairro')?.value || ''));
+            payload.set('cidade', (document.getElementById('cidade')?.value || ''));
+            payload.set('estado', estadoVal);
+
+            btnSalvarEndereco.disabled = true;
+            setMsg('Salvando...', true);
+
+            fetch('/checkout/salvar-endereco', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                body: payload.toString(),
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json().then(function(j){ return { status: r.status, body: j }; }); })
+            .then(function(res) {
+                btnSalvarEndereco.disabled = false;
+                var data = res.body || {};
+                if (!data.success || !data.endereco) {
+                    setMsg(data.error || 'Não foi possível salvar o endereço.', false);
+                    return;
+                }
+
+                var e = data.endereco;
+                if (!enderecoSelect) {
+                    // Usuário não tinha endereços: recarrega para o seletor aparecer
+                    // já com o endereço salvo disponível.
+                    setMsg('Endereço salvo.', true);
+                    window.location.reload();
+                    return;
+                }
+                if (enderecoSelect) {
+                    // Evitar duplicar caso já exista uma option com o mesmo id.
+                    var jaExiste = Array.prototype.some.call(enderecoSelect.options, function(o){ return o.value === String(e.id); });
+                    if (!jaExiste) {
+                        var opt = document.createElement('option');
+                        opt.value = String(e.id);
+                        opt.setAttribute('data-pais', e.pais || 'BR');
+                        opt.setAttribute('data-cep', e.cep || '');
+                        opt.setAttribute('data-endereco', e.endereco || '');
+                        opt.setAttribute('data-numero', e.numero || '');
+                        opt.setAttribute('data-complemento', e.complemento || '');
+                        opt.setAttribute('data-bairro', e.bairro || '');
+                        opt.setAttribute('data-cidade', e.cidade || '');
+                        opt.setAttribute('data-estado', e.estado || '');
+                        opt.textContent = (e.endereco || '') + ', ' + (e.numero || '') + ' - ' + (e.bairro || '') + ', ' + (e.cidade || '') + '/' + (e.estado || '');
+                        enderecoSelect.appendChild(opt);
+                    }
+                    enderecoSelect.value = String(e.id);
+                    // Disparar o fluxo de seleção (preenche campos, país e recalcula envio).
+                    try { enderecoSelect.dispatchEvent(new Event('change')); } catch (ev) {}
+                }
+
+                setMsg('Endereço salvo e selecionado.', true);
+            })
+            .catch(function() {
+                btnSalvarEndereco.disabled = false;
+                setMsg('Erro de conexão ao salvar o endereço.', false);
+            });
         });
     }
 });

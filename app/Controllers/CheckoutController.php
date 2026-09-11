@@ -7227,6 +7227,98 @@ class CheckoutController extends Controller {
         }
     }
 
+    /**
+     * Salva um novo endereço de entrega a partir do checkout (via AJAX), sem
+     * finalizar o pedido, e o retorna já normalizado para que o front-end possa
+     * inseri-lo no seletor e marcá-lo como endereço de entrega selecionado.
+     *
+     * Requer usuário logado (o endereço é vinculado à conta).
+     */
+    public function salvarEnderecoCheckout(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'É necessário estar logado para salvar um endereço.'], 401);
+            return;
+        }
+
+        $dados = $request->getParams();
+
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+        $cep = trim((string) ($dados['cep'] ?? ''));
+        $endereco = trim((string) ($dados['endereco'] ?? ''));
+        $cidade = trim((string) ($dados['cidade'] ?? ''));
+        $estado = trim((string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')));
+        $numero = trim((string) ($dados['numero'] ?? ''));
+        $complemento = trim((string) ($dados['complemento'] ?? ''));
+        $bairro = trim((string) ($dados['bairro'] ?? ''));
+
+        // Validação mínima (campos obrigatórios variam por país).
+        $faltando = [];
+        if ($cep === '') $faltando[] = 'CEP/ZIP';
+        if ($endereco === '') $faltando[] = 'Rua';
+        if (mb_strlen($cidade) < 3) $faltando[] = 'Cidade';
+        if ($pais === 'BR') {
+            if ($numero === '') $faltando[] = 'Número';
+            if ($bairro === '') $faltando[] = 'Bairro';
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true) && $estado === '') {
+            $faltando[] = 'Estado';
+        }
+        if (!empty($faltando)) {
+            $this->json(['success' => false, 'error' => 'Preencha: ' . implode(', ', $faltando) . '.'], 400);
+            return;
+        }
+
+        try {
+            $enderecoData = [
+                'usuario_id' => $usuarioId,
+                'tipo' => 'entrega',
+                'cep' => $cep,
+                'endereco' => $endereco,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'estado' => $estado,
+                'pais' => $pais,
+                'principal' => false,
+            ];
+
+            $ok = $this->enderecoModel->create($enderecoData);
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Não foi possível salvar o endereço.'], 500);
+                return;
+            }
+
+            $novoId = (int) $this->enderecoModel->getConnection()->lastInsertId();
+
+            $this->json([
+                'success' => true,
+                'endereco' => [
+                    'id' => $novoId,
+                    'pais' => $pais,
+                    'cep' => $cep,
+                    'endereco' => $endereco,
+                    'numero' => $numero,
+                    'complemento' => $complemento,
+                    'bairro' => $bairro,
+                    'cidade' => $cidade,
+                    'estado' => $estado,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao salvar o endereço: ' . $e->getMessage()], 500);
+        }
+    }
+
     private function criarPedido($dados, $carrinho, $usuario) {
         try {
             $this->debugLog('[CRIAR_PEDIDO] Iniciando criacao do pedido');
