@@ -72,6 +72,7 @@
             select: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
             free_shipping: <?= json_encode(__('cart.free_shipping', 'Frete grátis'), JSON_UNESCAPED_UNICODE) ?>,
             shipping_on_request: <?= json_encode(__('checkout.shipping_on_request', 'Sob consulta'), JSON_UNESCAPED_UNICODE) ?>,
+            confirm_delete_address: <?= json_encode(__('checkout.confirm_delete_address', 'Deseja realmente excluir este endereço?'), JSON_UNESCAPED_UNICODE) ?>,
             processing_order: <?= json_encode(__('checkout.processing_order', 'Processando seu pedido...'), JSON_UNESCAPED_UNICODE) ?>,
             stripe_not_configured: <?= json_encode(__('checkout.stripe_not_configured', 'Stripe não configurado. Verifique as configurações de pagamento.'), JSON_UNESCAPED_UNICODE) ?>,
             stripe_card_form_error: <?= json_encode(__('checkout.stripe_card_form_error', 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.'), JSON_UNESCAPED_UNICODE) ?>,
@@ -232,11 +233,18 @@
                                     </select>
                                 </div>
                                 
-                                <!-- Botão para adicionar novo endereço -->
-                                <div class="mb-3">
+                                <!-- Botões de gestão do endereço -->
+                                <div class="mb-3 d-flex align-items-center gap-2">
                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btn-novo-endereco">
                                         <i class="fas fa-plus me-2"></i> <?= __('checkout.add_new_address', 'Adicionar Novo Endereço') ?>
                                     </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-editar-endereco" title="<?= htmlspecialchars(__('checkout.edit_address', 'Editar endereço'), ENT_QUOTES, 'UTF-8') ?>" style="display:none;">
+                                        <i class="fas fa-pencil-alt"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" id="btn-excluir-endereco" title="<?= htmlspecialchars(__('checkout.delete_address', 'Excluir endereço'), ENT_QUOTES, 'UTF-8') ?>" style="display:none;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    <span class="small" id="endereco-acao-msg" style="display:none;"></span>
                                 </div>
                             <?php endif; ?>
                             
@@ -3507,7 +3515,21 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
 
+        var btnEditarEndereco = document.getElementById('btn-editar-endereco');
+        var btnExcluirEndereco = document.getElementById('btn-excluir-endereco');
+
+        // Mostra/esconde os botões de editar/excluir conforme houver um endereço salvo selecionado.
+        function toggleEnderecoActionButtons() {
+            var temSelecionado = enderecoSelect.value !== '';
+            if (btnEditarEndereco) btnEditarEndereco.style.display = temSelecionado ? '' : 'none';
+            if (btnExcluirEndereco) btnExcluirEndereco.style.display = temSelecionado ? '' : 'none';
+        }
+
         function handleEnderecoChange() {
+            // Ao trocar de endereço, sair do modo de edição.
+            window.__editandoEnderecoId = null;
+            toggleEnderecoActionButtons();
+
             const selectedOption = enderecoSelect.options[enderecoSelect.selectedIndex];
             if (enderecoSelect.value === '') {
                 clearEnderecoForm();
@@ -3532,6 +3554,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         enderecoSelect.addEventListener('change', handleEnderecoChange);
+
+        // Editar: abre o formulário preenchido com o endereço selecionado (modo edição).
+        if (btnEditarEndereco) {
+            btnEditarEndereco.addEventListener('click', function() {
+                if (enderecoSelect.value === '') return;
+                var opt = enderecoSelect.options[enderecoSelect.selectedIndex];
+                window.__editandoEnderecoId = enderecoSelect.value;
+                fillEnderecoFormFromSelectedOption(opt);
+                var msgEl = document.getElementById('salvar-endereco-msg');
+                if (msgEl) {
+                    msgEl.textContent = 'Editando endereço — altere os campos e clique em salvar.';
+                    msgEl.className = 'ms-2 small text-muted';
+                    msgEl.style.display = '';
+                }
+            });
+        }
+
+        // Excluir: remove o endereço selecionado (com confirmação).
+        if (btnExcluirEndereco) {
+            btnExcluirEndereco.addEventListener('click', function() {
+                if (enderecoSelect.value === '') return;
+                var confirmMsg = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.confirm_delete_address) ? window.CHECKOUT_I18N.confirm_delete_address : 'Deseja realmente excluir este endereço?';
+                if (!window.confirm(confirmMsg)) return;
+
+                var id = enderecoSelect.value;
+                var acaoMsg = document.getElementById('endereco-acao-msg');
+                function setAcao(txt, ok) {
+                    if (!acaoMsg) return;
+                    acaoMsg.textContent = txt;
+                    acaoMsg.style.display = txt ? '' : 'none';
+                    acaoMsg.className = 'small ' + (ok ? 'text-success' : 'text-danger');
+                }
+
+                var payload = new URLSearchParams();
+                payload.set('id', id);
+                btnExcluirEndereco.disabled = true;
+                setAcao('Excluindo...', true);
+
+                fetch('/checkout/excluir-endereco', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: payload.toString(),
+                    credentials: 'same-origin'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    btnExcluirEndereco.disabled = false;
+                    if (!data || !data.success) {
+                        setAcao((data && data.error) ? data.error : 'Não foi possível excluir.', false);
+                        return;
+                    }
+                    // Remover a option e voltar para "Novo endereço...".
+                    var optToRemove = Array.prototype.filter.call(enderecoSelect.options, function(o){ return o.value === String(id); })[0];
+                    if (optToRemove) optToRemove.remove();
+                    enderecoSelect.value = '';
+                    window.__editandoEnderecoId = null;
+                    setAcao('Endereço excluído.', true);
+                    try { enderecoSelect.dispatchEvent(new Event('change')); } catch (ev) {}
+                })
+                .catch(function() {
+                    btnExcluirEndereco.disabled = false;
+                    setAcao('Erro de conexão ao excluir.', false);
+                });
+            });
+        }
 
         // Quando existe um endereço principal já selecionado, o evento change não dispara.
         // Se ele estiver incompleto, abrimos o formulário automaticamente para permitir preencher numero/bairro.
@@ -3580,10 +3667,17 @@ document.addEventListener('DOMContentLoaded', function() {
             payload.set('cidade', (document.getElementById('cidade')?.value || ''));
             payload.set('estado', estadoVal);
 
+            // Modo edição x criação.
+            var editandoId = window.__editandoEnderecoId || null;
+            var url = editandoId ? '/checkout/atualizar-endereco' : '/checkout/salvar-endereco';
+            if (editandoId) {
+                payload.set('id', editandoId);
+            }
+
             btnSalvarEndereco.disabled = true;
             setMsg('Salvando...', true);
 
-            fetch('/checkout/salvar-endereco', {
+            fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
                 body: payload.toString(),
@@ -3599,6 +3693,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 var e = data.endereco;
+                window.__editandoEnderecoId = null;
+
                 if (!enderecoSelect) {
                     // Usuário não tinha endereços: recarrega para o seletor aparecer
                     // já com o endereço salvo disponível.
@@ -3606,29 +3702,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.reload();
                     return;
                 }
-                if (enderecoSelect) {
-                    // Evitar duplicar caso já exista uma option com o mesmo id.
-                    var jaExiste = Array.prototype.some.call(enderecoSelect.options, function(o){ return o.value === String(e.id); });
-                    if (!jaExiste) {
-                        var opt = document.createElement('option');
-                        opt.value = String(e.id);
-                        opt.setAttribute('data-pais', e.pais || 'BR');
-                        opt.setAttribute('data-cep', e.cep || '');
-                        opt.setAttribute('data-endereco', e.endereco || '');
-                        opt.setAttribute('data-numero', e.numero || '');
-                        opt.setAttribute('data-complemento', e.complemento || '');
-                        opt.setAttribute('data-bairro', e.bairro || '');
-                        opt.setAttribute('data-cidade', e.cidade || '');
-                        opt.setAttribute('data-estado', e.estado || '');
-                        opt.textContent = (e.endereco || '') + ', ' + (e.numero || '') + ' - ' + (e.bairro || '') + ', ' + (e.cidade || '') + '/' + (e.estado || '');
-                        enderecoSelect.appendChild(opt);
-                    }
-                    enderecoSelect.value = String(e.id);
-                    // Disparar o fluxo de seleção (preenche campos, país e recalcula envio).
-                    try { enderecoSelect.dispatchEvent(new Event('change')); } catch (ev) {}
-                }
 
-                setMsg('Endereço salvo e selecionado.', true);
+                // Encontrar option existente (edição) ou criar nova (criação).
+                var optExistente = Array.prototype.filter.call(enderecoSelect.options, function(o){ return o.value === String(e.id); })[0];
+                var opt = optExistente || document.createElement('option');
+                opt.value = String(e.id);
+                opt.setAttribute('data-pais', e.pais || 'BR');
+                opt.setAttribute('data-cep', e.cep || '');
+                opt.setAttribute('data-endereco', e.endereco || '');
+                opt.setAttribute('data-numero', e.numero || '');
+                opt.setAttribute('data-complemento', e.complemento || '');
+                opt.setAttribute('data-bairro', e.bairro || '');
+                opt.setAttribute('data-cidade', e.cidade || '');
+                opt.setAttribute('data-estado', e.estado || '');
+                opt.textContent = (e.endereco || '') + ', ' + (e.numero || '') + ' - ' + (e.bairro || '') + ', ' + (e.cidade || '') + '/' + (e.estado || '');
+                if (!optExistente) {
+                    enderecoSelect.appendChild(opt);
+                }
+                enderecoSelect.value = String(e.id);
+                // Disparar o fluxo de seleção (preenche campos, país e recalcula envio).
+                try { enderecoSelect.dispatchEvent(new Event('change')); } catch (ev) {}
+
+                setMsg(editandoId ? 'Endereço atualizado e selecionado.' : 'Endereço salvo e selecionado.', true);
             })
             .catch(function() {
                 btnSalvarEndereco.disabled = false;

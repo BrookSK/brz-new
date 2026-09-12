@@ -7319,6 +7319,149 @@ class CheckoutController extends Controller {
         }
     }
 
+    /**
+     * Atualiza um endereço existente do usuário logado (via AJAX, sem finalizar
+     * o pedido). Verifica a posse do endereço antes de alterar.
+     */
+    public function atualizarEnderecoCheckout(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'É necessário estar logado para editar um endereço.'], 401);
+            return;
+        }
+
+        $dados = $request->getParams();
+        $enderecoId = (int) ($dados['id'] ?? 0);
+        if ($enderecoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Endereço inválido.'], 400);
+            return;
+        }
+
+        // Verificar posse.
+        try {
+            $addr = $this->enderecoModel->find($enderecoId);
+        } catch (\Throwable $e) {
+            $addr = null;
+        }
+        if (!is_array($addr) || (int) ($addr['usuario_id'] ?? 0) !== $usuarioId) {
+            $this->json(['success' => false, 'error' => 'Endereço não encontrado.'], 404);
+            return;
+        }
+
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+        $cep = trim((string) ($dados['cep'] ?? ''));
+        $endereco = trim((string) ($dados['endereco'] ?? ''));
+        $cidade = trim((string) ($dados['cidade'] ?? ''));
+        $estado = trim((string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')));
+        $numero = trim((string) ($dados['numero'] ?? ''));
+        $complemento = trim((string) ($dados['complemento'] ?? ''));
+        $bairro = trim((string) ($dados['bairro'] ?? ''));
+
+        $faltando = [];
+        if ($cep === '') $faltando[] = 'CEP/ZIP';
+        if ($endereco === '') $faltando[] = 'Rua';
+        if (mb_strlen($cidade) < 3) $faltando[] = 'Cidade';
+        if ($pais === 'BR') {
+            if ($numero === '') $faltando[] = 'Número';
+            if ($bairro === '') $faltando[] = 'Bairro';
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true) && $estado === '') {
+            $faltando[] = 'Estado';
+        }
+        if (!empty($faltando)) {
+            $this->json(['success' => false, 'error' => 'Preencha: ' . implode(', ', $faltando) . '.'], 400);
+            return;
+        }
+
+        try {
+            $ok = $this->enderecoModel->update($enderecoId, [
+                'tipo' => (string) ($addr['tipo'] ?? 'entrega'),
+                'cep' => $cep,
+                'logradouro' => $endereco,
+                'endereco' => $endereco,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'estado' => $estado,
+                'pais' => $pais,
+            ]);
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Não foi possível atualizar o endereço.'], 500);
+                return;
+            }
+
+            $this->json([
+                'success' => true,
+                'endereco' => [
+                    'id' => $enderecoId,
+                    'pais' => $pais,
+                    'cep' => $cep,
+                    'endereco' => $endereco,
+                    'numero' => $numero,
+                    'complemento' => $complemento,
+                    'bairro' => $bairro,
+                    'cidade' => $cidade,
+                    'estado' => $estado,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao atualizar o endereço: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Exclui um endereço do usuário logado (via AJAX). Verifica a posse antes.
+     */
+    public function excluirEnderecoCheckout(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'É necessário estar logado para excluir um endereço.'], 401);
+            return;
+        }
+
+        $dados = $request->getParams();
+        $enderecoId = (int) ($dados['id'] ?? 0);
+        if ($enderecoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Endereço inválido.'], 400);
+            return;
+        }
+
+        try {
+            $addr = $this->enderecoModel->find($enderecoId);
+        } catch (\Throwable $e) {
+            $addr = null;
+        }
+        if (!is_array($addr) || (int) ($addr['usuario_id'] ?? 0) !== $usuarioId) {
+            $this->json(['success' => false, 'error' => 'Endereço não encontrado.'], 404);
+            return;
+        }
+
+        try {
+            $ok = $this->enderecoModel->delete($enderecoId);
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Não foi possível excluir o endereço.'], 500);
+                return;
+            }
+            $this->json(['success' => true, 'id' => $enderecoId]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao excluir o endereço: ' . $e->getMessage()], 500);
+        }
+    }
+
     private function criarPedido($dados, $carrinho, $usuario) {
         try {
             $this->debugLog('[CRIAR_PEDIDO] Iniciando criacao do pedido');

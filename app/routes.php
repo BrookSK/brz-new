@@ -122,6 +122,8 @@ $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 $router->post('/checkout/envio-pais', 'CheckoutController', 'calcularEnvioPais');
 $router->post('/checkout/salvar-endereco', 'CheckoutController', 'salvarEnderecoCheckout');
+$router->post('/checkout/atualizar-endereco', 'CheckoutController', 'atualizarEnderecoCheckout');
+$router->post('/checkout/excluir-endereco', 'CheckoutController', 'excluirEnderecoCheckout');
 
 // Assessoria de Compras
 $router->get('/assessoria', 'AssessoriaController', 'index');

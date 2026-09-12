@@ -580,6 +580,9 @@ return [
     'checkout.manual_service_note' => 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após verificarmos se os produtos podem ser enviados para o seu país. Fale com o atendimento para finalizar.',
     'checkout.talk_to_support' => 'Falar com o atendimento (WhatsApp)',
     'checkout.save_and_use_address' => 'Salvar e usar este endereço',
+    'checkout.edit_address' => 'Editar endereço',
+    'checkout.delete_address' => 'Excluir endereço',
+    'checkout.confirm_delete_address' => 'Deseja realmente excluir este endereço?',
 
     // User panel
     'user.dashboard' => 'Painel',
