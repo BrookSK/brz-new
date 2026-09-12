@@ -104,34 +104,55 @@ class Endereco extends Model {
             throw new \Exception('Cidade deve ter no mínimo 3 caracteres');
         }
 
-        $sql = "UPDATE {$this->table} SET 
-                tipo = :tipo, 
-                cep = :cep, 
-                logradouro = :logradouro, 
-                numero = :numero, 
-                complemento = :complemento, 
-                bairro = :bairro, 
-                cidade = :cidade, 
-                estado = :estado, 
-                pais = :pais, 
-                updated_at = NOW() 
-                WHERE id = :id";
-        
+        // Descobrir colunas reais da tabela para montar o UPDATE dinamicamente.
+        // Schemas variam: algumas bases usam 'endereco', outras 'logradouro';
+        // 'updated_at' pode não existir. Montar apenas com o que existe evita o
+        // erro "Unknown column".
+        $cols = [];
+        try {
+            $stmtCols = $this->connection->query("DESCRIBE {$this->table}");
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        // Espelhar endereco <-> logradouro (nem toda base tem as duas colunas).
+        $dataNormalized = $data;
+        if (!isset($dataNormalized['logradouro']) && isset($dataNormalized['endereco'])) {
+            $dataNormalized['logradouro'] = $dataNormalized['endereco'];
+        }
+        if (!isset($dataNormalized['endereco']) && isset($dataNormalized['logradouro'])) {
+            $dataNormalized['endereco'] = $dataNormalized['logradouro'];
+        }
+
+        $allowed = ['tipo', 'cep', 'logradouro', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'pais'];
+
+        $setParts = [];
+        $params = [':id' => $id];
+        foreach ($allowed as $col) {
+            if (!array_key_exists($col, $dataNormalized)) {
+                continue;
+            }
+            // Só incluir a coluna se ela existir no schema (ou se DESCRIBE falhou).
+            if (!empty($cols) && !in_array($col, $cols, true)) {
+                continue;
+            }
+            $setParts[] = "{$col} = :{$col}";
+            $params[":{$col}"] = $dataNormalized[$col];
+        }
+
+        if (empty($setParts)) {
+            return false;
+        }
+
+        if (empty($cols) || in_array('updated_at', $cols, true)) {
+            $setParts[] = 'updated_at = NOW()';
+        }
+
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $setParts) . " WHERE id = :id";
         $stmt = $this->connection->prepare($sql);
-        
-        $stmt->bindParam(':tipo', $data['tipo']);
-        $stmt->bindParam(':cep', $data['cep']);
-        $stmt->bindParam(':logradouro', $data['logradouro']);
-        $stmt->bindParam(':numero', $data['numero']);
-        $stmt->bindParam(':complemento', $data['complemento']);
-        $stmt->bindParam(':bairro', $data['bairro']);
-        $stmt->bindParam(':cidade', $data['cidade']);
-        $stmt->bindParam(':estado', $data['estado']);
-        $paisValue = $data['pais'] ?? 'BR';
-        $stmt->bindParam(':pais', $paisValue);
-        $stmt->bindParam(':id', $id);
-        
-        return $stmt->execute();
+
+        return $stmt->execute($params);
     }
     
     public function delete($id) {
