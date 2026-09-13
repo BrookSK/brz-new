@@ -3591,6 +3591,11 @@ class CheckoutController extends Controller {
             $usuario = $this->authService->getUsuarioLogado();
             $this->debugLog('[CHECKOUT] Usuario: ' . ($usuario ? $usuario['email'] : 'Nao logado'));
             
+            // BARREIRA FINAL: revalidação obrigatória imediatamente antes de criar o pedido.
+            // Garante que NENHUM pedido seja gerado com dados essenciais faltando ou CPF/CNPJ
+            // inválido, mesmo que alguma validação anterior tenha sido contornada.
+            $this->assertDadosPedidoCompletos($dados);
+
             // Criar pedido (idempotente)
             $this->debugLog('[CHECKOUT] Chamando criarPedido()...');
             $pedidoCreateResult = $this->criarPedido($dados, $carrinho, $usuario);
@@ -6807,17 +6812,23 @@ class CheckoutController extends Controller {
                 $erros[] = 'Informe nome e sobrenome';
             }
         }
-        if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
+        if (empty($dados['email'])) {
+            $erros[] = 'E-mail é obrigatório';
+        } elseif (!filter_var(trim((string) $dados['email']), FILTER_VALIDATE_EMAIL)) {
+            $erros[] = 'E-mail inválido';
+        }
         $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
-            if ($doc === '' || strlen($doc) < 11) {
-                $erros[] = 'CPF é obrigatório para residentes no Brasil';
-            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
-                $erros[] = 'CPF inválido';
+            // No Brasil o documento é obrigatório e precisa ser CPF ou CNPJ válido.
+            if ($doc === '') {
+                $erros[] = 'CPF/CNPJ é obrigatório para residentes no Brasil';
+            } elseif (!CpfValidator::isValidDocumento($doc)) {
+                $erros[] = 'CPF/CNPJ inválido';
             }
         } else {
-            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
-                $erros[] = 'CPF inválido';
+            // Fora do BR o documento é opcional, mas se informado precisa ser válido.
+            if ($doc !== '' && !CpfValidator::isValidDocumento($doc)) {
+                $erros[] = 'CPF/CNPJ inválido';
             }
         }
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
@@ -6864,15 +6875,15 @@ class CheckoutController extends Controller {
             }
             if ($pais === 'BR') {
                 $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
-                if ($docDest === '' || strlen($docDest) < 11) {
-                    $erros[] = 'CPF do destinatário é obrigatório para entregas no Brasil';
-                } elseif (strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
-                    $erros[] = 'CPF do destinatário inválido';
+                if ($docDest === '') {
+                    $erros[] = 'CPF/CNPJ do destinatário é obrigatório para entregas no Brasil';
+                } elseif (!CpfValidator::isValidDocumento($docDest)) {
+                    $erros[] = 'CPF/CNPJ do destinatário inválido';
                 }
             } else {
                 $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
-                if ($docDest !== '' && strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
-                    $erros[] = 'CPF do destinatário inválido';
+                if ($docDest !== '' && !CpfValidator::isValidDocumento($docDest)) {
+                    $erros[] = 'CPF/CNPJ do destinatário inválido';
                 }
             }
         }
@@ -6888,6 +6899,115 @@ class CheckoutController extends Controller {
         }
         
         return $erros;
+    }
+
+    /**
+     * Barreira final antes de criar o pedido: garante que os dados essenciais
+     * (identificação, contato, documento e endereço de entrega conforme o país)
+     * estejam presentes e válidos. Lança \Exception no primeiro problema para
+     * IMPEDIR a criação do pedido — não deve existir pedido com dado faltando.
+     *
+     * Considera também o endereço selecionado (endereco_selecionado/endereco_entrega_id),
+     * quando os campos de endereço não vierem soltos no formulário.
+     */
+    private function assertDadosPedidoCompletos(array $dados): void {
+        // Resolver endereço a partir de um endereço salvo, se os campos vierem vazios.
+        $endereco = [
+            'pais' => trim((string) ($dados['pais'] ?? '')),
+            'cep' => trim((string) ($dados['cep'] ?? '')),
+            'endereco' => trim((string) ($dados['endereco'] ?? '')),
+            'numero' => trim((string) ($dados['numero'] ?? '')),
+            'bairro' => trim((string) ($dados['bairro'] ?? '')),
+            'cidade' => trim((string) ($dados['cidade'] ?? '')),
+            'estado' => trim((string) ($dados['estado'] ?? ($dados['estado_text'] ?? ''))),
+        ];
+
+        $enderecoId = 0;
+        foreach (['endereco_selecionado', 'endereco_entrega_id', 'endereco_id'] as $k) {
+            if (!empty($dados[$k])) {
+                $enderecoId = (int) $dados[$k];
+                if ($enderecoId > 0) break;
+            }
+        }
+        if ($enderecoId > 0) {
+            try {
+                $addr = $this->enderecoModel->find($enderecoId);
+                if (is_array($addr) && !empty($addr)) {
+                    foreach ($endereco as $campo => $valor) {
+                        if ($valor === '' && !empty($addr[$campo])) {
+                            $endereco[$campo] = trim((string) $addr[$campo]);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $pais = strtoupper($endereco['pais'] !== '' ? $endereco['pais'] : 'BR');
+
+        // Dados pessoais obrigatórios
+        $nome = trim((string) ($dados['nome'] ?? ''));
+        if ($nome === '') {
+            throw new \Exception('Nome é obrigatório para finalizar o pedido.');
+        }
+        $partesNome = array_values(array_filter(preg_split('/\s+/', $nome) ?: [], static fn($p) => mb_strlen(trim((string) $p)) >= 2));
+        if (count($partesNome) < 2) {
+            throw new \Exception('Informe nome e sobrenome para finalizar o pedido.');
+        }
+
+        $email = trim((string) ($dados['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \Exception('E-mail válido é obrigatório para finalizar o pedido.');
+        }
+
+        $telefone = trim((string) ($dados['telefone'] ?? ''));
+        if ($telefone === '') {
+            throw new \Exception('Telefone é obrigatório para finalizar o pedido.');
+        }
+
+        if (trim((string) ($dados['data_nascimento'] ?? '')) === '') {
+            throw new \Exception('Data de nascimento é obrigatória para finalizar o pedido.');
+        }
+
+        // Documento (CPF/CNPJ)
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
+        if ($pais === 'BR') {
+            if ($doc === '') {
+                throw new \Exception('CPF/CNPJ é obrigatório para entregas no Brasil.');
+            }
+            if (!CpfValidator::isValidDocumento($doc)) {
+                throw new \Exception('CPF/CNPJ inválido. Corrija o documento para finalizar o pedido.');
+            }
+        } elseif ($doc !== '' && !CpfValidator::isValidDocumento($doc)) {
+            throw new \Exception('CPF/CNPJ inválido. Corrija o documento para finalizar o pedido.');
+        }
+
+        // Endereço de entrega obrigatório
+        if ($endereco['cep'] === '') {
+            throw new \Exception('CEP é obrigatório para finalizar o pedido.');
+        }
+        if ($endereco['endereco'] === '') {
+            throw new \Exception('Endereço (rua) é obrigatório para finalizar o pedido.');
+        }
+        if ($endereco['cidade'] === '') {
+            throw new \Exception('Cidade é obrigatória para finalizar o pedido.');
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true) && $endereco['estado'] === '') {
+            throw new \Exception('Estado é obrigatório para finalizar o pedido.');
+        }
+        if ($pais === 'BR') {
+            if ($endereco['numero'] === '') {
+                throw new \Exception('Número do endereço é obrigatório para entregas no Brasil.');
+            }
+            if ($endereco['bairro'] === '') {
+                throw new \Exception('Bairro é obrigatório para entregas no Brasil.');
+            }
+        }
+
+        // Forma de pagamento
+        if (trim((string) ($dados['forma_pagamento'] ?? '')) === '') {
+            throw new \Exception('Selecione uma forma de pagamento para finalizar o pedido.');
+        }
     }
     
     private function criarOuAtualizarUsuario($dados, $usuario) {

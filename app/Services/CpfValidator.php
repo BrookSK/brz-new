@@ -24,6 +24,54 @@ class CpfValidator {
     }
 
 
+    /**
+     * Valida CNPJ (14 dígitos) pelos dígitos verificadores.
+     */
+    public static function isValidCnpj(?string $cnpj): bool {
+        $cnpj = self::onlyDigits($cnpj);
+        if ($cnpj === '' || strlen($cnpj) !== 14) {
+            return false;
+        }
+        if (preg_match('/^(\d)\1{13}$/', $cnpj)) {
+            return false;
+        }
+        $digits = array_map('intval', str_split($cnpj));
+
+        $calc = function (array $d, array $pesos): int {
+            $sum = 0;
+            foreach ($pesos as $i => $p) {
+                $sum += $d[$i] * $p;
+            }
+            $r = $sum % 11;
+            return ($r < 2) ? 0 : (11 - $r);
+        };
+
+        $pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+        $d1 = $calc($digits, $pesos1);
+        if ($digits[12] !== $d1) {
+            return false;
+        }
+        $pesos2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+        $d2 = $calc($digits, $pesos2);
+        return $digits[13] === $d2;
+    }
+
+    /**
+     * Valida um documento (CPF de 11 dígitos OU CNPJ de 14 dígitos).
+     * Qualquer outro tamanho é inválido.
+     */
+    public static function isValidDocumento(?string $doc): bool {
+        $digits = self::onlyDigits($doc);
+        $len = strlen($digits);
+        if ($len === 11) {
+            return self::isValid($digits);
+        }
+        if ($len === 14) {
+            return self::isValidCnpj($digits);
+        }
+        return false;
+    }
+
     public static function isValid(?string $cpf): bool {
         $cpf = self::onlyDigits($cpf);
         if ($cpf === '' || strlen($cpf) !== 11) {
