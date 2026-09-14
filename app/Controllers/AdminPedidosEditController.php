@@ -1412,6 +1412,113 @@ class AdminPedidosEditController extends Controller {
         }
     }
 
+    /**
+     * Re-sincroniza os itens da(s) invoice(s) do pedido (pedido_invoice_items) com os
+     * itens atuais de pedido_itens. Necessário porque a etiqueta lê o valor declarado
+     * da invoice (snapshot), que não é atualizado automaticamente ao editar o pedido.
+     *
+     * Recria os invoice_items a partir de pedido_itens (mesma lógica da liberação de invoice),
+     * preservando nome/ncm/peso via fallback em pacotes_recebidos quando aplicável.
+     */
+    private function sincronizarInvoiceItens(int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('pedido_invoices') || !$this->tableExists('pedido_invoice_items')) {
+            return;
+        }
+
+        $db = $this->connection;
+
+        // Buscar invoices do pedido (todas as não canceladas) para manter a etiqueta coerente.
+        $stInv = $db->prepare("SELECT id FROM pedido_invoices WHERE pedido_id = ? AND (status IS NULL OR status <> 'cancelado')");
+        $stInv->execute([$pedidoId]);
+        $invoiceIds = $stInv->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        if (empty($invoiceIds)) {
+            return; // Pedido sem invoice: nada a sincronizar (etiqueta usará pedido_itens direto).
+        }
+
+        // Itens atuais do pedido
+        $itensTable = $this->getItensTableForPedido($pedidoId);
+        $stItens = $db->prepare("SELECT * FROM {$itensTable} WHERE pedido_id = ? ORDER BY id ASC");
+        $stItens->execute([$pedidoId]);
+        $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($itens)) {
+            return;
+        }
+
+        // Montar os itens normalizados (declaration_value = preço atual; fallback pacotes_recebidos)
+        $novos = [];
+        foreach ($itens as $it) {
+            $nome = trim((string) ($it['nome_produto'] ?? ($it['produto_nome'] ?? ($it['nome'] ?? ($it['nome_item'] ?? '')))));
+            $ncm = (string) ($it['ncm'] ?? ($it['produto_ncm'] ?? ''));
+            // O valor declarado deve seguir o preço atual do item (corrigido pelo admin).
+            $decl = (float) ($it['preco_unitario'] ?? ($it['valor_unitario'] ?? ($it['declaration_value'] ?? 0)));
+            if ($decl <= 0) {
+                $decl = (float) ($it['declaration_value'] ?? 0);
+            }
+            $peso = (float) ($it['peso_kg'] ?? ($it['peso'] ?? 0));
+            $qtd = (int) ($it['quantidade'] ?? 1);
+            $pacoteId = isset($it['pacote_id']) ? (int) $it['pacote_id'] : 0;
+            $foto = $it['foto_url'] ?? null;
+
+            if ($pacoteId > 0) {
+                try {
+                    $stPac = $db->prepare('SELECT nome, ncm, foto_url, peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                    $stPac->execute([$pacoteId]);
+                    $pac = $stPac->fetch(\PDO::FETCH_ASSOC);
+                    if ($pac) {
+                        if ($nome === '' || strpos($nome, 'Produto #') === 0) $nome = (string) ($pac['nome'] ?? $nome);
+                        if ($ncm === '') $ncm = (string) ($pac['ncm'] ?? '');
+                        if (empty($foto)) $foto = $pac['foto_url'] ?? null;
+                        if ($peso <= 0) $peso = (float) ($pac['peso_kg'] ?? 0);
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            if ($nome === '') $nome = 'Produto';
+
+            $novos[] = [
+                'pedido_item_id' => (int) ($it['id'] ?? 0),
+                'pacote_id' => $pacoteId > 0 ? $pacoteId : null,
+                'nome_produto' => $nome,
+                'ncm' => $ncm !== '' ? $ncm : null,
+                'declaration_value' => round($decl, 2),
+                'peso_kg' => $peso,
+                'quantidade' => $qtd,
+                'foto_url' => $foto,
+            ];
+        }
+
+        // Descobrir colunas realmente existentes em pedido_invoice_items
+        $colsInv = $this->getColsFromTable('pedido_invoice_items');
+
+        foreach ($invoiceIds as $invId) {
+            $invId = (int) $invId;
+            try {
+                $db->prepare('DELETE FROM pedido_invoice_items WHERE invoice_id = ?')->execute([$invId]);
+                foreach ($novos as $n) {
+                    $map = array_merge(['invoice_id' => $invId], $n);
+                    $insCols = [];
+                    $insPh = [];
+                    $insParams = [];
+                    foreach ($map as $c => $v) {
+                        if (in_array($c, $colsInv, true)) {
+                            $insCols[] = $c;
+                            $insPh[] = ':' . $c;
+                            $insParams[':' . $c] = $v;
+                        }
+                    }
+                    if (empty($insCols)) continue;
+                    $sql = 'INSERT INTO pedido_invoice_items (' . implode(', ', $insCols) . ') VALUES (' . implode(', ', $insPh) . ')';
+                    $db->prepare($sql)->execute($insParams);
+                }
+            } catch (\Throwable $e) {
+                error_log('[PedidosEdit] Falha ao recriar invoice_items invoice ' . $invId . ': ' . $e->getMessage());
+            }
+        }
+    }
+
     public function salvar($request) {
         try {
             // Pedidos grandes podem exceder o limite padrão de memória/tempo
@@ -1714,6 +1821,11 @@ class AdminPedidosEditController extends Controller {
                         $map['preco_unitario'] = (float) $map['declaration_value'];
                         $map['subtotal'] = (float) $map['declaration_value'] * (int) ($item['quantidade'] ?? 1);
                         $subtotalItem = $map['subtotal'];
+                    } elseif ((float) ($map['preco_unitario'] ?? 0) > 0) {
+                        // O admin definiu um preço válido: o valor declarado (usado na etiqueta/invoice)
+                        // DEVE acompanhar o novo preço. Caso contrário, a etiqueta continuaria com
+                        // o declaration_value antigo (ex.: 1.349,00 após correção para 13,49).
+                        $map['declaration_value'] = (float) $map['preco_unitario'];
                     }
 
                     foreach ($map as $c => $v) {
@@ -1983,6 +2095,15 @@ class AdminPedidosEditController extends Controller {
 
             if ($this->connection->inTransaction()) {
                 $this->connection->commit();
+            }
+
+            // Re-sincronizar o snapshot da invoice (pedido_invoice_items) com os itens
+            // atuais do pedido. A etiqueta usa a invoice como fonte do valor declarado,
+            // então sem isso uma correção de preço em pedido_itens não reflete na etiqueta.
+            try {
+                $this->sincronizarInvoiceItens((int) $pedidoId);
+            } catch (\Throwable $e) {
+                error_log('[PedidosEdit] sincronizarInvoiceItens falhou p/ pedido ' . $pedidoId . ': ' . $e->getMessage());
             }
 
             try {
