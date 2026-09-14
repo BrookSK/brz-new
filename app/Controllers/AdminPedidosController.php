@@ -4205,11 +4205,13 @@ HTML;
                                                         $img = 'https:' . $img;
                                                     }
                                                     echo '<img src="' . htmlspecialchars($img) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
-                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
+                                                         class="pedido-item-thumb" data-full-img="' . htmlspecialchars($img) . '"
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: zoom-in;">';
                                                 } elseif (strpos($img, '/public/uploads/') === 0 || strpos($img, '/uploads/pacotes/') === 0) {
                                                     // Path absoluto de pacotes/uploads — usar direto
                                                     echo '<img src="' . htmlspecialchars($img) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
-                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
+                                                         class="pedido-item-thumb" data-full-img="' . htmlspecialchars($img) . '"
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: zoom-in;">';
                                                 } else {
                                                     // Remover caminho duplicado se existir
                                                     $imagemPath = $img;
@@ -4217,7 +4219,8 @@ HTML;
                                                         $imagemPath = str_replace('uploads/produtos/', '', $imagemPath);
                                                     }
                                                     echo '<img src="/uploads/produtos/' . htmlspecialchars($imagemPath) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
-                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
+                                                         class="pedido-item-thumb" data-full-img="/uploads/produtos/' . htmlspecialchars($imagemPath) . '"
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: zoom-in;">';
                                                 }
                                             }
                                             
@@ -4395,6 +4398,47 @@ HTML;
                             </div>
                         </div>
                     </div>';
+
+                    // Lightbox para ampliar imagens dos itens do pedido
+                    echo <<<HTML
+<div id="pedidoImgLightbox" style="display:none;position:fixed;inset:0;z-index:20000;background:rgba(60,60,60,0.85);align-items:center;justify-content:center;">
+    <button type="button" id="pedidoImgLightboxClose" aria-label="Fechar" style="position:absolute;top:20px;right:28px;background:transparent;border:none;color:#fff;font-size:42px;line-height:1;cursor:pointer;font-weight:300;">&times;</button>
+    <img id="pedidoImgLightboxImg" src="" alt="Imagem ampliada" style="max-width:90vw;max-height:90vh;object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,0.5);" />
+</div>
+<script>(function(){
+    var box = document.getElementById("pedidoImgLightbox");
+    var img = document.getElementById("pedidoImgLightboxImg");
+    var closeBtn = document.getElementById("pedidoImgLightboxClose");
+    if(!box || !img) return;
+
+    function openBox(src){
+        img.src = src;
+        box.style.display = "flex";
+        document.body.style.overflow = "hidden";
+    }
+    function closeBox(){
+        box.style.display = "none";
+        img.src = "";
+        document.body.style.overflow = "";
+    }
+
+    document.addEventListener("click", function(ev){
+        var t = ev.target && ev.target.closest ? ev.target.closest(".pedido-item-thumb") : null;
+        if(!t) return;
+        ev.preventDefault();
+        var full = t.getAttribute("data-full-img") || t.getAttribute("src") || "";
+        if(full) openBox(full);
+    });
+
+    if(closeBtn) closeBtn.addEventListener("click", closeBox);
+    box.addEventListener("click", function(ev){
+        if(ev.target === box) closeBox();
+    });
+    document.addEventListener("keydown", function(ev){
+        if(ev.key === "Escape" && box.style.display !== "none") closeBox();
+    });
+})();</script>
+HTML;
 
                     echo '<div class="modal fade" id="modalNcmQuick" tabindex="-1" aria-hidden="true">'
                         . '<div class="modal-dialog modal-lg">'
