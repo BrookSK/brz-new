@@ -228,6 +228,9 @@ class AdminRelatorioPedidosController extends Controller {
      * Registrar impressão (AJAX)
      */
     public function registrarImpressao(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
         header('Content-Type: application/json');
         $pedidoId = (int) $request->getParam('pedido_id', 0);
         if ($pedidoId <= 0) { echo json_encode(['success'=>false]); exit; }

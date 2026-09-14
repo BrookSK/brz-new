@@ -3576,6 +3576,23 @@ HTML;
             // Obter itens do pedido (já vem com dados do produto adaptados)
             $itens = $pedido['items'] ?? [];
 
+            // Status de impressão do pedido (mesma fonte do Relatório de Pedidos)
+            $printCount = 0;
+            $lastPrintedBy = '';
+            try {
+                $pdoPrint = \Config\Database::getConnection();
+                $colsPrint = [];
+                try { $stC = $pdoPrint->query('DESCRIBE pedidos'); $colsPrint = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+                if (in_array('print_count', $colsPrint, true)) {
+                    $selPrint = 'print_count' . (in_array('last_printed_by', $colsPrint, true) ? ', last_printed_by' : '');
+                    $stP = $pdoPrint->prepare('SELECT ' . $selPrint . ' FROM pedidos WHERE id = ? LIMIT 1');
+                    $stP->execute([(int) $id]);
+                    $rowP = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $printCount = (int) ($rowP['print_count'] ?? 0);
+                    $lastPrintedBy = (string) ($rowP['last_printed_by'] ?? '');
+                }
+            } catch (\Exception $e) {}
+
             $quantidadeTotalItens = 0;
             if (is_array($itens)) {
                 foreach ($itens as $it) {
@@ -3666,9 +3683,34 @@ HTML;
                             <i class="fas fa-rotate me-1"></i><span class="d-none d-lg-inline">Sincronizar pagamentos</span>
                         </button>
                     </form>
-                    <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener">
+                    ' . (
+                        $printCount > 0
+                        ? '<span id="badge-impressao-pedido" class="badge bg-success align-self-center me-1">Impresso ' . (int) $printCount . 'x' . ($lastPrintedBy !== '' ? ' por ' . htmlspecialchars($lastPrintedBy, ENT_QUOTES, 'UTF-8') : '') . '</span>'
+                        : '<span id="badge-impressao-pedido" class="badge bg-secondary align-self-center me-1">Não impresso</span>'
+                    ) . '
+                    <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" onclick="marcarPedidoImpresso(' . (int) $id . ')">
                         <i class="fas fa-file-pdf me-1"></i><span class="d-none d-md-inline">PDF</span>
                     </a>
+                    <script>
+                    function marcarPedidoImpresso(pedidoId) {
+                        // Registra a impressão (mesma marcação do Relatório de Pedidos).
+                        // Não bloqueia a abertura do PDF: dispara o registro em paralelo.
+                        try {
+                            var body = new URLSearchParams();
+                            body.set("pedido_id", String(pedidoId));
+                            fetch("/admin/relatorio-pedidos/registrar-impressao", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest" },
+                                body: body.toString(),
+                                keepalive: true
+                            }).then(function() {
+                                var b = document.getElementById("badge-impressao-pedido");
+                                if (b) { b.className = "badge bg-success align-self-center me-1"; b.textContent = "\u2713 Impresso agora"; }
+                            }).catch(function() {});
+                        } catch (e) {}
+                        return true; // permite o link abrir o PDF normalmente
+                    }
+                    </script>
                     <a href="/admin/pedidos/editar/' . $id . '?returnUrl=' . urlencode($voltarUrl) . '" class="btn btn-warning btn-sm">
                         <i class="fas fa-edit me-1"></i><span class="d-none d-md-inline">Editar</span>
                     </a>
