@@ -131,6 +131,25 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
         foreach ($itens as $it):
             $nome = (string)($it['nome_produto'] ?? '');
             $foto = (string)($it['imagem'] ?? '');
+            // Fallbacks e normalização do caminho da foto
+            if ($foto === '' || $foto === 'default.jpg' || $foto === 'placeholder.jpg') {
+                $foto = (string)($it['foto_url'] ?? ($it['imagem_principal'] ?? ''));
+            }
+            if ($foto !== '' && $foto !== 'default.jpg' && $foto !== 'placeholder.jpg') {
+                if (preg_match('#^https?://#i', $foto)) {
+                    // URL externa — usar direto
+                } elseif (strpos($foto, '//') === 0) {
+                    $foto = 'https:' . $foto;
+                } elseif (strpos($foto, '/public/uploads/') === 0 || strpos($foto, '/uploads/') === 0) {
+                    // caminho absoluto — direto
+                } elseif (strpos($foto, 'uploads/') !== false) {
+                    $foto = '/' . ltrim($foto, '/');
+                } else {
+                    $foto = '/uploads/produtos/' . ltrim($foto, '/');
+                }
+            } else {
+                $foto = '';
+            }
             $qtd = (int)($it['quantidade'] ?? 1);
             $preco = (float)($it['preco_unitario'] ?? 0);
             $sub = (float)($it['subtotal'] ?? ($preco * $qtd));
@@ -154,14 +173,23 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
             </tr>
         <?php endforeach; ?>
             <tr class="total-row"><td colspan="5">Subtotal</td><td><?= $fmt($pedido['subtotal'] ?? 0) ?></td></tr>
+            <?php if (empty($ocultarTaxaServico)): ?>
             <tr class="total-row"><td colspan="5">Taxa de Serviço</td><td><?= $fmt($pedido['servicos'] ?? 0) ?></td></tr>
+            <?php endif; ?>
             <tr class="total-row"><td colspan="5">Impostos</td><td><?= $fmt($pedido['impostos'] ?? 0) ?></td></tr>
             <?php if (((float)($pedido['imposto_local'] ?? 0)) > 0): ?>
             <tr class="total-row"><td colspan="5">Imposto Local</td><td><?= $fmt($pedido['imposto_local']) ?></td></tr>
             <?php endif; ?>
             <tr class="total-row"><td colspan="5">Frete</td><td><?= ((float)($pedido['frete'] ?? 0)) <= 0 ? '<span class="highlight">Frete Grátis</span>' : $fmt($pedido['frete']) ?></td></tr>
             <tr class="total-row"><td colspan="5">Peso Total</td><td class="highlight"><?= number_format($pesoTotal, 3, ',', '.') ?> kg</td></tr>
-            <tr class="total-row"><td colspan="5" style="font-size:13px;">Total do Pedido</td><td style="font-size:13px;"><?= $fmt($pedido['total'] ?? 0) ?></td></tr>
+            <?php
+                $totalPdf = (float) ($pedido['total'] ?? 0);
+                if (!empty($ocultarTaxaServico)) {
+                    // Ao ocultar a taxa de serviço, subtraí-la do total exibido.
+                    $totalPdf = max(0.0, $totalPdf - (float) ($pedido['servicos'] ?? 0));
+                }
+            ?>
+            <tr class="total-row"><td colspan="5" style="font-size:13px;">Total do Pedido</td><td style="font-size:13px;"><?= $fmt($totalPdf) ?></td></tr>
         </tbody>
     </table>
 </div>

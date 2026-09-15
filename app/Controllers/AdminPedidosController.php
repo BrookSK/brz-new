@@ -3688,10 +3688,22 @@ HTML;
                         ? '<span id="badge-impressao-pedido" class="badge bg-success align-self-center me-1">Impresso ' . (int) $printCount . 'x' . ($lastPrintedBy !== '' ? ' por ' . htmlspecialchars($lastPrintedBy, ENT_QUOTES, 'UTF-8') : '') . '</span>'
                         : '<span id="badge-impressao-pedido" class="badge bg-secondary align-self-center me-1">Não impresso</span>'
                     ) . '
-                    <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" onclick="marcarPedidoImpresso(' . (int) $id . ')">
+                    <span class="form-check form-check-inline align-self-center mb-0 me-1" title="Se marcado, o PDF é gerado sem a linha de Taxa de Serviço">
+                        <input class="form-check-input" type="checkbox" id="pdf-ocultar-taxa">
+                        <label class="form-check-label small" for="pdf-ocultar-taxa">Ocultar taxa no PDF</label>
+                    </span>
+                    <button type="button" class="btn btn-outline-dark btn-sm" onclick="abrirPdfPedido(' . (int) $id . ')">
                         <i class="fas fa-file-pdf me-1"></i><span class="d-none d-md-inline">PDF</span>
-                    </a>
+                    </button>
                     <script>
+                    function abrirPdfPedido(pedidoId) {
+                        var ocultar = false;
+                        var chk = document.getElementById("pdf-ocultar-taxa");
+                        if (chk) ocultar = !!chk.checked;
+                        var url = "/admin/relatorio-pedidos/imprimir/" + pedidoId + (ocultar ? "?ocultar_taxa=1" : "");
+                        marcarPedidoImpresso(pedidoId);
+                        window.open(url, "_blank", "noopener");
+                    }
                     function marcarPedidoImpresso(pedidoId) {
                         // Registra a impressão (mesma marcação do Relatório de Pedidos).
                         // Não bloqueia a abertura do PDF: dispara o registro em paralelo.
@@ -3708,7 +3720,7 @@ HTML;
                                 if (b) { b.className = "badge bg-success align-self-center me-1"; b.textContent = "\u2713 Impresso agora"; }
                             }).catch(function() {});
                         } catch (e) {}
-                        return true; // permite o link abrir o PDF normalmente
+                        return true;
                     }
                     </script>
                     <a href="/admin/pedidos/editar/' . $id . '?returnUrl=' . urlencode($voltarUrl) . '" class="btn btn-warning btn-sm">

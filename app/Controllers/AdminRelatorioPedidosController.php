@@ -161,11 +161,47 @@ class AdminRelatorioPedidosController extends Controller {
             $nomeCol = in_array('name', $prodCols, true) ? 'p2.name' : (in_array('nome', $prodCols, true) ? 'p2.nome' : "''");
             $fotoCol = in_array('foto_principal', $prodCols, true) ? 'p2.foto_principal' : "''";
 
-            $stIt = $this->db->prepare("SELECT i.*, {$fotoCol} AS produto_foto, {$nomeCol} AS produto_nome_db
+            // Colunas de imagem/pacote na tabela de itens
+            $itemCols = [];
+            try { $stIC = $this->db->query("DESCRIBE {$itensTable}"); $itemCols = $stIC ? $stIC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $fotoUrlItemSel = in_array('foto_url', $itemCols, true) ? 'i.foto_url' : "''";
+
+            // Foto da galeria (produto_fotos) como fallback quando não há foto_principal
+            $galeriaSel = "''";
+            try {
+                if ($this->tableExists('produto_fotos')) {
+                    $pfCols = [];
+                    try { $stPF = $this->db->query('DESCRIBE produto_fotos'); $pfCols = $stPF ? $stPF->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $pfNomeArq = in_array('nome_arquivo', $pfCols, true) ? 'nome_arquivo' : (in_array('url', $pfCols, true) ? 'url' : (in_array('foto', $pfCols, true) ? 'foto' : ''));
+                    if ($pfNomeArq !== '') {
+                        $ordemExpr = (in_array('principal', $pfCols, true) ? 'pf.principal DESC, ' : '') . (in_array('ordem', $pfCols, true) ? 'pf.ordem ASC, ' : '') . 'pf.id ASC';
+                        $galeriaSel = "(SELECT pf.{$pfNomeArq} FROM produto_fotos pf WHERE pf.produto_id = i.produto_id ORDER BY {$ordemExpr} LIMIT 1)";
+                    }
+                }
+            } catch (\Exception $e) {}
+
+            $stIt = $this->db->prepare("SELECT i.*, {$fotoCol} AS produto_foto, {$nomeCol} AS produto_nome_db, {$fotoUrlItemSel} AS item_foto_url, {$galeriaSel} AS galeria_foto
                 FROM {$itensTable} i LEFT JOIN produtos p2 ON p2.id = i.produto_id
                 WHERE i.pedido_id IN ({$in})");
             $stIt->execute($pids);
             foreach ($stIt->fetchAll(\PDO::FETCH_ASSOC) as $it) {
+                // Resolver a melhor foto disponível (mesma cascata do detalhe):
+                // 1) foto_url do item (pacotes/redirecionamento) 2) foto_principal do produto 3) galeria
+                $fotoResolvida = '';
+                foreach ([$it['produto_foto'] ?? '', $it['galeria_foto'] ?? '', $it['item_foto_url'] ?? ''] as $cand) {
+                    $cand = trim((string) $cand);
+                    if ($cand !== '' && $cand !== 'default.jpg' && $cand !== 'placeholder.jpg') {
+                        $fotoResolvida = $cand;
+                        break;
+                    }
+                }
+                // Para pacotes, priorizar a foto_url do item
+                $pidIt = (int) ($it['produto_id'] ?? 0);
+                $tipoIt = (string) ($it['tipo_item'] ?? '');
+                if (($tipoIt === 'pacote_redirecionamento' || $pidIt >= 999990) && trim((string) ($it['item_foto_url'] ?? '')) !== '') {
+                    $fotoResolvida = trim((string) $it['item_foto_url']);
+                }
+                $it['produto_foto'] = $this->normalizarUrlFoto($fotoResolvida);
                 $itensPorPedido[(int)$it['pedido_id']][] = $it;
             }
         }
@@ -225,6 +261,35 @@ class AdminRelatorioPedidosController extends Controller {
     }
 
     /**
+     * Normaliza o caminho/URL de uma foto de produto para uso em src,
+     * seguindo a mesma lógica da tela de detalhes do pedido.
+     */
+    private function normalizarUrlFoto(string $img): string {
+        $img = trim($img);
+        if ($img === '' || $img === 'default.jpg' || $img === 'placeholder.jpg') {
+            return '';
+        }
+        // URL externa
+        if (preg_match('#^https?://#i', $img)) {
+            return $img;
+        }
+        // Protocolo relativo (//cdn...)
+        if (strpos($img, '//') === 0) {
+            return 'https:' . $img;
+        }
+        // Caminho absoluto de uploads/pacotes
+        if (strpos($img, '/public/uploads/') === 0 || strpos($img, '/uploads/') === 0) {
+            return $img;
+        }
+        // Caminho relativo com pasta uploads
+        if (strpos($img, 'uploads/') !== false) {
+            return '/' . ltrim($img, '/');
+        }
+        // Nome de arquivo simples → assume pasta de produtos
+        return '/uploads/produtos/' . ltrim($img, '/');
+    }
+
+    /**
      * Registrar impressão (AJAX)
      */
     public function registrarImpressao(Request $request) {
@@ -264,6 +329,9 @@ class AdminRelatorioPedidosController extends Controller {
     public function imprimir(Request $request, $id) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        // Opção de ocultar a Taxa de Serviço no PDF (via ?ocultar_taxa=1)
+        $ocultarTaxaServico = ((string) $request->getParam('ocultar_taxa', '0') === '1');
 
         $pedidoModel = new \App\Models\PedidoEcommerce();
         $pedido = $pedidoModel->getComDetalhes($id);
