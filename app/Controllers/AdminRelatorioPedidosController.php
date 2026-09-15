@@ -169,9 +169,10 @@ class AdminRelatorioPedidosController extends Controller {
             // Foto da galeria (produto_fotos) como fallback quando não há foto_principal
             $galeriaSel = "''";
             try {
-                if ($this->tableExists('produto_fotos')) {
-                    $pfCols = [];
-                    try { $stPF = $this->db->query('DESCRIBE produto_fotos'); $pfCols = $stPF ? $stPF->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                // Se a tabela não existir, o DESCRIBE lança exceção e caímos no catch.
+                $pfCols = [];
+                try { $stPF = $this->db->query('DESCRIBE produto_fotos'); $pfCols = $stPF ? $stPF->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) { $pfCols = []; }
+                if (!empty($pfCols)) {
                     $pfNomeArq = in_array('nome_arquivo', $pfCols, true) ? 'nome_arquivo' : (in_array('url', $pfCols, true) ? 'url' : (in_array('foto', $pfCols, true) ? 'foto' : ''));
                     if ($pfNomeArq !== '') {
                         $ordemExpr = (in_array('principal', $pfCols, true) ? 'pf.principal DESC, ' : '') . (in_array('ordem', $pfCols, true) ? 'pf.ordem ASC, ' : '') . 'pf.id ASC';
