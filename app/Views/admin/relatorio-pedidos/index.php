@@ -175,7 +175,7 @@ $statusColors = [
                                 $pesoTotal += $peso * $qtd;
                             ?>
                                 <tr>
-                                    <td><?= $foto ? '<img src="'.htmlspecialchars($foto).'" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">' : '' ?></td>
+                                    <td><?= $foto ? '<img src="'.htmlspecialchars($foto).'" class="relatorio-item-thumb" data-full="'.htmlspecialchars($foto).'" style="width:40px;height:40px;object-fit:cover;border-radius:4px;cursor:zoom-in;" title="Clique para ampliar">' : '' ?></td>
                                     <td><?= htmlspecialchars($nome) ?></td>
                                     <td><?= $qtd ?></td>
                                     <td><?= $fmt($preco) ?></td>
@@ -261,4 +261,40 @@ function imprimirTodos() {
     });
     window.open('/admin/relatorio-pedidos/imprimir-lote?ids=' + ids.join(','), '_blank');
 }
+</script>
+
+<!-- Lightbox de imagem do produto (Relatório de Pedidos) -->
+<div id="relatorioImgLightbox" style="display:none;position:fixed;inset:0;z-index:20000;background:rgba(60,60,60,0.85);align-items:center;justify-content:center;">
+    <button type="button" id="relatorioImgLightboxClose" aria-label="Fechar" style="position:absolute;top:20px;right:28px;background:transparent;border:none;color:#fff;font-size:42px;line-height:1;cursor:pointer;font-weight:300;">&times;</button>
+    <img id="relatorioImgLightboxImg" src="" alt="Imagem ampliada" style="max-width:90vw;max-height:90vh;object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,0.5);" />
+</div>
+<script>
+(function() {
+    var box = document.getElementById('relatorioImgLightbox');
+    var img = document.getElementById('relatorioImgLightboxImg');
+    var closeBtn = document.getElementById('relatorioImgLightboxClose');
+    if (!box || !img) return;
+
+    function abrir(src) {
+        img.src = src;
+        box.style.display = 'flex';
+    }
+    function fechar() {
+        box.style.display = 'none';
+        img.src = '';
+    }
+
+    // Delegação: funciona mesmo para linhas expandidas dinamicamente
+    document.addEventListener('click', function(e) {
+        var t = e.target;
+        if (t && t.classList && t.classList.contains('relatorio-item-thumb')) {
+            var src = t.getAttribute('data-full') || t.getAttribute('src');
+            if (src) { e.preventDefault(); e.stopPropagation(); abrir(src); }
+        }
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', fechar);
+    box.addEventListener('click', function(e) { if (e.target === box) fechar(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && box.style.display === 'flex') fechar(); });
+})();
 </script>
