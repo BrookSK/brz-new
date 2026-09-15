@@ -1511,12 +1511,34 @@ class AdminComprasController extends Controller {
                 }
             }
 
-            // Contadores gerais (excluindo itens de carnê)
-            $countWhere = "WHERE (tipo_compra IS NULL OR tipo_compra = '' OR tipo_compra != 'carne')";
-            if (!$temTipoCompraEmLista) {
-                $countWhere = "WHERE 1=1";
+            // Contadores gerais — DEVEM usar os MESMOS filtros da listagem para não divergir:
+            // exclui pacotes de redirecionamento (produto_id >= 999990), pedidos cancelados/apagados
+            // (mantém só status válidos) e itens de pedidos de carnê.
+            $countJoin = $temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '';
+            $countConds = ['lc.produto_id < 999990'];
+
+            if ($temTipoCompraEmLista) {
+                $countConds[] = "(lc.tipo_compra IS NULL OR lc.tipo_compra = '' OR lc.tipo_compra != 'carne')";
             }
-            $stmt = $this->connection->prepare("SELECT COUNT(*) as total_itens, SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes, SUM(CASE WHEN status = 'comprado' THEN 1 ELSE 0 END) as comprados, SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) as cancelados FROM lista_compras {$countWhere}");
+
+            if ($temPedidoEmLista) {
+                // Só considerar pedidos em status válidos (exclui cancelados/apagados)
+                $countConds[] = "(lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ("
+                    . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "")
+                    . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','itens_comprados','itens_parcialmente_comprados')))";
+                // Excluir itens de pedidos de carnê (tela separada)
+                $countConds[] = "(lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL) AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'))";
+            }
+
+            $countWhere = 'WHERE ' . implode(' AND ', $countConds);
+
+            $stmt = $this->connection->prepare(
+                "SELECT COUNT(*) as total_itens,"
+                . " SUM(CASE WHEN lc.status = 'pendente' THEN 1 ELSE 0 END) as pendentes,"
+                . " SUM(CASE WHEN lc.status = 'comprado' THEN 1 ELSE 0 END) as comprados,"
+                . " SUM(CASE WHEN lc.status = 'cancelado' THEN 1 ELSE 0 END) as cancelados"
+                . " FROM lista_compras lc" . $countJoin . " " . $countWhere
+            );
             $stmt->execute();
             $estatisticas = $stmt->fetch(\PDO::FETCH_ASSOC);
 
