@@ -79,7 +79,7 @@ class AdminPromocoesAgendadasController extends Controller {
         // Produtos: não carregar todos no HTML — busca via AJAX
         $produtos = [];
 
-        $title = 'Promoções Agendadas';
+        $title = __('admin.scheduled_promos.page_title', 'Promoções Agendadas');
         $sidebarActive = 'promocoes-agendadas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -105,7 +105,7 @@ class AdminPromocoesAgendadasController extends Controller {
         if (!is_array($produtoIds)) $produtoIds = [];
 
         if ($nome === '' || $descontoValor <= 0 || $inicio === '' || $fim === '' || empty($produtoIds)) {
-            $_SESSION['flash_error'] = 'Preencha todos os campos obrigatórios (nome, desconto, datas e pelo menos 1 produto).';
+            $_SESSION['flash_error'] = __('admin.scheduled_promos.fill_required_fields', 'Preencha todos os campos obrigatórios (nome, desconto, datas e pelo menos 1 produto).');
             header('Location: /admin/promocoes-agendadas');
             exit;
         }
@@ -114,7 +114,7 @@ class AdminPromocoesAgendadasController extends Controller {
         $fimFmt = date('Y-m-d H:i:s', strtotime($fim));
 
         if (strtotime($fimFmt) <= strtotime($inicioFmt)) {
-            $_SESSION['flash_error'] = 'A data de fim deve ser posterior à data de início.';
+            $_SESSION['flash_error'] = __('admin.scheduled_promos.end_after_start', 'A data de fim deve ser posterior à data de início.');
             header('Location: /admin/promocoes-agendadas');
             exit;
         }
@@ -152,7 +152,10 @@ class AdminPromocoesAgendadasController extends Controller {
             $this->aplicarPromocao($pdo, $promoId);
         }
 
-        $_SESSION['flash_success'] = "Promoção \"{$nome}\" criada com {$status}. {$this->contarProdutos($pdo, $promoId)} produtos vinculados.";
+        $statusLabel = $status === 'ativa'
+            ? __('admin.scheduled_promos.status_ativa', 'ativa')
+            : __('admin.scheduled_promos.status_agendada', 'agendada');
+        $_SESSION['flash_success'] = __('admin.scheduled_promos.created_success', 'Promoção "{nome}" criada com status {status}. {n} produtos vinculados.', ['nome' => $nome, 'status' => $statusLabel, 'n' => $this->contarProdutos($pdo, $promoId)]);
         header('Location: /admin/promocoes-agendadas');
         exit;
     }
@@ -169,7 +172,7 @@ class AdminPromocoesAgendadasController extends Controller {
 
         $pdo->prepare("UPDATE promocoes_agendadas SET status = 'cancelada', updated_at = NOW() WHERE id = ?")->execute([$id]);
 
-        $_SESSION['flash_success'] = 'Promoção cancelada e preços restaurados.';
+        $_SESSION['flash_success'] = __('admin.scheduled_promos.canceled_success', 'Promoção cancelada e preços restaurados.');
         header('Location: /admin/promocoes-agendadas');
         exit;
     }

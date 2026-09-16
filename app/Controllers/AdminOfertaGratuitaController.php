@@ -47,11 +47,11 @@ class AdminOfertaGratuitaController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oferta Gratuita - Admin</title>
+    <title>' . htmlspecialchars(__('admin.free_offer.page_title', 'Oferta Gratuita - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -60,7 +60,7 @@ class AdminOfertaGratuitaController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Oferta de Produto Gratuito</h1>
+                <h1 class="page-title">' . __('admin.free_offer.title', 'Oferta de Produto Gratuito') . '</h1>
             </div>';
 
         // Mensagens flash
@@ -73,34 +73,34 @@ class AdminOfertaGratuitaController extends Controller {
 
         // Controle Global
         echo '<div class="card mb-4">
-            <div class="card-header bg-white"><strong><i class="fas fa-power-off"></i> Controle Global</strong></div>
+            <div class="card-header bg-white"><strong><i class="fas fa-power-off"></i> ' . __('admin.free_offer.global_control', 'Controle Global') . '</strong></div>
             <div class="card-body">
                 <form method="POST" action="/admin/oferta-gratuita/toggle-global" class="d-flex align-items-center gap-3">
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="globalToggle" name="ativa" value="1" ' . ($globalAtiva ? 'checked' : '') . ' onchange="this.form.submit()" style="width:3em;height:1.5em;">
                         <label class="form-check-label ms-2" for="globalToggle">
-                            ' . ($globalAtiva ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Desativada</span>') . '
+                            ' . ($globalAtiva ? '<span class="badge bg-success">' . __('admin.free_offer.active', 'Ativa') . '</span>' : '<span class="badge bg-secondary">' . __('admin.free_offer.disabled', 'Desativada') . '</span>') . '
                         </label>
                     </div>
-                    <span class="text-muted small">Ativar/desativar a oferta de produto gratuito no carrinho para todos os clientes</span>
+                    <span class="text-muted small">' . __('admin.free_offer.global_control_hint', 'Ativar/desativar a oferta de produto gratuito no carrinho para todos os clientes') . '</span>
                 </form>
             </div>
         </div>';
 
         // Estatísticas
         echo '<div class="row mb-4">
-            <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-success">' . $stats['aceitas'] . '</h5><small class="text-muted">Ofertas Aceitas</small></div></div></div>
-            <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-warning">' . $stats['recusadas'] . '</h5><small class="text-muted">Ofertas Recusadas</small></div></div></div>
-            <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-danger">' . $stats['removidas'] . '</h5><small class="text-muted">Removidas do Carrinho</small></div></div></div>
+            <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-success">' . $stats['aceitas'] . '</h5><small class="text-muted">' . __('admin.free_offer.stat_accepted', 'Ofertas Aceitas') . '</small></div></div></div>
+            <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-warning">' . $stats['recusadas'] . '</h5><small class="text-muted">' . __('admin.free_offer.stat_declined', 'Ofertas Recusadas') . '</small></div></div></div>
+            <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-danger">' . $stats['removidas'] . '</h5><small class="text-muted">' . __('admin.free_offer.stat_removed', 'Removidas do Carrinho') . '</small></div></div></div>
         </div>';
 
         // Sincronização automática
         echo '<div class="card mb-4">
-            <div class="card-header bg-white"><strong><i class="fas fa-sync-alt"></i> Sincronização Automática</strong></div>
+            <div class="card-header bg-white"><strong><i class="fas fa-sync-alt"></i> ' . __('admin.free_offer.auto_sync', 'Sincronização Automática') . '</strong></div>
             <div class="card-body">
-                <p class="text-muted small mb-2">Marca automaticamente como elegíveis todos os produtos do catálogo do site (sem grupo de compras) com peso &ge; 500g. Produtos que não atendem mais os critérios são removidos.</p>
+                <p class="text-muted small mb-2">' . __('admin.free_offer.auto_sync_hint', 'Marca automaticamente como elegíveis todos os produtos do catálogo do site (sem grupo de compras) com peso &ge; 500g. Produtos que não atendem mais os critérios são removidos.') . '</p>
                 <form method="POST" action="/admin/oferta-gratuita/sincronizar" class="d-inline">
-                    <button type="submit" class="btn btn-outline-success" onclick="return confirm(\'Sincronizar produtos do site com peso >= 500g como elegíveis para oferta gratuita?\')"><i class="fas fa-sync-alt me-1"></i> Sincronizar Produtos do Site</button>
+                    <button type="submit" class="btn btn-outline-success" onclick="return confirm(\'' . htmlspecialchars(__('admin.free_offer.sync_confirm', 'Sincronizar produtos do site com peso >= 500g como elegíveis para oferta gratuita?'), ENT_QUOTES, 'UTF-8') . '\')"><i class="fas fa-sync-alt me-1"></i> ' . __('admin.free_offer.sync_button', 'Sincronizar Produtos do Site') . '</button>
                 </form>
             </div>
         </div>';
@@ -108,42 +108,42 @@ class AdminOfertaGratuitaController extends Controller {
         // Lista de produtos elegíveis
         echo '<div class="card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <strong><i class="fas fa-box-open"></i> Produtos Elegíveis para Oferta Gratuita (' . $total . ')</strong>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarProduto"><i class="fas fa-plus"></i> Adicionar Produto</button>
+                <strong><i class="fas fa-box-open"></i> ' . __('admin.free_offer.eligible_products', 'Produtos Elegíveis para Oferta Gratuita') . ' (' . $total . ')</strong>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarProduto"><i class="fas fa-plus"></i> ' . __('admin.free_offer.add_product', 'Adicionar Produto') . '</button>
             </div>
             <div class="card-body">';
 
         if (empty($produtos)) {
-            echo '<div class="text-muted text-center py-4">Nenhum produto marcado como elegível para oferta gratuita.</div>';
+            echo '<div class="text-muted text-center py-4">' . __('admin.free_offer.no_eligible', 'Nenhum produto marcado como elegível para oferta gratuita.') . '</div>';
         } else {
             // Barra de ação em massa
             echo '<div id="bulkBar" class="alert alert-info d-none align-items-center gap-3 mb-3">
-                <span><strong id="bulkCount">0</strong> produto(s) selecionado(s)</span>
+                <span><strong id="bulkCount">0</strong> ' . __('admin.free_offer.selected_products', 'produto(s) selecionado(s)') . '</span>
                 <form method="POST" action="/admin/oferta-gratuita/acao-massa" class="d-flex align-items-center gap-2 ms-auto" id="bulkForm">
                     <input type="hidden" name="produto_ids" id="bulkIds" value="">
                     <select name="categoria_id" class="form-select form-select-sm" style="width:auto;" required>
-                        <option value="">Alterar categoria para...</option>';
+                        <option value="">' . __('admin.free_offer.change_category_to', 'Alterar categoria para...') . '</option>';
             foreach ($categorias as $cat) {
                 echo '<option value="' . (int) $cat['id'] . '">' . htmlspecialchars($cat['name']) . '</option>';
             }
             echo '</select>
-                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save me-1"></i> Aplicar</button>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save me-1"></i> ' . __('admin.free_offer.apply', 'Aplicar') . '</button>
                 </form>
             </div>';
 
             echo '<div class="table-responsive d-none d-md-block"><table class="table table-hover align-middle">
                 <thead><tr>
                     <th style="width:40px"><input type="checkbox" id="checkAll" class="form-check-input"></th>
-                    <th>ID</th><th>Produto</th><th>Categoria</th><th>Peso</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th>
+                    <th>ID</th><th>' . __('admin.free_offer.th_product', 'Produto') . '</th><th>' . __('admin.free_offer.th_category', 'Categoria') . '</th><th>' . __('admin.free_offer.th_weight', 'Peso') . '</th><th>' . __('admin.free_offer.th_price', 'Preço') . '</th><th>' . __('admin.free_offer.th_stock', 'Estoque') . '</th><th>' . __('admin.free_offer.th_status', 'Status') . '</th><th>' . __('admin.free_offer.th_actions', 'Ações') . '</th>
                 </tr></thead><tbody>';
 
             foreach ($produtos as $p) {
                 $statusBadge = ((int) ($p['active'] ?? 0) && ($p['status'] ?? '') === 'published')
-                    ? '<span class="badge bg-success">Ativo</span>'
-                    : '<span class="badge bg-secondary">Inativo</span>';
+                    ? '<span class="badge bg-success">' . __('admin.free_offer.status_active', 'Ativo') . '</span>'
+                    : '<span class="badge bg-secondary">' . __('admin.free_offer.status_inactive', 'Inativo') . '</span>';
                 $stockBadge = ((int) ($p['stock'] ?? 0) > 0)
                     ? '<span class="badge bg-info">' . (int) $p['stock'] . '</span>'
-                    : '<span class="badge bg-danger">Sem estoque</span>';
+                    : '<span class="badge bg-danger">' . __('admin.free_offer.out_of_stock', 'Sem estoque') . '</span>';
                 $pesoKg = (float) ($p['weight'] ?? 0);
                 $pesoG = round($pesoKg * 1000);
                 $pesoBadge = $pesoKg >= 0.5
@@ -154,13 +154,13 @@ class AdminOfertaGratuitaController extends Controller {
                     <td><input type="checkbox" class="form-check-input bulk-check" value="' . (int) $p['id'] . '"></td>
                     <td>' . (int) $p['id'] . '</td>
                     <td>' . htmlspecialchars((string) ($p['name'] ?? '')) . '</td>
-                    <td>' . htmlspecialchars((string) ($p['categoria_nome'] ?? 'Sem categoria')) . '</td>
+                    <td>' . htmlspecialchars((string) ($p['categoria_nome'] ?? __('admin.free_offer.no_category', 'Sem categoria'))) . '</td>
                     <td>' . $pesoBadge . '</td>
                     <td>$ ' . number_format((float) ($p['price'] ?? 0), 2) . '</td>
                     <td>' . $stockBadge . '</td>
                     <td>' . $statusBadge . '</td>
                     <td>
-                        <form method="POST" action="/admin/oferta-gratuita/remover" class="d-inline" onsubmit="return confirm(\'Remover este produto da oferta gratuita?\')">
+                        <form method="POST" action="/admin/oferta-gratuita/remover" class="d-inline" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.free_offer.remove_confirm', 'Remover este produto da oferta gratuita?'), ENT_QUOTES, 'UTF-8') . '\')">
                             <input type="hidden" name="produto_id" value="' . (int) $p['id'] . '">
                             <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
                         </form>
@@ -175,8 +175,8 @@ class AdminOfertaGratuitaController extends Controller {
             echo '<div class="d-md-none">';
             foreach ($produtos as $p) {
                 $statusBadge2 = ((int) ($p['active'] ?? 0) && ($p['status'] ?? '') === 'published')
-                    ? '<span class="badge bg-success">Ativo</span>'
-                    : '<span class="badge bg-secondary">Inativo</span>';
+                    ? '<span class="badge bg-success">' . __('admin.free_offer.status_active', 'Ativo') . '</span>'
+                    : '<span class="badge bg-secondary">' . __('admin.free_offer.status_inactive', 'Inativo') . '</span>';
                 $pesoKg2 = (float) ($p['weight'] ?? 0);
                 $pesoG2 = round($pesoKg2 * 1000);
 
@@ -192,7 +192,7 @@ class AdminOfertaGratuitaController extends Controller {
                                 ' . $statusBadge2 . '
                             </div>
                         </div>
-                        <form method="POST" action="/admin/oferta-gratuita/remover" class="d-inline" onsubmit="return confirm(\'Remover?\')">
+                        <form method="POST" action="/admin/oferta-gratuita/remover" class="d-inline" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.free_offer.remove_short_confirm', 'Remover?'), ENT_QUOTES, 'UTF-8') . '\')">
                             <input type="hidden" name="produto_id" value="' . (int) $p['id'] . '">
                             <button class="btn btn-sm btn-outline-danger py-0 px-1"><i class="fas fa-times"></i></button>
                         </form>
@@ -244,11 +244,11 @@ class AdminOfertaGratuitaController extends Controller {
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Adicionar Produto à Oferta Gratuita</h5>
+                        <h5 class="modal-title">' . __('admin.free_offer.modal_title', 'Adicionar Produto à Oferta Gratuita') . '</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <input type="text" id="buscaProduto" class="form-control mb-3" placeholder="Buscar produto por nome...">
+                        <input type="text" id="buscaProduto" class="form-control mb-3" placeholder="' . htmlspecialchars(__('admin.free_offer.search_placeholder', 'Buscar produto por nome...'), ENT_QUOTES, 'UTF-8') . '">
                         <div id="resultadosBusca"></div>
                     </div>
                 </div>
@@ -297,8 +297,8 @@ class AdminOfertaGratuitaController extends Controller {
             if (bulkForm) {
                 bulkForm.addEventListener("submit", function(e) {
                     var sel = bulkForm.querySelector("select[name=categoria_id]");
-                    if (!sel.value) { e.preventDefault(); alert("Selecione uma categoria."); return; }
-                    if (!bulkIds.value) { e.preventDefault(); alert("Selecione ao menos um produto."); return; }
+                    if (!sel.value) { e.preventDefault(); alert("' . htmlspecialchars(__('admin.free_offer.js_select_category', 'Selecione uma categoria.'), ENT_QUOTES, 'UTF-8') . '"); return; }
+                    if (!bulkIds.value) { e.preventDefault(); alert("' . htmlspecialchars(__('admin.free_offer.js_select_product', 'Selecione ao menos um produto.'), ENT_QUOTES, 'UTF-8') . '"); return; }
                 });
             }
         })();
@@ -311,19 +311,19 @@ class AdminOfertaGratuitaController extends Controller {
                 const res = await fetch("/admin/oferta-gratuita/buscar-produtos?q=" + encodeURIComponent(q));
                 const data = await res.json();
                 if (!data.items || data.items.length === 0) {
-                    container.innerHTML = "<div class=\"text-muted\">Nenhum produto encontrado.</div>";
+                    container.innerHTML = "<div class=\"text-muted\">' . htmlspecialchars(__('admin.free_offer.js_no_products', 'Nenhum produto encontrado.'), ENT_QUOTES, 'UTF-8') . '</div>";
                     return;
                 }
                 let html = "<div class=\"list-group\">";
                 data.items.forEach(p => {
                     html += "<div class=\"list-group-item d-flex justify-content-between align-items-center\">" +
-                        "<div><strong>" + (p.name || "") + "</strong> <small class=\"text-muted\">ID: " + p.id + " | Estoque: " + p.stock + " | $ " + parseFloat(p.price || 0).toFixed(2) + "</small></div>" +
+                        "<div><strong>" + (p.name || "") + "</strong> <small class=\"text-muted\">ID: " + p.id + " | ' . htmlspecialchars(__('admin.free_offer.js_stock', 'Estoque'), ENT_QUOTES, 'UTF-8') . ': " + p.stock + " | $ " + parseFloat(p.price || 0).toFixed(2) + "</small></div>" +
                         "<form method=\"POST\" action=\"/admin/oferta-gratuita/adicionar\"><input type=\"hidden\" name=\"produto_id\" value=\"" + p.id + "\">" +
-                        "<button class=\"btn btn-sm btn-success\"><i class=\"fas fa-plus\"></i> Adicionar</button></form></div>";
+                        "<button class=\"btn btn-sm btn-success\"><i class=\"fas fa-plus\"></i> ' . htmlspecialchars(__('admin.free_offer.add_product', 'Adicionar Produto'), ENT_QUOTES, 'UTF-8') . '</button></form></div>";
                 });
                 html += "</div>";
                 container.innerHTML = html;
-            } catch(e) { container.innerHTML = "<div class=\"text-danger\">Erro na busca.</div>"; }
+            } catch(e) { container.innerHTML = "<div class=\"text-danger\">' . htmlspecialchars(__('admin.free_offer.js_search_error', 'Erro na busca.'), ENT_QUOTES, 'UTF-8') . '</div>"; }
         });
         </script>';
 
@@ -373,7 +373,7 @@ class AdminOfertaGratuitaController extends Controller {
         } catch (\Exception $e) {}
 
         if (session_status() === PHP_SESSION_NONE) session_start();
-        $_SESSION['message'] = $ativa === '1' ? 'Oferta gratuita ativada.' : 'Oferta gratuita desativada.';
+        $_SESSION['message'] = $ativa === '1' ? __('admin.free_offer.msg_activated', 'Oferta gratuita ativada.') : __('admin.free_offer.msg_deactivated', 'Oferta gratuita desativada.');
         $_SESSION['message_type'] = 'success';
         header('Location: /admin/oferta-gratuita');
         exit;
@@ -393,7 +393,7 @@ class AdminOfertaGratuitaController extends Controller {
         }
 
         if (session_status() === PHP_SESSION_NONE) session_start();
-        $_SESSION['message'] = 'Produto adicionado à oferta gratuita.';
+        $_SESSION['message'] = __('admin.free_offer.msg_added', 'Produto adicionado à oferta gratuita.');
         $_SESSION['message_type'] = 'success';
         header('Location: /admin/oferta-gratuita');
         exit;
@@ -413,7 +413,7 @@ class AdminOfertaGratuitaController extends Controller {
         }
 
         if (session_status() === PHP_SESSION_NONE) session_start();
-        $_SESSION['message'] = 'Produto removido da oferta gratuita.';
+        $_SESSION['message'] = __('admin.free_offer.msg_removed', 'Produto removido da oferta gratuita.');
         $_SESSION['message_type'] = 'success';
         header('Location: /admin/oferta-gratuita');
         exit;
@@ -432,11 +432,14 @@ class AdminOfertaGratuitaController extends Controller {
         if (session_status() === PHP_SESSION_NONE) session_start();
 
         if (isset($result['erro'])) {
-            $_SESSION['message'] = 'Erro na sincronização: ' . $result['erro'];
+            $_SESSION['message'] = __('admin.free_offer.msg_sync_error', 'Erro na sincronização: ') . $result['erro'];
             $_SESSION['message_type'] = 'danger';
         } else {
-            $msg = 'Sincronização concluída: ' . $result['adicionados'] . ' produto(s) adicionado(s), '
-                 . $result['removidos'] . ' removido(s). Total elegíveis: ' . $result['total'] . '.';
+            $msg = __('admin.free_offer.msg_sync_done', 'Sincronização concluída: {added} produto(s) adicionado(s), {removed} removido(s). Total elegíveis: {total}.', [
+                'added' => $result['adicionados'],
+                'removed' => $result['removidos'],
+                'total' => $result['total'],
+            ]);
             $_SESSION['message'] = $msg;
             $_SESSION['message_type'] = 'success';
         }
@@ -458,7 +461,7 @@ class AdminOfertaGratuitaController extends Controller {
         if (session_status() === PHP_SESSION_NONE) session_start();
 
         if (empty($ids) || $categoriaId <= 0) {
-            $_SESSION['message'] = 'Selecione produtos e uma categoria.';
+            $_SESSION['message'] = __('admin.free_offer.msg_select_products_category', 'Selecione produtos e uma categoria.');
             $_SESSION['message_type'] = 'warning';
             header('Location: /admin/oferta-gratuita');
             exit;
@@ -472,10 +475,10 @@ class AdminOfertaGratuitaController extends Controller {
             $stmt->execute($params);
             $affected = $stmt->rowCount();
 
-            $_SESSION['message'] = "Categoria atualizada em {$affected} produto(s).";
+            $_SESSION['message'] = __('admin.free_offer.msg_category_updated', 'Categoria atualizada em {count} produto(s).', ['count' => $affected]);
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao atualizar categoria: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.free_offer.msg_category_error', 'Erro ao atualizar categoria: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 

@@ -119,11 +119,11 @@ class AdminVariacoesController extends Controller {
         renderAdminSidebarStyles();
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Variações - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.variations.page_title', 'Variações - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -135,7 +135,7 @@ class AdminVariacoesController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Variações</h1>
+                    <h1 class="page-title">' . __('admin.variations.title', 'Variações') . '</h1>
                 </div>';
 
         if (isset($_SESSION['message'])) {
@@ -152,28 +152,28 @@ class AdminVariacoesController extends Controller {
                 <div class="col-lg-5">
                     <div class="card">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <strong>Tipos de variação</strong>
+                            <strong>' . __('admin.variations.types_title', 'Tipos de variação') . '</strong>
                         </div>
                         <div class="card-body">
                             <form method="POST" action="/admin/variacoes/tipos/salvar" class="row g-2 mb-3">
                                 <input type="hidden" name="id" value="0">
                                 <div class="col-md-6">
-                                    <label class="form-label">Nome</label>
-                                    <input type="text" name="nome" class="form-control" placeholder="Ex: Cor" required>
+                                    <label class="form-label">' . __('admin.variations.label_name', 'Nome') . '</label>
+                                    <input type="text" name="nome" class="form-control" placeholder="' . htmlspecialchars(__('admin.variations.type_name_placeholder', 'Ex: Cor'), ENT_QUOTES, 'UTF-8') . '" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Slug (opcional)</label>
-                                    <input type="text" name="slug" class="form-control" placeholder="ex: cor">
+                                    <label class="form-label">' . __('admin.variations.label_slug_optional', 'Slug (opcional)') . '</label>
+                                    <input type="text" name="slug" class="form-control" placeholder="' . htmlspecialchars(__('admin.variations.type_slug_placeholder', 'ex: cor'), ENT_QUOTES, 'UTF-8') . '">
                                 </div>
                                 <div class="col-12">
-                                    <button class="btn btn-primary w-100" type="submit"><i class="fas fa-plus me-2"></i>Adicionar tipo</button>
+                                    <button class="btn btn-primary w-100" type="submit"><i class="fas fa-plus me-2"></i>' . __('admin.variations.btn_add_type', 'Adicionar tipo') . '</button>
                                 </div>
                             </form>
 
                             <div class="list-group">';
 
         if (empty($tipos)) {
-            echo '<div class="text-muted">Nenhum tipo cadastrado.</div>';
+            echo '<div class="text-muted">' . __('admin.variations.no_types', 'Nenhum tipo cadastrado.') . '</div>';
         } else {
             foreach ($tipos as $t) {
                 $tid = (int) ($t['id'] ?? 0);
@@ -194,11 +194,11 @@ class AdminVariacoesController extends Controller {
                       </a>';
 
                 if ($ativo === 1) {
-                    echo '<form method="POST" action="/admin/variacoes/tipos/inativar/' . $tid . '" onsubmit="return confirm(\'Inativar este tipo?\')">
+                    echo '<form method="POST" action="/admin/variacoes/tipos/inativar/' . $tid . '" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.variations.confirm_deactivate_type', 'Inativar este tipo?'), ENT_QUOTES, 'UTF-8') . '\')">
                             <button type="submit" class="btn btn-sm ' . ($isActive ? 'btn-light' : 'btn-outline-danger') . '"><i class="fas fa-ban"></i></button>
                           </form>';
                 } else {
-                    echo '<span class="badge bg-secondary">Inativo</span>';
+                    echo '<span class="badge bg-secondary">' . __('admin.variations.badge_inactive', 'Inativo') . '</span>';
                 }
 
                 echo '      </div>
@@ -214,60 +214,60 @@ class AdminVariacoesController extends Controller {
                 <div class="col-lg-7">
                     <div class="card">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <strong>Opções do tipo</strong>
+                            <strong>' . __('admin.variations.options_title', 'Opções do tipo') . '</strong>
                         </div>
                         <div class="card-body">';
 
         if (!$tipoSelecionado) {
-            echo '<div class="text-muted">Selecione um tipo para cadastrar as opções (ex: Preto, Branco, P, M).</div>';
+            echo '<div class="text-muted">' . __('admin.variations.select_type_hint', 'Selecione um tipo para cadastrar as opções (ex: Preto, Branco, P, M).') . '</div>';
         } else {
             $tipoNome = (string) ($tipoSelecionado['nome'] ?? '');
             echo '<div class="mb-3">
-                    <div class="fw-semibold">Tipo selecionado: ' . htmlspecialchars($tipoNome, ENT_QUOTES, 'UTF-8') . '</div>
+                    <div class="fw-semibold">' . __('admin.variations.selected_type', 'Tipo selecionado:') . ' ' . htmlspecialchars($tipoNome, ENT_QUOTES, 'UTF-8') . '</div>
                   </div>';
 
             echo '<form method="POST" action="/admin/variacoes/opcoes/salvar" class="row g-2 mb-3" enctype="multipart/form-data">
                     <input type="hidden" name="id" value="0">
                     <input type="hidden" name="tipo_id" value="' . (int) $tipoId . '">
                     <div class="col-md-6">
-                        <label class="form-label">Valor</label>
-                        <input type="text" name="valor" class="form-control" placeholder="Ex: Preto" required>
+                        <label class="form-label">' . __('admin.variations.label_value', 'Valor') . '</label>
+                        <input type="text" name="valor" class="form-control" placeholder="' . htmlspecialchars(__('admin.variations.value_placeholder', 'Ex: Preto'), ENT_QUOTES, 'UTF-8') . '" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Nome de exibição (opcional)</label>
-                        <input type="text" name="nome_exibicao" class="form-control" placeholder="Ex: Azul Royal">
+                        <label class="form-label">' . __('admin.variations.label_display_name', 'Nome de exibição (opcional)') . '</label>
+                        <input type="text" name="nome_exibicao" class="form-control" placeholder="' . htmlspecialchars(__('admin.variations.display_name_placeholder', 'Ex: Azul Royal'), ENT_QUOTES, 'UTF-8') . '">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Slug (opcional)</label>
-                        <input type="text" name="slug" class="form-control" placeholder="ex: preto">
+                        <label class="form-label">' . __('admin.variations.label_slug_optional', 'Slug (opcional)') . '</label>
+                        <input type="text" name="slug" class="form-control" placeholder="' . htmlspecialchars(__('admin.variations.option_slug_placeholder', 'ex: preto'), ENT_QUOTES, 'UTF-8') . '">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Ordem</label>
+                        <label class="form-label">' . __('admin.variations.label_order', 'Ordem') . '</label>
                         <input type="number" name="ordem" class="form-control" value="0" min="0" step="1">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Imagem (opcional)</label>
+                        <label class="form-label">' . __('admin.variations.label_image', 'Imagem (opcional)') . '</label>
                         <input type="file" name="imagem" class="form-control" accept="image/*">
                     </div>
                     <div class="col-12">
-                        <button class="btn btn-primary w-100" type="submit"><i class="fas fa-plus me-2"></i>Adicionar opção</button>
+                        <button class="btn btn-primary w-100" type="submit"><i class="fas fa-plus me-2"></i>' . __('admin.variations.btn_add_option', 'Adicionar opção') . '</button>
                     </div>
                   </form>';
 
             if (empty($opcoes)) {
-                echo '<div class="text-muted">Nenhuma opção cadastrada.</div>';
+                echo '<div class="text-muted">' . __('admin.variations.no_options', 'Nenhuma opção cadastrada.') . '</div>';
             } else {
                 echo '<div class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead>
                                 <tr>
                                     <th style="width: 56px;"></th>
-                                    <th>Valor</th>
-                                    <th>Exibição</th>
-                                    <th>Slug</th>
-                                    <th>Ordem</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Ações</th>
+                                    <th>' . __('admin.variations.th_value', 'Valor') . '</th>
+                                    <th>' . __('admin.variations.th_display', 'Exibição') . '</th>
+                                    <th>' . __('admin.variations.th_slug', 'Slug') . '</th>
+                                    <th>' . __('admin.variations.th_order', 'Ordem') . '</th>
+                                    <th>' . __('admin.variations.th_status', 'Status') . '</th>
+                                    <th class="text-end">' . __('admin.variations.th_actions', 'Ações') . '</th>
                                 </tr>
                             </thead>
                             <tbody>';
@@ -293,11 +293,11 @@ class AdminVariacoesController extends Controller {
                             <td class="text-muted">' . htmlspecialchars($nomeExibicao, ENT_QUOTES, 'UTF-8') . '</td>
                             <td class="text-muted">' . htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') . '</td>
                             <td>' . $ordem . '</td>
-                            <td>' . ($ativo ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>') . '</td>
+                            <td>' . ($ativo ? '<span class="badge bg-success">' . __('admin.variations.badge_active', 'Ativo') . '</span>' : '<span class="badge bg-secondary">' . __('admin.variations.badge_inactive', 'Inativo') . '</span>') . '</td>
                             <td class="text-end">';
 
                     if ($ativo) {
-                        echo '<form method="POST" action="/admin/variacoes/opcoes/inativar/' . $oid . '" style="display:inline" onsubmit="return confirm(\'Inativar esta opção?\')">
+                        echo '<form method="POST" action="/admin/variacoes/opcoes/inativar/' . $oid . '" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.variations.confirm_deactivate_option', 'Inativar esta opção?'), ENT_QUOTES, 'UTF-8') . '\')">
                                 <input type="hidden" name="tipo_id" value="' . (int) $tipoId . '">
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-ban"></i></button>
                               </form>';
@@ -336,7 +336,7 @@ class AdminVariacoesController extends Controller {
         $slug = trim((string) $request->getParam('slug', ''));
 
         if ($nome === '') {
-            $_SESSION['message'] = 'Informe o nome do tipo.';
+            $_SESSION['message'] = __('admin.variations.msg_type_name_required', 'Informe o nome do tipo.');
             $_SESSION['message_type'] = 'danger';
             $this->redirectToIndex(null);
         }
@@ -354,10 +354,10 @@ class AdminVariacoesController extends Controller {
             $stmt = $pdo->prepare('INSERT INTO variacao_tipos (nome, slug, ativo, created_at, updated_at) VALUES (:nome, :slug, 1, NOW(), NOW())');
             $stmt->execute([':nome' => $nome, ':slug' => $slug]);
 
-            $_SESSION['message'] = 'Tipo criado com sucesso.';
+            $_SESSION['message'] = __('admin.variations.msg_type_created', 'Tipo criado com sucesso.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao salvar tipo.';
+            $_SESSION['message'] = __('admin.variations.msg_type_save_error', 'Erro ao salvar tipo.');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -376,10 +376,10 @@ class AdminVariacoesController extends Controller {
             $stmt = $pdo->prepare('UPDATE variacao_tipos SET ativo = 0, updated_at = NOW() WHERE id = :id');
             $stmt->execute([':id' => $id]);
 
-            $_SESSION['message'] = 'Tipo inativado.';
+            $_SESSION['message'] = __('admin.variations.msg_type_deactivated', 'Tipo inativado.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao inativar tipo.';
+            $_SESSION['message'] = __('admin.variations.msg_type_deactivate_error', 'Erro ao inativar tipo.');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -396,13 +396,13 @@ class AdminVariacoesController extends Controller {
         $ordem = (int) $request->getParam('ordem', 0);
 
         if ($tipoId <= 0) {
-            $_SESSION['message'] = 'Selecione um tipo válido.';
+            $_SESSION['message'] = __('admin.variations.msg_select_valid_type', 'Selecione um tipo válido.');
             $_SESSION['message_type'] = 'danger';
             $this->redirectToIndex(null);
         }
 
         if ($valor === '') {
-            $_SESSION['message'] = 'Informe o valor da opção.';
+            $_SESSION['message'] = __('admin.variations.msg_option_value_required', 'Informe o valor da opção.');
             $_SESSION['message_type'] = 'danger';
             $this->redirectToIndex($tipoId);
         }
@@ -444,10 +444,10 @@ class AdminVariacoesController extends Controller {
                 ':ordem' => $ordem,
             ]);
 
-            $_SESSION['message'] = 'Opção criada com sucesso.';
+            $_SESSION['message'] = __('admin.variations.msg_option_created', 'Opção criada com sucesso.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao salvar opção (talvez slug duplicado).';
+            $_SESSION['message'] = __('admin.variations.msg_option_save_error', 'Erro ao salvar opção (talvez slug duplicado).');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -467,10 +467,10 @@ class AdminVariacoesController extends Controller {
             $stmt = $pdo->prepare('UPDATE variacao_opcoes SET ativo = 0, updated_at = NOW() WHERE id = :id');
             $stmt->execute([':id' => $id]);
 
-            $_SESSION['message'] = 'Opção inativada.';
+            $_SESSION['message'] = __('admin.variations.msg_option_deactivated', 'Opção inativada.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao inativar opção.';
+            $_SESSION['message'] = __('admin.variations.msg_option_deactivate_error', 'Erro ao inativar opção.');
             $_SESSION['message_type'] = 'danger';
         }
 

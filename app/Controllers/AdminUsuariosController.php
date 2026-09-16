@@ -63,13 +63,13 @@ class AdminUsuariosController extends Controller {
             }
             if ($perfil === '') $perfil = 'cliente';
             $map = [
-                'admin' => ['Admin', 'role-admin'],
-                'vendedor' => ['Vendedor', 'role-vendedor'],
-                'suporte' => ['Suporte', 'role-suporte'],
-                'redirecionador' => ['Redirecionador', 'role-redirecionador'],
-                'conferente' => ['Conferente', 'role-conferente'],
+                'admin' => [__('admin.users.role_admin', 'Admin'), 'role-admin'],
+                'vendedor' => [__('admin.users.role_vendedor', 'Vendedor'), 'role-vendedor'],
+                'suporte' => [__('admin.users.role_suporte', 'Suporte'), 'role-suporte'],
+                'redirecionador' => [__('admin.users.role_redirecionador', 'Redirecionador'), 'role-redirecionador'],
+                'conferente' => [__('admin.users.role_conferente', 'Conferente'), 'role-conferente'],
             ];
-            return $map[$perfil] ?? ['Cliente', 'role-cliente'];
+            return $map[$perfil] ?? [__('admin.users.role_cliente', 'Cliente'), 'role-cliente'];
         };
 
         // Helper: format wallet
@@ -79,21 +79,21 @@ class AdminUsuariosController extends Controller {
 
         // Helper: user status
         $getUserStatus = function($u) {
-            if (isset($u['ativo']) && (int)$u['ativo'] === 1) return ['Ativo', 'badge-green'];
-            if (isset($u['status']) && strtolower($u['status']) === 'ativo') return ['Ativo', 'badge-green'];
-            if (!isset($u['ativo']) && !isset($u['status'])) return ['Ativo', 'badge-green'];
-            return ['Inativo', 'badge-red'];
+            if (isset($u['ativo']) && (int)$u['ativo'] === 1) return [__('admin.users.status_active', 'Ativo'), 'badge-green'];
+            if (isset($u['status']) && strtolower($u['status']) === 'ativo') return [__('admin.users.status_active', 'Ativo'), 'badge-green'];
+            if (!isset($u['ativo']) && !isset($u['status'])) return [__('admin.users.status_active', 'Ativo'), 'badge-green'];
+            return [__('admin.users.status_inactive', 'Inativo'), 'badge-red'];
         };
         
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usuários - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.users.page_title', 'Usuários - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -117,16 +117,16 @@ class AdminUsuariosController extends Controller {
         echo '<div class="page-header">
                 <div class="page-title-wrap">
                     <div>
-                        <h1 class="page-title">Usuários</h1>
-                        <div class="page-count">' . (int)$total . ' usuários cadastrados</div>
+                        <h1 class="page-title">' . __('admin.users.title', 'Usuários') . '</h1>
+                        <div class="page-count">' . (int)$total . ' ' . __('admin.users.registered_count', 'usuários cadastrados') . '</div>
                     </div>
                 </div>
                 <div class="header-actions">
                     <button type="button" class="btn btn-success-soft" onclick="adicionarCreditosEmLote()">
-                        <i class="bi bi-cash-stack"></i> Adicionar Créditos em Lote
+                        <i class="bi bi-cash-stack"></i> ' . __('admin.users.add_credits_bulk', 'Adicionar Créditos em Lote') . '
                     </button>
                     <a href="/admin/usuarios/novo" class="btn btn-primary-navy">
-                        <i class="bi bi-plus-lg"></i> Novo Usuário
+                        <i class="bi bi-plus-lg"></i> ' . __('admin.users.new_user', 'Novo Usuário') . '
                     </a>
                 </div>
             </div>';
@@ -135,7 +135,7 @@ class AdminUsuariosController extends Controller {
         if (isset($erro)) {
             echo '<div class="alert alert-danger" style="border-radius:10px;margin-bottom:20px;">
                 <i class="bi bi-exclamation-triangle me-2"></i>
-                <strong>Erro:</strong> ' . htmlspecialchars($erro) . '
+                <strong>' . __('admin.users.error_label', 'Erro:') . '</strong> ' . htmlspecialchars($erro) . '
             </div>';
         }
 
@@ -146,19 +146,19 @@ class AdminUsuariosController extends Controller {
 
         echo '<div class="kpi-grid">
                 <div class="kpi-card">
-                    <div class="kpi-label">Total Usuários</div>
+                    <div class="kpi-label">' . __('admin.users.kpi_total_users', 'Total Usuários') . '</div>
                     <div class="kpi-value">' . (int)$total . '</div>
                 </div>
                 <div class="kpi-card is-highlight">
-                    <div class="kpi-label">Total em Carteiras</div>
+                    <div class="kpi-label">' . __('admin.users.kpi_total_wallets', 'Total em Carteiras') . '</div>
                     <div class="kpi-value">' . $totalCarteiras . '</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Usuários Ativos</div>
+                    <div class="kpi-label">' . __('admin.users.kpi_active_users', 'Usuários Ativos') . '</div>
                     <div class="kpi-value">' . $usuariosAtivos . '</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Novos Hoje</div>
+                    <div class="kpi-label">' . __('admin.users.kpi_new_today', 'Novos Hoje') . '</div>
                     <div class="kpi-value">' . $novosHoje . '</div>
                 </div>
             </div>';
@@ -168,21 +168,21 @@ class AdminUsuariosController extends Controller {
                 <form method="GET" action="/admin/usuarios" class="filters-grid">
                     <div class="input-wrap">
                         <i class="bi bi-search"></i>
-                        <input type="text" name="busca" placeholder="Buscar por nome, email, CPF ou suite..." value="' . htmlspecialchars($busca) . '">
+                        <input type="text" name="busca" placeholder="' . htmlspecialchars(__('admin.users.search_placeholder', 'Buscar por nome, email, CPF ou suite...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca) . '">
                     </div>
                     <select name="ordem" onchange="this.form.submit()">
-                        <option value="nome_asc"' . ($ordem === 'nome_asc' ? ' selected' : '') . '>Nome A→Z</option>
-                        <option value="nome_desc"' . ($ordem === 'nome_desc' ? ' selected' : '') . '>Nome Z→A</option>
-                        <option value=""' . ($ordem === '' ? ' selected' : '') . '>Mais recentes</option>
-                        <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>Carteira maior→menor</option>
-                        <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>Carteira menor→maior</option>
+                        <option value="nome_asc"' . ($ordem === 'nome_asc' ? ' selected' : '') . '>' . __('admin.users.sort_name_asc', 'Nome A→Z') . '</option>
+                        <option value="nome_desc"' . ($ordem === 'nome_desc' ? ' selected' : '') . '>' . __('admin.users.sort_name_desc', 'Nome Z→A') . '</option>
+                        <option value=""' . ($ordem === '' ? ' selected' : '') . '>' . __('admin.users.sort_recent', 'Mais recentes') . '</option>
+                        <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>' . __('admin.users.sort_wallet_desc', 'Carteira maior→menor') . '</option>
+                        <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>' . __('admin.users.sort_wallet_asc', 'Carteira menor→maior') . '</option>
                     </select>
                     <select name="tipo" onchange="this.form.submit()">
-                        <option value="">Todos os tipos</option>
-                        <option value="desapeguista"' . ($request->getParam('tipo') === 'desapeguista' ? ' selected' : '') . '>Desapeguistas</option>
+                        <option value="">' . __('admin.users.type_all', 'Todos os tipos') . '</option>
+                        <option value="desapeguista"' . ($request->getParam('tipo') === 'desapeguista' ? ' selected' : '') . '>' . __('admin.users.type_desapeguistas', 'Desapeguistas') . '</option>
                     </select>
-                    <button type="submit" class="btn btn-search"><i class="bi bi-search"></i> Buscar</button>
-                    <a href="/admin/usuarios" class="btn btn-clear"><i class="bi bi-x-lg"></i> Limpar</a>
+                    <button type="submit" class="btn btn-search"><i class="bi bi-search"></i> ' . __('admin.users.search', 'Buscar') . '</button>
+                    <a href="/admin/usuarios" class="btn btn-clear"><i class="bi bi-x-lg"></i> ' . __('admin.users.clear', 'Limpar') . '</a>
                 </form>
             </div>';
 
@@ -190,8 +190,8 @@ class AdminUsuariosController extends Controller {
         if (empty($usuarios)) {
             echo '<div style="text-align:center;padding:60px 20px;">
                 <i class="bi bi-people" style="font-size:48px;color:var(--text-muted);"></i>
-                <h5 style="color:var(--text-secondary);margin-top:16px;">Nenhum usuário encontrado</h5>
-                <p style="color:var(--text-muted);">Tente ajustar sua busca ou cadastre um novo usuário.</p>
+                <h5 style="color:var(--text-secondary);margin-top:16px;">' . __('admin.users.empty_title', 'Nenhum usuário encontrado') . '</h5>
+                <p style="color:var(--text-muted);">' . __('admin.users.empty_hint', 'Tente ajustar sua busca ou cadastre um novo usuário.') . '</p>
             </div>';
         } else {
             echo '<div class="alphabetical-list">';
@@ -211,7 +211,7 @@ class AdminUsuariosController extends Controller {
                     $pedidos = (int)($u['total_pedidos'] ?? 0);
                     $userId = (int)$u['id'];
                     $isDesapeguista = !empty($u['is_desapeguista']);
-                    $desapeguistaBadge = $isDesapeguista ? ' <span class="role-badge" style="background:rgba(8,145,178,.12);color:#0891b2;font-size:.7rem;"><i class="bi bi-heart-fill"></i> Desapeguista</span>' : '';
+                    $desapeguistaBadge = $isDesapeguista ? ' <span class="role-badge" style="background:rgba(8,145,178,.12);color:#0891b2;font-size:.7rem;"><i class="bi bi-heart-fill"></i> ' . __('admin.users.desapeguista', 'Desapeguista') . '</span>' : '';
 
                     // Desktop row
                     echo '<div class="user-row">
@@ -223,27 +223,27 @@ class AdminUsuariosController extends Controller {
                                     <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>' . $desapeguistaBadge . '
                                 </div>
                                 <div class="user-email">' . $email . '</div>'
-                                . ($suite ? '<div class="user-suite">Suite: ' . $suite . '</div>' : '') .
+                                . ($suite ? '<div class="user-suite">' . __('admin.users.suite_label', 'Suite:') . ' ' . $suite . '</div>' : '') .
                             '</div>
                         </div>
                         <div>
-                            <div class="list-metric-label">Pedidos</div>
+                            <div class="list-metric-label">' . __('admin.users.orders', 'Pedidos') . '</div>
                             <div class="list-metric-value">' . $pedidos . '</div>
                         </div>
                         <div>
-                            <div class="list-metric-label">Carteira</div>
+                            <div class="list-metric-label">' . __('admin.users.wallet', 'Carteira') . '</div>
                             <div class="wallet-value">' . $wallet . '</div>
                         </div>
                         <div>
                             <span class="badge ' . $statusClass . '">' . $statusLabel . '</span>
                         </div>
                         <div class="user-actions">
-                            <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> Ver</a>
-                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
-                            <span class="icon-btn icon-btn-credit" title="Crédito" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
-                            <span class="icon-btn" title="Debitar" onclick="debitarCredito(' . $userId . ', \'' . addslashes($nome) . '\')" style="color:#dc3545;cursor:pointer;"><i class="bi bi-dash-circle"></i></span>
-                            <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit" title="Editar"><i class="bi bi-pencil"></i></a>
-                            <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'Excluir ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="Excluir"><i class="bi bi-trash"></i></button></form>
+                            <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> ' . __('admin.users.view', 'Ver') . '</a>
+                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="icon-btn icon-btn-admin" title="' . htmlspecialchars(__('admin.users.login_as', 'Login As'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-box-arrow-in-right"></i></button></form>
+                            <span class="icon-btn icon-btn-credit" title="' . htmlspecialchars(__('admin.users.credit', 'Crédito'), ENT_QUOTES, 'UTF-8') . '" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
+                            <span class="icon-btn" title="' . htmlspecialchars(__('admin.users.debit', 'Debitar'), ENT_QUOTES, 'UTF-8') . '" onclick="debitarCredito(' . $userId . ', \'' . addslashes($nome) . '\')" style="color:#dc3545;cursor:pointer;"><i class="bi bi-dash-circle"></i></span>
+                            <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit" title="' . htmlspecialchars(__('admin.users.edit', 'Editar'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-pencil"></i></a>
+                            <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.users.confirm_delete', 'Excluir'), ENT_QUOTES, 'UTF-8') . ' ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="' . htmlspecialchars(__('admin.users.delete', 'Excluir'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-trash"></i></button></form>
                         </div>
                     </div>';
 
@@ -257,30 +257,30 @@ class AdminUsuariosController extends Controller {
                                     <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>' . $desapeguistaBadge . '
                                 </div>
                                 <div class="user-email">' . $email . '</div>'
-                                . ($suite ? '<div class="user-suite">Suite: ' . $suite . '</div>' : '') .
+                                . ($suite ? '<div class="user-suite">' . __('admin.users.suite_label', 'Suite:') . ' ' . $suite . '</div>' : '') .
                             '</div>
                         </div>
                         <div class="mobile-metrics">
                             <div class="metric">
-                                <div class="metric-label">Pedidos</div>
+                                <div class="metric-label">' . __('admin.users.orders', 'Pedidos') . '</div>
                                 <div class="metric-value">' . $pedidos . '</div>
                             </div>
                             <div class="metric">
-                                <div class="metric-label">Carteira</div>
+                                <div class="metric-label">' . __('admin.users.wallet', 'Carteira') . '</div>
                                 <div class="metric-value">' . $wallet . '</div>
                             </div>
                             <div class="metric">
-                                <div class="metric-label">Status</div>
+                                <div class="metric-label">' . __('admin.users.status', 'Status') . '</div>
                                 <div class="metric-value"><span class="badge ' . $statusClass . '">' . $statusLabel . '</span></div>
                             </div>
                         </div>
                         <div class="mobile-actions">
-                            <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> Ver</a>
-                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
+                            <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> ' . __('admin.users.view', 'Ver') . '</a>
+                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="icon-btn icon-btn-admin" title="' . htmlspecialchars(__('admin.users.login_as', 'Login As'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-box-arrow-in-right"></i></button></form>
                             <span class="icon-btn icon-btn-credit" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
-                            <span class="icon-btn" title="Debitar" onclick="debitarCredito(' . $userId . ', \'' . addslashes($nome) . '\')" style="color:#dc3545;cursor:pointer;"><i class="bi bi-dash-circle"></i></span>
+                            <span class="icon-btn" title="' . htmlspecialchars(__('admin.users.debit', 'Debitar'), ENT_QUOTES, 'UTF-8') . '" onclick="debitarCredito(' . $userId . ', \'' . addslashes($nome) . '\')" style="color:#dc3545;cursor:pointer;"><i class="bi bi-dash-circle"></i></span>
                             <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit"><i class="bi bi-pencil"></i></a>
-                            <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'Excluir ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="Excluir"><i class="bi bi-trash"></i></button></form>
+                            <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.users.confirm_delete', 'Excluir'), ENT_QUOTES, 'UTF-8') . ' ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="' . htmlspecialchars(__('admin.users.delete', 'Excluir'), ENT_QUOTES, 'UTF-8') . '"><i class="bi bi-trash"></i></button></form>
                         </div>
                     </div>';
                 }
@@ -316,7 +316,7 @@ class AdminUsuariosController extends Controller {
 
             $prev = max(1, $paginaAtual - 1);
             echo '<li class="page-item ' . ($paginaAtual <= 1 ? 'disabled' : '') . '">'
-                . '<a class="page-link" href="' . ($paginaAtual <= 1 ? '#' : $mkUrl($prev)) . '" tabindex="-1">Anterior</a>'
+                . '<a class="page-link" href="' . ($paginaAtual <= 1 ? '#' : $mkUrl($prev)) . '" tabindex="-1">' . __('admin.users.previous', 'Anterior') . '</a>'
                 . '</li>';
 
             if ($start > 1) {
@@ -341,7 +341,7 @@ class AdminUsuariosController extends Controller {
 
             $next = min((int) $totalPaginas, $paginaAtual + 1);
             echo '<li class="page-item ' . ($paginaAtual >= (int) $totalPaginas ? 'disabled' : '') . '">'
-                . '<a class="page-link" href="' . ($paginaAtual >= (int) $totalPaginas ? '#' : $mkUrl($next)) . '">Próxima</a>'
+                . '<a class="page-link" href="' . ($paginaAtual >= (int) $totalPaginas ? '#' : $mkUrl($next)) . '">' . __('admin.users.next', 'Próxima') . '</a>'
                 . '</li>';
 
             echo '</ul></nav>';
@@ -378,11 +378,11 @@ class AdminUsuariosController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Usuário - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.users.new_page_title', 'Novo Usuário - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -397,8 +397,8 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Novo Usuário</h1>
-                <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                <h1 class="page-title">' . __('admin.users.new_user', 'Novo Usuário') . '</h1>
+                <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('admin.users.back', 'Voltar') . '</a>
             </div>
 
             <div class="card">
@@ -406,70 +406,70 @@ class AdminUsuariosController extends Controller {
                     <form method="POST" action="/admin/usuarios/salvar">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Nome</label>
+                                <label class="form-label">' . __('admin.users.field_name', 'Nome') . '</label>
                                 <input type="text" class="form-control" name="nome" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">E-mail</label>
+                                <label class="form-label">' . __('admin.users.field_email', 'E-mail') . '</label>
                                 <input type="email" class="form-control" name="email" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">País</label>
+                                <label class="form-label">' . __('admin.users.field_country', 'País') . '</label>
                                 <select class="form-select" name="pais" id="novo_pais" onchange="atualizarCpfObrigatorio()">
-                                    <option value="BR" selected>Brasil</option>
-                                    <option value="US">Estados Unidos</option>
-                                    <option value="CA">Canadá</option>
-                                    <option value="PT">Portugal</option>
-                                    <option value="DE">Alemanha</option>
-                                    <option value="FR">França</option>
-                                    <option value="GB">Reino Unido</option>
-                                    <option value="AR">Argentina</option>
-                                    <option value="CL">Chile</option>
-                                    <option value="CO">Colômbia</option>
-                                    <option value="MX">México</option>
-                                    <option value="UY">Uruguai</option>
-                                    <option value="PY">Paraguai</option>
-                                    <option value="PE">Peru</option>
-                                    <option value="JP">Japão</option>
-                                    <option value="AU">Austrália</option>
-                                    <option value="OTHER">Outro</option>
+                                    <option value="BR" selected>' . __('admin.users.country_br', 'Brasil') . '</option>
+                                    <option value="US">' . __('admin.users.country_us', 'Estados Unidos') . '</option>
+                                    <option value="CA">' . __('admin.users.country_ca', 'Canadá') . '</option>
+                                    <option value="PT">' . __('admin.users.country_pt', 'Portugal') . '</option>
+                                    <option value="DE">' . __('admin.users.country_de', 'Alemanha') . '</option>
+                                    <option value="FR">' . __('admin.users.country_fr', 'França') . '</option>
+                                    <option value="GB">' . __('admin.users.country_gb', 'Reino Unido') . '</option>
+                                    <option value="AR">' . __('admin.users.country_ar', 'Argentina') . '</option>
+                                    <option value="CL">' . __('admin.users.country_cl', 'Chile') . '</option>
+                                    <option value="CO">' . __('admin.users.country_co', 'Colômbia') . '</option>
+                                    <option value="MX">' . __('admin.users.country_mx', 'México') . '</option>
+                                    <option value="UY">' . __('admin.users.country_uy', 'Uruguai') . '</option>
+                                    <option value="PY">' . __('admin.users.country_py', 'Paraguai') . '</option>
+                                    <option value="PE">' . __('admin.users.country_pe', 'Peru') . '</option>
+                                    <option value="JP">' . __('admin.users.country_jp', 'Japão') . '</option>
+                                    <option value="AU">' . __('admin.users.country_au', 'Austrália') . '</option>
+                                    <option value="OTHER">' . __('admin.users.country_other', 'Outro') . '</option>
                                 </select>
                             </div>
                             <div class="col-md-6" id="wrap_cpf">
-                                <label class="form-label" id="lbl_cpf">CPF</label>
+                                <label class="form-label" id="lbl_cpf">' . __('admin.users.field_cpf', 'CPF') . '</label>
                                 <input type="text" class="form-control" name="cpf" id="input_cpf">
-                                <small class="text-muted" id="cpf_hint">Obrigatório para residentes no Brasil</small>
+                                <small class="text-muted" id="cpf_hint">' . __('admin.users.cpf_hint_br', 'Obrigatório para residentes no Brasil') . '</small>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Telefone</label>
+                                <label class="form-label">' . __('admin.users.field_phone', 'Telefone') . '</label>
                                 <input type="text" class="form-control" name="telefone">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Senha</label>
+                                <label class="form-label">' . __('admin.users.field_password', 'Senha') . '</label>
                                 <input type="password" class="form-control" name="senha" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Status</label>
+                                <label class="form-label">' . __('admin.users.status', 'Status') . '</label>
                                 <select class="form-select" name="ativo">
-                                    <option value="1" selected>Ativo</option>
-                                    <option value="0">Inativo</option>
+                                    <option value="1" selected>' . __('admin.users.status_active', 'Ativo') . '</option>
+                                    <option value="0">' . __('admin.users.status_inactive', 'Inativo') . '</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Perfil</label>
+                                <label class="form-label">' . __('admin.users.field_profile', 'Perfil') . '</label>
                                 <select class="form-select" name="perfil" required>
-                                    <option value="cliente" selected>Cliente</option>
-                                    <option value="admin">Administrador</option>
-                                    <option value="vendedor">Vendedor</option>
-                                    <option value="conferente">Conferente</option>
-                                    <option value="suporte">Suporte</option>
-                                    <option value="representante">Representante</option>
-                                    <option value="redirecionador">Redirecionador</option>
+                                    <option value="cliente" selected>' . __('admin.users.role_cliente', 'Cliente') . '</option>
+                                    <option value="admin">' . __('admin.users.profile_admin', 'Administrador') . '</option>
+                                    <option value="vendedor">' . __('admin.users.role_vendedor', 'Vendedor') . '</option>
+                                    <option value="conferente">' . __('admin.users.role_conferente', 'Conferente') . '</option>
+                                    <option value="suporte">' . __('admin.users.role_suporte', 'Suporte') . '</option>
+                                    <option value="representante">' . __('admin.users.profile_representante', 'Representante') . '</option>
+                                    <option value="redirecionador">' . __('admin.users.role_redirecionador', 'Redirecionador') . '</option>
                                 </select>
                             </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i>Salvar
+                                    <i class="fas fa-save me-1"></i>' . __('admin.users.save', 'Salvar') . '
                                 </button>
                             </div>
                         </div>
@@ -487,13 +487,13 @@ class AdminUsuariosController extends Controller {
         var lblCpf = document.getElementById("lbl_cpf");
         var hint = document.getElementById("cpf_hint");
         if (pais === "BR") {
-            lblCpf.textContent = "CPF";
+            lblCpf.textContent = "' . htmlspecialchars(__('admin.users.field_cpf', 'CPF'), ENT_QUOTES, 'UTF-8') . '";
             inputCpf.placeholder = "000.000.000-00";
-            hint.textContent = "Obrigatório para residentes no Brasil";
+            hint.textContent = "' . htmlspecialchars(__('admin.users.cpf_hint_br', 'Obrigatório para residentes no Brasil'), ENT_QUOTES, 'UTF-8') . '";
         } else {
-            lblCpf.textContent = "Documento (opcional)";
+            lblCpf.textContent = "' . htmlspecialchars(__('admin.users.document_optional', 'Documento (opcional)'), ENT_QUOTES, 'UTF-8') . '";
             inputCpf.placeholder = "SSN, Tax ID, etc.";
-            hint.textContent = "Opcional para residentes fora do Brasil";
+            hint.textContent = "' . htmlspecialchars(__('admin.users.cpf_hint_foreign', 'Opcional para residentes fora do Brasil'), ENT_QUOTES, 'UTF-8') . '";
         }
     }
     atualizarCpfObrigatorio();
@@ -513,13 +513,13 @@ class AdminUsuariosController extends Controller {
             $usuario = $helper->getUsuarioComCarteira($id);
 
             if (!$usuario) {
-                echo '<div class="alert alert-danger">Usuário não encontrado</div>';
-                echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+                echo '<div class="alert alert-danger">' . __('admin.users.not_found', 'Usuário não encontrado') . '</div>';
+                echo '<a href="/admin/usuarios" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
                 exit;
             }
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('admin.users.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
             exit;
         }
 
@@ -550,11 +550,11 @@ class AdminUsuariosController extends Controller {
         }
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Usuário - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.users.edit_page_title', 'Editar Usuário - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -569,8 +569,8 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Editar Usuário</h1>
-                <a href="/admin/usuarios/detalhes/' . (int)$usuario['id'] . '" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                <h1 class="page-title">' . __('admin.users.edit_user', 'Editar Usuário') . '</h1>
+                <a href="/admin/usuarios/detalhes/' . (int)$usuario['id'] . '" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('admin.users.back', 'Voltar') . '</a>
             </div>
 
             <div class="card">
@@ -579,64 +579,64 @@ class AdminUsuariosController extends Controller {
                         <input type="hidden" name="id" value="' . (int)$usuario['id'] . '">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Nome</label>
+                                <label class="form-label">' . __('admin.users.field_name', 'Nome') . '</label>
                                 <input type="text" class="form-control" name="nome" value="' . htmlspecialchars($usuario['nome'] ?? '') . '" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">E-mail</label>
+                                <label class="form-label">' . __('admin.users.field_email', 'E-mail') . '</label>
                                 <input type="email" class="form-control" name="email" value="' . htmlspecialchars($usuario['email'] ?? '') . '" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">CPF</label>
+                                <label class="form-label">' . __('admin.users.field_cpf', 'CPF') . '</label>
                                 <input type="text" class="form-control" name="cpf" value="' . htmlspecialchars(\App\Services\CpfValidator::format(($usuario['cpf'] ?? '') !== '' ? ($usuario['cpf'] ?? '') : ($usuario['documento'] ?? ''))) . '">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Telefone</label>
+                                <label class="form-label">' . __('admin.users.field_phone', 'Telefone') . '</label>
                                 <input type="text" class="form-control" name="telefone" value="' . htmlspecialchars($usuario['telefone'] ?? '') . '">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Data de Nascimento</label>
+                                <label class="form-label">' . __('admin.users.field_birthdate', 'Data de Nascimento') . '</label>
                                 <input type="date" class="form-control" name="data_nascimento" value="' . htmlspecialchars($usuario['data_nascimento'] ?? '') . '">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Nova Senha (opcional)</label>
-                                <input type="password" class="form-control" name="senha" placeholder="Deixe em branco para manter">
+                                <label class="form-label">' . __('admin.users.field_new_password', 'Nova Senha (opcional)') . '</label>
+                                <input type="password" class="form-control" name="senha" placeholder="' . htmlspecialchars(__('admin.users.password_keep_placeholder', 'Deixe em branco para manter'), ENT_QUOTES, 'UTF-8') . '">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Status</label>
+                                <label class="form-label">' . __('admin.users.status', 'Status') . '</label>
                                 <select class="form-select" name="ativo">
-                                    <option value="1" ' . ((int)($usuario['ativo'] ?? 1) === 1 ? 'selected' : '') . '>Ativo</option>
-                                    <option value="0" ' . ((int)($usuario['ativo'] ?? 1) === 0 ? 'selected' : '') . '>Inativo</option>
+                                    <option value="1" ' . ((int)($usuario['ativo'] ?? 1) === 1 ? 'selected' : '') . '>' . __('admin.users.status_active', 'Ativo') . '</option>
+                                    <option value="0" ' . ((int)($usuario['ativo'] ?? 1) === 0 ? 'selected' : '') . '>' . __('admin.users.status_inactive', 'Inativo') . '</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Perfil</label>
+                                <label class="form-label">' . __('admin.users.field_profile', 'Perfil') . '</label>
                                 <select class="form-select" name="perfil" required>
-                                    <option value="cliente" ' . ($perfilAtual === 'cliente' ? 'selected' : '') . '>Cliente</option>
-                                    <option value="admin" ' . ($perfilAtual === 'admin' ? 'selected' : '') . '>Administrador</option>
-                                    <option value="vendedor" ' . ($perfilAtual === 'vendedor' ? 'selected' : '') . '>Vendedor</option>
-                                    <option value="conferente" ' . ($perfilAtual === 'conferente' ? 'selected' : '') . '>Conferente</option>
-                                    <option value="suporte" ' . ($perfilAtual === 'suporte' ? 'selected' : '') . '>Suporte</option>
-                                    <option value="representante" ' . ($perfilAtual === 'representante' ? 'selected' : '') . '>Representante</option>
-                                    <option value="redirecionador" ' . ($perfilAtual === 'redirecionador' ? 'selected' : '') . '>Redirecionador</option>
+                                    <option value="cliente" ' . ($perfilAtual === 'cliente' ? 'selected' : '') . '>' . __('admin.users.role_cliente', 'Cliente') . '</option>
+                                    <option value="admin" ' . ($perfilAtual === 'admin' ? 'selected' : '') . '>' . __('admin.users.profile_admin', 'Administrador') . '</option>
+                                    <option value="vendedor" ' . ($perfilAtual === 'vendedor' ? 'selected' : '') . '>' . __('admin.users.role_vendedor', 'Vendedor') . '</option>
+                                    <option value="conferente" ' . ($perfilAtual === 'conferente' ? 'selected' : '') . '>' . __('admin.users.role_conferente', 'Conferente') . '</option>
+                                    <option value="suporte" ' . ($perfilAtual === 'suporte' ? 'selected' : '') . '>' . __('admin.users.role_suporte', 'Suporte') . '</option>
+                                    <option value="representante" ' . ($perfilAtual === 'representante' ? 'selected' : '') . '>' . __('admin.users.profile_representante', 'Representante') . '</option>
+                                    <option value="redirecionador" ' . ($perfilAtual === 'redirecionador' ? 'selected' : '') . '>' . __('admin.users.role_redirecionador', 'Redirecionador') . '</option>
                                 </select>
                             </div>
                         </div>
 
                         <hr class="my-4">
-                        <h5 class="mb-3"><i class="fas fa-hand-holding-heart me-2"></i>Desapego Braziliana</h5>
+                        <h5 class="mb-3"><i class="fas fa-hand-holding-heart me-2"></i>' . __('admin.users.desapego_braziliana', 'Desapego Braziliana') . '</h5>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="isDesapeguista" name="is_desapeguista" value="1" ' . (!empty($usuario['is_desapeguista']) ? 'checked' : '') . '>
-                                    <label class="form-check-label fw-semibold" for="isDesapeguista">Este usuário é um Desapeguista</label>
+                                    <label class="form-check-label fw-semibold" for="isDesapeguista">' . __('admin.users.is_desapeguista', 'Este usuário é um Desapeguista') . '</label>
                                 </div>
-                                <small class="text-muted">Se marcado, este usuário poderá ser selecionado como dono de produtos de desapego.</small>
+                                <small class="text-muted">' . __('admin.users.desapeguista_hint', 'Se marcado, este usuário poderá ser selecionado como dono de produtos de desapego.') . '</small>
                             </div>
                             <div class="col-md-6" id="comissaoDesapeguistaWrap" style="' . (empty($usuario['is_desapeguista']) ? 'display:none' : '') . '">
-                                <label class="form-label">Comissão (%)</label>
+                                <label class="form-label">' . __('admin.users.commission_pct', 'Comissão (%)') . '</label>
                                 <input type="number" class="form-control" name="desapeguista_comissao" step="0.01" min="0" max="100" value="' . htmlspecialchars((string) ($usuario['desapeguista_comissao'] ?? '30.00')) . '">
-                                <small class="text-muted">Percentual de comissão sobre vendas de produtos vinculados (padrão: 30%).</small>
+                                <small class="text-muted">' . __('admin.users.commission_hint', 'Percentual de comissão sobre vendas de produtos vinculados (padrão: 30%).') . '</small>
                             </div>
                         </div>
                         <script>
@@ -646,7 +646,7 @@ class AdminUsuariosController extends Controller {
                         </script>
 
                         <hr class="my-4">
-                        <h5 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Endereço Principal</h5>
+                        <h5 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>' . __('admin.users.main_address', 'Endereço Principal') . '</h5>
                         <input type="hidden" name="endereco_id" value="' . (int) ($endereco['id'] ?? 0) . '">';
 
         $paisAtual = strtoupper(trim((string) ($endereco['pais'] ?? 'BR')));
@@ -688,39 +688,39 @@ class AdminUsuariosController extends Controller {
         echo '
                         <div class="row g-3">
                             <div class="col-md-3">
-                                <label class="form-label">País</label>
+                                <label class="form-label">' . __('admin.users.field_country', 'País') . '</label>
                                 <select class="form-select" name="end_pais" id="end_pais" onchange="atualizarCamposPorPais()">
                                     ' . $paisOptions . '
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label" id="lbl_cep">CEP</label>
+                                <label class="form-label" id="lbl_cep">' . __('admin.users.field_zip', 'CEP') . '</label>
                                 <input type="text" class="form-control" name="end_cep" id="end_cep" value="' . htmlspecialchars((string) ($endereco['cep'] ?? '')) . '" placeholder="00000-000">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" id="lbl_endereco">Endereço</label>
+                                <label class="form-label" id="lbl_endereco">' . __('admin.users.field_address', 'Endereço') . '</label>
                                 <input type="text" class="form-control" name="end_endereco" value="' . htmlspecialchars((string) ($endereco['endereco'] ?? ($endereco['logradouro'] ?? ''))) . '">
                             </div>
                             <div class="col-md-3" id="wrap_numero">
-                                <label class="form-label" id="lbl_numero">Número</label>
+                                <label class="form-label" id="lbl_numero">' . __('admin.users.field_number', 'Número') . '</label>
                                 <input type="text" class="form-control" name="end_numero" value="' . htmlspecialchars((string) ($endereco['numero'] ?? '')) . '">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" id="lbl_complemento">Complemento</label>
+                                <label class="form-label" id="lbl_complemento">' . __('admin.users.field_complement', 'Complemento') . '</label>
                                 <input type="text" class="form-control" name="end_complemento" value="' . htmlspecialchars((string) ($endereco['complemento'] ?? '')) . '">
                             </div>
                             <div class="col-md-4" id="wrap_bairro">
-                                <label class="form-label">Bairro</label>
+                                <label class="form-label">' . __('admin.users.field_neighborhood', 'Bairro') . '</label>
                                 <input type="text" class="form-control" name="end_bairro" value="' . htmlspecialchars((string) ($endereco['bairro'] ?? '')) . '">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Cidade</label>
+                                <label class="form-label">' . __('admin.users.field_city', 'Cidade') . '</label>
                                 <input type="text" class="form-control" name="end_cidade" minlength="3" value="' . htmlspecialchars((string) ($endereco['cidade'] ?? '')) . '">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label" id="lbl_estado">Estado</label>
+                                <label class="form-label" id="lbl_estado">' . __('admin.users.field_state', 'Estado') . '</label>
                                 <select class="form-select" name="end_estado" id="end_estado_select">
-                                    <option value="">Selecione...</option>
+                                    <option value="">' . __('admin.users.select_placeholder', 'Selecione...') . '</option>
                                 </select>
                                 <input type="text" class="form-control" name="end_estado_text" id="end_estado_text" value="' . htmlspecialchars((string) ($endereco['estado'] ?? '')) . '" maxlength="2" placeholder="SP" style="display:none;">
                             </div>
@@ -728,7 +728,7 @@ class AdminUsuariosController extends Controller {
 
                         <div class="mt-4">
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>Salvar Alterações
+                                <i class="fas fa-save me-1"></i>' . __('admin.users.save_changes', 'Salvar Alterações') . '
                             </button>
                         </div>
                     </form>
@@ -763,18 +763,18 @@ class AdminUsuariosController extends Controller {
         var lblEstado = document.getElementById("lbl_estado");
 
         if (cep && lblCep) {
-            if (pais === "BR") { cep.placeholder = "00000-000"; cep.maxLength = 9; lblCep.textContent = "CEP"; }
+            if (pais === "BR") { cep.placeholder = "00000-000"; cep.maxLength = 9; lblCep.textContent = "' . htmlspecialchars(__('admin.users.field_zip', 'CEP'), ENT_QUOTES, 'UTF-8') . '"; }
             else if (pais === "US") { cep.placeholder = "00000"; cep.maxLength = 10; lblCep.textContent = "ZIP Code"; }
             else if (pais === "CA") { cep.placeholder = "A1A 1A1"; cep.maxLength = 7; lblCep.textContent = "Postal Code"; }
             else { cep.placeholder = ""; cep.maxLength = 12; lblCep.textContent = "Postal Code"; }
         }
 
-        if (lblEnd) lblEnd.textContent = (pais === "BR") ? "Endereço" : "Address";
-        if (lblComp) lblComp.textContent = (pais === "BR") ? "Complemento" : "Address line 2";
-        if (lblNum) lblNum.textContent = (pais === "BR") ? "Número" : "Number";
+        if (lblEnd) lblEnd.textContent = (pais === "BR") ? "' . htmlspecialchars(__('admin.users.field_address', 'Endereço'), ENT_QUOTES, 'UTF-8') . '" : "Address";
+        if (lblComp) lblComp.textContent = (pais === "BR") ? "' . htmlspecialchars(__('admin.users.field_complement', 'Complemento'), ENT_QUOTES, 'UTF-8') . '" : "Address line 2";
+        if (lblNum) lblNum.textContent = (pais === "BR") ? "' . htmlspecialchars(__('admin.users.field_number', 'Número'), ENT_QUOTES, 'UTF-8') . '" : "Number";
         if (wrapNum) wrapNum.style.display = (pais === "BR") ? "" : "none";
         if (wrapBairro) wrapBairro.style.display = (pais === "BR") ? "" : "none";
-        if (lblEstado) lblEstado.textContent = (pais === "BR") ? "Estado" : "State";
+        if (lblEstado) lblEstado.textContent = (pais === "BR") ? "' . htmlspecialchars(__('admin.users.field_state', 'Estado'), ENT_QUOTES, 'UTF-8') . '" : "State";
 
         var list = statesByCountry[pais] || null;
         if (selEstado && txtEstado) {
@@ -782,7 +782,7 @@ class AdminUsuariosController extends Controller {
                 var cur = (selEstado.value || txtEstado.value || estadoAtual || "").toUpperCase();
                 selEstado.innerHTML = "";
                 var optE = document.createElement("option");
-                optE.value = ""; optE.textContent = "Selecione...";
+                optE.value = ""; optE.textContent = "' . htmlspecialchars(__('admin.users.select_placeholder', 'Selecione...'), ENT_QUOTES, 'UTF-8') . '";
                 selEstado.appendChild(optE);
                 list.forEach(function(uf) {
                     var opt = document.createElement("option");
@@ -885,7 +885,7 @@ class AdminUsuariosController extends Controller {
 
                     // Validar cidade: mínimo 3 caracteres
                     if ($endCidade !== '' && mb_strlen($endCidade) < 3) {
-                        throw new \Exception('Cidade deve ter no mínimo 3 caracteres');
+                        throw new \Exception(__('admin.users.city_min_length', 'Cidade deve ter no mínimo 3 caracteres'));
                     }
 
                     if ($temDados && in_array('usuario_id', $colsEnd, true)) {
@@ -990,8 +990,8 @@ class AdminUsuariosController extends Controller {
             header('Location: /admin/usuarios/detalhes/' . (int)$novoId . '?success=1');
             exit;
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro ao salvar usuário: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('admin.users.save_error', 'Erro ao salvar usuário:') . ' ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
             exit;
         }
     }
@@ -1006,8 +1006,8 @@ class AdminUsuariosController extends Controller {
             $usuario = $helper->getUsuarioComCarteira($id);
             
             if (!$usuario) {
-                echo '<div class="alert alert-danger">Usuário não encontrado</div>';
-                echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+                echo '<div class="alert alert-danger">' . __('admin.users.not_found', 'Usuário não encontrado') . '</div>';
+                echo '<a href="/admin/usuarios" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
                 exit;
             }
 
@@ -1070,8 +1070,8 @@ class AdminUsuariosController extends Controller {
             ];
             
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('admin.users.error_label', 'Erro:') . ' ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
             exit;
         }
 
@@ -1079,7 +1079,7 @@ class AdminUsuariosController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1104,7 +1104,7 @@ class AdminUsuariosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="page-title">' . htmlspecialchars($usuario['nome']) . '</h1>
-                    <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> ' . __('admin.users.back', 'Voltar') . '</a>
                 </div>
                 
                 <div class="row">
@@ -1114,19 +1114,19 @@ class AdminUsuariosController extends Controller {
                                 <img src="https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=4e73df&color=fff&size=120" class="user-avatar mb-3" alt="Avatar">
                                 <h5>' . htmlspecialchars($usuario['nome']) . '</h5>
                                 <p class="text-muted">' . htmlspecialchars($usuario['email']) . '</p>
-                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
-                                ' . (!empty($usuario['is_desapeguista']) ? '<span class="badge bg-info mt-2"><i class="fas fa-hand-holding-heart me-1"></i>Desapeguista (' . htmlspecialchars((string) ($usuario['desapeguista_comissao'] ?? '30')) . '%)</span>' : '') . '
+                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? __('admin.users.status_active', 'Ativo') : __('admin.users.status_inactive', 'Inativo')) . '</span>
+                                ' . (!empty($usuario['is_desapeguista']) ? '<span class="badge bg-info mt-2"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.users.desapeguista', 'Desapeguista') . ' (' . htmlspecialchars((string) ($usuario['desapeguista_comissao'] ?? '30')) . '%)</span>' : '') . '
                             </div>
                         </div>
                         
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0">Estatísticas</h5>
+                                <h5 class="mb-0">' . __('admin.users.statistics', 'Estatísticas') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="text-center mb-3">
                                     <h3 class="text-primary">' . $stats['total_pedidos'] . '</h3>
-                                    <p class="text-muted">Total de Pedidos</p>
+                                    <p class="text-muted">' . __('admin.users.total_orders', 'Total de Pedidos') . '</p>
                                 </div>
                                 <div class="text-center mb-3">
                                     ' . (function() use ($stats) {
@@ -1141,12 +1141,12 @@ class AdminUsuariosController extends Controller {
                                         }
                                         return '<h3 class="text-success">' . $val . '</h3>';
                                     })() . '
-                                    <p class="text-muted">Total Gasto</p>
+                                    <p class="text-muted">' . __('admin.users.total_spent', 'Total Gasto') . '</p>
                                 </div>
                                 <hr>
                                 <p class="small text-muted">
-                                    <strong>Último pedido:</strong><br>
-                                    ' . ($stats['ultimo_pedido'] ? date('d/m/Y H:i', strtotime($stats['ultimo_pedido'])) : 'Nenhum') . '
+                                    <strong>' . __('admin.users.last_order', 'Último pedido:') . '</strong><br>
+                                    ' . ($stats['ultimo_pedido'] ? date('d/m/Y H:i', strtotime($stats['ultimo_pedido'])) : __('admin.users.none', 'Nenhum')) . '
                                 </p>
                             </div>
                         </div>
@@ -1155,34 +1155,34 @@ class AdminUsuariosController extends Controller {
                     <div class="col-md-8">
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0">Dados Pessoais</h5>
+                                <h5 class="mb-0">' . __('admin.users.personal_data', 'Dados Pessoais') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <p><strong>Nome:</strong> ' . htmlspecialchars($usuario['nome']) . '</p>
-                                        <p><strong>Email:</strong> ' . htmlspecialchars($usuario['email']) . '</p>
-                                        <p><strong>Telefone:</strong> ' . htmlspecialchars($usuario['telefone'] ?? 'N/A') . '</p>
-                                        <p><strong>CPF:</strong> ' . htmlspecialchars($usuario['cpf'] ?? ($usuario['documento'] ?? 'N/A')) . '</p>
-                                        ' . (!empty($usuario['suite']) ? '<p><strong>Suite:</strong> ' . (int) $usuario['suite'] . '</p>' : '') . '
+                                        <p><strong>' . __('admin.users.field_name', 'Nome') . ':</strong> ' . htmlspecialchars($usuario['nome']) . '</p>
+                                        <p><strong>' . __('admin.users.field_email_short', 'Email') . ':</strong> ' . htmlspecialchars($usuario['email']) . '</p>
+                                        <p><strong>' . __('admin.users.field_phone', 'Telefone') . ':</strong> ' . htmlspecialchars($usuario['telefone'] ?? 'N/A') . '</p>
+                                        <p><strong>' . __('admin.users.field_cpf', 'CPF') . ':</strong> ' . htmlspecialchars($usuario['cpf'] ?? ($usuario['documento'] ?? 'N/A')) . '</p>
+                                        ' . (!empty($usuario['suite']) ? '<p><strong>' . __('admin.users.suite_label', 'Suite:') . '</strong> ' . (int) $usuario['suite'] . '</p>' : '') . '
                                     </div>
                                     <div class="col-md-6">
-                                        <p><strong>Data Nascimento:</strong> ' . ($usuario['data_nascimento'] ? date('d/m/Y', strtotime($usuario['data_nascimento'])) : 'N/A') . '</p>
-                                        <p><strong>CEP:</strong> ' . htmlspecialchars($usuario['cep'] ?? 'N/A') . '</p>
-                                        <p><strong>Endereço:</strong> ' . htmlspecialchars($usuario['endereco'] ?? '') . ', ' . htmlspecialchars($usuario['numero'] ?? '') . '</p>
-                                        <p><strong>Bairro:</strong> ' . htmlspecialchars($usuario['bairro'] ?? 'N/A') . '</p>
-                                        <p><strong>Cidade:</strong> ' . htmlspecialchars($usuario['cidade'] ?? '') . ' - ' . htmlspecialchars($usuario['estado'] ?? '') . '</p>
+                                        <p><strong>' . __('admin.users.birthdate_short', 'Data Nascimento:') . '</strong> ' . ($usuario['data_nascimento'] ? date('d/m/Y', strtotime($usuario['data_nascimento'])) : 'N/A') . '</p>
+                                        <p><strong>' . __('admin.users.field_zip', 'CEP') . ':</strong> ' . htmlspecialchars($usuario['cep'] ?? 'N/A') . '</p>
+                                        <p><strong>' . __('admin.users.field_address', 'Endereço') . ':</strong> ' . htmlspecialchars($usuario['endereco'] ?? '') . ', ' . htmlspecialchars($usuario['numero'] ?? '') . '</p>
+                                        <p><strong>' . __('admin.users.field_neighborhood', 'Bairro') . ':</strong> ' . htmlspecialchars($usuario['bairro'] ?? 'N/A') . '</p>
+                                        <p><strong>' . __('admin.users.field_city', 'Cidade') . ':</strong> ' . htmlspecialchars($usuario['cidade'] ?? '') . ' - ' . htmlspecialchars($usuario['estado'] ?? '') . '</p>
                                     </div>
                                 </div>
                                 <hr>
                                 <div class="d-flex justify-content-between">
                                     <a href="/admin/usuarios/editar/' . $usuario['id'] . '" class="btn btn-warning">
-                                        <i class="fas fa-edit"></i> Editar Usuário
+                                        <i class="fas fa-edit"></i> ' . __('admin.users.edit_user', 'Editar Usuário') . '
                                     </a>
                                     <form method="POST" action="/admin/usuarios/atualizar-status/' . $usuario['id'] . '" style="display: inline;">
                                         <input type="hidden" name="ativo" value="' . ($usuario['ativo'] ? '0' : '1') . '">
                                         <button type="submit" class="btn ' . ($usuario['ativo'] ? 'btn-danger' : 'btn-success') . '">
-                                            <i class="fas fa-' . ($usuario['ativo'] ? 'ban' : 'check') . '"></i> ' . ($usuario['ativo'] ? 'Desativar' : 'Ativar') . '
+                                            <i class="fas fa-' . ($usuario['ativo'] ? 'ban' : 'check') . '"></i> ' . ($usuario['ativo'] ? __('admin.users.deactivate', 'Desativar') : __('admin.users.activate', 'Ativar')) . '
                                         </button>
                                     </form>
                                 </div>
@@ -1191,13 +1191,13 @@ class AdminUsuariosController extends Controller {
 
                         <div class="card mt-4">
                             <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Rendimentos da Carteira (Clube)</h5>
+                                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>' . __('admin.users.wallet_earnings', 'Rendimentos da Carteira (Clube)') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
-                                            <div class="small text-muted">Total creditado</div>
+                                            <div class="small text-muted">' . __('admin.users.total_credited', 'Total creditado') . '</div>
                                             <div class="fw-bold">'
                                             . ((float) ($carteiraRendimentoResumo['credito_brl'] ?? 0) > 0 ? ('R$ ' . number_format((float) ($carteiraRendimentoResumo['credito_brl'] ?? 0), 2, ',', '.') ) : 'R$ 0,00')
                                             . (((float) ($carteiraRendimentoResumo['credito_usd'] ?? 0) > 0) ? ('<br><span class="text-muted">US$ ' . number_format((float) ($carteiraRendimentoResumo['credito_usd'] ?? 0), 2, ',', '.') . '</span>') : '')
@@ -1206,7 +1206,7 @@ class AdminUsuariosController extends Controller {
                                     </div>
                                     <div class="col-md-6">
                                         <div class="border rounded p-3" style="background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.18) !important;">
-                                            <div class="small text-muted">Total estornado</div>
+                                            <div class="small text-muted">' . __('admin.users.total_reversed', 'Total estornado') . '</div>
                                             <div class="fw-bold">'
                                             . ((float) ($carteiraRendimentoResumo['debito_brl'] ?? 0) > 0 ? ('R$ ' . number_format((float) ($carteiraRendimentoResumo['debito_brl'] ?? 0), 2, ',', '.') ) : 'R$ 0,00')
                                             . (((float) ($carteiraRendimentoResumo['debito_usd'] ?? 0) > 0) ? ('<br><span class="text-muted">US$ ' . number_format((float) ($carteiraRendimentoResumo['debito_usd'] ?? 0), 2, ',', '.') . '</span>') : '')
@@ -1219,15 +1219,15 @@ class AdminUsuariosController extends Controller {
                                     <table class="table table-sm table-hover align-middle">
                                         <thead>
                                             <tr>
-                                                <th>Data</th>
-                                                <th>Descrição</th>
-                                                <th class="text-end">Valor</th>
+                                                <th>' . __('admin.users.th_date', 'Data') . '</th>
+                                                <th>' . __('admin.users.th_description', 'Descrição') . '</th>
+                                                <th class="text-end">' . __('admin.users.th_value', 'Valor') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
 
         if (empty($carteiraTransacoes)) {
-            echo '<tr><td colspan="3" class="text-center text-muted py-3">Nenhuma movimentação encontrada.</td></tr>';
+            echo '<tr><td colspan="3" class="text-center text-muted py-3">' . __('admin.users.no_transactions', 'Nenhuma movimentação encontrada.') . '</td></tr>';
         } else {
             foreach ($carteiraTransacoes as $t) {
                 $desc = (string) ($t['descricao'] ?? '');
@@ -1248,7 +1248,7 @@ class AdminUsuariosController extends Controller {
 
                 echo '<tr class="' . $rowClass . '">' .
                     '<td style="white-space:nowrap;">' . $dt . '</td>' .
-                    '<td>' . ($isRend ? '<span class="badge bg-light text-dark me-1">Clube</span>' : '') . htmlspecialchars($desc) . '</td>' .
+                    '<td>' . ($isRend ? '<span class="badge bg-light text-dark me-1">' . __('admin.users.club', 'Clube') . '</span>' : '') . htmlspecialchars($desc) . '</td>' .
                     '<td class="text-end ' . $valorClass . '" style="white-space:nowrap;">' . ($tipo === 'debito' ? '-' : '+') . ' ' . $valorStr . '</td>' .
                 '</tr>';
             }
@@ -1256,25 +1256,25 @@ class AdminUsuariosController extends Controller {
 
         echo '                        </tbody>
                                     </table>
-                                    <div class="small text-muted">Mostrando as últimas 50 movimentações.</div>
+                                    <div class="small text-muted">' . __('admin.users.showing_last_50', 'Mostrando as últimas 50 movimentações.') . '</div>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="card mt-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Pedidos Recentes</h5>
+                                <h5 class="mb-0">' . __('admin.users.recent_orders', 'Pedidos Recentes') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table">
                                         <thead>
                                             <tr>
-                                                <th>Pedido</th>
-                                                <th>Data</th>
-                                                <th>Status</th>
-                                                <th>Valor</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.users.th_order', 'Pedido') . '</th>
+                                                <th>' . __('admin.users.th_date', 'Data') . '</th>
+                                                <th>' . __('admin.users.status', 'Status') . '</th>
+                                                <th>' . __('admin.users.th_value', 'Valor') . '</th>
+                                                <th>' . __('admin.users.th_actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -1299,7 +1299,7 @@ class AdminUsuariosController extends Controller {
                                         }
                                         
                                         if (empty($pedidos)) {
-                                            echo '<tr><td colspan="5" class="text-center text-muted">Nenhum pedido encontrado</td></tr>';
+                                            echo '<tr><td colspan="5" class="text-center text-muted">' . __('admin.users.no_orders', 'Nenhum pedido encontrado') . '</td></tr>';
                                         }
                                         
                                         echo '</tbody>
@@ -1307,7 +1307,7 @@ class AdminUsuariosController extends Controller {
                                 </div>
                                 <div class="text-center mt-3">
                                     <a href="/admin/pedidos?busca=' . urlencode($usuario['email']) . '" class="btn btn-outline-primary">
-                                        Ver Todos os Pedidos
+                                        ' . __('admin.users.view_all_orders', 'Ver Todos os Pedidos') . '
                                     </a>
                                 </div>
                             </div>
@@ -1335,8 +1335,8 @@ class AdminUsuariosController extends Controller {
             header('Location: /admin/usuarios?success=excluido');
             exit;
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro ao excluir usuário: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('admin.users.delete_error', 'Erro ao excluir usuário:') . ' ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
             exit;
         }
     }
@@ -1355,8 +1355,8 @@ class AdminUsuariosController extends Controller {
             exit;
             
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro ao atualizar status: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/usuarios/detalhes/' . $id . '" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('admin.users.status_update_error', 'Erro ao atualizar status:') . ' ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios/detalhes/' . $id . '" class="btn btn-secondary">' . __('admin.users.back', 'Voltar') . '</a>';
             exit;
         }
     }
@@ -1370,7 +1370,7 @@ class AdminUsuariosController extends Controller {
         }
 
         if (!empty($_SESSION['impersonation']['active'])) {
-            $_SESSION['message'] = 'Impersonação já está ativa.';
+            $_SESSION['message'] = __('admin.users.impersonation_active', 'Impersonação já está ativa.');
             $_SESSION['message_type'] = 'warning';
             header('Location: /admin/usuarios');
             exit;
@@ -1378,7 +1378,7 @@ class AdminUsuariosController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            $_SESSION['message'] = 'Usuário inválido.';
+            $_SESSION['message'] = __('admin.users.invalid_user', 'Usuário inválido.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/usuarios');
             exit;
@@ -1386,7 +1386,7 @@ class AdminUsuariosController extends Controller {
 
         $csrf = (string) $request->getParam('csrf_token', '');
         if (!$auth->validarCSRF($csrf)) {
-            $_SESSION['message'] = 'Token de segurança inválido.';
+            $_SESSION['message'] = __('admin.users.invalid_csrf', 'Token de segurança inválido.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/usuarios');
             exit;
@@ -1401,7 +1401,7 @@ class AdminUsuariosController extends Controller {
         $adminPerfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
         $adminRole = strtolower(trim((string) ($admin['role'] ?? '')));
         if (!in_array($adminPerfil, ['admin', 'suporte', 'vendedor'], true) && !in_array($adminRole, ['admin', 'suporte', 'vendedor'], true)) {
-            $_SESSION['message'] = 'Acesso negado.';
+            $_SESSION['message'] = __('admin.users.access_denied', 'Acesso negado.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/usuarios');
             exit;
@@ -1410,7 +1410,7 @@ class AdminUsuariosController extends Controller {
         $uModel = new Usuario();
         $target = $uModel->find($id);
         if (!is_array($target) || empty($target['id'])) {
-            $_SESSION['message'] = 'Usuário não encontrado.';
+            $_SESSION['message'] = __('admin.users.not_found_dot', 'Usuário não encontrado.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/usuarios');
             exit;
@@ -1428,7 +1428,7 @@ class AdminUsuariosController extends Controller {
         // Aceitar variações comuns de perfil de cliente (ex: 'customer' do WooCommerce)
         $perfisCliente = ['cliente', 'customer', 'subscriber', ''];
         if (!in_array($targetPerfil, $perfisCliente, true) && !str_contains($targetPerfil, 'customer')) {
-            $_SESSION['message'] = 'Você só pode logar como clientes.';
+            $_SESSION['message'] = __('admin.users.only_clients', 'Você só pode logar como clientes.');
             $_SESSION['message_type'] = 'warning';
             header('Location: /admin/usuarios');
             exit;

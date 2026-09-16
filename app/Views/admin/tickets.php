@@ -24,22 +24,22 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
             <div class="row g-2">
                 <div class="col-6 col-md-2">
                     <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
-                        <option value="open" <?= $status === 'open' ? 'selected' : '' ?>>Abertos</option>
-                        <option value="closed" <?= $status === 'closed' ? 'selected' : '' ?>>Fechados</option>
-                        <option value="all" <?= $status === 'all' ? 'selected' : '' ?>>Todos</option>
+                        <option value="open" <?= $status === 'open' ? 'selected' : '' ?>><?= __('admin.tickets.filter.open', 'Abertos') ?></option>
+                        <option value="closed" <?= $status === 'closed' ? 'selected' : '' ?>><?= __('admin.tickets.filter.closed', 'Fechados') ?></option>
+                        <option value="all" <?= $status === 'all' ? 'selected' : '' ?>><?= __('admin.tickets.filter.all', 'Todos') ?></option>
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
                     <select class="form-select form-select-sm" name="cliente_tipo" onchange="this.form.submit()">
-                        <option value="" <?= $clienteTipo === '' ? 'selected' : '' ?>>Tipo: Todos</option>
-                        <option value="admin" <?= $clienteTipo === 'admin' ? 'selected' : '' ?>>Admin</option>
-                        <option value="suporte" <?= $clienteTipo === 'suporte' ? 'selected' : '' ?>>Suporte</option>
-                        <option value="vendedor" <?= $clienteTipo === 'vendedor' ? 'selected' : '' ?>>Vendedor</option>
+                        <option value="" <?= $clienteTipo === '' ? 'selected' : '' ?>><?= __('admin.tickets.filter.type_all', 'Tipo: Todos') ?></option>
+                        <option value="admin" <?= $clienteTipo === 'admin' ? 'selected' : '' ?>><?= __('admin.tickets.filter.type_admin', 'Admin') ?></option>
+                        <option value="suporte" <?= $clienteTipo === 'suporte' ? 'selected' : '' ?>><?= __('admin.tickets.filter.type_support', 'Suporte') ?></option>
+                        <option value="vendedor" <?= $clienteTipo === 'vendedor' ? 'selected' : '' ?>><?= __('admin.tickets.filter.type_seller', 'Vendedor') ?></option>
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
                     <select class="form-select form-select-sm" name="atendente_id" onchange="this.form.submit()">
-                        <option value="0" <?= $atendenteId === 0 ? 'selected' : '' ?>>Atendente: Todos</option>
+                        <option value="0" <?= $atendenteId === 0 ? 'selected' : '' ?>><?= __('admin.tickets.filter.agent_all', 'Atendente: Todos') ?></option>
                         <?php foreach (($atendentes ?? []) as $a): ?>
                             <option value="<?= (int) ($a['id'] ?? 0) ?>" <?= (int) ($a['id'] ?? 0) === $atendenteId ? 'selected' : '' ?>>
                                 <?= htmlspecialchars((string) ($a['nome'] ?? $a['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
@@ -48,13 +48,13 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
-                    <input type="date" class="form-control form-control-sm" name="date_from" value="<?= htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') ?>" placeholder="De" onchange="this.form.submit()">
+                    <input type="date" class="form-control form-control-sm" name="date_from" value="<?= htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars(__('admin.tickets.filter.date_from', 'De'), ENT_QUOTES, 'UTF-8') ?>" onchange="this.form.submit()">
                 </div>
                 <div class="col-6 col-md-2">
-                    <input type="date" class="form-control form-control-sm" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') ?>" placeholder="Até" onchange="this.form.submit()">
+                    <input type="date" class="form-control form-control-sm" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars(__('admin.tickets.filter.date_to', 'Até'), ENT_QUOTES, 'UTF-8') ?>" onchange="this.form.submit()">
                 </div>
                 <div class="col-6 col-md-2">
-                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/tickets">Limpar</a>
+                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/tickets"><?= __('admin.tickets.filter.clear', 'Limpar') ?></a>
                 </div>
             </div>
         </form>
@@ -107,7 +107,7 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
                                         <i class="fas fa-comments"></i>
                                         <?php if (!empty($t['has_unread'])): ?>
                                             <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="width: 12px; height: 12px;">
-                                                <span class="visually-hidden">mensagens não lidas</span>
+                                                <span class="visually-hidden"><?= __('admin.tickets.unread_messages', 'mensagens não lidas') ?></span>
                                             </span>
                                         <?php endif; ?>
                                     </a>
@@ -134,17 +134,17 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
                                 <div class="fw-semibold text-dark" style="word-break:break-word;"><?= htmlspecialchars((string) ($t['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 <div class="text-muted small" style="word-break:break-all;"><?= htmlspecialchars((string) ($t['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 <?php if (!empty($t['atendente_nome'])): ?>
-                                    <div class="small mt-1"><span class="text-muted">Atendente:</span> <?= htmlspecialchars((string) ($t['atendente_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                    <div class="small mt-1"><span class="text-muted"><?= __('admin.tickets.table.agent', 'Atendente') ?>:</span> <?= htmlspecialchars((string) ($t['atendente_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 <?php endif; ?>
                                 <?php if (!empty($t['motivo'])): ?>
-                                    <div class="small mt-1"><span class="text-muted">Motivo:</span> <?= htmlspecialchars((string) ($t['motivo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                    <div class="small mt-1"><span class="text-muted"><?= __('admin.tickets.table.reason', 'Motivo') ?>:</span> <?= htmlspecialchars((string) ($t['motivo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 <?php endif; ?>
                                 <?php if (!empty($t['assunto'])): ?>
-                                    <div class="small mt-1" style="word-break:break-word;"><span class="text-muted">Assunto:</span> <?= htmlspecialchars((string) ($t['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                    <div class="small mt-1" style="word-break:break-word;"><span class="text-muted"><?= __('admin.tickets.table.subject', 'Assunto') ?>:</span> <?= htmlspecialchars((string) ($t['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 <?php endif; ?>
                                 <div class="text-muted small mt-1"><?= htmlspecialchars((string) ($t['updated_at'] ?? $t['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 <?php if (!empty($t['has_unread'])): ?>
-                                    <span class="badge bg-danger mt-1">Nova mensagem</span>
+                                    <span class="badge bg-danger mt-1"><?= __('admin.tickets.new_message', 'Nova mensagem') ?></span>
                                 <?php endif; ?>
                             </div>
                         </div>

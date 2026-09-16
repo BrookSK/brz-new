@@ -1,19 +1,19 @@
 <?php ob_start(); ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Pacotes WordPress</h1>
+        <h1 class="page-title"><?= __('admin.wp_packages.title', 'Pacotes WordPress') ?></h1>
         <div class="d-flex gap-2 align-items-center flex-wrap">
             <button class="btn btn-sm btn-success" onclick="sincronizarPacotes()" id="btnSync">
-                <i class="fas fa-sync-alt me-1"></i>Sincronizar
+                <i class="fas fa-sync-alt me-1"></i><?= __('admin.wp_packages.sync', 'Sincronizar') ?>
             </button>
-            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=containers">Containers</a>
-            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=faturas">Faturas (CN38)</a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=containers"><?= __('admin.wp_packages.containers', 'Containers') ?></a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=faturas"><?= __('admin.wp_packages.invoices_cn38', 'Faturas (CN38)') ?></a>
         </div>
     </div>
 
     <?php if (!empty($lastSync)): ?>
         <div class="text-muted small mb-3">
-            <i class="fas fa-clock me-1"></i>Última sincronização: <?= date('d/m/Y H:i', strtotime((string) $lastSync)) ?>
+            <i class="fas fa-clock me-1"></i><?= __('admin.wp_packages.last_sync', 'Última sincronização:') ?> <?= date('d/m/Y H:i', strtotime((string) $lastSync)) ?>
         </div>
     <?php endif; ?>
 
@@ -25,25 +25,25 @@
         <div class="card-body py-2">
             <form method="GET" action="/admin/pacotes-wordpress" class="row g-2 align-items-end">
                 <div class="col-auto">
-                    <label class="form-label small mb-0">Origem</label>
+                    <label class="form-label small mb-0"><?= __('admin.wp_packages.origin', 'Origem') ?></label>
                     <select name="origem" class="form-select form-select-sm">
-                        <option value="">Todas</option>
+                        <option value=""><?= __('admin.wp_packages.all', 'Todas') ?></option>
                         <option value="br" <?= ($filtroOrigem ?? '') === 'br' ? 'selected' : '' ?>>BR</option>
                         <option value="red" <?= ($filtroOrigem ?? '') === 'red' ? 'selected' : '' ?>>RED</option>
                         <option value="us" <?= ($filtroOrigem ?? '') === 'us' ? 'selected' : '' ?>>US</option>
                     </select>
                 </div>
                 <div class="col-auto">
-                    <label class="form-label small mb-0">Nº Pedido</label>
-                    <input type="text" name="pedido" class="form-control form-control-sm" placeholder="Ex: 68849" value="<?= htmlspecialchars((string) ($filtroPedido ?? '')) ?>">
+                    <label class="form-label small mb-0"><?= __('admin.wp_packages.order_number', 'Nº Pedido') ?></label>
+                    <input type="text" name="pedido" class="form-control form-control-sm" placeholder="<?= htmlspecialchars(__('admin.wp_packages.order_number_placeholder', 'Ex: 68849'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) ($filtroPedido ?? '')) ?>">
                 </div>
                 <div class="col-auto">
-                    <label class="form-label small mb-0">Tracking</label>
-                    <input type="text" name="tracking" class="form-control form-control-sm" placeholder="Código rastreio..." value="<?= htmlspecialchars((string) ($filtroTracking ?? '')) ?>">
+                    <label class="form-label small mb-0"><?= __('admin.wp_packages.tracking', 'Tracking') ?></label>
+                    <input type="text" name="tracking" class="form-control form-control-sm" placeholder="<?= htmlspecialchars(__('admin.wp_packages.tracking_placeholder', 'Código rastreio...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) ($filtroTracking ?? '')) ?>">
                 </div>
                 <div class="col-auto">
-                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search me-1"></i>Filtrar</button>
-                    <a href="/admin/pacotes-wordpress" class="btn btn-sm btn-outline-secondary">Limpar</a>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search me-1"></i><?= __('admin.wp_packages.filter', 'Filtrar') ?></button>
+                    <a href="/admin/pacotes-wordpress" class="btn btn-sm btn-outline-secondary"><?= __('admin.wp_packages.clear', 'Limpar') ?></a>
                 </div>
             </form>
         </div>
@@ -52,26 +52,26 @@
     <!-- Tabela de Etiquetas -->
     <div class="card border-0 shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Etiquetas (<?= (int) ($total ?? 0) ?> total)</strong>
+            <strong><?= __('admin.wp_packages.labels_total', 'Etiquetas ({0} total)', [(int) ($total ?? 0)]) ?></strong>
         </div>
         <div class="card-body">
             <div class="table-responsive d-none d-md-block">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
-                            <th>Origem</th>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Rastreio</th>
-                            <th>Container</th>
-                            <th>Data</th>
-                            <th>Ações</th>
+                            <th><?= __('admin.wp_packages.origin', 'Origem') ?></th>
+                            <th><?= __('admin.wp_packages.order', 'Pedido') ?></th>
+                            <th><?= __('admin.wp_packages.customer', 'Cliente') ?></th>
+                            <th><?= __('admin.wp_packages.tracking_col', 'Rastreio') ?></th>
+                            <th><?= __('admin.wp_packages.container', 'Container') ?></th>
+                            <th><?= __('admin.wp_packages.date', 'Data') ?></th>
+                            <th><?= __('admin.wp_packages.actions', 'Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $etiquetas = isset($etiquetas) && is_array($etiquetas) ? $etiquetas : []; ?>
                         <?php if (empty($etiquetas)): ?>
-                            <tr><td colspan="7" class="text-muted">Nenhuma etiqueta encontrada. Clique em "Sincronizar" para puxar do WordPress.</td></tr>
+                            <tr><td colspan="7" class="text-muted"><?= __('admin.wp_packages.no_labels_hint', 'Nenhuma etiqueta encontrada. Clique em "Sincronizar" para puxar do WordPress.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($etiquetas as $e): ?>
                                 <?php
@@ -124,7 +124,7 @@
                                                     'origem' => strtoupper((string) ($e['origem'] ?? '')),
                                                 ], JSON_UNESCAPED_UNICODE);
                                             ?>
-                                            <button class="btn btn-sm btn-outline-primary" onclick='gerarEtiquetaPdf(<?= htmlspecialchars($pdfData, ENT_QUOTES) ?>)' title="Gerar PDF"><i class="fas fa-file-pdf"></i></button>
+                                            <button class="btn btn-sm btn-outline-primary" onclick='gerarEtiquetaPdf(<?= htmlspecialchars($pdfData, ENT_QUOTES) ?>)' title="<?= htmlspecialchars(__('admin.wp_packages.generate_pdf', 'Gerar PDF'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-file-pdf"></i></button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -137,7 +137,7 @@
             <!-- Mobile: Cards -->
             <div class="d-md-none">
                 <?php if (empty($etiquetas)): ?>
-                    <div class="text-muted small py-3">Nenhuma etiqueta encontrada.</div>
+                    <div class="text-muted small py-3"><?= __('admin.wp_packages.no_labels', 'Nenhuma etiqueta encontrada.') ?></div>
                 <?php else: ?>
                     <?php foreach ($etiquetas as $e): ?>
                         <?php
@@ -232,7 +232,7 @@ function gerarEtiquetaPdf(d) {
     doc.setFontSize(8);
     doc.text('PACKET STANDARD', 60, 8);
     doc.setFontSize(7);
-    doc.text('Order #: ' + orderId, 5, 8);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_order_hash', 'Order #:'), ENT_QUOTES, 'UTF-8') ?> ' + orderId, 5, 8);
     doc.text('DDU', 5, 12);
 
     // Tracking number
@@ -257,9 +257,9 @@ function gerarEtiquetaPdf(d) {
 
     // Recebedor / Assinatura
     doc.setFontSize(7);
-    doc.text('Recebedor: ___________________________________', 5, 43);
-    doc.text('Assinatura: ___________________________________', 5, 48);
-    doc.text('Documento: ____________', 65, 48);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_receiver', 'Recebedor:'), ENT_QUOTES, 'UTF-8') ?> ___________________________________', 5, 43);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_signature', 'Assinatura:'), ENT_QUOTES, 'UTF-8') ?> ___________________________________', 5, 48);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_document', 'Documento:'), ENT_QUOTES, 'UTF-8') ?> ____________', 65, 48);
 
     // Destinatário box
     doc.setFillColor(0, 0, 0);
@@ -267,7 +267,7 @@ function gerarEtiquetaPdf(d) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8);
     doc.setFont(undefined, 'bold');
-    doc.text('DESTINATÁRIO', 7, 56);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_recipient', 'DESTINATÁRIO'), ENT_QUOTES, 'UTF-8') ?>', 7, 56);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, 'normal');
 
@@ -295,15 +295,15 @@ function gerarEtiquetaPdf(d) {
 
     // Instrução de não nacionalização
     doc.setFontSize(7);
-    doc.text('Instrução do Remetente no caso de não nacionalização:', 5, 85);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_sender_instruction', 'Instrução do Remetente no caso de não nacionalização:'), ENT_QUOTES, 'UTF-8') ?>', 5, 85);
     doc.rect(5, 87, 3, 3);
     doc.text('X', 5.8, 89.5);
-    doc.text('Retorno à origem', 10, 89.5);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_return_origin', 'Retorno à origem'), ENT_QUOTES, 'UTF-8') ?>', 10, 89.5);
 
     // Remetente
     doc.setFontSize(8);
     doc.setFont(undefined, 'bold');
-    doc.text('Remetente:', 60, 85);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_sender', 'Remetente:'), ENT_QUOTES, 'UTF-8') ?>', 60, 85);
     doc.setFont(undefined, 'normal');
     doc.setFontSize(7);
     doc.text('Braziliana LLC', 60, 89);
@@ -311,8 +311,8 @@ function gerarEtiquetaPdf(d) {
 
     // Devolução
     doc.setFontSize(6);
-    doc.text('--- DEVOLUÇÃO ---', 5, 97);
-    doc.text('(Em caso de não entrega ao remetente, entregar para:)', 5, 101);
+    doc.text('--- <?= htmlspecialchars(__('admin.wp_packages.pdf_return', 'DEVOLUÇÃO'), ENT_QUOTES, 'UTF-8') ?> ---', 5, 97);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_return_instruction', '(Em caso de não entrega ao remetente, entregar para:)'), ENT_QUOTES, 'UTF-8') ?>', 5, 101);
     doc.text('Braziliana', 5, 105);
     doc.text('Rua Votuporanga 2276 / Eldorado', 5, 109);
     doc.text('15043-040 - São José do Rio Preto/SP', 5, 113);
@@ -323,16 +323,16 @@ function gerarEtiquetaPdf(d) {
     // Declaração para Alfândega
     doc.setFontSize(7);
     doc.setFont(undefined, 'bold');
-    doc.text('Declaração para Alfândega', 5, 120);
-    doc.text('Pode ser aberto Ex Officio', 55, 120);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_customs_declaration', 'Declaração para Alfândega'), ENT_QUOTES, 'UTF-8') ?>', 5, 120);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_may_be_opened', 'Pode ser aberto Ex Officio'), ENT_QUOTES, 'UTF-8') ?>', 55, 120);
     doc.setFont(undefined, 'normal');
 
     // Table header
     doc.setFontSize(6);
-    doc.text('Cod SH', 5, 125);
-    doc.text('Qtde', 25, 125);
-    doc.text('Descrição', 35, 125);
-    doc.text('Peso KG', 60, 125);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_col_hs_code', 'Cod SH'), ENT_QUOTES, 'UTF-8') ?>', 5, 125);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_col_qty', 'Qtde'), ENT_QUOTES, 'UTF-8') ?>', 25, 125);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_col_description', 'Descrição'), ENT_QUOTES, 'UTF-8') ?>', 35, 125);
+    doc.text('<?= htmlspecialchars(__('admin.wp_packages.pdf_col_weight_kg', 'Peso KG'), ENT_QUOTES, 'UTF-8') ?>', 60, 125);
     doc.text('Unit USD', 75, 125);
     doc.text('Valor USD', 88, 125);
     doc.line(5, 126, 95, 126);
@@ -356,7 +356,7 @@ async function sincronizarPacotes() {
     successEl.style.display = 'none';
     errorEl.style.display = 'none';
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sincronizando...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i><?= htmlspecialchars(__('admin.wp_packages.syncing', 'Sincronizando...'), ENT_QUOTES, 'UTF-8') ?>';
 
     try {
         const r = await fetch('/admin/pacotes-wordpress?action=sincronizar', {
@@ -365,15 +365,15 @@ async function sincronizarPacotes() {
         });
         const data = await r.json();
         if (data.success) {
-            successEl.textContent = 'Sincronização concluída! ' + (data.synced || 0) + ' pacotes sincronizados.';
+            successEl.textContent = '<?= htmlspecialchars(__('admin.wp_packages.sync_done', 'Sincronização concluída!'), ENT_QUOTES, 'UTF-8') ?> ' + (data.synced || 0) + ' <?= htmlspecialchars(__('admin.wp_packages.packages_synced', 'pacotes sincronizados.'), ENT_QUOTES, 'UTF-8') ?>';
             successEl.style.display = '';
             setTimeout(() => location.reload(), 1500);
         } else {
-            errorEl.textContent = 'Erros: ' + (data.errors || []).join('; ');
+            errorEl.textContent = '<?= htmlspecialchars(__('admin.wp_packages.errors', 'Erros:'), ENT_QUOTES, 'UTF-8') ?> ' + (data.errors || []).join('; ');
             errorEl.style.display = '';
         }
     } catch (e) {
-        errorEl.textContent = 'Falha na sincronização: ' + e.message;
+        errorEl.textContent = '<?= htmlspecialchars(__('admin.wp_packages.sync_failed', 'Falha na sincronização:'), ENT_QUOTES, 'UTF-8') ?> ' + e.message;
         errorEl.style.display = '';
     } finally {
         btn.disabled = false;
@@ -384,7 +384,7 @@ async function sincronizarPacotes() {
 
 <?php
 $content = ob_get_clean();
-$title = 'Pacotes WordPress - Admin';
+$title = __('admin.wp_packages.page_title', 'Pacotes WordPress - Admin');
 $activePage = 'pacotes-wordpress';
 include __DIR__ . '/../../layouts/admin.php';
 ?>

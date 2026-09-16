@@ -101,11 +101,11 @@ class AdminDescontoAutorizacaoController
                 $descontoTipo = 'percentual';
             }
             if ($descontoValor <= 0) {
-                echo json_encode(['ok' => false, 'error' => 'Valor do desconto deve ser maior que zero']);
+                echo json_encode(['ok' => false, 'error' => __('admin.discount_auth.err_discount_gt_zero', 'Valor do desconto deve ser maior que zero')]);
                 exit;
             }
             if ($precoOriginal <= 0) {
-                echo json_encode(['ok' => false, 'error' => 'Preço original inválido']);
+                echo json_encode(['ok' => false, 'error' => __('admin.discount_auth.err_invalid_original_price', 'Preço original inválido')]);
                 exit;
             }
 
@@ -147,7 +147,7 @@ class AdminDescontoAutorizacaoController
 
             $token = trim((string) $request->getParam('token', ''));
             if ($token === '') {
-                echo json_encode(['ok' => false, 'error' => 'Token inválido']);
+                echo json_encode(['ok' => false, 'error' => __('admin.discount_auth.err_invalid_token', 'Token inválido')]);
                 exit;
             }
 
@@ -159,7 +159,7 @@ class AdminDescontoAutorizacaoController
             $row = $st->fetch(\PDO::FETCH_ASSOC);
 
             if (!$row) {
-                echo json_encode(['ok' => false, 'error' => 'Solicitação não encontrada']);
+                echo json_encode(['ok' => false, 'error' => __('admin.discount_auth.err_request_not_found', 'Solicitação não encontrada')]);
                 exit;
             }
 
@@ -199,20 +199,20 @@ class AdminDescontoAutorizacaoController
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $solicitacao && $solicitacao['status'] === 'pendente') {
             $senha = trim((string) $request->getParam('senha', ''));
             if ($senha !== self::SENHA_AUTORIZACAO) {
-                $mensagem = 'Senha incorreta.';
+                $mensagem = __('admin.discount_auth.wrong_password', 'Senha incorreta.');
                 $tipo = 'danger';
             } else {
                 if ($acao === 'aprovar') {
                     $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'aprovado', aprovado_por = 'painel', updated_at = NOW() WHERE token = ? AND status = 'pendente'");
                     $st->execute([$token]);
-                    $mensagem = 'Desconto aprovado com sucesso.';
+                    $mensagem = __('admin.discount_auth.approved_success', 'Desconto aprovado com sucesso.');
                     $tipo = 'success';
                     $solicitacao['status'] = 'aprovado';
                 } elseif ($acao === 'negar') {
                     $motivo = trim((string) $request->getParam('motivo', ''));
                     $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'negado', aprovado_por = 'painel', motivo = ?, updated_at = NOW() WHERE token = ? AND status = 'pendente'");
                     $st->execute([$motivo, $token]);
-                    $mensagem = 'Desconto negado.';
+                    $mensagem = __('admin.discount_auth.denied', 'Desconto negado.');
                     $tipo = 'warning';
                     $solicitacao['status'] = 'negado';
                 }
@@ -246,21 +246,21 @@ class AdminDescontoAutorizacaoController
             if ($acao === 'aprovar') {
                 $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'aprovado', aprovado_por = 'email', updated_at = NOW() WHERE token = ? AND status = 'pendente'");
                 $st->execute([$token]);
-                $mensagem = 'Desconto aprovado com sucesso via email.';
+                $mensagem = __('admin.discount_auth.approved_success_email', 'Desconto aprovado com sucesso via email.');
                 $tipo = 'success';
                 $solicitacao['status'] = 'aprovado';
             } elseif ($acao === 'negar') {
                 $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'negado', aprovado_por = 'email', updated_at = NOW() WHERE token = ? AND status = 'pendente'");
                 $st->execute([$token]);
-                $mensagem = 'Desconto negado via email.';
+                $mensagem = __('admin.discount_auth.denied_email', 'Desconto negado via email.');
                 $tipo = 'warning';
                 $solicitacao['status'] = 'negado';
             }
         } elseif ($solicitacao) {
-            $mensagem = 'Esta solicitação já foi ' . ($solicitacao['status'] === 'aprovado' ? 'aprovada' : 'negada') . '.';
+            $mensagem = __('admin.discount_auth.already_processed', 'Esta solicitação já foi {n}.', ['n'=>($solicitacao['status'] === 'aprovado' ? __('admin.discount_auth.approved_lc', 'aprovada') : __('admin.discount_auth.denied_lc', 'negada'))]);
             $tipo = 'info';
         } else {
-            $mensagem = 'Solicitação não encontrada.';
+            $mensagem = __('admin.discount_auth.request_not_found_period', 'Solicitação não encontrada.');
             $tipo = 'danger';
         }
 
@@ -310,10 +310,10 @@ class AdminDescontoAutorizacaoController
                     } catch (\Exception $e) {}
                 }
 
-                $mensagem = 'Emails salvos com sucesso.';
+                $mensagem = __('admin.discount_auth.emails_saved', 'Emails salvos com sucesso.');
                 $tipo = 'success';
             } catch (\Exception $e) {
-                $mensagem = 'Erro ao salvar: ' . $e->getMessage();
+                $mensagem = __('admin.discount_auth.save_error', 'Erro ao salvar:') . ' ' . $e->getMessage();
                 $tipo = 'danger';
             }
         }
@@ -321,23 +321,23 @@ class AdminDescontoAutorizacaoController
         $emailsAtuais = implode("\n", $this->getEmailsAutorizadores());
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Configuração de Desconto - Admin</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>' . htmlspecialchars(__('admin.discount_auth.config_page_title', 'Configuração de Desconto - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
         echo '</head><body><div class="container-fluid"><div class="row">';
         renderAdminSidebar('configuracoes');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="page-title">Configuração de Desconto com Autorização</h1></div>';
+            <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="page-title">' . __('admin.discount_auth.config_title', 'Configuração de Desconto com Autorização') . '</h1></div>';
         if ($mensagem) echo '<div class="alert alert-' . $tipo . '">' . htmlspecialchars($mensagem) . '</div>';
         echo '<form method="POST"><div class="card"><div class="card-body">
             <div class="mb-3">
-                <label class="form-label">Emails autorizadores (um por linha)</label>
+                <label class="form-label">' . __('admin.discount_auth.authorizer_emails_label', 'Emails autorizadores (um por linha)') . '</label>
                 <textarea class="form-control" name="emails_autorizadores" rows="5" placeholder="admin@exemplo.com">' . htmlspecialchars($emailsAtuais) . '</textarea>
-                <div class="form-text">Esses emails receberão solicitações de desconto com botões para aprovar/negar.</div>
+                <div class="form-text">' . __('admin.discount_auth.authorizer_emails_hint', 'Esses emails receberão solicitações de desconto com botões para aprovar/negar.') . '</div>
             </div>
-            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> ' . __('admin.discount_auth.save', 'Salvar') . '</button>
         </div></div></form></main></div></div></body></html>';
         exit;
     }
@@ -356,21 +356,21 @@ class AdminDescontoAutorizacaoController
             $sym = $moeda === 'BRL' ? 'R$' : '$';
             $descontoLabel = $tipo === 'percentual' ? number_format($valor, 2, ',', '.') . '%' : $sym . ' ' . number_format($valor, 2, ',', '.');
 
-            $subject = 'Solicitação de Desconto - ' . $produto;
+            $subject = __('admin.discount_auth.email_discount_subject', 'Solicitação de Desconto -') . ' ' . $produto;
             $html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-                <h2 style="color:#333;">Solicitação de Desconto</h2>
-                <p>O vendedor <strong>' . htmlspecialchars($vendedor) . '</strong> está solicitando autorização para aplicar um desconto:</p>
+                <h2 style="color:#333;">' . __('admin.discount_auth.email_discount_heading', 'Solicitação de Desconto') . '</h2>
+                <p>' . __('admin.discount_auth.email_discount_intro', 'O vendedor') . ' <strong>' . htmlspecialchars($vendedor) . '</strong> ' . __('admin.discount_auth.email_discount_intro2', 'está solicitando autorização para aplicar um desconto:') . '</p>
                 <table style="width:100%;border-collapse:collapse;margin:15px 0;">
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Produto</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($produto) . '</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Desconto</strong></td><td style="padding:8px;border:1px solid #ddd;">' . $descontoLabel . ' (' . $tipo . ')</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Preço original</strong></td><td style="padding:8px;border:1px solid #ddd;">' . $sym . ' ' . number_format($original, 2, ',', '.') . '</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Preço com desconto</strong></td><td style="padding:8px;border:1px solid #ddd;color:#28a745;font-weight:bold;">' . $sym . ' ' . number_format($final, 2, ',', '.') . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.product', 'Produto') . '</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($produto) . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.discount', 'Desconto') . '</strong></td><td style="padding:8px;border:1px solid #ddd;">' . $descontoLabel . ' (' . $tipo . ')</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.original_price', 'Preço original') . '</strong></td><td style="padding:8px;border:1px solid #ddd;">' . $sym . ' ' . number_format($original, 2, ',', '.') . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.discounted_price', 'Preço com desconto') . '</strong></td><td style="padding:8px;border:1px solid #ddd;color:#28a745;font-weight:bold;">' . $sym . ' ' . number_format($final, 2, ',', '.') . '</td></tr>
                 </table>
                 <div style="margin:20px 0;text-align:center;">
-                    <a href="' . htmlspecialchars($urlAprovar) . '" style="display:inline-block;padding:12px 30px;background:#28a745;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">✅ Aprovar</a>
-                    <a href="' . htmlspecialchars($urlNegar) . '" style="display:inline-block;padding:12px 30px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">❌ Negar</a>
+                    <a href="' . htmlspecialchars($urlAprovar) . '" style="display:inline-block;padding:12px 30px;background:#28a745;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">✅ ' . __('admin.discount_auth.approve', 'Aprovar') . '</a>
+                    <a href="' . htmlspecialchars($urlNegar) . '" style="display:inline-block;padding:12px 30px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">❌ ' . __('admin.discount_auth.deny', 'Negar') . '</a>
                 </div>
-                <p style="color:#666;font-size:12px;">Ou acesse o painel: <a href="' . htmlspecialchars($urlPainel) . '">' . htmlspecialchars($urlPainel) . '</a></p>
+                <p style="color:#666;font-size:12px;">' . __('admin.discount_auth.or_access_panel', 'Ou acesse o painel:') . ' <a href="' . htmlspecialchars($urlPainel) . '">' . htmlspecialchars($urlPainel) . '</a></p>
             </div>';
 
             $emailService = new \App\Services\EmailService();
@@ -385,8 +385,8 @@ class AdminDescontoAutorizacaoController
     private function renderTela(?array $sol, string $msg, string $tipo, string $token): void
     {
         $h = fn($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Autorização de Desconto</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>' . htmlspecialchars(__('admin.discount_auth.authorize_page_title', 'Autorização de Desconto'), ENT_QUOTES, 'UTF-8') . '</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
         </head><body class="bg-light"><div class="container py-5"><div class="row justify-content-center"><div class="col-md-6">';
@@ -394,40 +394,40 @@ class AdminDescontoAutorizacaoController
         if ($msg) echo '<div class="alert alert-' . $tipo . '">' . $h($msg) . '</div>';
 
         if (!$sol) {
-            echo '<div class="card"><div class="card-body text-center"><p class="text-muted">Solicitação não encontrada ou token inválido.</p></div></div>';
+            echo '<div class="card"><div class="card-body text-center"><p class="text-muted">' . __('admin.discount_auth.request_not_found_or_invalid', 'Solicitação não encontrada ou token inválido.') . '</p></div></div>';
         } else {
             $sym = ($sol['moeda'] ?? 'USD') === 'BRL' ? 'R$' : '$';
             $statusBadge = match ($sol['status']) {
-                'aprovado' => '<span class="badge bg-success">Aprovado</span>',
-                'negado'   => '<span class="badge bg-danger">Negado</span>',
-                'expirado' => '<span class="badge bg-secondary">Expirado</span>',
-                default    => '<span class="badge bg-warning text-dark">Pendente</span>',
+                'aprovado' => '<span class="badge bg-success">' . __('admin.discount_auth.status_approved', 'Aprovado') . '</span>',
+                'negado'   => '<span class="badge bg-danger">' . __('admin.discount_auth.status_denied', 'Negado') . '</span>',
+                'expirado' => '<span class="badge bg-secondary">' . __('admin.discount_auth.status_expired', 'Expirado') . '</span>',
+                default    => '<span class="badge bg-warning text-dark">' . __('admin.discount_auth.status_pending', 'Pendente') . '</span>',
             };
 
-            echo '<div class="card"><div class="card-header"><strong>Solicitação de Desconto</strong> ' . $statusBadge . '</div><div class="card-body">
+            echo '<div class="card"><div class="card-header"><strong>' . __('admin.discount_auth.email_discount_heading', 'Solicitação de Desconto') . '</strong> ' . $statusBadge . '</div><div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><th>Vendedor</th><td>' . $h($sol['vendedor_nome']) . '</td></tr>
-                    <tr><th>Produto</th><td>' . $h($sol['produto_nome']) . '</td></tr>
-                    <tr><th>Desconto</th><td>' . ($sol['desconto_tipo'] === 'percentual' ? number_format((float) $sol['desconto_valor'], 2, ',', '.') . '%' : $sym . ' ' . number_format((float) $sol['desconto_valor'], 2, ',', '.')) . ' (' . $h($sol['desconto_tipo']) . ')</td></tr>
-                    <tr><th>Preço original</th><td>' . $sym . ' ' . number_format((float) $sol['preco_original'], 2, ',', '.') . '</td></tr>
-                    <tr><th>Preço final</th><td class="text-success fw-bold">' . $sym . ' ' . number_format((float) $sol['preco_final'], 2, ',', '.') . '</td></tr>
-                    <tr><th>Data</th><td>' . $h($sol['created_at']) . '</td></tr>
+                    <tr><th>' . __('admin.discount_auth.seller', 'Vendedor') . '</th><td>' . $h($sol['vendedor_nome']) . '</td></tr>
+                    <tr><th>' . __('admin.discount_auth.product', 'Produto') . '</th><td>' . $h($sol['produto_nome']) . '</td></tr>
+                    <tr><th>' . __('admin.discount_auth.discount', 'Desconto') . '</th><td>' . ($sol['desconto_tipo'] === 'percentual' ? number_format((float) $sol['desconto_valor'], 2, ',', '.') . '%' : $sym . ' ' . number_format((float) $sol['desconto_valor'], 2, ',', '.')) . ' (' . $h($sol['desconto_tipo']) . ')</td></tr>
+                    <tr><th>' . __('admin.discount_auth.original_price', 'Preço original') . '</th><td>' . $sym . ' ' . number_format((float) $sol['preco_original'], 2, ',', '.') . '</td></tr>
+                    <tr><th>' . __('admin.discount_auth.final_price', 'Preço final') . '</th><td class="text-success fw-bold">' . $sym . ' ' . number_format((float) $sol['preco_final'], 2, ',', '.') . '</td></tr>
+                    <tr><th>' . __('admin.discount_auth.date', 'Data') . '</th><td>' . $h($sol['created_at']) . '</td></tr>
                 </table></div>';
 
             if ($sol['status'] === 'pendente') {
                 echo '<div class="card-footer">
                     <form method="POST" action="/admin/configuracoes/desconto/autorizar?token=' . $h($token) . '">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Senha de autorização</label>
-                            <input type="password" class="form-control" name="senha" required placeholder="Digite a senha...">
+                            <label class="form-label fw-bold">' . __('admin.discount_auth.authorization_password', 'Senha de autorização') . '</label>
+                            <input type="password" class="form-control" name="senha" required placeholder="' . htmlspecialchars(__('admin.discount_auth.enter_password_placeholder', 'Digite a senha...'), ENT_QUOTES, 'UTF-8') . '">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Motivo (opcional, para negação)</label>
-                            <input type="text" class="form-control" name="motivo" placeholder="Ex: desconto muito alto">
+                            <label class="form-label">' . __('admin.discount_auth.reason_optional', 'Motivo (opcional, para negação)') . '</label>
+                            <input type="text" class="form-control" name="motivo" placeholder="' . htmlspecialchars(__('admin.discount_auth.reason_placeholder', 'Ex: desconto muito alto'), ENT_QUOTES, 'UTF-8') . '">
                         </div>
                         <div class="d-flex gap-2">
-                            <button type="submit" name="acao" value="aprovar" class="btn btn-success"><i class="fas fa-check"></i> Aprovar</button>
-                            <button type="submit" name="acao" value="negar" class="btn btn-danger"><i class="fas fa-times"></i> Negar</button>
+                            <button type="submit" name="acao" value="aprovar" class="btn btn-success"><i class="fas fa-check"></i> ' . __('admin.discount_auth.approve', 'Aprovar') . '</button>
+                            <button type="submit" name="acao" value="negar" class="btn btn-danger"><i class="fas fa-times"></i> ' . __('admin.discount_auth.deny', 'Negar') . '</button>
                         </div>
                     </form>
                 </div>';
@@ -457,7 +457,7 @@ class AdminDescontoAutorizacaoController
                 $_SESSION['desconto_painel_auth'] = true;
                 $autenticado = true;
             } else {
-                $mensagem = 'Senha incorreta.';
+                $mensagem = __('admin.discount_auth.wrong_password', 'Senha incorreta.');
                 $tipo = 'danger';
             }
         }
@@ -471,12 +471,12 @@ class AdminDescontoAutorizacaoController
                 if ($acao === 'aprovar') {
                     $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'aprovado', aprovado_por = 'painel', updated_at = NOW() WHERE token = ? AND status = 'pendente'");
                     $st->execute([$token]);
-                    $mensagem = 'Desconto aprovado.';
+                    $mensagem = __('admin.discount_auth.approved', 'Desconto aprovado.');
                     $tipo = 'success';
                 } else {
                     $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'negado', aprovado_por = 'painel', motivo = ?, updated_at = NOW() WHERE token = ? AND status = 'pendente'");
                     $st->execute([$motivo, $token]);
-                    $mensagem = 'Desconto negado.';
+                    $mensagem = __('admin.discount_auth.denied', 'Desconto negado.');
                     $tipo = 'warning';
                 }
             }
@@ -485,8 +485,8 @@ class AdminDescontoAutorizacaoController
         $h = fn($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Autorizações de Desconto</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>' . htmlspecialchars(__('admin.discount_auth.panel_page_title', 'Autorizações de Desconto'), ENT_QUOTES, 'UTF-8') . '</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -494,7 +494,7 @@ class AdminDescontoAutorizacaoController
         renderAdminSidebar('descontos');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Autorizações de Desconto</h1>
+                <h1 class="page-title">' . __('admin.discount_auth.panel_title', 'Autorizações de Desconto') . '</h1>
             </div>';
 
         if ($mensagem) echo '<div class="alert alert-' . $tipo . '">' . $h($mensagem) . '</div>';
@@ -502,13 +502,13 @@ class AdminDescontoAutorizacaoController
         if (!$autenticado) {
             echo '<div class="row justify-content-center"><div class="col-md-4">
                 <div class="card"><div class="card-body">
-                    <h5 class="card-title text-center mb-3"><i class="fas fa-lock me-2"></i>Acesso restrito</h5>
+                    <h5 class="card-title text-center mb-3"><i class="fas fa-lock me-2"></i>' . __('admin.discount_auth.restricted_access', 'Acesso restrito') . '</h5>
                     <form method="POST">
                         <div class="mb-3">
-                            <label class="form-label">Senha de autorização</label>
-                            <input type="password" class="form-control" name="senha" required autofocus placeholder="Digite a senha...">
+                            <label class="form-label">' . __('admin.discount_auth.authorization_password', 'Senha de autorização') . '</label>
+                            <input type="password" class="form-control" name="senha" required autofocus placeholder="' . htmlspecialchars(__('admin.discount_auth.enter_password_placeholder', 'Digite a senha...'), ENT_QUOTES, 'UTF-8') . '">
                         </div>
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-sign-in-alt me-1"></i> Entrar</button>
+                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-sign-in-alt me-1"></i> ' . __('admin.discount_auth.enter', 'Entrar') . '</button>
                     </form>
                 </div></div>
             </div></div>';
@@ -518,15 +518,15 @@ class AdminDescontoAutorizacaoController
             $recentes = $pdo->query("SELECT * FROM desconto_autorizacoes WHERE status != 'pendente' ORDER BY updated_at DESC LIMIT 20")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             echo '<div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="badge bg-warning text-dark fs-6">' . count($pendentes) . ' pendente(s)</span>
-                <a href="/admin/configuracoes/desconto/configuracao" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog"></i> Configurar emails</a>
+                <span class="badge bg-warning text-dark fs-6">' . __('admin.discount_auth.pending_count', '{n} pendente(s)', ['n'=>count($pendentes)]) . '</span>
+                <a href="/admin/configuracoes/desconto/configuracao" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog"></i> ' . __('admin.discount_auth.configure_emails', 'Configurar emails') . '</a>
             </div>';
 
             if (empty($pendentes)) {
-                echo '<div class="alert alert-info">Nenhuma solicitação pendente.</div>';
+                echo '<div class="alert alert-info">' . __('admin.discount_auth.no_pending', 'Nenhuma solicitação pendente.') . '</div>';
             } else {
                 echo '<div class="table-responsive"><table class="table table-hover">
-                    <thead><tr><th>Data</th><th>Vendedor</th><th>Produto</th><th>Desconto</th><th>Original</th><th>Final</th><th>Ações</th></tr></thead><tbody>';
+                    <thead><tr><th>' . __('admin.discount_auth.date', 'Data') . '</th><th>' . __('admin.discount_auth.seller', 'Vendedor') . '</th><th>' . __('admin.discount_auth.product', 'Produto') . '</th><th>' . __('admin.discount_auth.discount', 'Desconto') . '</th><th>' . __('admin.discount_auth.original', 'Original') . '</th><th>' . __('admin.discount_auth.final', 'Final') . '</th><th>' . __('admin.discount_auth.actions', 'Ações') . '</th></tr></thead><tbody>';
                 foreach ($pendentes as $s) {
                     $sym = ($s['moeda'] ?? 'USD') === 'BRL' ? 'R$' : '$';
                     $descLabel = $s['desconto_tipo'] === 'percentual'
@@ -552,17 +552,17 @@ class AdminDescontoAutorizacaoController
             }
 
             if (!empty($recentes)) {
-                echo '<h5 class="mt-4 mb-3">Histórico recente</h5>
+                echo '<h5 class="mt-4 mb-3">' . __('admin.discount_auth.recent_history', 'Histórico recente') . '</h5>
                 <div class="table-responsive"><table class="table table-sm table-striped">
-                    <thead><tr><th>Data</th><th>Vendedor</th><th>Produto</th><th>Desconto</th><th>Status</th><th>Por</th></tr></thead><tbody>';
+                    <thead><tr><th>' . __('admin.discount_auth.date', 'Data') . '</th><th>' . __('admin.discount_auth.seller', 'Vendedor') . '</th><th>' . __('admin.discount_auth.product', 'Produto') . '</th><th>' . __('admin.discount_auth.discount', 'Desconto') . '</th><th>' . __('admin.discount_auth.status', 'Status') . '</th><th>' . __('admin.discount_auth.by', 'Por') . '</th></tr></thead><tbody>';
                 foreach ($recentes as $s) {
                     $sym = ($s['moeda'] ?? 'USD') === 'BRL' ? 'R$' : '$';
                     $descLabel = $s['desconto_tipo'] === 'percentual'
                         ? number_format((float) $s['desconto_valor'], 2, ',', '.') . '%'
                         : $sym . ' ' . number_format((float) $s['desconto_valor'], 2, ',', '.');
                     $badge = match ($s['status']) {
-                        'aprovado' => '<span class="badge bg-success">Aprovado</span>',
-                        'negado' => '<span class="badge bg-danger">Negado</span>',
+                        'aprovado' => '<span class="badge bg-success">' . __('admin.discount_auth.status_approved', 'Aprovado') . '</span>',
+                        'negado' => '<span class="badge bg-danger">' . __('admin.discount_auth.status_denied', 'Negado') . '</span>',
                         default => '<span class="badge bg-secondary">' . $h($s['status']) . '</span>',
                     };
                     echo '<tr>
@@ -633,7 +633,7 @@ class AdminDescontoAutorizacaoController
 
             $token = trim((string) $request->getParam('token', ''));
             if ($token === '') {
-                echo json_encode(['ok' => false, 'error' => 'Token inválido']);
+                echo json_encode(['ok' => false, 'error' => __('admin.discount_auth.err_invalid_token', 'Token inválido')]);
                 exit;
             }
 
@@ -645,7 +645,7 @@ class AdminDescontoAutorizacaoController
             $row = $st->fetch(\PDO::FETCH_ASSOC);
 
             if (!$row) {
-                echo json_encode(['ok' => false, 'error' => 'Solicitação não encontrada']);
+                echo json_encode(['ok' => false, 'error' => __('admin.discount_auth.err_request_not_found', 'Solicitação não encontrada')]);
                 exit;
             }
 
@@ -674,21 +674,21 @@ class AdminDescontoAutorizacaoController
 
             $sym = $moeda === 'BRL' ? 'R$' : '$';
 
-            $subject = 'Solicitação de PagDev - ' . ($clienteNome !== '' ? $clienteNome : 'Pedido Manual');
+            $subject = __('admin.discount_auth.email_pagdev_subject', 'Solicitação de PagDev -') . ' ' . ($clienteNome !== '' ? $clienteNome : __('admin.discount_auth.manual_order', 'Pedido Manual'));
             $html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-                <h2 style="color:#333;">Solicitação de Pagamento PagDev</h2>
-                <p>O vendedor <strong>' . htmlspecialchars($vendedor) . '</strong> está solicitando autorização para usar o método de pagamento <strong>PagDev (offline)</strong>:</p>
+                <h2 style="color:#333;">' . __('admin.discount_auth.email_pagdev_heading', 'Solicitação de Pagamento PagDev') . '</h2>
+                <p>' . __('admin.discount_auth.email_discount_intro', 'O vendedor') . ' <strong>' . htmlspecialchars($vendedor) . '</strong> ' . __('admin.discount_auth.email_pagdev_intro2', 'está solicitando autorização para usar o método de pagamento') . ' <strong>PagDev (offline)</strong>:</p>
                 <table style="width:100%;border-collapse:collapse;margin:15px 0;">
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Vendedor</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($vendedor) . '</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Cliente</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($clienteNome !== '' ? $clienteNome : '—') . '</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Valor Total</strong></td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">' . $sym . ' ' . number_format($valorTotal, 2, ',', '.') . '</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Método</strong></td><td style="padding:8px;border:1px solid #ddd;">PagDev (offline)</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.seller', 'Vendedor') . '</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($vendedor) . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.customer', 'Cliente') . '</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($clienteNome !== '' ? $clienteNome : '—') . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.total_amount', 'Valor Total') . '</strong></td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">' . $sym . ' ' . number_format($valorTotal, 2, ',', '.') . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>' . __('admin.discount_auth.method', 'Método') . '</strong></td><td style="padding:8px;border:1px solid #ddd;">PagDev (offline)</td></tr>
                 </table>
                 <div style="margin:20px 0;text-align:center;">
-                    <a href="' . htmlspecialchars($urlAprovar) . '" style="display:inline-block;padding:12px 30px;background:#28a745;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">✅ Aprovar</a>
-                    <a href="' . htmlspecialchars($urlNegar) . '" style="display:inline-block;padding:12px 30px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">❌ Negar</a>
+                    <a href="' . htmlspecialchars($urlAprovar) . '" style="display:inline-block;padding:12px 30px;background:#28a745;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">✅ ' . __('admin.discount_auth.approve', 'Aprovar') . '</a>
+                    <a href="' . htmlspecialchars($urlNegar) . '" style="display:inline-block;padding:12px 30px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">❌ ' . __('admin.discount_auth.deny', 'Negar') . '</a>
                 </div>
-                <p style="color:#666;font-size:12px;">Ou acesse o painel: <a href="' . htmlspecialchars($urlPainel) . '">' . htmlspecialchars($urlPainel) . '</a></p>
+                <p style="color:#666;font-size:12px;">' . __('admin.discount_auth.or_access_panel', 'Ou acesse o painel:') . ' <a href="' . htmlspecialchars($urlPainel) . '">' . htmlspecialchars($urlPainel) . '</a></p>
             </div>';
 
             $emailService = new \App\Services\EmailService();

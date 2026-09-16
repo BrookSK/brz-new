@@ -80,7 +80,7 @@ class AdminServerLogsController {
 
         // Renderizar
         header('Content-Type: text/html; charset=UTF-8');
-        echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Busca Logs do Servidor</title>
+        echo '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8"><title>' . htmlspecialchars(__('admin.server_logs.page_title', 'Busca Logs do Servidor'), ENT_QUOTES, 'UTF-8') . '</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
             .log-line { font-family: monospace; font-size: 12px; padding: 4px 8px; border-bottom: 1px solid #eee; word-break: break-all; }
@@ -90,19 +90,19 @@ class AdminServerLogsController {
         </head><body>
         <div class="container-fluid py-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4><i class="fas fa-search"></i> Busca nos Logs do Servidor</h4>
-                <a href="/admin" class="btn btn-outline-secondary btn-sm">Voltar ao Admin</a>
+                <h4><i class="fas fa-search"></i> ' . __('admin.server_logs.heading', 'Busca nos Logs do Servidor') . '</h4>
+                <a href="/admin" class="btn btn-outline-secondary btn-sm">' . __('admin.server_logs.back_to_admin', 'Voltar ao Admin') . '</a>
             </div>
             
             <form method="GET" class="row g-3 mb-4">
                 <div class="col-md-5">
-                    <label class="form-label fw-bold">Termo de busca</label>
-                    <input type="text" name="busca" class="form-control" value="' . htmlspecialchars($busca) . '" placeholder="Ex: declaration_value, 1000132, CRIAR_PEDIDO...">
+                    <label class="form-label fw-bold">' . __('admin.server_logs.search_term', 'Termo de busca') . '</label>
+                    <input type="text" name="busca" class="form-control" value="' . htmlspecialchars($busca) . '" placeholder="' . htmlspecialchars(__('admin.server_logs.search_placeholder', 'Ex: declaration_value, 1000132, CRIAR_PEDIDO...'), ENT_QUOTES, 'UTF-8') . '">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-bold">Arquivo de log</label>
+                    <label class="form-label fw-bold">' . __('admin.server_logs.log_file', 'Arquivo de log') . '</label>
                     <select name="arquivo" class="form-select">
-                        <option value="">Todos disponíveis</option>';
+                        <option value="">' . __('admin.server_logs.all_available', 'Todos disponíveis') . '</option>';
         foreach ($disponíveis as $d) {
             $sel = ($arquivo === $d) ? 'selected' : '';
             echo '<option value="' . htmlspecialchars($d) . '" ' . $sel . '>' . htmlspecialchars($d) . '</option>';
@@ -110,20 +110,20 @@ class AdminServerLogsController {
         echo '      </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold">Máx. linhas</label>
+                    <label class="form-label fw-bold">' . __('admin.server_logs.max_lines', 'Máx. linhas') . '</label>
                     <input type="number" name="linhas" class="form-control" value="' . $linhas . '" min="50" max="5000">
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i>Buscar</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i>' . __('admin.server_logs.search_button', 'Buscar') . '</button>
                 </div>
             </form>
 
             <div class="mb-3">
-                <small class="text-muted">Logs disponíveis: ' . count($disponíveis) . ' arquivos</small>';
+                <small class="text-muted">' . __('admin.server_logs.available_logs', 'Logs disponíveis: {n} arquivos', ['n' => count($disponíveis)]) . '</small>';
         if ($busca !== '') {
-            echo ' | <small class="text-success fw-bold">Encontrados: ' . $totalEncontrados . ' resultados para "' . htmlspecialchars($busca) . '"</small>';
+            echo ' | <small class="text-success fw-bold">' . __('admin.server_logs.found_results', 'Encontrados: {n} resultados para "{q}"', ['n' => $totalEncontrados, 'q' => htmlspecialchars($busca)]) . '</small>';
             if ($arquivoUsado) {
-                echo ' | <small class="text-muted">Fonte: ' . htmlspecialchars($arquivoUsado) . '</small>';
+                echo ' | <small class="text-muted">' . __('admin.server_logs.source', 'Fonte:') . ' ' . htmlspecialchars($arquivoUsado) . '</small>';
             }
         }
         echo '  </div>';
@@ -140,12 +140,12 @@ class AdminServerLogsController {
             }
             echo '</div></div>';
         } elseif ($busca !== '') {
-            echo '<div class="alert alert-warning">Nenhum resultado encontrado para "' . htmlspecialchars($busca) . '" nos logs disponíveis.</div>';
-            echo '<div class="alert alert-info"><strong>Dica:</strong> Tente buscar por:<ul>
-                <li><code>declaration_value</code> — valores declarados</li>
-                <li><code>CRIAR_PEDIDO</code> — logs do checkout</li>
-                <li><code>1000132</code> — produto_id específico</li>
-                <li><code>pedido 1225</code> — referências ao pedido</li>
+            echo '<div class="alert alert-warning">' . __('admin.server_logs.no_results', 'Nenhum resultado encontrado para "{q}" nos logs disponíveis.', ['q' => htmlspecialchars($busca)]) . '</div>';
+            echo '<div class="alert alert-info"><strong>' . __('admin.server_logs.tip', 'Dica:') . '</strong> ' . __('admin.server_logs.try_searching', 'Tente buscar por:') . '<ul>
+                <li><code>declaration_value</code> — ' . __('admin.server_logs.tip_declared_values', 'valores declarados') . '</li>
+                <li><code>CRIAR_PEDIDO</code> — ' . __('admin.server_logs.tip_checkout_logs', 'logs do checkout') . '</li>
+                <li><code>1000132</code> — ' . __('admin.server_logs.tip_product_id', 'produto_id específico') . '</li>
+                <li><code>pedido 1225</code> — ' . __('admin.server_logs.tip_order_refs', 'referências ao pedido') . '</li>
             </ul></div>';
         }
 

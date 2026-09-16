@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\ShippoService;
 use App\Services\CpfValidator;
 use App\Models\Carrinho;
 use App\Models\Produto;
@@ -808,6 +809,241 @@ class CheckoutController extends Controller {
             }
         }
         return null;
+    }
+
+    /**
+     * Classifica o país de destino em uma das três categorias de regra de envio:
+     *   - 'US'    → Estados Unidos: checkout normal, frete grátis, método Shippo.
+     *   - 'BR'    → Brasil: checkout normal, frete grátis, método Braziliana Global.
+     *   - 'OTHER' → Demais países: estimativa via Shippo + 30%, sem pagamento no
+     *               checkout, atendimento manual pelo WhatsApp.
+     */
+    private function classificarPaisEnvio(?string $pais): string {
+        $p = strtoupper(trim((string) $pais));
+        if ($p === '') {
+            $p = 'BR';
+        }
+        if (in_array($p, ['BR', 'BRA', 'BRAZIL', 'BRASIL'], true)) {
+            return 'BR';
+        }
+        if (in_array($p, ['US', 'USA', 'EUA', 'UNITED STATES'], true)) {
+            return 'US';
+        }
+        return 'OTHER';
+    }
+
+    /**
+     * Percentual de acréscimo aplicado sobre a tarifa retornada pela Shippo para
+     * os "demais países" (regra comercial da Braziliana: +30%).
+     */
+    private function getShippoMarkupPercent(): float {
+        $v = $this->getConfigValue('shippo_markup_percent', null);
+        if ($v === null || $v === '') {
+            return 30.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) {
+            $p = 0.0;
+        }
+        return $p;
+    }
+
+    /**
+     * Número de WhatsApp de atendimento (apenas dígitos, formato internacional).
+     * Reutiliza a constante do Clube como fallback padrão.
+     */
+    private function getWhatsappAtendimento(): string {
+        $v = (string) $this->getConfigValue('contato_whatsapp', '');
+        $v = preg_replace('/\D+/', '', $v);
+        if ($v === '') {
+            $v = \App\Controllers\ClubeController::CLUBE_WHATSAPP;
+        }
+        return (string) $v;
+    }
+
+    /**
+     * Resolve a regra de envio para o checkout com base no país de destino.
+     *
+     * Retorna um array com:
+     *   - categoria: 'US' | 'BR' | 'OTHER'
+     *   - metodo_envio: rótulo do método de envio (Shippo / Braziliana Global)
+     *   - frete: valor do frete a cobrar no checkout (0 = grátis)
+     *   - frete_gratis: bool
+     *   - atendimento_manual: bool (true para 'OTHER' → bloqueia pagamento)
+     *   - estimativa: dados da estimativa Shippo+30% (somente 'OTHER'), ou null
+     *
+     * @param string $pais       País de destino (ISO-2 ou nome)
+     * @param array  $enderecoTo Endereço de destino para a cotação Shippo
+     * @param array  $itens      Itens do carrinho (para declaração aduaneira)
+     * @param float  $pesoTotal  Peso total do carrinho em kg
+     */
+    private function resolverEnvioPorPais(string $pais, array $enderecoTo, array $itens, float $pesoTotal): array {
+        $categoria = $this->classificarPaisEnvio($pais);
+
+        $base = [
+            'categoria' => $categoria,
+            'metodo_envio' => '',
+            'frete' => 0.0,
+            'frete_gratis' => true,
+            'atendimento_manual' => false,
+            'estimativa' => null,
+        ];
+
+        if ($categoria === 'US') {
+            $base['metodo_envio'] = 'Shippo';
+            return $base;
+        }
+
+        if ($categoria === 'BR') {
+            $base['metodo_envio'] = 'Braziliana Global';
+            return $base;
+        }
+
+        // Demais países: estimativa via Shippo + markup, sem pagamento no checkout.
+        $base['metodo_envio'] = 'Shippo';
+        $base['atendimento_manual'] = true;
+        $base['frete_gratis'] = false;
+        $base['estimativa'] = $this->calcularEstimativaShippo($enderecoTo, $itens, $pesoTotal);
+
+        if (is_array($base['estimativa']) && !empty($base['estimativa']['success'])) {
+            $base['frete'] = (float) $base['estimativa']['valor_final'];
+        }
+
+        return $base;
+    }
+
+    /**
+     * Calcula a estimativa de frete para os "demais países" consultando a Shippo
+     * em tempo real e aplicando o acréscimo comercial (padrão +30%).
+     *
+     * Retorna sempre um array com a chave 'success'. Em caso de falha, traz uma
+     * mensagem amigável para exibir no checkout (o cliente ainda poderá acionar o
+     * atendimento manual mesmo sem estimativa).
+     */
+    private function calcularEstimativaShippo(array $enderecoTo, array $itens, float $pesoTotal): array {
+        try {
+            $svc = new ShippoService();
+            if (!$svc->isConfigured()) {
+                return ['success' => false, 'error' => 'Cotação de frete indisponível no momento.'];
+            }
+
+            $paisTo = strtoupper(trim((string) ($enderecoTo['country'] ?? ($enderecoTo['pais'] ?? ''))));
+            if ($paisTo === '') {
+                return ['success' => false, 'error' => 'Informe o país de destino para calcular o frete.'];
+            }
+
+            $peso = max(0.1, (float) $pesoTotal);
+
+            // Dimensões: usar defaults seguros de caixa quando não houver dados de
+            // produto. Mantém a estimativa funcional para pesos/destinos variados.
+            $altura = max(1.0, (float) $this->getConfigValue('shippo_default_altura_cm', '10'));
+            $largura = max(1.0, (float) $this->getConfigValue('shippo_default_largura_cm', '20'));
+            $comprimento = max(1.0, (float) $this->getConfigValue('shippo_default_comprimento_cm', '25'));
+
+            $parcel = [
+                'length' => (string) $comprimento,
+                'width' => (string) $largura,
+                'height' => (string) $altura,
+                'distance_unit' => 'cm',
+                'weight' => (string) $peso,
+                'mass_unit' => 'kg',
+            ];
+
+            $addressTo = [
+                'name' => (string) ($enderecoTo['name'] ?? 'Cliente'),
+                'street1' => (string) ($enderecoTo['street1'] ?? ($enderecoTo['endereco'] ?? '')),
+                'street2' => (string) ($enderecoTo['street2'] ?? ($enderecoTo['complemento'] ?? '')),
+                'city' => (string) ($enderecoTo['city'] ?? ($enderecoTo['cidade'] ?? '')),
+                'state' => (string) ($enderecoTo['state'] ?? ($enderecoTo['estado'] ?? '')),
+                'zip' => (string) ($enderecoTo['zip'] ?? ($enderecoTo['cep'] ?? '')),
+                'country' => $paisTo,
+                'phone' => (string) ($enderecoTo['phone'] ?? ($enderecoTo['telefone'] ?? '')),
+                'email' => (string) ($enderecoTo['email'] ?? ''),
+            ];
+
+            // Declaração aduaneira: build a partir dos itens quando possível.
+            $customs = [];
+            try {
+                $customsItens = [];
+                foreach ($itens as $it) {
+                    $customsItens[] = [
+                        'description' => (string) ($it['nome'] ?? ($it['name'] ?? 'Merchandise')),
+                        'quantity' => (int) ($it['quantidade'] ?? 1),
+                        'net_weight' => (string) max(0.01, (float) ($it['peso'] ?? 0.1)),
+                        'value_amount' => (string) max(1.0, (float) ($it['preco'] ?? ($it['preco_unitario'] ?? 10))),
+                        'value_currency' => 'USD',
+                    ];
+                }
+                if (!empty($customsItens)) {
+                    $customs = $svc->buildCustomsDeclaration($customsItens);
+                }
+            } catch (\Throwable $e) {
+                $customs = [];
+            }
+
+            $rate = $svc->getLiveRate($addressTo, $parcel, $customs);
+            if (empty($rate['success'])) {
+                return ['success' => false, 'error' => $rate['error'] ?? 'Não foi possível calcular o frete para este destino.'];
+            }
+
+            $valorBase = (float) $rate['amount'];
+            $markup = $this->getShippoMarkupPercent();
+            $valorAcrescimo = $valorBase * ($markup / 100.0);
+            $valorFinal = $valorBase + $valorAcrescimo;
+
+            return [
+                'success' => true,
+                'valor_base' => round($valorBase, 2),
+                'markup_percent' => $markup,
+                'valor_acrescimo' => round($valorAcrescimo, 2),
+                'valor_final' => round($valorFinal, 2),
+                'moeda' => (string) $rate['currency'],
+                'transportadora' => (string) $rate['provider'],
+                'servico' => (string) $rate['servicelevel'],
+                'prazo_dias' => $rate['estimated_days'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => 'Cotação de frete indisponível no momento.'];
+        }
+    }
+
+    /**
+     * Monta um link de WhatsApp de atendimento com um resumo do carrinho/pedido,
+     * para que a equipe consiga identificar o que o cliente pretende comprar.
+     *
+     * @param array  $itens       Itens processados do checkout
+     * @param string $pais        País de destino
+     * @param array  $estimativa  Estimativa de frete (opcional)
+     */
+    private function montarWhatsappAtendimento(array $itens, string $pais, ?array $estimativa = null): string {
+        $numero = $this->getWhatsappAtendimento();
+
+        $linhas = [];
+        $linhas[] = 'Olá! Gostaria de finalizar uma compra para envio internacional.';
+        $linhas[] = '';
+        $linhas[] = 'Destino: ' . strtoupper(trim((string) $pais));
+        $linhas[] = 'Itens do carrinho:';
+
+        $totalItens = 0.0;
+        foreach ($itens as $it) {
+            $nome = trim((string) ($it['nome'] ?? ($it['name'] ?? 'Produto')));
+            $qtd = (int) ($it['quantidade'] ?? 1);
+            $preco = (float) ($it['preco'] ?? ($it['preco_unitario'] ?? 0));
+            $sub = (float) ($it['subtotal'] ?? ($preco * $qtd));
+            $totalItens += $sub;
+            $linhas[] = '- ' . $qtd . 'x ' . $nome . ' (US$ ' . number_format($sub, 2, '.', ',') . ')';
+        }
+
+        $linhas[] = '';
+        $linhas[] = 'Subtotal produtos: US$ ' . number_format($totalItens, 2, '.', ',');
+
+        if (is_array($estimativa) && !empty($estimativa['success'])) {
+            $linhas[] = 'Estimativa de frete (Shippo + ' . rtrim(rtrim(number_format((float) $estimativa['markup_percent'], 2, '.', ''), '0'), '.') . '%): '
+                . (string) ($estimativa['moeda'] ?? 'USD') . ' ' . number_format((float) $estimativa['valor_final'], 2, '.', ',');
+        }
+
+        $texto = implode("\n", $linhas);
+        return 'https://wa.me/' . $numero . '?text=' . rawurlencode($texto);
     }
 
     private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
@@ -2937,6 +3173,49 @@ class CheckoutController extends Controller {
             $total = (float) $subtotal + (float) $frete + (float) $taxaServico;
         }
 
+        // ─── Regras de envio por país (US / BR / demais países) ──────────────
+        // US  → frete grátis, método Shippo, checkout normal.
+        // BR  → frete grátis, método Braziliana Global, checkout normal.
+        // OUTROS → estimativa Shippo + 30%, SEM pagamento no checkout (atendimento manual).
+        $enderecoToParaCotacao = [
+            'name' => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
+            'endereco' => (string) ($enderecoPrefill['endereco'] ?? ''),
+            'complemento' => (string) ($enderecoPrefill['complemento'] ?? ''),
+            'cidade' => (string) ($enderecoPrefill['cidade'] ?? ''),
+            'estado' => (string) ($enderecoPrefill['estado'] ?? ''),
+            'cep' => (string) ($enderecoPrefill['cep'] ?? ''),
+            'country' => (string) $paisEntrega,
+            'telefone' => (string) ($usuario['telefone'] ?? ''),
+            'email' => (string) ($usuario['email'] ?? ''),
+        ];
+
+        $envioPais = $this->resolverEnvioPorPais((string) $paisEntrega, $enderecoToParaCotacao, $items, (float) $pesoTotal);
+        $categoriaEnvio = (string) $envioPais['categoria'];
+        $metodoEnvio = (string) $envioPais['metodo_envio'];
+        $atendimentoManual = (bool) $envioPais['atendimento_manual'];
+        $estimativaFrete = $envioPais['estimativa'] ?? null;
+        $whatsappAtendimentoUrl = $atendimentoManual
+            ? $this->montarWhatsappAtendimento($items, (string) $paisEntrega, is_array($estimativaFrete) ? $estimativaFrete : null)
+            : '';
+
+        // Para os "demais países" o frete apresentado é a ESTIMATIVA (Shippo + 30%).
+        // O total é apenas referência (o pagamento é bloqueado no checkout).
+        if ($categoriaEnvio === 'OTHER') {
+            $freteEstimado = (float) $envioPais['frete'];
+            $frete = $freteEstimado;
+            $total = (float) $subtotal + (float) $frete + (float) $taxaServico;
+        } else {
+            // US e BR: frete grátis por padrão. Respeitar frete_manual definido pelo
+            // admin quando houver um valor positivo explícito (não sobrescrever).
+            if ($categoriaEnvio === 'US' || $categoriaEnvio === 'BR') {
+                $temFreteManualPositivo = (isset($freteFromDb) && (float) $freteFromDb > 0);
+                if (!$temFreteManualPositivo) {
+                    $frete = 0.0;
+                }
+                $total = (float) $subtotal + (float) $frete + (float) $taxaServico + (float) $impostos;
+            }
+        }
+
         // Calcular imposto local do grupo de compras OU do produto individual
         $impostoLocal = 0.0;
         $impostoLocalPercent = 0.0;
@@ -3134,6 +3413,13 @@ class CheckoutController extends Controller {
             'total' => $total,
             'cobra_impostos_br' => $cobraImpostosBR,
             'frete_gratis' => ($frete == 0),
+            // ─── Regras de envio por país ───────────────────────────────
+            'pais_entrega' => $paisEntrega,
+            'categoria_envio' => $categoriaEnvio,
+            'metodo_envio' => $metodoEnvio,
+            'atendimento_manual' => $atendimentoManual,
+            'estimativa_frete' => $estimativaFrete,
+            'whatsapp_atendimento_url' => $whatsappAtendimentoUrl,
             'exchange_rates' => [
                 'BRL' => $rateBRL,
                 'USD' => 1.0,
@@ -3538,6 +3824,32 @@ class CheckoutController extends Controller {
             } catch (\Throwable $e) {
                 // Se não conseguir validar, continua (coluna pode não existir ainda)
             }
+        }
+
+        // ─── Bloqueio de pagamento para os "demais países" ──────────────────
+        // Regra comercial: para destinos fora dos Estados Unidos e do Brasil, o
+        // pedido NÃO pode ser pago diretamente pelo checkout. O cliente deve ser
+        // direcionado ao atendimento (WhatsApp) para conclusão manual, pois há
+        // produtos com restrição de envio internacional (baterias, álcool, etc.).
+        // Este bloqueio acontece ANTES de criar o pedido / gerar cobrança.
+        $categoriaEnvioCheckout = $this->classificarPaisEnvio($paisCheckout);
+        if ($categoriaEnvioCheckout === 'OTHER') {
+            $itensAtendimento = [];
+            foreach ($carrinho as $cItemW) {
+                $itensAtendimento[] = [
+                    'nome' => (string) ($cItemW['nome'] ?? ($cItemW['name'] ?? 'Produto')),
+                    'quantidade' => (int) ($cItemW['quantidade'] ?? 1),
+                    'preco' => (float) ($cItemW['preco_unitario'] ?? ($cItemW['price'] ?? ($cItemW['preco'] ?? 0))),
+                    'subtotal' => (float) ($cItemW['subtotal'] ?? 0),
+                ];
+            }
+            $whatsappUrl = $this->montarWhatsappAtendimento($itensAtendimento, $paisCheckout, null);
+            $this->json([
+                'error' => 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após a verificação de que os produtos podem ser enviados para o seu país. Fale com o atendimento pelo WhatsApp para finalizar.',
+                'atendimento_manual' => true,
+                'whatsapp_url' => $whatsappUrl,
+            ], 422);
+            return;
         }
 
         // Validar valor mínimo de produtos (USD 5.00) — sempre em USD
@@ -7132,7 +7444,324 @@ class CheckoutController extends Controller {
             $this->json(['error' => 'Erro ao calcular valores: ' . $e->getMessage()], 500);
         }
     }
-    
+
+    /**
+     * Recalcula a regra de envio para um país de destino informado, SEM recarregar
+     * a página. Usado no checkout quando o cliente troca/preenche o país de entrega.
+     *
+     * Retorna a categoria (US/BR/OTHER), o método de envio, o frete/estimativa
+     * (Shippo + markup) e, para os "demais países", a flag de atendimento manual
+     * com o link de WhatsApp já montado a partir do carrinho.
+     */
+    public function calcularEnvioPais(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $dados = $request->getParams();
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+
+        try {
+            $usuario = $this->authService->getUsuarioLogado();
+            $carrinho = $this->getCarrinhoForCheckout(is_array($usuario) ? $usuario : null);
+
+            if (empty($carrinho)) {
+                $this->json(['success' => false, 'error' => 'Carrinho vazio'], 400);
+                return;
+            }
+
+            // Montar itens + peso total (mesma lógica de peso do index()).
+            $itens = [];
+            $pesoTotal = 0.0;
+            foreach ($carrinho as $item) {
+                $qtd = (int) ($item['quantidade'] ?? 1);
+                if ($qtd < 1) $qtd = 1;
+                $pesoUnit = (float) ($item['peso'] ?? ($item['peso_kg'] ?? ($item['weight'] ?? 0)));
+                if ($pesoUnit <= 0) {
+                    $pesoUnit = 0.5;
+                }
+                $pesoTotal += ($pesoUnit * $qtd);
+                $preco = (float) ($item['preco_unitario'] ?? ($item['price'] ?? ($item['preco'] ?? 0)));
+                $itens[] = [
+                    'nome' => (string) ($item['nome'] ?? ($item['name'] ?? 'Produto')),
+                    'quantidade' => $qtd,
+                    'preco' => $preco,
+                    'peso' => $pesoUnit,
+                    'subtotal' => (float) ($item['subtotal'] ?? ($preco * $qtd)),
+                ];
+            }
+
+            $enderecoTo = [
+                'name' => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
+                'endereco' => (string) ($dados['endereco'] ?? ''),
+                'complemento' => (string) ($dados['complemento'] ?? ''),
+                'cidade' => (string) ($dados['cidade'] ?? ''),
+                'estado' => (string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')),
+                'cep' => (string) ($dados['cep'] ?? ''),
+                'country' => $pais,
+                'telefone' => (string) ($usuario['telefone'] ?? ''),
+                'email' => (string) ($usuario['email'] ?? ''),
+            ];
+
+            $envio = $this->resolverEnvioPorPais($pais, $enderecoTo, $itens, (float) $pesoTotal);
+            $estimativa = $envio['estimativa'] ?? null;
+            $whatsappUrl = !empty($envio['atendimento_manual'])
+                ? $this->montarWhatsappAtendimento($itens, $pais, is_array($estimativa) ? $estimativa : null)
+                : '';
+
+            $this->json([
+                'success' => true,
+                'categoria' => (string) $envio['categoria'],
+                'metodo_envio' => (string) $envio['metodo_envio'],
+                'frete' => (float) $envio['frete'],
+                'frete_gratis' => (bool) $envio['frete_gratis'],
+                'atendimento_manual' => (bool) $envio['atendimento_manual'],
+                'estimativa' => $estimativa,
+                'whatsapp_url' => $whatsappUrl,
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Não foi possível calcular o envio para este destino.'], 500);
+        }
+    }
+
+    /**
+     * Salva um novo endereço de entrega a partir do checkout (via AJAX), sem
+     * finalizar o pedido, e o retorna já normalizado para que o front-end possa
+     * inseri-lo no seletor e marcá-lo como endereço de entrega selecionado.
+     *
+     * Requer usuário logado (o endereço é vinculado à conta).
+     */
+    public function salvarEnderecoCheckout(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'É necessário estar logado para salvar um endereço.'], 401);
+            return;
+        }
+
+        $dados = $request->getParams();
+
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+        $cep = trim((string) ($dados['cep'] ?? ''));
+        $endereco = trim((string) ($dados['endereco'] ?? ''));
+        $cidade = trim((string) ($dados['cidade'] ?? ''));
+        $estado = trim((string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')));
+        $numero = trim((string) ($dados['numero'] ?? ''));
+        $complemento = trim((string) ($dados['complemento'] ?? ''));
+        $bairro = trim((string) ($dados['bairro'] ?? ''));
+
+        // Validação mínima (campos obrigatórios variam por país).
+        $faltando = [];
+        if ($cep === '') $faltando[] = 'CEP/ZIP';
+        if ($endereco === '') $faltando[] = 'Rua';
+        if (mb_strlen($cidade) < 3) $faltando[] = 'Cidade';
+        if ($pais === 'BR') {
+            if ($numero === '') $faltando[] = 'Número';
+            if ($bairro === '') $faltando[] = 'Bairro';
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true) && $estado === '') {
+            $faltando[] = 'Estado';
+        }
+        if (!empty($faltando)) {
+            $this->json(['success' => false, 'error' => 'Preencha: ' . implode(', ', $faltando) . '.'], 400);
+            return;
+        }
+
+        try {
+            $enderecoData = [
+                'usuario_id' => $usuarioId,
+                'tipo' => 'entrega',
+                'cep' => $cep,
+                'endereco' => $endereco,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'estado' => $estado,
+                'pais' => $pais,
+                'principal' => false,
+            ];
+
+            $ok = $this->enderecoModel->create($enderecoData);
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Não foi possível salvar o endereço.'], 500);
+                return;
+            }
+
+            $novoId = (int) $this->enderecoModel->getConnection()->lastInsertId();
+
+            $this->json([
+                'success' => true,
+                'endereco' => [
+                    'id' => $novoId,
+                    'pais' => $pais,
+                    'cep' => $cep,
+                    'endereco' => $endereco,
+                    'numero' => $numero,
+                    'complemento' => $complemento,
+                    'bairro' => $bairro,
+                    'cidade' => $cidade,
+                    'estado' => $estado,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao salvar o endereço: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Atualiza um endereço existente do usuário logado (via AJAX, sem finalizar
+     * o pedido). Verifica a posse do endereço antes de alterar.
+     */
+    public function atualizarEnderecoCheckout(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'É necessário estar logado para editar um endereço.'], 401);
+            return;
+        }
+
+        $dados = $request->getParams();
+        $enderecoId = (int) ($dados['id'] ?? 0);
+        if ($enderecoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Endereço inválido.'], 400);
+            return;
+        }
+
+        // Verificar posse.
+        try {
+            $addr = $this->enderecoModel->find($enderecoId);
+        } catch (\Throwable $e) {
+            $addr = null;
+        }
+        if (!is_array($addr) || (int) ($addr['usuario_id'] ?? 0) !== $usuarioId) {
+            $this->json(['success' => false, 'error' => 'Endereço não encontrado.'], 404);
+            return;
+        }
+
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+        $cep = trim((string) ($dados['cep'] ?? ''));
+        $endereco = trim((string) ($dados['endereco'] ?? ''));
+        $cidade = trim((string) ($dados['cidade'] ?? ''));
+        $estado = trim((string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')));
+        $numero = trim((string) ($dados['numero'] ?? ''));
+        $complemento = trim((string) ($dados['complemento'] ?? ''));
+        $bairro = trim((string) ($dados['bairro'] ?? ''));
+
+        $faltando = [];
+        if ($cep === '') $faltando[] = 'CEP/ZIP';
+        if ($endereco === '') $faltando[] = 'Rua';
+        if (mb_strlen($cidade) < 3) $faltando[] = 'Cidade';
+        if ($pais === 'BR') {
+            if ($numero === '') $faltando[] = 'Número';
+            if ($bairro === '') $faltando[] = 'Bairro';
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true) && $estado === '') {
+            $faltando[] = 'Estado';
+        }
+        if (!empty($faltando)) {
+            $this->json(['success' => false, 'error' => 'Preencha: ' . implode(', ', $faltando) . '.'], 400);
+            return;
+        }
+
+        try {
+            $ok = $this->enderecoModel->update($enderecoId, [
+                'tipo' => (string) ($addr['tipo'] ?? 'entrega'),
+                'cep' => $cep,
+                'logradouro' => $endereco,
+                'endereco' => $endereco,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'estado' => $estado,
+                'pais' => $pais,
+            ]);
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Não foi possível atualizar o endereço.'], 500);
+                return;
+            }
+
+            $this->json([
+                'success' => true,
+                'endereco' => [
+                    'id' => $enderecoId,
+                    'pais' => $pais,
+                    'cep' => $cep,
+                    'endereco' => $endereco,
+                    'numero' => $numero,
+                    'complemento' => $complemento,
+                    'bairro' => $bairro,
+                    'cidade' => $cidade,
+                    'estado' => $estado,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao atualizar o endereço: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Exclui um endereço do usuário logado (via AJAX). Verifica a posse antes.
+     */
+    public function excluirEnderecoCheckout(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+
+        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'É necessário estar logado para excluir um endereço.'], 401);
+            return;
+        }
+
+        $dados = $request->getParams();
+        $enderecoId = (int) ($dados['id'] ?? 0);
+        if ($enderecoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Endereço inválido.'], 400);
+            return;
+        }
+
+        try {
+            $addr = $this->enderecoModel->find($enderecoId);
+        } catch (\Throwable $e) {
+            $addr = null;
+        }
+        if (!is_array($addr) || (int) ($addr['usuario_id'] ?? 0) !== $usuarioId) {
+            $this->json(['success' => false, 'error' => 'Endereço não encontrado.'], 404);
+            return;
+        }
+
+        try {
+            $ok = $this->enderecoModel->delete($enderecoId);
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Não foi possível excluir o endereço.'], 500);
+                return;
+            }
+            $this->json(['success' => true, 'id' => $enderecoId]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao excluir o endereço: ' . $e->getMessage()], 500);
+        }
+    }
+
     private function criarPedido($dados, $carrinho, $usuario) {
         try {
             $this->debugLog('[CRIAR_PEDIDO] Iniciando criacao do pedido');
@@ -7468,6 +8097,26 @@ class CheckoutController extends Controller {
                     }
                 } catch (\Exception $e) {
                 }
+
+                // Fallback robusto: se a taxa não veio válida (<=1.01), NÃO podemos gravar
+                // valores em USD rotulados como BRL. Buscar a taxa central (ExchangeRate).
+                if ($taxaConversao <= 1.01) {
+                    try {
+                        $rFb = (float) \App\Core\ExchangeRate::getUsdToBrl();
+                        if ($rFb > 1.01) {
+                            $taxaConversao = $rFb;
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                }
+
+                // Se AINDA assim não há taxa válida, é mais seguro tratar o pedido como USD
+                // (valores permanecem na moeda base de cálculo) do que gravar valores USD
+                // com o rótulo BRL, o que corromperia a exibição.
+                if ($taxaConversao <= 1.01) {
+                    $this->debugLog('[CRIAR_PEDIDO] Taxa USD->BRL indisponível; revertendo moeda para USD para preservar coerência valor<->moeda.');
+                    $moedaSelecionada = 'USD';
+                }
             }
 
             // Calcular em USD (mesma regra do carrinho/checkout)
@@ -7663,7 +8312,23 @@ class CheckoutController extends Controller {
                 $frete = $freteUsd;
                 $impostoLocal = $impostoLocalUsd;
                 $total = $totalUsd;
+                // Pedido em USD: valores permanecem na moeda base (USD) e a taxa é sempre 1.
+                // Isso garante a invariante "valores gravados estão na moeda do pedido".
+                $taxaConversao = 1.0;
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);
+            }
+
+            // === Salvaguarda de coerência valor<->moeda ===
+            // Invariante do sistema: os valores gravados DEVEM estar na moeda do pedido.
+            // - moeda=USD  => taxa_conversao = 1 e valores em USD
+            // - moeda=BRL  => taxa_conversao > 1.01 e valores em BRL (USD * taxa)
+            // Se algo violar isso, registramos para auditoria (não silenciar corrupção).
+            if ($moedaSelecionada === 'USD' && $taxaConversao > 1.01) {
+                $this->debugLog('[CRIAR_PEDIDO][ALERTA] Pedido USD com taxa>1 detectado; forçando taxa=1.');
+                $taxaConversao = 1.0;
+            }
+            if ($moedaSelecionada === 'BRL' && $taxaConversao <= 1.01) {
+                $this->debugLog('[CRIAR_PEDIDO][ALERTA] Pedido BRL sem taxa válida após cálculo; valores podem estar em USD.');
             }
             
             // Desconto do cupom na moeda final do pedido (mesmo fator de conversão do total)

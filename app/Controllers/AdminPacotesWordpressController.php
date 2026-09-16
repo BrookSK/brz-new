@@ -95,7 +95,7 @@ class AdminPacotesWordpressController extends Controller {
                 }
             }
         } catch (\Exception $e) {
-            throw new \RuntimeException('Configure o banco WordPress em Admin > Configurações > WordPress');
+            throw new \RuntimeException(__('admin.wp_packages.configure_wp_db', 'Configure o banco WordPress em Admin > Configurações > WordPress'));
         }
 
         $host = trim((string) ($out['db_host'] ?? ''));
@@ -116,7 +116,7 @@ class AdminPacotesWordpressController extends Controller {
         }
 
         if ($host === '' || $dbname === '' || $user === '') {
-            throw new \RuntimeException("Configure o banco WordPress ({$source}) em Admin > Configurações > WordPress");
+            throw new \RuntimeException(__('admin.wp_packages.configure_wp_db_source', 'Configure o banco WordPress ({source}) em Admin > Configurações > WordPress', ['source' => $source]));
         }
 
         $dsn = 'mysql:host=' . $host . ';' . ($port ? ('port=' . $port . ';') : '') . 'dbname=' . $dbname . ';charset=utf8mb4';
@@ -157,11 +157,11 @@ class AdminPacotesWordpressController extends Controller {
             $st->execute();
             $packages = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => 'Erro ao consultar pacotes no WordPress: ' . $e->getMessage()];
+            return ['success' => false, 'error' => __('admin.wp_packages.query_packages_error', 'Erro ao consultar pacotes no WordPress: ') . $e->getMessage()];
         }
 
         if (empty($packages)) {
-            return ['success' => true, 'synced' => 0, 'message' => 'Nenhum pacote encontrado.'];
+            return ['success' => true, 'synced' => 0, 'message' => __('admin.wp_packages.no_packages_found', 'Nenhum pacote encontrado.')];
         }
 
         $postIds = array_column($packages, 'ID');
@@ -320,7 +320,7 @@ class AdminPacotesWordpressController extends Controller {
             case 'fatura-criar':
                 return $this->faturaCriar($request);
             default:
-                $this->json(['success' => false, 'error' => 'Ação não reconhecida.'], 400);
+                $this->json(['success' => false, 'error' => __('admin.wp_packages.action_not_recognized', 'Ação não reconhecida.')], 400);
         }
     }
 
@@ -462,7 +462,7 @@ class AdminPacotesWordpressController extends Controller {
             if (!empty($r['success'])) {
                 $totalSynced += (int) ($r['synced'] ?? 0);
             } else {
-                $errors[] = strtoupper($src) . ': ' . ($r['error'] ?? 'Erro desconhecido');
+                $errors[] = strtoupper($src) . ': ' . ($r['error'] ?? __('admin.wp_packages.unknown_error', 'Erro desconhecido'));
             }
         }
 
@@ -529,7 +529,7 @@ class AdminPacotesWordpressController extends Controller {
         }
 
         if (empty($trackings)) {
-            $this->json(['success' => false, 'error' => 'Selecione ao menos um tracking number.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.wp_packages.select_one_tracking', 'Selecione ao menos um tracking number.')], 400);
             return;
         }
 
@@ -544,7 +544,7 @@ class AdminPacotesWordpressController extends Controller {
             VALUES (?, ?, ?, 'created', NOW())
         ");
         $stInsert->execute([
-            $nome !== '' ? $nome : 'Container #' . $dispatchNumber,
+            $nome !== '' ? $nome : __('admin.wp_packages.container_default_name', 'Container #{n}', ['n' => $dispatchNumber]),
             $dispatchNumber,
             $trackingsJson,
         ]);
@@ -607,7 +607,7 @@ class AdminPacotesWordpressController extends Controller {
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
-            $this->json(['success' => false, 'error' => 'ID inválido.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.wp_packages.invalid_id', 'ID inválido.')], 400);
             return;
         }
 
@@ -665,7 +665,7 @@ class AdminPacotesWordpressController extends Controller {
         }
 
         if (empty($containerIds)) {
-            $this->json(['success' => false, 'error' => 'Selecione ao menos um container.'], 400);
+            $this->json(['success' => false, 'error' => __('admin.wp_packages.select_one_container', 'Selecione ao menos um container.')], 400);
             return;
         }
 
@@ -709,7 +709,7 @@ class AdminPacotesWordpressController extends Controller {
         if ($id <= 0) {
             http_response_code(404);
             header('Content-Type: text/plain; charset=utf-8');
-            echo 'ID de etiqueta inválido.';
+            echo __('admin.wp_packages.invalid_label_id', 'ID de etiqueta inválido.');
             exit;
         }
 
@@ -722,7 +722,7 @@ class AdminPacotesWordpressController extends Controller {
         if (!$etiqueta) {
             http_response_code(404);
             header('Content-Type: text/plain; charset=utf-8');
-            echo 'Etiqueta #' . $id . ' não encontrada na tabela local. Sincronize os pacotes primeiro.';
+            echo __('admin.wp_packages.label_not_found_local', 'Etiqueta #{id} não encontrada na tabela local. Sincronize os pacotes primeiro.', ['id' => $id]);
             exit;
         }
 
@@ -734,7 +734,7 @@ class AdminPacotesWordpressController extends Controller {
         if ($tracking === '') {
             http_response_code(404);
             header('Content-Type: text/plain; charset=utf-8');
-            echo 'Etiqueta #' . $id . ' não possui tracking number.';
+            echo __('admin.wp_packages.label_no_tracking', 'Etiqueta #{id} não possui tracking number.', ['id' => $id]);
             exit;
         }
 
@@ -803,7 +803,7 @@ class AdminPacotesWordpressController extends Controller {
 
         http_response_code(404);
         header('Content-Type: text/plain; charset=utf-8');
-        echo 'PDF da etiqueta não disponível para tracking ' . htmlspecialchars($tracking) . '. Gere a etiqueta no WordPress primeiro.';
+        echo __('admin.wp_packages.pdf_unavailable', 'PDF da etiqueta não disponível para tracking {tracking}. Gere a etiqueta no WordPress primeiro.', ['tracking' => htmlspecialchars($tracking)]);
         exit;
     }
 }

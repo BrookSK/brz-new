@@ -278,7 +278,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'wp-estatisticas';
-        $title = 'Estatísticas (WP) - Braziliana Admin';
+        $title = __('admin.orders_wp.stats_title', 'Estatísticas (WP) - Braziliana Admin');
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp_estatisticas.php';
@@ -1210,7 +1210,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'pedidos-wp';
-        $title = 'Pedidos (WordPress) - Braziliana Admin';
+        $title = __('admin.orders_wp.list_title', 'Pedidos (WordPress) - Braziliana Admin');
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp.php';
@@ -1230,7 +1230,7 @@ class AdminPedidosWpController extends Controller {
 
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
             header('Content-Type: text/plain; charset=UTF-8');
-            echo 'Parâmetros inválidos. Use start/end no formato YYYY-MM-DD.';
+            echo __('admin.orders_wp.invalid_params', 'Parâmetros inválidos. Use start/end no formato YYYY-MM-DD.');
             return;
         }
 
@@ -1328,7 +1328,7 @@ class AdminPedidosWpController extends Controller {
 
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
             header('Content-Type: text/plain; charset=UTF-8');
-            echo 'Parâmetros inválidos. Use start/end no formato YYYY-MM-DD.';
+            echo __('admin.orders_wp.invalid_params', 'Parâmetros inválidos. Use start/end no formato YYYY-MM-DD.');
             return;
         }
 
@@ -1340,21 +1340,21 @@ class AdminPedidosWpController extends Controller {
             $sources = $source === 'all' ? self::SOURCES : [$source];
 
             $headers = [
-                'WP Order ID',
-                'Origem',
-                'Data',
-                'Hora',
-                'Status',
-                'Nome',
-                'Sobrenome',
-                'Email',
-                'Moeda',
-                'Total Produtos',
-                'Total Taxa Serviço',
-                'Total Venda',
-                'Total Declaração',
-                'Qtd Itens',
-                'Peso Total (kg)',
+                __('admin.orders_wp.export_wp_order_id', 'WP Order ID'),
+                __('admin.orders_wp.export_origin', 'Origem'),
+                __('admin.orders_wp.export_date', 'Data'),
+                __('admin.orders_wp.export_time', 'Hora'),
+                __('common.status', 'Status'),
+                __('common.name', 'Nome'),
+                __('admin.orders_wp.export_lastname', 'Sobrenome'),
+                __('common.email', 'Email'),
+                __('admin.orders_wp.export_currency', 'Moeda'),
+                __('admin.orders_wp.export_total_products', 'Total Produtos'),
+                __('admin.orders_wp.export_total_service_fee', 'Total Taxa Serviço'),
+                __('admin.orders_wp.export_total_sale', 'Total Venda'),
+                __('admin.orders_wp.export_total_declaration', 'Total Declaração'),
+                __('admin.orders_wp.export_items_count', 'Qtd Itens'),
+                __('admin.orders_wp.export_total_weight', 'Peso Total (kg)'),
             ];
 
             $rowsAll = [];
@@ -1402,10 +1402,10 @@ class AdminPedidosWpController extends Controller {
             $monthKeys = array_keys($monthKeys);
 
             $spreadsheet = new Spreadsheet();
-            $spreadsheet->getProperties()->setCreator('Braziliana')->setTitle('Pedidos WP - Exportação');
+            $spreadsheet->getProperties()->setCreator('Braziliana')->setTitle(__('admin.orders_wp.export_doc_title', 'Pedidos WP - Exportação'));
 
             $sheetAll = $spreadsheet->getActiveSheet();
-            $sheetAll->setTitle('Todos');
+            $sheetAll->setTitle(__('admin.orders_wp.export_sheet_all', 'Todos'));
             $this->fillSheetWithRows($sheetAll, $headers, $rowsAll, $monthKeys, true, true);
 
             foreach ($monthKeys as $idx => $mk) {
@@ -1427,7 +1427,7 @@ class AdminPedidosWpController extends Controller {
 
         } catch (\Exception $e) {
             header('Content-Type: text/plain; charset=UTF-8');
-            echo 'Erro ao gerar XLSX: ' . $e->getMessage();
+            echo __('admin.orders_wp.xlsx_error', 'Erro ao gerar XLSX:') . ' ' . $e->getMessage();
             return;
         }
     }
@@ -2034,7 +2034,7 @@ class AdminPedidosWpController extends Controller {
 
         $orderId = (int) $id;
         if ($orderId <= 0) {
-            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            $this->json(['success' => false, 'error' => __('admin.orders_wp.invalid_order', 'Pedido inválido')], 400);
             return;
         }
 
@@ -2051,7 +2051,7 @@ class AdminPedidosWpController extends Controller {
             $stP->execute([$orderId]);
             $pedido = $stP->fetch(\PDO::FETCH_ASSOC) ?: null;
             if (!$pedido) {
-                $this->json(['success' => false, 'error' => 'Pedido não encontrado no WordPress'], 404);
+                $this->json(['success' => false, 'error' => __('admin.orders_wp.order_not_found', 'Pedido não encontrado no WordPress')], 404);
                 return;
             }
 
@@ -2074,7 +2074,7 @@ class AdminPedidosWpController extends Controller {
                     $this->json([
                         'success' => true,
                         'label_url' => $existingUrl,
-                        'message' => 'Etiqueta já gerada para este pedido',
+                        'message' => __('admin.orders_wp.label_already_generated', 'Etiqueta já gerada para este pedido'),
                     ]);
                     return;
                 }
@@ -2086,7 +2086,7 @@ class AdminPedidosWpController extends Controller {
             $billingCpf = (string) ($meta['_billing_cpf'] ?? ($meta['_billing_cnpj'] ?? ''));
             $billingDocDigits = (string) preg_replace('/\D+/', '', $billingCpf);
             if ($billingDocDigits === '') {
-                $this->json(['success' => false, 'error' => 'Documento (CPF/CNPJ) não encontrado no pedido. Preencha o campo de CPF/CNPJ no WooCommerce antes de gerar a etiqueta.'], 400);
+                $this->json(['success' => false, 'error' => __('admin.orders_wp.document_not_found', 'Documento (CPF/CNPJ) não encontrado no pedido. Preencha o campo de CPF/CNPJ no WooCommerce antes de gerar a etiqueta.')], 400);
                 return;
             }
 
@@ -2117,7 +2117,7 @@ class AdminPedidosWpController extends Controller {
             $addr2 = trim(implode(', ', $addr2Parts));
 
             if ($shipAddress1 === '' || $shipCity === '' || $shipState === '' || $shipPostcode === '') {
-                $this->json(['success' => false, 'error' => 'Endereço de entrega incompleto no pedido (shipping). Corrija no WooCommerce antes de gerar a etiqueta.'], 400);
+                $this->json(['success' => false, 'error' => __('admin.orders_wp.incomplete_address', 'Endereço de entrega incompleto no pedido (shipping). Corrija no WooCommerce antes de gerar a etiqueta.')], 400);
                 return;
             }
 
@@ -2211,7 +2211,7 @@ class AdminPedidosWpController extends Controller {
 
                 $ncmDigits = preg_replace('/\D+/', '', (string) $ncm);
                 if ($ncmDigits === '') {
-                    $this->json(['success' => false, 'error' => 'NCM não encontrado para um ou mais itens do pedido. Cadastre o NCM nos produtos (ou no Invoice) antes de gerar a etiqueta.'], 400);
+                    $this->json(['success' => false, 'error' => __('admin.orders_wp.ncm_not_found', 'NCM não encontrado para um ou mais itens do pedido. Cadastre o NCM nos produtos (ou no Invoice) antes de gerar a etiqueta.')], 400);
                     return;
                 }
 
@@ -2249,7 +2249,7 @@ class AdminPedidosWpController extends Controller {
             }
 
             if (empty($items)) {
-                $this->json(['success' => false, 'error' => 'Sem itens no pedido'], 400);
+                $this->json(['success' => false, 'error' => __('admin.orders_wp.no_items', 'Sem itens no pedido')], 400);
                 return;
             }
 
@@ -2261,7 +2261,7 @@ class AdminPedidosWpController extends Controller {
             $sender = $svcWx->getSender();
             if (!is_array($sender) || empty($sender)) {
                 $err = $svcWx->getSenderJsonError();
-                $this->json(['success' => false, 'error' => 'W-Express: configure o Sender (JSON) em Admin > Configurações > Entrega' . ($err ? (': ' . $err) : '')], 400);
+                $this->json(['success' => false, 'error' => __('admin.orders_wp.wexpress_sender_config', 'W-Express: configure o Sender (JSON) em Admin > Configurações > Entrega') . ($err ? (': ' . $err) : '')], 400);
                 return;
             }
 
@@ -2415,7 +2415,7 @@ class AdminPedidosWpController extends Controller {
             $stP->execute([(int) $id]);
             $pedido = $stP->fetch(\PDO::FETCH_ASSOC) ?: null;
             if (!$pedido) {
-                throw new \RuntimeException('Pedido não encontrado no WordPress');
+                throw new \RuntimeException(__('admin.orders_wp.order_not_found', 'Pedido não encontrado no WordPress'));
             }
 
             $stM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}postmeta WHERE post_id = ?");
@@ -2548,7 +2548,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'pedidos-wp';
-        $title = 'Pedido WP - Detalhes - Braziliana Admin';
+        $title = __('admin.orders_wp.details_title', 'Pedido WP - Detalhes - Braziliana Admin');
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp_detalhes.php';
@@ -3191,7 +3191,7 @@ class AdminPedidosWpController extends Controller {
         if ($prefix === '') $prefix = 'wp_';
 
         if ($host === '' || $dbname === '' || $user === '') {
-            throw new \RuntimeException('Configure o banco WordPress em Admin > Configurações > WordPress');
+            throw new \RuntimeException(__('admin.orders_wp.configure_wp_db', 'Configure o banco WordPress em Admin > Configurações > WordPress'));
         }
 
         $dsn = 'mysql:host=' . $host . ';' . ($port ? ('port=' . $port . ';') : '') . 'dbname=' . $dbname . ';charset=utf8mb4';
