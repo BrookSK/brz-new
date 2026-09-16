@@ -3644,6 +3644,7 @@ HTML;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
+        $pedidoId = (int) $id; // alias usado em trechos internos desta view
         $embed = ((string) $request->getParam('embed', '0') === '1');
         $syncOk = ((string) $request->getParam('sync_ok', '0') === '1');
         $syncErr = (string) $request->getParam('sync_err', '');
