@@ -1,4 +1,35 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+<?php
+// Traduz o status interno de um pedido (ex.: "etiqueta_gerada") para o idioma atual.
+if (!isset($traduzirStatusPedido)) {
+    $traduzirStatusPedido = function (?string $valor): string {
+        $v = strtolower(trim((string) $valor));
+        if ($v === '') return '';
+        $mapa = [
+            'pendente'                       => __('order_status.pending', 'Pendente'),
+            'processando'                    => __('order_status.processing', 'Processando'),
+            'pago'                           => __('order_status.paid', 'Pago'),
+            'itens_parcialmente_comprados'   => __('order_status.items_partially_purchased', 'Parcialmente Comprado'),
+            'itens_comprados'                => __('order_status.items_purchased', 'Produto Comprado'),
+            'invoice_liberado'               => __('order_status.invoice_released', 'Invoice Liberado'),
+            'invoice_confirmado'             => __('order_status.invoice_confirmed', 'Invoice Confirmado'),
+            'invoice_contestado'             => __('order_status.invoice_disputed', 'Invoice Contestado'),
+            'fatura_pendente'                => __('order_status.billing_pending', 'Fatura Pendente'),
+            'fatura_paga'                    => __('order_status.billing_paid', 'Fatura Paga'),
+            'carne_pagando'                  => __('order_status.installment_paying', 'Carnê em Pagamento'),
+            'carne_aguardando'               => __('order_status.installment_waiting', 'Carnê Aguardando'),
+            'produto_consolidado'            => __('order_status.product_consolidated', 'Caixa Fechada'),
+            'etiqueta_gerada'                => __('order_status.label_generated', 'Etiqueta Gerada'),
+            'em_transporte'                  => __('order_status.in_transit', 'Em Transporte'),
+            'aguardando_liberacao_aduaneira' => __('order_status.awaiting_customs_release', 'Aguardando Liberação Aduaneira'),
+            'enviado_ao_destinatario'        => __('order_status.sent_to_recipient', 'Enviado ao Destinatário'),
+            'entregue'                       => __('order_status.delivered', 'Entregue'),
+            'cancelado'                      => __('order_status.cancelled', 'Cancelado'),
+        ];
+        return $mapa[$v] ?? ucfirst(str_replace('_', ' ', $v));
+    };
+}
+?>
     <div>
         <h1 class="h4 mb-0"><?= __('ticket.title', 'Ticket #{id}', ['id' => (int) ($ticket['id'] ?? 0)]) ?></h1>
         <div class="text-muted small"><?= htmlspecialchars((string) ($ticket['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
@@ -489,7 +520,7 @@
                                 <?php if (!empty($pd['status'])): ?>
                                     <tr>
                                         <td class="k"><?= __('common.status', 'Status') ?></td>
-                                        <td class="v muted"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td class="v muted"><?= htmlspecialchars($traduzirStatusPedido((string) ($pd['status'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
                                     </tr>
                                 <?php endif; ?>
                                 <?php if ($taxaConv !== null && $taxaConv !== '' && (float) $taxaConv != 0.0): ?>
@@ -750,7 +781,7 @@
                                         <tr>
                                             <td><?= (int) ($p['id'] ?? 0) ?></td>
                                             <td><?= htmlspecialchars((string) ($p['codigo_pedido'] ?? ($p['id'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td><?= htmlspecialchars((string) ($p['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars($traduzirStatusPedido((string) ($p['status'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars((string) ($p['total'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars((string) ($p['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-end">
@@ -785,7 +816,7 @@
                                         <tr>
                                             <td class="text-muted small">#<?= (int) ($tp['id'] ?? 0) ?></td>
                                             <td><?= htmlspecialchars((string) ($tp['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td><?= htmlspecialchars((string) ($tp['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= (strtolower(trim((string) ($tp['status'] ?? ''))) === 'closed') ? htmlspecialchars(__('ticket.status.closed', 'Fechado'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('ticket.status.open', 'Aberto'), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-muted small"><?= htmlspecialchars((string) ($tp['atualizado_em'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tp['id'] ?? 0) ?>" target="_blank" rel="noopener"><?= __('common.view', 'Ver') ?></a></td>
                                         </tr>
@@ -819,7 +850,7 @@
                                             <td class="fw-semibold">#<?= (int) ($tc['id'] ?? 0) ?></td>
                                             <td class="text-muted small"><?= !empty($tc['pedido_id']) ? ('#' . (int) $tc['pedido_id']) : '-' ?></td>
                                             <td><?= htmlspecialchars((string) ($tc['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td><?= htmlspecialchars((string) ($tc['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= (strtolower(trim((string) ($tc['status'] ?? ''))) === 'closed') ? htmlspecialchars(__('ticket.status.closed', 'Fechado'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('ticket.status.open', 'Aberto'), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-muted small"><?= htmlspecialchars((string) ($tc['atualizado_em'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tc['id'] ?? 0) ?>" target="_blank" rel="noopener"><?= __('common.view', 'Ver') ?></a></td>
                                         </tr>
@@ -833,3 +864,60 @@
         </div>
     </div>
 </div>
+
+<?php
+// Localização do input[type=file]: o texto "Escolher arquivos / Nenhum arquivo escolhido"
+// é gerado pelo navegador e não é traduzível via PHP. Quando o idioma do painel for inglês,
+// substituímos o botão nativo por um custom com os textos traduzidos.
+$__localeInputFile = \App\Core\I18n::getLocale();
+if ($__localeInputFile === 'en'):
+?>
+<style>
+    .brz-file-i18n input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; z-index: -1; }
+    .brz-file-i18n { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .brz-file-i18n .brz-file-btn { display: inline-block; padding: .375rem .75rem; border: 1px solid #cbd5e1; border-radius: var(--radius-md, 8px); background: #f1f5f9; color: #0f172a; font-size: .9rem; cursor: pointer; white-space: nowrap; }
+    .brz-file-i18n .brz-file-btn:hover { background: #e2e8f0; }
+    .brz-file-i18n .brz-file-name { color: #475569; font-size: .875rem; }
+</style>
+<script>
+(function() {
+    var LABEL_CHOOSE = <?= json_encode(__('common.file.choose', 'Choose file'), JSON_UNESCAPED_UNICODE) ?>;
+    var LABEL_CHOOSE_MULTIPLE = <?= json_encode(__('common.file.choose_multiple', 'Choose files'), JSON_UNESCAPED_UNICODE) ?>;
+    var LABEL_NONE = <?= json_encode(__('common.file.none_selected', 'No file selected'), JSON_UNESCAPED_UNICODE) ?>;
+    var LABEL_COUNT = <?= json_encode(__('common.file.count_selected', '{n} files selected'), JSON_UNESCAPED_UNICODE) ?>;
+
+    function decorate(input) {
+        if (input.dataset.brzFileI18n === '1') return;
+        input.dataset.brzFileI18n = '1';
+
+        var wrap = document.createElement('span');
+        wrap.className = 'brz-file-i18n' + (input.className ? '' : '');
+        input.parentNode.insertBefore(wrap, input);
+
+        var btn = document.createElement('span');
+        btn.className = 'brz-file-btn';
+        btn.textContent = input.multiple ? LABEL_CHOOSE_MULTIPLE : LABEL_CHOOSE;
+
+        var name = document.createElement('span');
+        name.className = 'brz-file-name';
+        name.textContent = LABEL_NONE;
+
+        wrap.appendChild(input);
+        wrap.appendChild(btn);
+        wrap.appendChild(name);
+
+        btn.addEventListener('click', function() { input.click(); });
+        input.addEventListener('change', function() {
+            var files = input.files;
+            if (!files || files.length === 0) { name.textContent = LABEL_NONE; }
+            else if (files.length === 1) { name.textContent = files[0].name; }
+            else { name.textContent = LABEL_COUNT.replace('{n}', String(files.length)); }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('input[type="file"]').forEach(decorate);
+    });
+})();
+</script>
+<?php endif; ?>
