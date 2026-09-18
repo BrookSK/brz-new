@@ -42,6 +42,25 @@ class AdminPedidosController extends Controller {
                 }
             }
 
+            // Garantir que existam colunas dedicadas de cliente no próprio pedido.
+            // Sem elas, os dados editados no pop-up não teriam onde ser gravados e a leitura
+            // (getComDetalhes) cairia no fallback da tabela `usuarios`, reintroduzindo o bug
+            // de dados "vazando" entre todos os pedidos do mesmo cliente.
+            $ensureCol = function(string $col, string $ddl) use ($pdo, &$cols): void {
+                if (is_array($cols) && !in_array($col, $cols, true)) {
+                    try {
+                        $pdo->exec($ddl);
+                        $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
+                    } catch (\Throwable $e) {
+                        // Se falhar (ex.: permissão), seguir com o schema atual.
+                    }
+                }
+            };
+            $ensureCol('cliente_nome', "ALTER TABLE pedidos ADD COLUMN cliente_nome VARCHAR(255) NULL");
+            $ensureCol('cliente_email', "ALTER TABLE pedidos ADD COLUMN cliente_email VARCHAR(255) NULL");
+            $ensureCol('cliente_telefone', "ALTER TABLE pedidos ADD COLUMN cliente_telefone VARCHAR(50) NULL");
+            $ensureCol('cliente_cpf_cnpj', "ALTER TABLE pedidos ADD COLUMN cliente_cpf_cnpj VARCHAR(30) NULL");
+
             $usuarioLogado = $auth->getUsuarioLogado();
             $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
             $oldRow = [];
@@ -157,73 +176,15 @@ class AdminPedidosController extends Controller {
             ];
             error_log('[ATUALIZAR_CLIENTE_DEBUG] ' . json_encode($debugInfo, JSON_UNESCAPED_UNICODE));
 
-            // Propagar dados editados para a tabela usuarios (cadastro do cliente)
-            // O sistema lê telefone, email, nome e CPF de lá via fallback no getComDetalhes()
+            // IMPORTANTE (correção de bug): NÃO propagar mais os dados editados para a
+            // tabela `usuarios` (conta do cliente). Os dados editados aqui pertencem SOMENTE
+            // a este pedido e já foram gravados nas colunas do próprio pedido acima.
+            // Alterar `usuarios` fazia todos os pedidos do mesmo cliente (que compartilham
+            // usuario_id) exibirem os dados editados — inclusive na etiqueta, PDF e link de
+            // pagamento — porque a leitura (getComDetalhes) usa `usuarios` como fallback.
+            // Mantemos apenas a resolução do usuario_id para vincular o endereço exclusivo abaixo.
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
             $usuarioIdPedido = ($colUsuarioId !== '') ? (int) ($oldRow[$colUsuarioId] ?? 0) : 0;
-
-            if ($usuarioIdPedido > 0) {
-                try {
-                    $colsUsuarios = $this->getTableColumnsPdo($pdo, 'usuarios');
-                    $pickColU = function(array $candidates) use ($colsUsuarios): string {
-                        foreach ($candidates as $c) {
-                            if (is_array($colsUsuarios) && in_array($c, $colsUsuarios, true)) return $c;
-                        }
-                        return '';
-                    };
-
-                    $setU = [];
-                    $paramsU = [];
-
-                    // Telefone
-                    $telefoneVal = trim((string) $request->getParam('telefone'));
-                    if ($telefoneVal !== '') {
-                        $colTelU = $pickColU(['telefone', 'phone', 'celular', 'mobile', 'whatsapp']);
-                        if ($colTelU !== '') {
-                            $setU[] = $colTelU . ' = ?';
-                            $paramsU[] = $telefoneVal;
-                        }
-                    }
-
-                    // Email
-                    $emailVal = trim((string) $request->getParam('email'));
-                    if ($emailVal !== '') {
-                        $colEmailU = $pickColU(['email']);
-                        if ($colEmailU !== '') {
-                            $setU[] = $colEmailU . ' = ?';
-                            $paramsU[] = $emailVal;
-                        }
-                    }
-
-                    // Nome
-                    $nomeVal = trim((string) $request->getParam('nome'));
-                    if ($nomeVal !== '') {
-                        $colNomeU = $pickColU(['nome', 'name', 'full_name']);
-                        if ($colNomeU !== '') {
-                            $setU[] = $colNomeU . ' = ?';
-                            $paramsU[] = $nomeVal;
-                        }
-                    }
-
-                    // CPF/Documento
-                    $docVal = trim((string) $request->getParam('documento'));
-                    if ($docVal !== '') {
-                        $colDocU = $pickColU(['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf']);
-                        if ($colDocU !== '') {
-                            $setU[] = $colDocU . ' = ?';
-                            $paramsU[] = $docVal;
-                        }
-                    }
-
-                    if (!empty($setU)) {
-                        $paramsU[] = $usuarioIdPedido;
-                        $sqlU = 'UPDATE usuarios SET ' . implode(', ', $setU) . ' WHERE id = ?';
-                        $pdo->prepare($sqlU)->execute($paramsU);
-                    }
-                } catch (\Throwable $e) {
-                    // Silenciar — não bloquear o fluxo principal por falha na propagação
-                }
-            }
 
             // ENDEREÇO: SEMPRE criar registro NOVO exclusivo para este pedido
             // Isso garante que editar endereço de um pedido NÃO afeta outros pedidos da mesma cliente.
@@ -647,8 +608,10 @@ class AdminPedidosController extends Controller {
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
             $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
-            $nomeAltSelect = ($colUserName !== 'nome' && in_array('nome', $colsUsuarios, true)) ? ", u.nome as cliente_nome_alt" : "";
-            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email" . $nomeAltSelect . " FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
+            // Dados do cliente vêm da tabela usuarios sob aliases dedicados (usu_*), para NÃO
+            // sobrescrever as colunas do próprio pedido (cliente_nome/cliente_email via p.*).
+            // A preferência é sempre pelo dado gravado no pedido; usuarios é apenas fallback.
+            $sql = "SELECT p.*, u." . $colUserName . " as usu_nome, u." . $colUserEmail . " as usu_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
             $params = [];
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
@@ -700,6 +663,15 @@ class AdminPedidosController extends Controller {
             }
             $st->execute();
             $pedidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Preferir SEMPRE os dados gravados no próprio pedido; usar usuarios (usu_*) só como fallback.
+            foreach ($pedidos as &$pRow) {
+                $nomePedido = trim((string) ($pRow['cliente_nome'] ?? ''));
+                $emailPedido = trim((string) ($pRow['cliente_email'] ?? ''));
+                $pRow['cliente_nome'] = ($nomePedido !== '') ? $nomePedido : (string) ($pRow['usu_nome'] ?? '');
+                $pRow['cliente_email'] = ($emailPedido !== '') ? $emailPedido : (string) ($pRow['usu_email'] ?? '');
+            }
+            unset($pRow);
 
             // Items (tolerant schema)
             $itens = [];
@@ -874,8 +846,17 @@ class AdminPedidosController extends Controller {
             $deletedByJoin = $hasDeletedBy ? 'LEFT JOIN usuarios d ON p.deleted_by = d.id' : '';
             $deletedBySelect = $hasDeletedBy ? ', d.name as deletado_por_nome, d.email as deletado_por_email' : '';
 
-            $stmt = $pdo->query("SELECT p.*, u.name as cliente_nome, u.email as cliente_email {$deletedBySelect} FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id {$deletedByJoin} WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC LIMIT 200");
+            // usuarios sob aliases usu_* para não sobrescrever cliente_nome/cliente_email do pedido (p.*)
+            $stmt = $pdo->query("SELECT p.*, u.name as usu_nome, u.email as usu_email {$deletedBySelect} FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id {$deletedByJoin} WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC LIMIT 200");
             $pedidos = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            // Preferir dado do pedido; usuarios apenas como fallback
+            foreach ($pedidos as &$_p) {
+                $_n = trim((string) ($_p['cliente_nome'] ?? ''));
+                $_e = trim((string) ($_p['cliente_email'] ?? ''));
+                $_p['cliente_nome'] = ($_n !== '') ? $_n : (string) ($_p['usu_nome'] ?? '');
+                $_p['cliente_email'] = ($_e !== '') ? $_e : (string) ($_p['usu_email'] ?? '');
+            }
+            unset($_p);
         } catch (\Exception $e) {
             $pedidos = [];
         }
@@ -1082,7 +1063,8 @@ class AdminPedidosController extends Controller {
             $colUsuarioId = in_array('usuario_id', $colsPedidos, true) ? 'usuario_id' : 'cliente_id';
             $colNumero = in_array('numero_pedido', $colsPedidos, true) ? 'numero_pedido' : (in_array('numero', $colsPedidos, true) ? 'numero' : null);
 
-            $sql = "SELECT p.*, u.{$colUserName} AS cliente_nome, u.{$colUserEmail} AS cliente_email
+            // usuarios sob aliases usu_* para não sobrescrever cliente_nome/cliente_email do pedido (p.*)
+            $sql = "SELECT p.*, u.{$colUserName} AS usu_nome, u.{$colUserEmail} AS usu_email
                     FROM pedidos p LEFT JOIN usuarios u ON p.{$colUsuarioId} = u.id
                     WHERE p.arquivado = 1";
             if (in_array('deleted_at', $colsPedidos, true)) {
@@ -1093,6 +1075,14 @@ class AdminPedidosController extends Controller {
             $stmt = $pdo->prepare($sql);
             $stmt->execute();
             $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            // Preferir dado do pedido; usuarios apenas como fallback
+            foreach ($pedidos as &$_p) {
+                $_n = trim((string) ($_p['cliente_nome'] ?? ''));
+                $_e = trim((string) ($_p['cliente_email'] ?? ''));
+                $_p['cliente_nome'] = ($_n !== '') ? $_n : (string) ($_p['usu_nome'] ?? '');
+                $_p['cliente_email'] = ($_e !== '') ? $_e : (string) ($_p['usu_email'] ?? '');
+            }
+            unset($_p);
 
             header('Content-Type: text/html; charset=UTF-8');
             echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pedidos Arquivados</title>
@@ -2272,8 +2262,10 @@ JS;
             } catch (\Exception $e) {
             }
             
-            $nomeAltSelect = ($colUserName !== 'nome' && in_array('nome', $colsUsuarios, true)) ? ", u.nome as cliente_nome_alt" : "";
-            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email" . $nomeAltSelect . " FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
+            // Dados do cliente vêm de usuarios sob aliases dedicados (usu_*) para NÃO sobrescrever
+            // as colunas do próprio pedido (cliente_nome/cliente_email via p.*). A preferência é
+            // sempre pelo dado gravado no pedido; usuarios é apenas fallback (resolvido no PHP abaixo).
+            $sql = "SELECT p.*, u." . $colUserName . " as usu_nome, u." . $colUserEmail . " as usu_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
             $params = [];
 
             if ($temDeletedAt) {
@@ -2372,25 +2364,32 @@ JS;
             $stmt->execute();
             $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            // Fallback: preencher cliente_nome de colunas do pedido quando JOIN não trouxe
+            // Preferir SEMPRE os dados gravados no próprio pedido (cliente_nome/cliente_email).
+            // A tabela usuarios (usu_nome/usu_email) é usada APENAS como fallback quando o pedido
+            // não tem o dado — assim editar um pedido nunca reflete nos demais pedidos do cliente.
             if (is_array($pedidos)) {
                 foreach ($pedidos as &$_p) {
-                    if (empty($_p['cliente_nome']) || trim((string)$_p['cliente_nome']) === '') {
-                        foreach (['cliente_nome_alt','cliente_nome','nome','customer_name'] as $_nc) {
+                    $_nomePedido = trim((string) ($_p['cliente_nome'] ?? ''));
+                    if ($_nomePedido === '') {
+                        foreach (['nome','customer_name','usu_nome'] as $_nc) {
                             if (!empty($_p[$_nc]) && trim((string)$_p[$_nc]) !== '') {
-                                $_p['cliente_nome'] = (string)$_p[$_nc];
+                                $_nomePedido = (string)$_p[$_nc];
                                 break;
                             }
                         }
                     }
-                    if (empty($_p['cliente_email']) || trim((string)$_p['cliente_email']) === '') {
-                        foreach (['cliente_email','email','customer_email'] as $_ec) {
+                    $_p['cliente_nome'] = $_nomePedido;
+
+                    $_emailPedido = trim((string) ($_p['cliente_email'] ?? ''));
+                    if ($_emailPedido === '') {
+                        foreach (['email','customer_email','usu_email'] as $_ec) {
                             if (!empty($_p[$_ec]) && trim((string)$_p[$_ec]) !== '') {
-                                $_p['cliente_email'] = (string)$_p[$_ec];
+                                $_emailPedido = (string)$_p[$_ec];
                                 break;
                             }
                         }
                     }
+                    $_p['cliente_email'] = $_emailPedido;
                 }
                 unset($_p);
             }
@@ -4038,11 +4037,47 @@ HTML;
                 }
 
                 if ($tracking !== '') {
+                    // Determinar o evento de notificação conforme a fonte do rastreio.
+                    $fonteLower = strtolower($trackingFonte);
+                    if (strpos($fonteLower, 'shippo') !== false) {
+                        $eventoNotif = 'shippo_label_created';
+                    } elseif (strpos($fonteLower, 'packet') !== false || strpos($fonteLower, 'mundial') !== false) {
+                        $eventoNotif = 'correios_packet_label_created';
+                    } else {
+                        // Fonte manual/genérica: usa o evento de embarque do Correios (mais abrangente).
+                        $eventoNotif = 'correios_packet_shipment_departed';
+                    }
+
                     echo '<div class="alert alert-info mb-3">'
                         . '<div><strong>' . __('admin.order_details.tracking_code', 'Código de rastreio') . ':</strong> ' . htmlspecialchars($tracking) . '</div>'
                         . ($trackingFonte !== '' ? ('<div class="small text-muted">' . __('admin.order_details.source', 'Fonte') . ': ' . htmlspecialchars($trackingFonte) . '</div>') : '')
                         . ($trackingUrl !== '' ? ('<div class="small"><a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" rel="noopener">' . __('admin.order_details.view_label', 'Ver etiqueta') . '</a></div>') : '')
+                        . '<div class="mt-2">'
+                        . '<button type="button" class="btn btn-sm btn-outline-primary" id="btn-notificar-rastreio" '
+                        . 'data-evento="' . htmlspecialchars($eventoNotif, ENT_QUOTES, 'UTF-8') . '" '
+                        . 'data-pedido="' . (int) $id . '">'
+                        . '<i class="fas fa-paper-plane me-1"></i>' . __('admin.order_details.send_tracking_notification', 'Enviar notificação de rastreio (e-mail + WhatsApp)')
+                        . '</button>'
+                        . '<span id="notificar-rastreio-msg" class="ms-2 small"></span>'
+                        . '</div>'
                         . '</div>';
+
+                    echo '<script>(function(){'
+                        . 'var b=document.getElementById("btn-notificar-rastreio");'
+                        . 'if(!b||b.dataset.bound)return;b.dataset.bound="1";'
+                        . 'b.addEventListener("click",async function(){'
+                        . 'var msg=document.getElementById("notificar-rastreio-msg");'
+                        . 'if(!confirm(' . json_encode(__('admin.order_details.confirm_send_tracking_notification', 'Enviar a notificação de rastreio (e-mail e WhatsApp) para o cliente deste pedido?')) . '))return;'
+                        . 'var orig=b.innerHTML;b.disabled=true;b.innerHTML=\'<i class="fas fa-spinner fa-spin me-1"></i>\';'
+                        . 'try{'
+                        . 'var r=await fetch("/admin/notificacoes/reenviar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({evento:b.dataset.evento,pedido_id:parseInt(b.dataset.pedido)})});'
+                        . 'var d=await r.json();'
+                        . 'if(d.success){msg.className="ms-2 small text-success";msg.textContent=' . json_encode(__('admin.order_details.tracking_notification_sent', 'Notificação enviada.')) . ';}'
+                        . 'else{msg.className="ms-2 small text-danger";msg.textContent=(d.error||' . json_encode(__('admin.order_details.tracking_notification_failed', 'Falha ao enviar.')) . ');}'
+                        . '}catch(e){msg.className="ms-2 small text-danger";msg.textContent=e.message;}'
+                        . 'finally{b.disabled=false;b.innerHTML=orig;}'
+                        . '});'
+                        . '})();</script>';
                 }
             } catch (\Exception $e) {
             }

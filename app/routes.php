@@ -517,6 +517,10 @@ $router->get('/admin/server-logs', 'AdminServerLogsController', 'index');
 // Log de Emails do sistema
 $router->get('/admin/emails', 'AdminEmailLogsController', 'index');
 
+// Histórico/gestão de notificações de pedido (e-mail + WhatsApp) com reenvio
+$router->get('/admin/notificacoes', 'AdminNotificacoesController', 'index');
+$router->post('/admin/notificacoes/reenviar', 'AdminNotificacoesController', 'reenviar');
+
 // Mercado Pago OAuth (conectar conta do produto)
 $router->get('/mercadopago/oauth/start', 'MercadoPagoOAuthController', 'start');
 $router->get('/mercadopago/oauth/callback', 'MercadoPagoOAuthController', 'callback');

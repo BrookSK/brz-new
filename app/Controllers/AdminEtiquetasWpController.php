@@ -604,7 +604,266 @@ class AdminEtiquetasWpController extends Controller
         }
 
         $resp = $this->wp->createDeparture($body);
+
+        // Após confirmar o embarque com sucesso, notificar os clientes dos pedidos embarcados
+        // (e-mail + WhatsApp via NotificationService) com o código de rastreio. Best-effort:
+        // qualquer falha aqui NÃO deve derrubar a resposta de sucesso do embarque.
+        if (!empty($resp['success'])) {
+            try {
+                $billIds = array_values(array_filter(array_map('intval', (array) ($body['billIds'] ?? [])), fn($v) => $v > 0));
+                $pares = $this->resolverPedidosTrackingDoEmbarque($billIds);
+                $embarqueInfo = [
+                    'flight_number' => (string) ($body['flightNumber'] ?? ''),
+                    'airline_code' => (string) ($body['airlineCode'] ?? ''),
+                    'departure_date' => (string) ($body['departureDate'] ?? ''),
+                    'departure_airport' => (string) ($body['departureAirportCode'] ?? ''),
+                    'arrival_date' => (string) ($body['arrivalDate'] ?? ''),
+                    'arrival_airport' => (string) ($body['arrivalAirportCode'] ?? ''),
+                ];
+                $resumoNotif = $this->notificarPedidosEmbarque($pares, $embarqueInfo);
+                $resp['notificacoes'] = $resumoNotif;
+            } catch (\Throwable $e) {
+                error_log('[EMBARQUE][NOTIF] Falha ao notificar clientes do embarque: ' . $e->getMessage());
+                $resp['notificacoes'] = ['enviadas' => 0, 'erro' => $e->getMessage()];
+            }
+        }
+
         $this->json($resp, !empty($resp['success']) ? 200 : 400);
+    }
+
+    /**
+     * Resolve os pares (pedido_id, tracking_number) de um embarque a partir das faturas (billIds).
+     *
+     * Como a hierarquia fatura->container->pacote vive no WordPress e o vínculo local é por
+     * tracking_number, a estratégia é: (1) obter as faturas do WP e seus containers;
+     * (2) obter os containers do WP e seus tracking codes; (3) cruzar os trackings com a
+     * tabela local correios_packet_etiquetas para descobrir o pedido_id de cada rastreio.
+     *
+     * É tolerante a variações de nomes de campos no retorno do WP e nunca lança exceção.
+     *
+     * @return array<int, array{pedido_id:int, tracking_number:string}>
+     */
+    private function resolverPedidosTrackingDoEmbarque(array $billIds): array
+    {
+        $billIds = array_values(array_filter(array_map('intval', $billIds), fn($v) => $v > 0));
+        if (empty($billIds)) {
+            return [];
+        }
+
+        // 1) Coletar todos os tracking codes das faturas selecionadas (via WP).
+        $trackings = $this->coletarTrackingsDasFaturas($billIds);
+        if (empty($trackings)) {
+            error_log('[EMBARQUE][NOTIF] Nenhum tracking resolvido para billIds=' . json_encode($billIds));
+            return [];
+        }
+
+        // 2) Cruzar trackings com a tabela local para obter pedido_id.
+        $pares = [];
+        if ($this->tableExists('correios_packet_etiquetas')) {
+            try {
+                $in = implode(',', array_fill(0, count($trackings), '?'));
+                $st = $this->connection->prepare("SELECT pedido_id, tracking_number FROM correios_packet_etiquetas WHERE tracking_number IN ({$in})");
+                $st->execute(array_values($trackings));
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                    $pid = (int) ($row['pedido_id'] ?? 0);
+                    $trk = trim((string) ($row['tracking_number'] ?? ''));
+                    if ($pid > 0 && $trk !== '') {
+                        $pares[$pid] = ['pedido_id' => $pid, 'tracking_number' => $trk];
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('[EMBARQUE][NOTIF] Erro ao cruzar trackings com etiquetas: ' . $e->getMessage());
+            }
+        }
+
+        return array_values($pares);
+    }
+
+    /**
+     * Coleta os tracking codes de um conjunto de faturas do WordPress, descendo por containers.
+     * Tolerante a diferentes formatos de retorno do WP.
+     *
+     * @return string[] lista única de tracking codes
+     */
+    private function coletarTrackingsDasFaturas(array $billIds): array
+    {
+        $billIdsSet = array_flip(array_map('intval', $billIds));
+        $containerIds = [];      // wp_post_id de containers (quando a fatura referenciar assim)
+        $dispatchNumbers = [];   // números de remessa (formato observado no retorno do WP: fatura.dispatch_numbers)
+        $trackings = [];
+
+        // Buscar as faturas do WP e extrair a ligação com containers de cada fatura selecionada.
+        try {
+            $respBills = $this->wp->listBills(['per_page' => 500]);
+            $bills = $this->extrairLista($respBills);
+            foreach ($bills as $bill) {
+                $bwid = (int) ($bill['wp_post_id'] ?? ($bill['id'] ?? 0));
+                if ($bwid <= 0 || !isset($billIdsSet[$bwid])) {
+                    continue;
+                }
+                // Formato principal observado: fatura.dispatch_numbers (liga por dispatch_number do container).
+                if (isset($bill['dispatch_numbers']) && is_array($bill['dispatch_numbers'])) {
+                    foreach ($bill['dispatch_numbers'] as $dn) {
+                        $dn = (string) $dn;
+                        if ($dn !== '') $dispatchNumbers[$dn] = $dn;
+                    }
+                }
+                // Fallbacks: alguns formatos referenciam containers por wp_post_id.
+                foreach ($this->extrairIds($bill, ['containerIds', 'container_ids', 'containers']) as $cid) {
+                    $containerIds[$cid] = $cid;
+                }
+                // Alguns retornos já trazem os trackings direto na fatura.
+                foreach ($this->extrairTrackings($bill) as $t) {
+                    $trackings[$t] = $t;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[EMBARQUE][NOTIF] Erro ao listar faturas do WP: ' . $e->getMessage());
+        }
+
+        // Buscar os containers do WP e coletar tracking codes dos containers vinculados
+        // (por dispatch_number — ligação principal — ou por wp_post_id — fallback).
+        if (!empty($dispatchNumbers) || !empty($containerIds)) {
+            try {
+                $respContainers = $this->wp->listContainers(['per_page' => 500]);
+                $containers = $this->extrairLista($respContainers);
+                foreach ($containers as $container) {
+                    $cwid = (int) ($container['wp_post_id'] ?? ($container['id'] ?? 0));
+                    $dn = (string) ($container['dispatch_number'] ?? '');
+                    $vinculado = ($dn !== '' && isset($dispatchNumbers[$dn])) || ($cwid > 0 && isset($containerIds[$cwid]));
+                    if (!$vinculado) {
+                        continue;
+                    }
+                    foreach ($this->extrairTrackings($container) as $t) {
+                        $trackings[$t] = $t;
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[EMBARQUE][NOTIF] Erro ao listar containers do WP: ' . $e->getMessage());
+            }
+        }
+
+        return array_values($trackings);
+    }
+
+    /**
+     * Extrai a lista de itens de uma resposta do WP (chave 'data' comum, ou o próprio array).
+     */
+    private function extrairLista($resp): array
+    {
+        if (!is_array($resp)) {
+            return [];
+        }
+        if (isset($resp['data']) && is_array($resp['data'])) {
+            return $resp['data'];
+        }
+        // Alguns endpoints podem retornar a lista na raiz.
+        $isList = array_keys($resp) === range(0, count($resp) - 1);
+        return $isList ? $resp : [];
+    }
+
+    /**
+     * Extrai IDs (inteiros) de um item, tentando várias chaves candidatas.
+     * Suporta tanto array de inteiros quanto array de objetos com id/wp_post_id.
+     *
+     * @return int[]
+     */
+    private function extrairIds(array $item, array $candidateKeys): array
+    {
+        $out = [];
+        foreach ($candidateKeys as $key) {
+            if (!isset($item[$key]) || !is_array($item[$key])) {
+                continue;
+            }
+            foreach ($item[$key] as $v) {
+                if (is_array($v)) {
+                    $id = (int) ($v['wp_post_id'] ?? ($v['id'] ?? 0));
+                } else {
+                    $id = (int) $v;
+                }
+                if ($id > 0) {
+                    $out[$id] = $id;
+                }
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * Extrai tracking codes de um item, tolerando várias chaves e formatos (array ou JSON string).
+     *
+     * @return string[]
+     */
+    private function extrairTrackings(array $item): array
+    {
+        $out = [];
+        $candidateKeys = ['trackingCodes', 'tracking_codes', 'trackingNumbers', 'tracking_numbers', 'tracking_numbers_json', 'trackings', 'tracking_code'];
+        foreach ($candidateKeys as $key) {
+            if (!isset($item[$key])) {
+                continue;
+            }
+            $val = $item[$key];
+            if (is_string($val)) {
+                $decoded = json_decode($val, true);
+                if (is_array($decoded)) {
+                    $val = $decoded;
+                } else {
+                    $val = [$val];
+                }
+            }
+            if (!is_array($val)) {
+                continue;
+            }
+            foreach ($val as $t) {
+                if (is_array($t)) {
+                    $t = (string) ($t['tracking_code'] ?? ($t['tracking_number'] ?? ($t['code'] ?? '')));
+                }
+                $t = trim((string) $t);
+                if ($t !== '') {
+                    $out[$t] = $t;
+                }
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * Dispara as notificações (e-mail + WhatsApp) para cada pedido embarcado, via NotificationService.
+     * Evento: correios_packet_shipment_departed. Retorna um resumo do que foi processado.
+     *
+     * @param array<int, array{pedido_id:int, tracking_number:string}> $pares
+     * @param array<string,string> $embarqueInfo
+     */
+    private function notificarPedidosEmbarque(array $pares, array $embarqueInfo): array
+    {
+        $enviadas = 0;
+        $falhas = 0;
+        $pedidos = [];
+
+        if (empty($pares)) {
+            return ['enviadas' => 0, 'falhas' => 0, 'pedidos' => [], 'aviso' => 'Nenhum pedido resolvido para o embarque'];
+        }
+
+        $notif = new \App\Services\NotificationService();
+        foreach ($pares as $par) {
+            $pedidoId = (int) ($par['pedido_id'] ?? 0);
+            $tracking = trim((string) ($par['tracking_number'] ?? ''));
+            if ($pedidoId <= 0) {
+                continue;
+            }
+            try {
+                $notif->notificarEventoPedido('correios_packet_shipment_departed', $pedidoId, array_merge($embarqueInfo, [
+                    'tracking_number' => $tracking,
+                ]));
+                $enviadas++;
+                $pedidos[] = $pedidoId;
+            } catch (\Throwable $e) {
+                $falhas++;
+                error_log('[EMBARQUE][NOTIF] Falha ao notificar pedido #' . $pedidoId . ': ' . $e->getMessage());
+            }
+        }
+
+        return ['enviadas' => $enviadas, 'falhas' => $falhas, 'pedidos' => $pedidos];
     }
 
     // =========================================================

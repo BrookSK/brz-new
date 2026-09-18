@@ -272,6 +272,7 @@ function renderAdminSidebar($activePage = '') {
         'cambioreal-health' => ['icon' => 'fas fa-heartbeat', 'label' => __('admin.menu.exchange_health', 'Câmbio Real Health'), 'url' => '/admin/cambioreal-health', 'roles' => ['admin']],
         'carteira-config' => ['icon' => 'fas fa-wallet', 'label' => __('admin.menu.wallet_config', 'Config. Carteira'), 'url' => '/admin/carteira-config', 'roles' => ['admin']],
         'email-logs' => ['icon' => 'fas fa-envelope', 'label' => __('admin.menu.email_logs', 'Log de Emails'), 'url' => '/admin/emails', 'roles' => ['admin']],
+        'notificacoes' => ['icon' => 'fas fa-bell', 'label' => __('admin.menu.notifications', 'Notificações'), 'url' => '/admin/notificacoes', 'roles' => ['admin','vendedor','suporte']],
         'descontos' => ['icon' => 'fas fa-tag', 'label' => __('admin.menu.discount_auth', 'Autorizações Desconto'), 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
         'documentacao-webhook' => ['icon' => 'fas fa-book', 'label' => __('admin.menu.api_docs', 'Documentação API'), 'url' => '/admin/documentacao/webhook-ticket', 'roles' => ['admin']],
         'promocoes-auditoria' => ['icon' => 'fas fa-percent', 'label' => __('admin.menu.promo_audit', 'Auditoria Promoções'), 'url' => '/admin/promocoes-auditoria', 'roles' => ['admin']],

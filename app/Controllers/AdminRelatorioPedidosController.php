@@ -136,11 +136,14 @@ class AdminRelatorioPedidosController extends Controller {
                         if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_p['cliente_cpf'] = (string)$_p[$k]; break; }
                     }
                 }
-                // Telefone
-                $_p['cliente_telefone'] = '';
-                foreach (['cliente_telefone','telefone','u_telefone','u_celular'] as $k) {
-                    if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_p['cliente_telefone'] = (string)$_p[$k]; break; }
+                // Telefone — preferir SEMPRE o valor gravado no pedido; usuarios (u_*) só como fallback.
+                $_telPedido = trim((string) ($_p['cliente_telefone'] ?? ''));
+                if ($_telPedido === '') {
+                    foreach (['telefone','u_telefone','u_celular'] as $k) {
+                        if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_telPedido = (string)$_p[$k]; break; }
+                    }
                 }
+                $_p['cliente_telefone'] = $_telPedido;
             }
             unset($_p);
         }

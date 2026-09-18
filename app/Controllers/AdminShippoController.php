@@ -1001,6 +1001,12 @@ class AdminShippoController extends Controller {
             return;
         }
 
+        // Notificar o cliente (e-mail + WhatsApp) com o código de rastreio. Best-effort.
+        $this->notificarClienteShippo($id, (string) ($result['tracking_number'] ?? ''), [
+            'tracking_url' => (string) ($result['tracking_url'] ?? ''),
+            'carrier' => (string) ($rate['provider'] ?? ''),
+        ]);
+
         $this->json([
             'success' => true,
             'tracking_number' => $result['tracking_number'] ?? '',
@@ -1009,6 +1015,27 @@ class AdminShippoController extends Controller {
             'carrier_key' => $carrierAccount['key'],
             'label_file_type' => 'PDF',
         ]);
+    }
+
+    /**
+     * Dispara a notificação ao cliente (e-mail + WhatsApp via NotificationService) quando uma
+     * etiqueta Shippo é gerada, incluindo o código de rastreio. Best-effort: nunca lança exceção
+     * nem interrompe o fluxo de geração da etiqueta.
+     *
+     * @param array<string,string> $extra dados adicionais para os templates (tracking_url, carrier, etc.)
+     */
+    private function notificarClienteShippo(int $pedidoId, string $tracking, array $extra = []): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+        try {
+            $notif = new \App\Services\NotificationService();
+            $notif->notificarEventoPedido('shippo_label_created', $pedidoId, array_merge($extra, [
+                'tracking_number' => $tracking,
+            ]));
+        } catch (\Throwable $e) {
+            error_log('[SHIPPO][NOTIF] Falha ao notificar pedido #' . $pedidoId . ': ' . $e->getMessage());
+        }
     }
 
     /**
@@ -1231,6 +1258,11 @@ class AdminShippoController extends Controller {
                         json_encode($labelResult['data'] ?? []),
                     ]);
 
+                    $this->notificarClienteShippo($pid, (string) ($labelResult['tracking_number'] ?? ''), [
+                        'tracking_url' => (string) ($labelResult['tracking_url'] ?? ''),
+                        'carrier' => (string) ($matchedRate['provider'] ?? ''),
+                    ]);
+
                     $results[] = [
                         'pedido_id' => $pid,
                         'success' => true,
@@ -1301,6 +1333,11 @@ class AdminShippoController extends Controller {
                     (string) ($cheapestRate['currency'] ?? 'USD'),
                     !empty($labelResult['data']['test']) ? 1 : 0,
                     json_encode($labelResult['data'] ?? []),
+                ]);
+
+                $this->notificarClienteShippo($pid, (string) ($labelResult['tracking_number'] ?? ''), [
+                    'tracking_url' => (string) ($labelResult['tracking_url'] ?? ''),
+                    'carrier' => (string) ($cheapestRate['provider'] ?? ''),
                 ]);
 
                 $results[] = [

@@ -897,6 +897,27 @@ class PedidoEcommerce {
                 }
 
                 if ($trk === '') {
+                    if ($this->tableExists('shippo_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, tracking_url, label_url, carrier FROM shippo_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $t = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Shippo' . (!empty($row['carrier']) ? (' (' . trim((string) $row['carrier']) . ')') : '');
+                                // Preferir a URL pública de rastreio; cair para a URL da etiqueta se não houver.
+                                $trkUrl = trim((string) ($row['tracking_url'] ?? ''));
+                                if ($trkUrl === '') {
+                                    $trkUrl = trim((string) ($row['label_url'] ?? ''));
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
                     if ($this->tableExists('shipstation_etiquetas')) {
                         try {
                             $st = $this->connection->prepare('SELECT tracking_number, label_url, carrier_code FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
