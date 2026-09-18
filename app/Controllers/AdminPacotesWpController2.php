@@ -22,7 +22,7 @@ class AdminPacotesWpController2 extends Controller {
         if ($id <= 0) {
             header('Content-Type: text/plain; charset=utf-8');
             http_response_code(400);
-            echo 'ID de etiqueta inválido.';
+            echo __('admin.wp_packages2.invalid_label_id', 'ID de etiqueta inválido.');
             exit;
         }
 
@@ -35,13 +35,13 @@ class AdminPacotesWpController2 extends Controller {
             if (((int) $st->fetchColumn()) === 0) {
                 header('Content-Type: text/plain; charset=utf-8');
                 http_response_code(404);
-                echo 'Tabela wp_packet_etiquetas não existe. Sincronize os pacotes primeiro.';
+                echo __('admin.wp_packages2.table_missing', 'Tabela wp_packet_etiquetas não existe. Sincronize os pacotes primeiro.');
                 exit;
             }
         } catch (\Exception $e) {
             header('Content-Type: text/plain; charset=utf-8');
             http_response_code(500);
-            echo 'Erro ao verificar tabela: ' . $e->getMessage();
+            echo __('admin.wp_packages2.table_check_error', 'Erro ao verificar tabela: ') . $e->getMessage();
             exit;
         }
 
@@ -52,7 +52,7 @@ class AdminPacotesWpController2 extends Controller {
         if (!$etiqueta) {
             header('Content-Type: text/plain; charset=utf-8');
             http_response_code(404);
-            echo 'Etiqueta #' . $id . ' não encontrada.';
+            echo __('admin.wp_packages2.label_not_found', 'Etiqueta #{id} não encontrada.', ['id' => $id]);
             exit;
         }
 
@@ -63,7 +63,7 @@ class AdminPacotesWpController2 extends Controller {
         if ($tracking === '') {
             header('Content-Type: text/plain; charset=utf-8');
             http_response_code(404);
-            echo 'Etiqueta #' . $id . ' não possui tracking number.';
+            echo __('admin.wp_packages2.label_no_tracking', 'Etiqueta #{id} não possui tracking number.', ['id' => $id]);
             exit;
         }
 
@@ -125,7 +125,7 @@ class AdminPacotesWpController2 extends Controller {
 
         header('Content-Type: text/plain; charset=utf-8');
         http_response_code(404);
-        echo 'PDF não disponível para tracking ' . $tracking . '. Verifique se a etiqueta foi gerada no WordPress.';
+        echo __('admin.wp_packages2.pdf_unavailable', 'PDF não disponível para tracking {tracking}. Verifique se a etiqueta foi gerada no WordPress.', ['tracking' => $tracking]);
         exit;
     }
 

@@ -22,20 +22,20 @@ $isAdmin = ($__perfilClube === 'admin');
     <?php endif; ?>
 
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Recargas Clube (Checkout rápido)</h1>
+        <h1 class="page-title"><?= __('admin.club_recharges.title', 'Recargas Clube (Checkout rápido)') ?></h1>
 
         <div class="d-flex align-items-center gap-2">
             <span class="badge <?= $clubeEnabled ? 'bg-success' : 'bg-secondary' ?>">
                 <i class="fas <?= $clubeEnabled ? 'fa-circle-check' : 'fa-pause' ?> me-1"></i>
-                <?= $clubeEnabled ? 'Clube ativo' : 'Clube desativado' ?>
+                <?= $clubeEnabled ? __('admin.club_recharges.club_active', 'Clube ativo') : __('admin.club_recharges.club_disabled', 'Clube desativado') ?>
             </span>
             <?php if ($isAdmin): ?>
                 <form method="post" action="/admin/clube/toggle" class="m-0"
-                      onsubmit="return confirm('<?= $clubeEnabled ? 'Desativar o Clube? Novas recargas serão bloqueadas em todo o site.' : 'Reativar o Clube? Novas recargas voltarão a ser aceitas.' ?>');">
+                      onsubmit="return confirm('<?= htmlspecialchars($clubeEnabled ? __('admin.club_recharges.confirm_disable', 'Desativar o Clube? Novas recargas serão bloqueadas em todo o site.') : __('admin.club_recharges.confirm_enable', 'Reativar o Clube? Novas recargas voltarão a ser aceitas.'), ENT_QUOTES, 'UTF-8') ?>');">
                     <input type="hidden" name="ativar" value="<?= $clubeEnabled ? '0' : '1' ?>">
                     <button type="submit" class="btn btn-sm <?= $clubeEnabled ? 'btn-outline-danger' : 'btn-success' ?>">
                         <i class="fas <?= $clubeEnabled ? 'fa-pause' : 'fa-play' ?> me-1"></i>
-                        <?= $clubeEnabled ? 'Desativar Clube' : 'Ativar Clube' ?>
+                        <?= $clubeEnabled ? __('admin.club_recharges.disable_club', 'Desativar Clube') : __('admin.club_recharges.enable_club', 'Ativar Clube') ?>
                     </button>
                 </form>
             <?php endif; ?>
@@ -45,7 +45,7 @@ $isAdmin = ($__perfilClube === 'admin');
     <?php if (!$clubeEnabled): ?>
         <div class="alert alert-warning border-0 shadow-sm">
             <i class="fas fa-triangle-exclamation me-1"></i>
-            O Clube está <strong>desativado</strong>. Novas recargas estão bloqueadas em todo o site (página do clube, página de recarga e painel do cliente). As páginas informativas continuam acessíveis e exibem um aviso para contato via WhatsApp.
+            <?= __('admin.club_recharges.disabled_notice', 'O Clube está <strong>desativado</strong>. Novas recargas estão bloqueadas em todo o site (página do clube, página de recarga e painel do cliente). As páginas informativas continuam acessíveis e exibem um aviso para contato via WhatsApp.') ?>
         </div>
     <?php endif; ?>
 
@@ -54,7 +54,7 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total registros</div>
+                    <div class="text-muted small"><?= __('admin.club_recharges.total_records', 'Total registros') ?></div>
                     <div class="h4 mb-0"><?= number_format((int) ($stats['total_registros'] ?? 0), 0, ',', '.') ?></div>
                 </div>
             </div>
@@ -62,7 +62,7 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total (USD)</div>
+                    <div class="text-muted small"><?= __('admin.club_recharges.total_usd', 'Total (USD)') ?></div>
                     <div class="h4 mb-0">$ <?= number_format((float) ($stats['total_usd'] ?? 0), 2, ',', '.') ?></div>
                 </div>
             </div>
@@ -70,7 +70,7 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Pagos/creditados</div>
+                    <div class="text-muted small"><?= __('admin.club_recharges.paid_credited', 'Pagos/creditados') ?></div>
                     <div class="h4 mb-0"><?= number_format((int) ($stats['total_pago_registros'] ?? 0), 0, ',', '.') ?></div>
                 </div>
             </div>
@@ -78,7 +78,7 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total pago (USD)</div>
+                    <div class="text-muted small"><?= __('admin.club_recharges.total_paid_usd', 'Total pago (USD)') ?></div>
                     <div class="h4 mb-0">$ <?= number_format((float) ($stats['total_pago_usd'] ?? 0), 2, ',', '.') ?></div>
                 </div>
             </div>
@@ -90,22 +90,22 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-4 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #f59e0b !important;">
                 <div class="card-body">
-                    <div class="fw-semibold mb-2" style="color:#b45309;"><i class="fas fa-bolt me-1"></i> Turbo</div>
+                    <div class="fw-semibold mb-2" style="color:#b45309;"><i class="fas fa-bolt me-1"></i> <?= __('admin.club_recharges.turbo', 'Turbo') ?></div>
                     <div class="row g-2">
                         <div class="col-6">
-                            <div class="small text-muted">Registros</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.records', 'Registros') ?></div>
                             <div class="fw-bold"><?= (int) ($stats['turbo_registros'] ?? 0) ?></div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted">Pagos</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.paid', 'Pagos') ?></div>
                             <div class="fw-bold"><?= (int) ($stats['turbo_pago_registros'] ?? 0) ?></div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted">Total USD</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.total_usd_short', 'Total USD') ?></div>
                             <div class="fw-bold">$ <?= number_format((float) ($stats['turbo_usd'] ?? 0), 2, ',', '.') ?></div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted">Pago USD</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.paid_usd_short', 'Pago USD') ?></div>
                             <div class="fw-bold">$ <?= number_format((float) ($stats['turbo_pago_usd'] ?? 0), 2, ',', '.') ?></div>
                         </div>
                     </div>
@@ -115,22 +115,22 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-4 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #10b981 !important;">
                 <div class="card-body">
-                    <div class="fw-semibold mb-2" style="color:#065f46;"><i class="fas fa-check-circle me-1"></i> Normal</div>
+                    <div class="fw-semibold mb-2" style="color:#065f46;"><i class="fas fa-check-circle me-1"></i> <?= __('admin.club_recharges.normal', 'Normal') ?></div>
                     <div class="row g-2">
                         <div class="col-6">
-                            <div class="small text-muted">Registros</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.records', 'Registros') ?></div>
                             <div class="fw-bold"><?= (int) ($stats['normal_registros'] ?? 0) ?></div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted">Pagos</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.paid', 'Pagos') ?></div>
                             <div class="fw-bold"><?= (int) ($stats['normal_pago_registros'] ?? 0) ?></div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted">Total USD</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.total_usd_short', 'Total USD') ?></div>
                             <div class="fw-bold">$ <?= number_format((float) ($stats['normal_usd'] ?? 0), 2, ',', '.') ?></div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted">Pago USD</div>
+                            <div class="small text-muted"><?= __('admin.club_recharges.paid_usd_short', 'Pago USD') ?></div>
                             <div class="fw-bold">$ <?= number_format((float) ($stats['normal_pago_usd'] ?? 0), 2, ',', '.') ?></div>
                         </div>
                     </div>
@@ -140,13 +140,13 @@ $isAdmin = ($__perfilClube === 'admin');
         <div class="col-xl-4 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="fw-semibold mb-2">Teto de captação (BRL)</div>
+                    <div class="fw-semibold mb-2"><?= __('admin.club_recharges.funding_cap_brl', 'Teto de captação (BRL)') ?></div>
                     <div class="h4 mb-0">R$ <?= number_format((float) ($stats['cap_brl'] ?? 150000), 2, ',', '.') ?></div>
-                    <div class="small text-muted mt-1">Captado pago: R$ <?= number_format((float) ($stats['total_pago_brl'] ?? 0), 2, ',', '.') ?></div>
+                    <div class="small text-muted mt-1"><?= __('admin.club_recharges.funded_paid', 'Captado pago:') ?> R$ <?= number_format((float) ($stats['total_pago_brl'] ?? 0), 2, ',', '.') ?></div>
                     <?php if (!empty($stats['cap_reached'])): ?>
-                        <div class="small fw-semibold mt-1" style="color:#b42318;">Limite atingido</div>
+                        <div class="small fw-semibold mt-1" style="color:#b42318;"><?= __('admin.club_recharges.limit_reached', 'Limite atingido') ?></div>
                     <?php else: ?>
-                        <div class="small fw-semibold mt-1" style="color:#027a48;">Aberto</div>
+                        <div class="small fw-semibold mt-1" style="color:#027a48;"><?= __('admin.club_recharges.open', 'Aberto') ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -156,25 +156,25 @@ $isAdmin = ($__perfilClube === 'admin');
     <!-- Abas: Mobile dropdown + Desktop tabs -->
     <div class="d-md-none mb-3">
         <select class="form-select" onchange="switchClubeTab(this.value)">
-            <option value="pane-todos" selected>Todos (<?= count($recargas) ?>)</option>
-            <option value="pane-turbo">Turbo (<?= count($turboRows) ?>)</option>
-            <option value="pane-normal">Normal (<?= count($normalRows) ?>)</option>
+            <option value="pane-todos" selected><?= __('admin.club_recharges.tab_all', 'Todos') ?> (<?= count($recargas) ?>)</option>
+            <option value="pane-turbo"><?= __('admin.club_recharges.turbo', 'Turbo') ?> (<?= count($turboRows) ?>)</option>
+            <option value="pane-normal"><?= __('admin.club_recharges.normal', 'Normal') ?> (<?= count($normalRows) ?>)</option>
         </select>
     </div>
     <ul class="nav nav-tabs mb-0 d-none d-md-flex" id="clubeRecargasTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="tab-todos" data-bs-toggle="tab" data-bs-target="#pane-todos" type="button" role="tab">
-                Todos <span class="badge bg-secondary ms-1"><?= count($recargas) ?></span>
+                <?= __('admin.club_recharges.tab_all', 'Todos') ?> <span class="badge bg-secondary ms-1"><?= count($recargas) ?></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-turbo" data-bs-toggle="tab" data-bs-target="#pane-turbo" type="button" role="tab">
-                Turbo <span class="badge bg-warning text-dark ms-1"><?= count($turboRows) ?></span>
+                <?= __('admin.club_recharges.turbo', 'Turbo') ?> <span class="badge bg-warning text-dark ms-1"><?= count($turboRows) ?></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-normal" data-bs-toggle="tab" data-bs-target="#pane-normal" type="button" role="tab">
-                Normal <span class="badge bg-info ms-1"><?= count($normalRows) ?></span>
+                <?= __('admin.club_recharges.normal', 'Normal') ?> <span class="badge bg-info ms-1"><?= count($normalRows) ?></span>
             </button>
         </li>
     </ul>
@@ -188,15 +188,16 @@ $isAdmin = ($__perfilClube === 'admin');
     <div class="tab-content">
 
 <?php
-function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga encontrada.'): void {
+function renderRecargasTable(array $rows, ?string $emptyMsg = null): void {
+    $emptyMsg = $emptyMsg ?? __('admin.club_recharges.none_found', 'Nenhuma recarga encontrada.');
     echo '<div class="card border-0 shadow-sm border-top-0" style="border-top-left-radius:0;border-top-right-radius:0;">';
     echo '<div class="card-body">';
     // Desktop: Table
     echo '<div class="table-responsive d-none d-md-block">';
     echo '<table class="table table-hover align-middle mb-0">';
     echo '<thead><tr>';
-    echo '<th>ID</th><th>Usuário</th><th>Pagador</th><th>Tipo</th><th>Gateway</th>';
-    echo '<th>Valor USD</th><th>Valor BRL</th><th>Status</th><th>Criado</th>';
+    echo '<th>' . __('admin.club_recharges.col_id', 'ID') . '</th><th>' . __('admin.club_recharges.col_user', 'Usuário') . '</th><th>' . __('admin.club_recharges.col_payer', 'Pagador') . '</th><th>' . __('admin.club_recharges.col_type', 'Tipo') . '</th><th>' . __('admin.club_recharges.col_gateway', 'Gateway') . '</th>';
+    echo '<th>' . __('admin.club_recharges.col_value_usd', 'Valor USD') . '</th><th>' . __('admin.club_recharges.col_value_brl', 'Valor BRL') . '</th><th>' . __('admin.club_recharges.col_status', 'Status') . '</th><th>' . __('admin.club_recharges.col_created', 'Criado') . '</th>';
     echo '</tr></thead><tbody>';
     if (empty($rows)) {
         echo '<tr><td colspan="9" class="text-muted">' . htmlspecialchars($emptyMsg) . '</td></tr>';
@@ -210,7 +211,7 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
 
             $tipoRec = strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal')));
             $tipoBadge = ($tipoRec === 'turbo') ? 'warning' : 'info';
-            $tipoLabel = ($tipoRec === 'turbo') ? 'Turbo' : 'Normal';
+            $tipoLabel = ($tipoRec === 'turbo') ? __('admin.club_recharges.turbo', 'Turbo') : __('admin.club_recharges.normal', 'Normal');
 
             $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
             $gwLabel = $gw === 'cambioreal' ? 'Câmbio Real' : ($gw === 'stripe' ? 'Stripe' : ($gw !== '' ? ucfirst($gw) : 'N/A'));
@@ -224,7 +225,7 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
             $uId    = (int)($r['usuario_id'] ?? 0);
             if ($uNome !== '') {
                 echo '<a href="/admin/usuarios/detalhes/' . $uId . '" class="fw-semibold text-decoration-none">' . $uNome . '</a>';
-                if ($uSuite > 0) echo '<div class="text-muted small">Suite ' . $uSuite . '</div>';
+                if ($uSuite > 0) echo '<div class="text-muted small">' . __('admin.club_recharges.suite', 'Suite') . ' ' . $uSuite . '</div>';
                 if ($uEmail !== '') echo '<div class="text-muted small">' . $uEmail . '</div>';
             } else {
                 echo '<a href="/admin/usuarios/detalhes/' . $uId . '" class="text-muted">#' . $uId . '</a>';
@@ -257,7 +258,7 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
 
             $tipoRec = strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal')));
             $tipoBadge = ($tipoRec === 'turbo') ? 'warning' : 'info';
-            $tipoLabel = ($tipoRec === 'turbo') ? 'Turbo' : 'Normal';
+            $tipoLabel = ($tipoRec === 'turbo') ? __('admin.club_recharges.turbo', 'Turbo') : __('admin.club_recharges.normal', 'Normal');
 
             $uNome  = htmlspecialchars((string)($r['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8');
             $uEmail = htmlspecialchars((string)($r['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -267,7 +268,7 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
             echo '<div class="d-flex justify-content-between align-items-start">';
             echo '<div style="min-width:0;flex:1;">';
             echo '<div class="fw-semibold small" style="word-break:break-word;">' . ($uNome !== '' ? $uNome : '#' . (int)($r['usuario_id'] ?? 0)) . '</div>';
-            if ($uSuite > 0) echo '<span class="text-muted" style="font-size:11px;">Suite ' . $uSuite . '</span> ';
+            if ($uSuite > 0) echo '<span class="text-muted" style="font-size:11px;">' . __('admin.club_recharges.suite', 'Suite') . ' ' . $uSuite . '</span> ';
             if ($uEmail !== '') echo '<div class="text-muted" style="font-size:11px;word-break:break-all;">' . $uEmail . '</div>';
             echo '</div>';
             echo '<span class="badge bg-' . $badge . ' ms-2">' . $status . '</span>';
@@ -294,12 +295,12 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
 
         <!-- Tab: Turbo -->
         <div class="tab-pane fade" id="pane-turbo" role="tabpanel">
-            <?php renderRecargasTable($turboRows, 'Nenhuma recarga Turbo encontrada.'); ?>
+            <?php renderRecargasTable($turboRows, __('admin.club_recharges.none_found_turbo', 'Nenhuma recarga Turbo encontrada.')); ?>
         </div>
 
         <!-- Tab: Normal -->
         <div class="tab-pane fade" id="pane-normal" role="tabpanel">
-            <?php renderRecargasTable($normalRows, 'Nenhuma recarga Normal encontrada.'); ?>
+            <?php renderRecargasTable($normalRows, __('admin.club_recharges.none_found_normal', 'Nenhuma recarga Normal encontrada.')); ?>
         </div>
     </div>
 </div>

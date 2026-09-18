@@ -93,7 +93,7 @@ class AdminMarketingCalendarController extends Controller {
         ob_start();
         require __DIR__ . '/../Views/admin/marketing/calendario.php';
         $content = ob_get_clean();
-        $title = 'Calendário de Marketing';
+        $title = __('admin.marketing_calendar.page_title', 'Calendário de Marketing');
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
@@ -115,7 +115,7 @@ class AdminMarketingCalendarController extends Controller {
         $categoria = trim((string) $request->getParam('categoria', 'comemorativa'));
 
         if ($titulo === '' || $dataEvento === '') {
-            echo json_encode(['ok' => false, 'error' => 'Título e data são obrigatórios']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.title_date_required', 'Título e data são obrigatórios')]);
             exit;
         }
 
@@ -150,7 +150,7 @@ class AdminMarketingCalendarController extends Controller {
 
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.invalid_id', 'ID inválido')]);
             exit;
         }
 
@@ -167,7 +167,7 @@ class AdminMarketingCalendarController extends Controller {
 
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            echo json_encode(['ok' => false, 'error' => 'ID inválido']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.invalid_id', 'ID inválido')]);
             exit;
         }
 
@@ -186,7 +186,7 @@ class AdminMarketingCalendarController extends Controller {
 
         $apiKey = $this->getChatGPTApiKey();
         if (!$apiKey) {
-            echo json_encode(['ok' => false, 'error' => 'API Key do ChatGPT não configurada. Vá em Configurações > Integrações.']);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.api_key_missing', 'API Key do ChatGPT não configurada. Vá em Configurações > Integrações.')]);
             exit;
         }
 
@@ -236,7 +236,7 @@ class AdminMarketingCalendarController extends Controller {
         curl_close($ch);
 
         if ($httpCode !== 200 || !$resp) {
-            echo json_encode(['ok' => false, 'error' => 'Erro ao comunicar com a API. HTTP ' . $httpCode]);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.api_error', 'Erro ao comunicar com a API. HTTP {code}', ['code' => $httpCode])]);
             exit;
         }
 
@@ -245,7 +245,7 @@ class AdminMarketingCalendarController extends Controller {
         $data = json_decode($content, true);
 
         if (!$data || !isset($data['eventos'])) {
-            echo json_encode(['ok' => false, 'error' => 'Resposta da IA não contém formato esperado.', 'raw' => $content]);
+            echo json_encode(['ok' => false, 'error' => __('admin.marketing_calendar.ai_bad_format', 'Resposta da IA não contém formato esperado.'), 'raw' => $content]);
             exit;
         }
 
@@ -441,16 +441,16 @@ class AdminMarketingCalendarController extends Controller {
                 ['date' => "{$year}-12-25", 'name' => "Christmas", 'emoji' => '🎄'],
             ],
             'brazil' => [
-                ['date' => "{$year}-02-28", 'name' => "Carnaval", 'emoji' => '🎭'],
-                ['date' => "{$year}-03-08", 'name' => "Dia da Mulher", 'emoji' => '👩'],
-                ['date' => "{$year}-03-15", 'name' => "Dia do Consumidor", 'emoji' => '🛒'],
-                ['date' => "{$year}-05-11", 'name' => "Dia das Mães", 'emoji' => '👩‍👧'],
-                ['date' => "{$year}-06-12", 'name' => "Dia dos Namorados", 'emoji' => '❤️'],
-                ['date' => "{$year}-08-10", 'name' => "Dia dos Pais", 'emoji' => '👨‍👧'],
-                ['date' => "{$year}-09-07", 'name' => "Independência do Brasil", 'emoji' => '🇧🇷'],
-                ['date' => "{$year}-10-12", 'name' => "Dia das Crianças", 'emoji' => '🧒'],
-                ['date' => "{$year}-11-28", 'name' => "Black Friday", 'emoji' => '🛍️'],
-                ['date' => "{$year}-12-25", 'name' => "Natal", 'emoji' => '🎄'],
+                ['date' => "{$year}-02-28", 'name' => __('admin.calendar.br_carnival', 'Carnaval'), 'emoji' => '🎭'],
+                ['date' => "{$year}-03-08", 'name' => __('admin.calendar.br_womens_day', 'Dia da Mulher'), 'emoji' => '👩'],
+                ['date' => "{$year}-03-15", 'name' => __('admin.calendar.br_consumer_day', 'Dia do Consumidor'), 'emoji' => '🛒'],
+                ['date' => "{$year}-05-11", 'name' => __('admin.calendar.br_mothers_day', 'Dia das Mães'), 'emoji' => '👩‍👧'],
+                ['date' => "{$year}-06-12", 'name' => __('admin.calendar.br_valentines_day', 'Dia dos Namorados'), 'emoji' => '❤️'],
+                ['date' => "{$year}-08-10", 'name' => __('admin.calendar.br_fathers_day', 'Dia dos Pais'), 'emoji' => '👨‍👧'],
+                ['date' => "{$year}-09-07", 'name' => __('admin.calendar.br_independence_day', 'Independência do Brasil'), 'emoji' => '🇧🇷'],
+                ['date' => "{$year}-10-12", 'name' => __('admin.calendar.br_childrens_day', 'Dia das Crianças'), 'emoji' => '🧒'],
+                ['date' => "{$year}-11-28", 'name' => __('admin.calendar.br_black_friday', 'Black Friday'), 'emoji' => '🛍️'],
+                ['date' => "{$year}-12-25", 'name' => __('admin.calendar.br_christmas', 'Natal'), 'emoji' => '🎄'],
             ]
         ];
     }

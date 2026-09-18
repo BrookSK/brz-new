@@ -223,78 +223,79 @@ function renderAdminSidebar($activePage = '') {
     $menuItems = [
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.dashboard', 'Dashboard'), 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'produtos' => ['icon' => 'fas fa-box', 'label' => __('admin.menu.products', 'Produtos'), 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
-        'grupos-compras' => ['icon' => 'fas fa-store', 'label' => 'Grupos de Compras', 'url' => '/admin/grupos-compras', 'roles' => ['admin','vendedor','suporte']],
+        'grupos-compras' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.purchase_groups', 'Grupos de Compras'), 'url' => '/admin/grupos-compras', 'roles' => ['admin','vendedor','suporte']],
         'lojas' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.stores', 'Lojas'), 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.categories', 'Categorias'), 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
-        'pacotes-recebidos' => ['icon' => 'fas fa-box-open', 'label' => 'Pacotes Recebidos', 'url' => '/admin/pacotes-recebidos', 'roles' => ['admin','vendedor','conferente']],
-        'faturas-adicionais' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Faturas Adicionais', 'url' => '/admin/faturas-adicionais', 'roles' => ['admin','vendedor']],
-        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Em Conferência', 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
-        'split-order' => ['icon' => 'fas fa-cut', 'label' => 'Split Order', 'url' => '/admin/pedidos/split', 'roles' => ['admin','vendedor']],
+        'pacotes-recebidos' => ['icon' => 'fas fa-box-open', 'label' => __('admin.menu.received_packages', 'Pacotes Recebidos'), 'url' => '/admin/pacotes-recebidos', 'roles' => ['admin','vendedor','conferente']],
+        'faturas-adicionais' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => __('admin.menu.additional_invoices', 'Faturas Adicionais'), 'url' => '/admin/faturas-adicionais', 'roles' => ['admin','vendedor']],
+        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => __('admin.menu.in_verification', 'Em Conferência'), 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
+        'split-order' => ['icon' => 'fas fa-cut', 'label' => __('admin.menu.split_order', 'Split Order'), 'url' => '/admin/pedidos/split', 'roles' => ['admin','vendedor']],
         'wp-estatisticas' => ['icon' => 'fas fa-chart-pie', 'label' => __('admin.menu.wp_orders_stats', 'Estatísticas (WP)'), 'url' => '/admin/pedidos-wp/estatisticas', 'roles' => ['admin']],
         'tickets' => ['icon' => 'fas fa-life-ring', 'label' => __('admin.menu.tickets', 'Tickets'), 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => __('admin.menu.my_commissions', 'Minhas Comissões'), 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => __('admin.menu.inventory', 'Estoque'), 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => __('admin.menu.purchases', 'Compras'), 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
         // 'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
-        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Wexpress', 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
+        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => __('admin.menu.wexpress', 'Wexpress'), 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
         // 'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
-        'remessa-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Conferência de Remessa', 'url' => '/admin/remessa-conferencia', 'roles' => ['admin','vendedor','suporte','conferente']],
-        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Correio Brasil', 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
-        'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correio Internacional', 'url' => '/admin/etiquetas-wp', 'roles' => ['admin','vendedor','suporte','redirecionador']],
-        'etiquetas-wp' => ['icon' => 'fas fa-tags', 'label' => 'Etiquetas', 'url' => '/admin/etiquetas-wp', 'roles' => ['admin','vendedor','suporte']],
-        'pacotes-wordpress' => ['icon' => 'fab fa-wordpress', 'label' => 'Pacotes WordPress', 'url' => '/admin/pacotes-wordpress', 'roles' => ['admin','vendedor','suporte']],
-        'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => 'UPS', 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
+        'remessa-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => __('admin.menu.shipment_verification', 'Conferência de Remessa'), 'url' => '/admin/remessa-conferencia', 'roles' => ['admin','vendedor','suporte','conferente']],
+        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => __('admin.menu.brazil_mail', 'Correio Brasil'), 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
+        'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => __('admin.menu.international_mail', 'Correio Internacional'), 'url' => '/admin/etiquetas-wp', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        'etiquetas-wp' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.labels', 'Etiquetas'), 'url' => '/admin/etiquetas-wp', 'roles' => ['admin','vendedor','suporte']],
+        'pacotes-wordpress' => ['icon' => 'fab fa-wordpress', 'label' => __('admin.menu.wordpress_packages', 'Pacotes WordPress'), 'url' => '/admin/pacotes-wordpress', 'roles' => ['admin','vendedor','suporte']],
+        'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => __('admin.menu.ups', 'UPS'), 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
+        'shippo' => ['icon' => 'fas fa-globe-americas', 'label' => __('admin.menu.shippo', 'Shippo (Internacional)'), 'url' => '/admin/shippo', 'roles' => ['admin','vendedor']],
         'usuarios' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.users', 'Usuários'), 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
-        'desapego' => ['icon' => 'fas fa-hand-holding-heart', 'label' => 'Desapego Comissões', 'url' => '/admin/desapego/comissoes', 'roles' => ['admin','suporte']],
-        'desapego-pendentes' => ['icon' => 'fas fa-clipboard-list', 'label' => 'Desapego Pendentes', 'url' => '/admin/desapego/pendentes', 'roles' => ['admin','suporte','vendedor']],
+        'desapego' => ['icon' => 'fas fa-hand-holding-heart', 'label' => __('admin.menu.desapego_commissions', 'Desapego Comissões'), 'url' => '/admin/desapego/comissoes', 'roles' => ['admin','suporte']],
+        'desapego-pendentes' => ['icon' => 'fas fa-clipboard-list', 'label' => __('admin.menu.desapego_pending', 'Desapego Pendentes'), 'url' => '/admin/desapego/pendentes', 'roles' => ['admin','suporte','vendedor']],
         // 'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.payments', 'Pagamentos'), 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
-        'carnes' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Carnê Braziliana', 'url' => '/admin/carnes', 'roles' => ['admin','vendedor']],
-        'carnes-compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras do Carnê', 'url' => '/admin/carnes/compras', 'roles' => ['admin','vendedor']],
-        'relatorio-pedidos' => ['icon' => 'fas fa-file-alt', 'label' => 'Relatório Pedidos', 'url' => '/admin/relatorio-pedidos', 'roles' => ['admin','vendedor']],
-        'relatorio-geral' => ['icon' => 'fas fa-chart-bar', 'label' => 'Resumo Financeiro', 'url' => '/admin/relatorio-geral', 'roles' => ['admin']],
-        'payment-links' => ['icon' => 'fas fa-link', 'label' => 'Payment Links', 'url' => '/admin/payment-links', 'roles' => ['admin','vendedor']],
-        'clube-recargas' => ['icon' => 'fas fa-wallet', 'label' => 'Recargas Clube', 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
-        'backup' => ['icon' => 'fas fa-database', 'label' => 'Backup', 'url' => '/admin/backup', 'roles' => ['admin']],
-        'oferta-gratuita' => ['icon' => 'fas fa-gift', 'label' => 'Oferta Gratuita', 'url' => '/admin/oferta-gratuita', 'roles' => ['admin']],
-        'copiloto' => ['icon' => 'fas fa-robot', 'label' => 'Co-Piloto IA', 'url' => '/admin/copiloto', 'roles' => ['admin']],
-        'live-shop' => ['icon' => 'fas fa-video', 'label' => 'Campanhas', 'url' => '/admin/live-shop', 'roles' => ['admin', 'vendedor']],
-        'live-shop-create' => ['icon' => 'fas fa-plus-circle', 'label' => 'Nova Campanha', 'url' => '/admin/live-shop/create', 'roles' => ['admin', 'vendedor']],
-        'live-shop-orders' => ['icon' => 'fas fa-shopping-bag', 'label' => 'Pedidos da Live', 'url' => '/admin/live-shop/orders', 'roles' => ['admin', 'vendedor']],
-        'live-shop-reports' => ['icon' => 'fas fa-chart-line', 'label' => 'Relatórios', 'url' => '/admin/live-shop/reports', 'roles' => ['admin', 'vendedor']],
-        'quickbooks' => ['icon' => 'fas fa-calculator', 'label' => 'QuickBooks', 'url' => '/admin/quickbooks', 'roles' => ['admin']],
-        'marketing-calendario' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Calendário', 'url' => '/admin/marketing-calendar', 'roles' => ['admin']],
-        'email-marketing' => ['icon' => 'fas fa-envelope-open-text', 'label' => 'Email Marketing', 'url' => '/admin/email-marketing', 'roles' => ['admin']],
-        'cart-recovery' => ['icon' => 'fas fa-cart-arrow-down', 'label' => 'Recuperação Carrinho', 'url' => '/admin/cart-recovery', 'roles' => ['admin','vendedor']],
-        'mapa-calor-site' => ['icon' => 'fas fa-fire', 'label' => 'Mapa de Calor', 'url' => '/admin/mapa-calor-site', 'roles' => ['admin']],
+        'carnes' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => __('admin.menu.installment_plan', 'Carnê Braziliana'), 'url' => '/admin/carnes', 'roles' => ['admin','vendedor']],
+        'carnes-compras' => ['icon' => 'fas fa-shopping-basket', 'label' => __('admin.menu.installment_purchases', 'Compras do Carnê'), 'url' => '/admin/carnes/compras', 'roles' => ['admin','vendedor']],
+        'relatorio-pedidos' => ['icon' => 'fas fa-file-alt', 'label' => __('admin.menu.orders_report', 'Relatório Pedidos'), 'url' => '/admin/relatorio-pedidos', 'roles' => ['admin','vendedor']],
+        'relatorio-geral' => ['icon' => 'fas fa-chart-bar', 'label' => __('admin.menu.financial_summary', 'Resumo Financeiro'), 'url' => '/admin/relatorio-geral', 'roles' => ['admin']],
+        'payment-links' => ['icon' => 'fas fa-link', 'label' => __('admin.menu.payment_links', 'Payment Links'), 'url' => '/admin/payment-links', 'roles' => ['admin','vendedor']],
+        'clube-recargas' => ['icon' => 'fas fa-wallet', 'label' => __('admin.menu.club_recharges', 'Recargas Clube'), 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        'backup' => ['icon' => 'fas fa-database', 'label' => __('admin.menu.backup', 'Backup'), 'url' => '/admin/backup', 'roles' => ['admin']],
+        'oferta-gratuita' => ['icon' => 'fas fa-gift', 'label' => __('admin.menu.free_offer', 'Oferta Gratuita'), 'url' => '/admin/oferta-gratuita', 'roles' => ['admin']],
+        'copiloto' => ['icon' => 'fas fa-robot', 'label' => __('admin.menu.ai_copilot', 'Co-Piloto IA'), 'url' => '/admin/copiloto', 'roles' => ['admin']],
+        'live-shop' => ['icon' => 'fas fa-video', 'label' => __('admin.menu.campaigns', 'Campanhas'), 'url' => '/admin/live-shop', 'roles' => ['admin', 'vendedor']],
+        'live-shop-create' => ['icon' => 'fas fa-plus-circle', 'label' => __('admin.menu.new_campaign', 'Nova Campanha'), 'url' => '/admin/live-shop/create', 'roles' => ['admin', 'vendedor']],
+        'live-shop-orders' => ['icon' => 'fas fa-shopping-bag', 'label' => __('admin.menu.live_orders', 'Pedidos da Live'), 'url' => '/admin/live-shop/orders', 'roles' => ['admin', 'vendedor']],
+        'live-shop-reports' => ['icon' => 'fas fa-chart-line', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/live-shop/reports', 'roles' => ['admin', 'vendedor']],
+        'quickbooks' => ['icon' => 'fas fa-calculator', 'label' => __('admin.menu.quickbooks', 'QuickBooks'), 'url' => '/admin/quickbooks', 'roles' => ['admin']],
+        'marketing-calendario' => ['icon' => 'fas fa-calendar-alt', 'label' => __('admin.menu.calendar', 'Calendário'), 'url' => '/admin/marketing-calendar', 'roles' => ['admin']],
+        'email-marketing' => ['icon' => 'fas fa-envelope-open-text', 'label' => __('admin.menu.email_marketing', 'Email Marketing'), 'url' => '/admin/email-marketing', 'roles' => ['admin']],
+        'cart-recovery' => ['icon' => 'fas fa-cart-arrow-down', 'label' => __('admin.menu.cart_recovery', 'Recuperação Carrinho'), 'url' => '/admin/cart-recovery', 'roles' => ['admin','vendedor']],
+        'mapa-calor-site' => ['icon' => 'fas fa-fire', 'label' => __('admin.menu.heatmap', 'Mapa de Calor'), 'url' => '/admin/mapa-calor-site', 'roles' => ['admin']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
-        'cambioreal-health' => ['icon' => 'fas fa-heartbeat', 'label' => 'Câmbio Real Health', 'url' => '/admin/cambioreal-health', 'roles' => ['admin']],
-        'carteira-config' => ['icon' => 'fas fa-wallet', 'label' => 'Config. Carteira', 'url' => '/admin/carteira-config', 'roles' => ['admin']],
-        'email-logs' => ['icon' => 'fas fa-envelope', 'label' => 'Log de Emails', 'url' => '/admin/emails', 'roles' => ['admin']],
-        'descontos' => ['icon' => 'fas fa-tag', 'label' => 'Autorizações Desconto', 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
-        'documentacao-webhook' => ['icon' => 'fas fa-book', 'label' => 'Documentação API', 'url' => '/admin/documentacao/webhook-ticket', 'roles' => ['admin']],
-        'promocoes-auditoria' => ['icon' => 'fas fa-percent', 'label' => 'Auditoria Promoções', 'url' => '/admin/promocoes-auditoria', 'roles' => ['admin']],
-        'descricao-produtos' => ['icon' => 'fas fa-pen-fancy', 'label' => 'Descrição de Produtos', 'url' => '/admin/descricao-produtos', 'roles' => ['admin','vendedor']],
-        'promocoes-agendadas' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Promoções Agendadas', 'url' => '/admin/promocoes-agendadas', 'roles' => ['admin', 'vendedor']],
-        'cupons' => ['icon' => 'fas fa-ticket-alt', 'label' => 'Cupons de Desconto', 'url' => '/admin/cupons', 'roles' => ['admin']],
-        'faq' => ['icon' => 'fas fa-question-circle', 'label' => 'FAQ / Termos', 'url' => '/admin/faq', 'roles' => ['admin']],
-        'comissoes-global' => ['icon' => 'fas fa-users-cog', 'label' => 'Comissões Global', 'url' => '/admin/comissoes-global', 'roles' => ['admin']],
-        'despesas' => ['icon' => 'fas fa-wallet', 'label' => 'Despesas', 'url' => '/admin/despesas', 'roles' => ['admin']],
-        'demandas-painel' => ['icon' => 'fas fa-columns', 'label' => 'Painel de Demandas', 'url' => '/admin/demandas/painel', 'roles' => ['admin', 'suporte']],
-        'demandas-minhas' => ['icon' => 'fas fa-user-clock', 'label' => 'Minhas Solicitações', 'url' => '/admin/demandas/minhas', 'roles' => ['admin', 'suporte', 'vendedor']],
-        'demandas-nova' => ['icon' => 'fas fa-file-alt', 'label' => 'Nova Solicitação', 'url' => '/admin/demandas/nova', 'roles' => ['admin', 'suporte', 'vendedor']],
-        'demandas-concluidos' => ['icon' => 'fas fa-check-circle', 'label' => 'Concluídos', 'url' => '/admin/demandas/concluidos', 'roles' => ['admin', 'suporte']],
-        'demandas-arquivados' => ['icon' => 'fas fa-archive', 'label' => 'Arquivados', 'url' => '/admin/demandas/arquivados', 'roles' => ['admin', 'suporte']],
+        'cambioreal-health' => ['icon' => 'fas fa-heartbeat', 'label' => __('admin.menu.exchange_health', 'Câmbio Real Health'), 'url' => '/admin/cambioreal-health', 'roles' => ['admin']],
+        'carteira-config' => ['icon' => 'fas fa-wallet', 'label' => __('admin.menu.wallet_config', 'Config. Carteira'), 'url' => '/admin/carteira-config', 'roles' => ['admin']],
+        'email-logs' => ['icon' => 'fas fa-envelope', 'label' => __('admin.menu.email_logs', 'Log de Emails'), 'url' => '/admin/emails', 'roles' => ['admin']],
+        'descontos' => ['icon' => 'fas fa-tag', 'label' => __('admin.menu.discount_auth', 'Autorizações Desconto'), 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
+        'documentacao-webhook' => ['icon' => 'fas fa-book', 'label' => __('admin.menu.api_docs', 'Documentação API'), 'url' => '/admin/documentacao/webhook-ticket', 'roles' => ['admin']],
+        'promocoes-auditoria' => ['icon' => 'fas fa-percent', 'label' => __('admin.menu.promo_audit', 'Auditoria Promoções'), 'url' => '/admin/promocoes-auditoria', 'roles' => ['admin']],
+        'descricao-produtos' => ['icon' => 'fas fa-pen-fancy', 'label' => __('admin.menu.product_descriptions', 'Descrição de Produtos'), 'url' => '/admin/descricao-produtos', 'roles' => ['admin','vendedor']],
+        'promocoes-agendadas' => ['icon' => 'fas fa-calendar-alt', 'label' => __('admin.menu.scheduled_promos', 'Promoções Agendadas'), 'url' => '/admin/promocoes-agendadas', 'roles' => ['admin', 'vendedor']],
+        'cupons' => ['icon' => 'fas fa-ticket-alt', 'label' => __('admin.menu.coupons', 'Cupons de Desconto'), 'url' => '/admin/cupons', 'roles' => ['admin']],
+        'faq' => ['icon' => 'fas fa-question-circle', 'label' => __('admin.menu.faq_terms', 'FAQ / Termos'), 'url' => '/admin/faq', 'roles' => ['admin']],
+        'comissoes-global' => ['icon' => 'fas fa-users-cog', 'label' => __('admin.menu.global_commissions', 'Comissões Global'), 'url' => '/admin/comissoes-global', 'roles' => ['admin']],
+        'despesas' => ['icon' => 'fas fa-wallet', 'label' => __('admin.menu.expenses', 'Despesas'), 'url' => '/admin/despesas', 'roles' => ['admin']],
+        'demandas-painel' => ['icon' => 'fas fa-columns', 'label' => __('admin.menu.demands_board', 'Painel de Demandas'), 'url' => '/admin/demandas/painel', 'roles' => ['admin', 'suporte']],
+        'demandas-minhas' => ['icon' => 'fas fa-user-clock', 'label' => __('admin.menu.my_requests', 'Minhas Solicitações'), 'url' => '/admin/demandas/minhas', 'roles' => ['admin', 'suporte', 'vendedor']],
+        'demandas-nova' => ['icon' => 'fas fa-file-alt', 'label' => __('admin.menu.new_request', 'Nova Solicitação'), 'url' => '/admin/demandas/nova', 'roles' => ['admin', 'suporte', 'vendedor']],
+        'demandas-concluidos' => ['icon' => 'fas fa-check-circle', 'label' => __('admin.menu.completed', 'Concluídos'), 'url' => '/admin/demandas/concluidos', 'roles' => ['admin', 'suporte']],
+        'demandas-arquivados' => ['icon' => 'fas fa-archive', 'label' => __('admin.menu.archived', 'Arquivados'), 'url' => '/admin/demandas/arquivados', 'roles' => ['admin', 'suporte']],
 
         // Módulo Redirecionamento (visível no admin/suporte)
-        'redirecionamento-envios' => ['icon' => 'fas fa-truck-fast', 'label' => '(RED) Envios', 'url' => '/admin/redirecionamento/envios', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-divergencias' => ['icon' => 'fas fa-scale-balanced', 'label' => '(RED) Divergências e Ajustes', 'url' => '/admin/redirecionamento/divergencias', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-clientes' => ['icon' => 'fas fa-users', 'label' => '(RED) Clientes', 'url' => '/admin/redirecionamento/clientes', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => '(RED) Tabela de Pesos e Preços', 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => '(RED) Pagamentos', 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => '(RED) Comprovantes', 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => '(RED) Coletas', 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-envios-sede' => ['icon' => 'fas fa-dolly', 'label' => '(RED) Envios à Sede', 'url' => '/admin/redirecionamento/envios-sede', 'roles' => ['admin', 'suporte']]
+        'redirecionamento-envios' => ['icon' => 'fas fa-truck-fast', 'label' => __('admin.menu.fwd_shipments', 'Envios'), 'url' => '/admin/redirecionamento/envios', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-divergencias' => ['icon' => 'fas fa-scale-balanced', 'label' => __('admin.menu.fwd_discrepancies', 'Divergências e Ajustes'), 'url' => '/admin/redirecionamento/divergencias', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-clientes' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.fwd_clients', 'Clientes'), 'url' => '/admin/redirecionamento/clientes', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => __('admin.menu.fwd_weight_table', 'Tabela de Pesos e Preços'), 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.fwd_payments', 'Pagamentos'), 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => __('admin.menu.fwd_receipts', 'Comprovantes'), 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => __('admin.menu.fwd_pickups', 'Coletas'), 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-envios-sede' => ['icon' => 'fas fa-dolly', 'label' => __('admin.menu.fwd_hq_shipments', '(RED) Envios à Sede'), 'url' => '/admin/redirecionamento/envios-sede', 'roles' => ['admin', 'suporte']]
     ];
 
     $unreadTickets = 0;
@@ -453,16 +454,16 @@ function renderAdminSidebar($activePage = '') {
             // Definir grupos de menu
             $menuGroups = [
                 '_solo_dashboard' => ['items' => ['dashboard']],
-                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pacotes-recebidos', 'faturas-adicionais', 'pedidos-conferencia', 'split-order', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
-                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
-                'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
-                'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'etiquetas-wp', 'pacotes-wordpress', 'remessa-shipstation']],
-                'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
-                'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos', 'demandas-arquivados']],
-                'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
-                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site', 'cupons']],
-                'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas', 'redirecionamento-envios-sede']],
-                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'desapego', 'desapego-pendentes', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
+                __('admin.sidebar.orders', 'Pedidos') => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pacotes-recebidos', 'faturas-adicionais', 'pedidos-conferencia', 'split-order', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
+                __('admin.sidebar.catalog', 'Catálogo') => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
+                __('admin.sidebar.inventory', 'Estoque & Compras') => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
+                __('admin.sidebar.shipping', 'Envios & Etiquetas') => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'etiquetas-wp', 'pacotes-wordpress', 'remessa-shipstation', 'shippo']],
+                __('admin.sidebar.financial', 'Financeiro') => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
+                __('admin.sidebar.demands', 'Demandas') => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos', 'demandas-arquivados']],
+                __('admin.sidebar.live_shop', 'Live Shop') => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
+                __('admin.sidebar.marketing', 'Marketing') => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site', 'cupons']],
+                __('admin.sidebar.forwarding', 'Redirecionamento') => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas', 'redirecionamento-envios-sede']],
+                __('admin.sidebar.settings', 'Configurações') => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'desapego', 'desapego-pendentes', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];
 
             foreach ($menuGroups as $groupName => $group) {
@@ -534,7 +535,7 @@ function renderAdminSidebar($activePage = '') {
             <div class="nav-item">
                 <a class="nav-link" href="javascript:void(0)" onclick="abrirPrefsModal()" style="font-size:12px;">
                     <i class="fas fa-fw fa-cog"></i>
-                    <span>' . htmlspecialchars(($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'en' ? 'Preferences' : 'Preferências', ENT_QUOTES, 'UTF-8') . '</span>
+                    <span>' . htmlspecialchars(__('admin.sidebar.preferences', 'Preferências'), ENT_QUOTES, 'UTF-8') . '</span>
                     <span class="badge ms-1" style="font-size:9px;background:#3b82f6;color:#fff;">' . strtoupper($_SESSION['admin_pref_moeda'] ?? 'USD') . ' · ' . (($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'en' ? 'EN' : 'PT') . '</span>
                 </a>
             </div>
@@ -1140,7 +1141,7 @@ function renderAdminScripts() {
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99998;max-width:400px;"></div>';
 
     // Modal de Preferências (acessível de qualquer tela via sidebar)
-    echo '<div class="modal fade" id="prefsChangeModal" tabindex="-1" data-bs-backdrop="true"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content" style="border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.4);"><div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:20px;border-radius:16px 16px 0 0;"><h5 style="color:#fff;font-weight:700;margin:0;"><i class="fas fa-cog me-2"></i>Preferências</h5></div><div class="modal-body p-4"><div class="mb-3"><label class="form-label fw-semibold small">Idioma</label><select id="pref_idioma" class="form-select"><option value="pt-BR"' . (($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'pt-BR' ? ' selected' : '') . '>Português (PT-BR)</option><option value="en"' . (($_SESSION['admin_pref_idioma'] ?? '') === 'en' ? ' selected' : '') . '>English</option></select></div><div class="mb-0"><label class="form-label fw-semibold small">Moeda de exibição</label><select id="pref_moeda" class="form-select"><option value="USD"' . (($_SESSION['admin_pref_moeda'] ?? 'USD') === 'USD' ? ' selected' : '') . '>USD (Dólar)</option><option value="BRL"' . (($_SESSION['admin_pref_moeda'] ?? '') === 'BRL' ? ' selected' : '') . '>BRL (Real)</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary btn-sm" onclick="salvarPrefsChange()"><i class="fas fa-check me-1"></i>Salvar</button></div></div></div></div>';
+    echo '<div class="modal fade" id="prefsChangeModal" tabindex="-1" data-bs-backdrop="true"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content" style="border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.4);"><div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:20px;border-radius:16px 16px 0 0;"><h5 style="color:#fff;font-weight:700;margin:0;"><i class="fas fa-cog me-2"></i>' . htmlspecialchars(__('admin.sidebar.preferences', 'Preferências'), ENT_QUOTES, 'UTF-8') . '</h5></div><div class="modal-body p-4"><div class="mb-3"><label class="form-label fw-semibold small">' . htmlspecialchars(__('admin.sidebar.language', 'Idioma'), ENT_QUOTES, 'UTF-8') . '</label><select id="pref_idioma" class="form-select"><option value="pt-BR"' . (($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'pt-BR' ? ' selected' : '') . '>Português (PT-BR)</option><option value="en"' . (($_SESSION['admin_pref_idioma'] ?? '') === 'en' ? ' selected' : '') . '>English</option></select></div><div class="mb-0"><label class="form-label fw-semibold small">' . htmlspecialchars(__('admin.sidebar.display_currency', 'Moeda de exibição'), ENT_QUOTES, 'UTF-8') . '</label><select id="pref_moeda" class="form-select"><option value="USD"' . (($_SESSION['admin_pref_moeda'] ?? 'USD') === 'USD' ? ' selected' : '') . '>USD (Dólar)</option><option value="BRL"' . (($_SESSION['admin_pref_moeda'] ?? '') === 'BRL' ? ' selected' : '') . '>BRL (Real)</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">' . htmlspecialchars(__('common.cancel', 'Cancelar'), ENT_QUOTES, 'UTF-8') . '</button><button type="button" class="btn btn-primary btn-sm" onclick="salvarPrefsChange()"><i class="fas fa-check me-1"></i>' . htmlspecialchars(__('common.save', 'Salvar'), ENT_QUOTES, 'UTF-8') . '</button></div></div></div></div>';
     echo '<style>#prefsChangeModal .modal-backdrop,#prefsChangeModal~.modal-backdrop{background:rgba(0,0,0,0.7)!important;}</style>';
 
     // Wizard de primeiro acesso (inline nas páginas que não usam admin.php layout)
@@ -1151,13 +1152,13 @@ function renderAdminScripts() {
         try { \App\Controllers\AdminPreferencesController::loadIntoSession((int)$_SESSION['usuario_id']); $__pConfigurado = (int)($_SESSION['admin_pref_configurado'] ?? 0); } catch (\Throwable $e) { $__pConfigurado = 0; }
     }
     if ($__pIsAdmin && $__pIsLogado && $__pConfigurado === 0) {
-        echo '<div class="modal fade" id="wizardPrefsModalInline" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius:16px;overflow:hidden;"><div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:32px 24px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">👋</div><h4 style="color:#fff;font-weight:700;margin-bottom:4px;">Bem-vindo ao Painel!</h4><p style="color:rgba(255,255,255,.7);font-size:14px;margin:0;">Configure suas preferências para uma melhor experiência.</p></div><div class="modal-body p-4"><div class="mb-4"><label class="form-label fw-bold"><i class="fas fa-globe me-2 text-primary"></i>Idioma de exibição</label><select id="wizard_idioma_inline" class="form-select form-select-lg"><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select><div class="form-text">Define o idioma dos textos e labels do painel.</div></div><div class="mb-3"><label class="form-label fw-bold"><i class="fas fa-coins me-2 text-success"></i>Moeda padrão de exibição</label><select id="wizard_moeda_inline" class="form-select form-select-lg"><option value="USD">USD — Dólar Americano ($)</option><option value="BRL">BRL — Real Brasileiro (R$)</option></select><div class="form-text">Define como os valores financeiros serão exibidos por padrão.</div></div></div><div class="modal-footer justify-content-center border-0 pb-4"><button type="button" class="btn btn-dark btn-lg px-5" onclick="salvarWizardInline()"><i class="fas fa-check me-2"></i>Confirmar e Entrar</button></div></div></div></div>';
-        echo '<script>document.addEventListener("DOMContentLoaded",function(){var i=setInterval(function(){if(typeof bootstrap!=="undefined"){clearInterval(i);new bootstrap.Modal(document.getElementById("wizardPrefsModalInline")).show();}},200);});function salvarWizardInline(){var b=new FormData();b.append("idioma",document.getElementById("wizard_idioma_inline").value);b.append("moeda",document.getElementById("wizard_moeda_inline").value);fetch("/admin/preferences/salvar",{method:"POST",body:b}).then(function(r){return r.json()}).then(function(d){if(d.ok)location.reload();else alert(d.error||"Erro");}).catch(function(e){alert("Erro: "+e.message);});}</script>';
+        echo '<div class="modal fade" id="wizardPrefsModalInline" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius:16px;overflow:hidden;"><div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:32px 24px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">👋</div><h4 style="color:#fff;font-weight:700;margin-bottom:4px;">' . htmlspecialchars(__('admin.sidebar.welcome_title', 'Bem-vindo ao Painel!'), ENT_QUOTES, 'UTF-8') . '</h4><p style="color:rgba(255,255,255,.7);font-size:14px;margin:0;">' . htmlspecialchars(__('admin.sidebar.welcome_subtitle', 'Configure suas preferências para uma melhor experiência.'), ENT_QUOTES, 'UTF-8') . '</p></div><div class="modal-body p-4"><div class="mb-4"><label class="form-label fw-bold"><i class="fas fa-globe me-2 text-primary"></i>' . htmlspecialchars(__('admin.sidebar.display_language', 'Idioma de exibição'), ENT_QUOTES, 'UTF-8') . '</label><select id="wizard_idioma_inline" class="form-select form-select-lg"><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select><div class="form-text">' . htmlspecialchars(__('admin.sidebar.language_help', 'Define o idioma dos textos e labels do painel.'), ENT_QUOTES, 'UTF-8') . '</div></div><div class="mb-3"><label class="form-label fw-bold"><i class="fas fa-coins me-2 text-success"></i>' . htmlspecialchars(__('admin.sidebar.default_display_currency', 'Moeda padrão de exibição'), ENT_QUOTES, 'UTF-8') . '</label><select id="wizard_moeda_inline" class="form-select form-select-lg"><option value="USD">USD — Dólar Americano ($)</option><option value="BRL">BRL — Real Brasileiro (R$)</option></select><div class="form-text">' . htmlspecialchars(__('admin.sidebar.currency_help', 'Define como os valores financeiros serão exibidos por padrão.'), ENT_QUOTES, 'UTF-8') . '</div></div></div><div class="modal-footer justify-content-center border-0 pb-4"><button type="button" class="btn btn-dark btn-lg px-5" onclick="salvarWizardInline()"><i class="fas fa-check me-2"></i>' . htmlspecialchars(__('admin.sidebar.confirm_enter', 'Confirmar e Entrar'), ENT_QUOTES, 'UTF-8') . '</button></div></div></div></div>';
+        echo '<script>document.addEventListener("DOMContentLoaded",function(){var i=setInterval(function(){if(typeof bootstrap!=="undefined"){clearInterval(i);new bootstrap.Modal(document.getElementById("wizardPrefsModalInline")).show();}},200);});function salvarWizardInline(){var b=new FormData();b.append("idioma",document.getElementById("wizard_idioma_inline").value);b.append("moeda",document.getElementById("wizard_moeda_inline").value);fetch("/admin/preferences/salvar",{method:"POST",body:b}).then(function(r){return r.json()}).then(function(d){if(d.ok)location.reload();else alert(d.error||"' . htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') . '");}).catch(function(e){alert("' . htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') . ': "+e.message);});}</script>';
         echo '<style>.modal-backdrop{background:rgba(0,0,0,0.75)!important;}.modal-backdrop.show{opacity:1!important;}</style>';
     }
     echo '<script>
 function abrirPrefsModal(){var el=document.getElementById("prefsChangeModal");if(!el)return;if(typeof bootstrap!=="undefined"&&bootstrap.Modal){bootstrap.Modal.getOrCreateInstance(el).show();}else{el.classList.add("show");el.style.display="block";el.setAttribute("aria-modal","true");var bk=document.createElement("div");bk.className="modal-backdrop fade show";bk.id="prefsBackdrop";document.body.appendChild(bk);document.body.classList.add("modal-open");el.querySelector(".btn-close,.btn-secondary").onclick=function(){el.classList.remove("show");el.style.display="none";var b=document.getElementById("prefsBackdrop");if(b)b.remove();document.body.classList.remove("modal-open");};}}
-function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.getElementById("pref_idioma").value);b.append("moeda",document.getElementById("pref_moeda").value);fetch("/admin/preferences/salvar",{method:"POST",body:b}).then(function(r){return r.json()}).then(function(d){if(d.ok){location.reload();}else{alert(d.error||"Erro");}}).catch(function(e){alert("Erro: "+e.message);});}
+function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.getElementById("pref_idioma").value);b.append("moeda",document.getElementById("pref_moeda").value);fetch("/admin/preferences/salvar",{method:"POST",body:b}).then(function(r){return r.json()}).then(function(d){if(d.ok){location.reload();}else{alert(d.error||"' . htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') . '");}}).catch(function(e){alert("' . htmlspecialchars(__('common.error', 'Erro'), ENT_QUOTES, 'UTF-8') . ': "+e.message);});}
 </script>';
 
     // Bell Widget
@@ -1168,14 +1169,14 @@ function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.get
         </button>
         <div id="bellDropdown" style="display:none;position:absolute;bottom:52px;right:0;width:360px;max-height:440px;background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.2);overflow:hidden;">
             <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
-                <span style="font-weight:700;font-size:15px;color:#1e293b;"><i class="fas fa-bell me-2"></i>Notificações</span>
-                <button onclick="marcarTodasLidas()" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;">Marcar todas como lidas</button>
+                <span style="font-weight:700;font-size:15px;color:#1e293b;"><i class="fas fa-bell me-2"></i>' . htmlspecialchars(__('admin.sidebar.notifications', 'Notificações'), ENT_QUOTES, 'UTF-8') . '</span>
+                <button onclick="marcarTodasLidas()" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;">' . htmlspecialchars(__('admin.sidebar.mark_all_read', 'Marcar todas como lidas'), ENT_QUOTES, 'UTF-8') . '</button>
             </div>
             <div id="bellList" style="max-height:340px;overflow-y:auto;padding:8px;">
-                <div class="text-center text-muted py-4" style="font-size:13px;"><i class="fas fa-check-circle d-block mb-2" style="font-size:24px;opacity:.4;"></i>Nenhuma notificação</div>
+                <div class="text-center text-muted py-4" style="font-size:13px;"><i class="fas fa-check-circle d-block mb-2" style="font-size:24px;opacity:.4;"></i>' . htmlspecialchars(__('admin.sidebar.no_notifications', 'Nenhuma notificação'), ENT_QUOTES, 'UTF-8') . '</div>
             </div>
             <div style="padding:10px 16px;border-top:1px solid #e2e8f0;text-align:center;">
-                <a href="/admin/demandas/minhas" style="color:#3b82f6;font-size:12px;font-weight:600;text-decoration:none;">Ver todas as demandas</a>
+                <a href="/admin/demandas/minhas" style="color:#3b82f6;font-size:12px;font-weight:600;text-decoration:none;">' . htmlspecialchars(__('admin.sidebar.view_all_demands', 'Ver todas as demandas'), ENT_QUOTES, 'UTF-8') . '</a>
             </div>
         </div>
     </div>';
@@ -1212,7 +1213,7 @@ function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.get
 
     function timeAgo(dateStr){
         var now=new Date();var d=new Date(dateStr.replace(" ","T"));var diff=Math.floor((now-d)/1000);
-        if(diff<60)return"agora";if(diff<3600)return Math.floor(diff/60)+"min";if(diff<86400)return Math.floor(diff/3600)+"h";return Math.floor(diff/86400)+"d";
+        if(diff<60)return"' . htmlspecialchars(__('admin.sidebar.time_now', 'agora'), ENT_QUOTES, 'UTF-8') . '";if(diff<3600)return Math.floor(diff/60)+"min";if(diff<86400)return Math.floor(diff/3600)+"h";return Math.floor(diff/86400)+"d";
     }
 
     function updateBell(notifs){
@@ -1238,7 +1239,7 @@ function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.get
 
         // Render dropdown list
         if(count===0){
-            list.innerHTML="<div class=\"text-center text-muted py-4\" style=\"font-size:13px;\"><i class=\"fas fa-check-circle d-block mb-2\" style=\"font-size:24px;opacity:.4;\"></i>Nenhuma notificação pendente</div>";
+            list.innerHTML="<div class=\"text-center text-muted py-4\" style=\"font-size:13px;\"><i class=\"fas fa-check-circle d-block mb-2\" style=\"font-size:24px;opacity:.4;\"></i>' . htmlspecialchars(__('admin.sidebar.no_pending_notifications', 'Nenhuma notificação pendente'), ENT_QUOTES, 'UTF-8') . '</div>";
             return;
         }
         var html="";
@@ -1271,7 +1272,7 @@ function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.get
                 el.innerHTML="<button class=\"notif-close\" onclick=\"dismissNotif("+n.id+",this)\">&times;</button>"
                     +"<div class=\"notif-title\">"+n.titulo+"</div>"
                     +"<div class=\"notif-msg\">"+(n.mensagem||"")+"</div>"
-                    +(n.link?"<a href=\""+n.link+"\" class=\"notif-link\">Ver demanda &rarr;</a>":"");
+                    +(n.link?"<a href=\""+n.link+"\" class=\"notif-link\">' . htmlspecialchars(__('admin.sidebar.view_demand', 'Ver demanda'), ENT_QUOTES, 'UTF-8') . ' &rarr;</a>":"");
                 container.appendChild(el);
                 // Auto-dismiss toast after 10s
                 setTimeout(function(){if(el.parentNode){el.style.transition="all .3s";el.style.opacity="0";el.style.transform="translateX(100%)";setTimeout(function(){el.remove()},300);}},10000);

@@ -142,15 +142,25 @@ class PedidoManualService {
             return 0;
         }
 
-        $cep = trim((string) ($enderecoEntrega['cep'] ?? ''));
-        $endereco = trim((string) ($enderecoEntrega['endereco'] ?? ''));
-        $numero = trim((string) ($enderecoEntrega['numero'] ?? ''));
-        $bairro = trim((string) ($enderecoEntrega['bairro'] ?? ''));
-        $cidade = trim((string) ($enderecoEntrega['cidade'] ?? ''));
-        $estado = trim((string) ($enderecoEntrega['estado'] ?? ''));
-        $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ''));
-        $pais = trim((string) ($enderecoEntrega['pais'] ?? 'BR'));
+        $cep = trim((string) ($enderecoEntrega['cep'] ?? ($enderecoEntrega['zip'] ?? ($enderecoEntrega['postal_code'] ?? ''))));
+        $endereco = trim((string) ($enderecoEntrega['endereco'] ?? ($enderecoEntrega['address_line_1'] ?? ($enderecoEntrega['address'] ?? ($enderecoEntrega['street1'] ?? '')))));
+        $numero = trim((string) ($enderecoEntrega['numero'] ?? ($enderecoEntrega['number'] ?? '')));
+        $bairro = trim((string) ($enderecoEntrega['bairro'] ?? ($enderecoEntrega['neighborhood'] ?? ($enderecoEntrega['district'] ?? ''))));
+        $cidade = trim((string) ($enderecoEntrega['cidade'] ?? ($enderecoEntrega['city'] ?? '')));
+        $estado = trim((string) ($enderecoEntrega['estado'] ?? ($enderecoEntrega['state'] ?? ($enderecoEntrega['state_province'] ?? ''))));
+        $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ($enderecoEntrega['address_line_2'] ?? ($enderecoEntrega['complement'] ?? ($enderecoEntrega['street2'] ?? '')))));
+        $pais = trim((string) ($enderecoEntrega['pais'] ?? ($enderecoEntrega['country'] ?? ($enderecoEntrega['country_code'] ?? 'BR'))));
         if ($pais === '') $pais = 'BR';
+        // Para endereços internacionais, se não tem número/bairro, usar valores padrão
+        if ($pais !== 'BR' && $pais !== 'BRA') {
+            if ($numero === '') $numero = '-';
+            if ($bairro === '') $bairro = '-';
+        }
+        // Fallback geral: nunca deixar campos críticos completamente vazios
+        if ($numero === '') $numero = 'S/N';
+        if ($bairro === '') $bairro = '-';
+        if ($estado === '' && $pais !== 'BR') $estado = '-';
+        if ($cidade === '') $cidade = '-';
 
         // Precisa ter pelo menos CEP ou endereço+cidade
         if ($cep === '' && ($endereco === '' || $cidade === '')) {
@@ -254,12 +264,41 @@ class PedidoManualService {
             }
 
             $sql = 'INSERT INTO enderecos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            
+            // Fix: corrigir AUTO_INCREMENT se necessário (prevenir Duplicate entry '0')
+            try {
+                $stMaxId = $this->db->query('SELECT MAX(id) FROM enderecos');
+                $maxId = (int) ($stMaxId ? ($stMaxId->fetchColumn() ?: 0) : 0);
+                if ($maxId >= 0) {
+                    $this->db->exec('ALTER TABLE enderecos AUTO_INCREMENT = ' . ($maxId + 1));
+                }
+            } catch (\Exception $e) {}
+            
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
             $newId = (int) $this->db->lastInsertId();
             return $newId > 0 ? $newId : 0;
         } catch (\Exception $e) {
-            error_log('criarEnderecoEntregaParaCliente ERRO: ' . $e->getMessage());
+            error_log('criarEnderecoEntregaParaCliente ERRO: ' . $e->getMessage() . ' | SQL State: ' . ($e instanceof \PDOException ? $e->getCode() : 'N/A'));
+            // Re-throw com mensagem mais útil para debug
+            throw new \Exception('Erro ao criar endereço: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Wrapper de criação de endereço de entrega.
+     * - Fluxo NORMAL ($rascunho = false): comportamento idêntico ao anterior (propaga exceções).
+     * - RASCUNHO ($rascunho = true): endereço é opcional; qualquer falha ao criar o endereço
+     *   é ignorada e o rascunho é salvo sem endereço vinculado (retorna 0).
+     */
+    private function criarEnderecoEntregaComTolerancia(int $clienteId, ?array $enderecoEntrega, bool $rascunho): int {
+        if (!$rascunho) {
+            return $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+        }
+        try {
+            return $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+        } catch (\Exception $e) {
+            error_log('[PEDIDO_MANUAL] Rascunho: falha ao criar endereço (ignorada): ' . $e->getMessage());
             return 0;
         }
     }
@@ -1203,11 +1242,16 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null, int $semComissao = 0, bool $limitePesoAtivo = true): int {
-        if ($clienteId <= 0) {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null, int $semComissao = 0, bool $limitePesoAtivo = true, bool $rascunho = false): int {
+        // Em rascunho, permitir cliente ainda não selecionado (será obrigatório apenas ao efetivar).
+        if (!$rascunho && $clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
-        if (empty($itens)) {
+        if ($clienteId < 0) {
+            $clienteId = 0;
+        }
+        // Em rascunho, permitir salvar mesmo sem itens (pedido incompleto).
+        if (!$rascunho && empty($itens)) {
             throw new \Exception('Adicione ao menos 1 produto');
         }
 
@@ -1229,7 +1273,12 @@ class PedidoManualService {
             if ($tc === '') {
                 $tipoCompra = null;
             } elseif (!in_array($tc, ['online', 'offline', 'marketing'], true)) {
-                throw new \Exception('Tipo de compra inválido');
+                if ($rascunho) {
+                    // Em rascunho, tipo de compra inválido/incompleto vira null (não bloqueia).
+                    $tipoCompra = null;
+                } else {
+                    throw new \Exception('Tipo de compra inválido');
+                }
             } else {
                 $tipoCompra = $tc;
             }
@@ -1265,7 +1314,8 @@ class PedidoManualService {
         $valorFreteValidacao = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
         $resumoValidacao = $this->calcularResumoPadrao($moeda, $itens, $valorFreteValidacao);
         $pesoTotalReal = (float) ($resumoValidacao['peso_total'] ?? 0.0);
-        if ($limitePesoAtivo && $pesoTotalReal > 30.0) {
+        // Em rascunho, não aplicar o limite de peso (pedido ainda incompleto).
+        if (!$rascunho && $limitePesoAtivo && $pesoTotalReal > 30.0) {
             throw new \Exception('Peso excede o limite de 30kg para pedido manual (peso total: ' . rtrim(rtrim(number_format($pesoTotalReal, 3, '.', ''), '0'), '.') . 'kg).');
         }
 
@@ -1274,6 +1324,10 @@ class PedidoManualService {
             $q = (int) ($it['quantidade'] ?? 0);
             $vu = (float) ($it['valor_unitario'] ?? 0);
             if ($q <= 0 || $vu < 0) {
+                if ($rascunho) {
+                    // Em rascunho, ignorar itens inválidos em vez de bloquear.
+                    continue;
+                }
                 throw new \Exception('Item inválido');
             }
             $subtotalItens += ($q * $vu);
@@ -1289,7 +1343,12 @@ class PedidoManualService {
         // IMPORTANTE: Se o admin informou um endereço diferente no formulário, criar um novo registro
         // para não sobrescrever o endereço principal do cliente.
         $enderecoEntregaId = 0;
-        if (in_array('endereco_entrega_id', $colsPedidos, true) && $this->tableExists('enderecos')) {
+        $temColunaEndEntrega = in_array('endereco_entrega_id', $colsPedidos, true);
+        // Em rascunho: endereço é opcional. Só tentamos resolver/criar endereço se houver cliente
+        // selecionado; caso contrário o rascunho é salvo sem endereço vinculado.
+        if ($rascunho && $clienteId <= 0) {
+            // Sem cliente ainda — não resolver endereço (mantém $enderecoEntregaId = 0).
+        } elseif ($this->tableExists('enderecos')) {
             $enderecoFormularioPreenchido = is_array($enderecoEntrega) && (
                 trim((string) ($enderecoEntrega['cep'] ?? '')) !== '' ||
                 (trim((string) ($enderecoEntrega['endereco'] ?? '')) !== '' && trim((string) ($enderecoEntrega['cidade'] ?? '')) !== '')
@@ -1347,7 +1406,7 @@ class PedidoManualService {
 
                         if ($enderecoMudou) {
                             // Criar novo endereço com os dados do formulário (não alterar o cadastro do cliente)
-                            $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+                            $enderecoEntregaId = $this->criarEnderecoEntregaComTolerancia($clienteId, $enderecoEntrega, $rascunho);
                         } else {
                             $enderecoEntregaId = $enderecoExistenteId;
                         }
@@ -1360,17 +1419,28 @@ class PedidoManualService {
             }
 
             if ($enderecoEntregaId <= 0) {
-                $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+                $enderecoEntregaId = $this->criarEnderecoEntregaComTolerancia($clienteId, $enderecoEntrega, $rascunho);
             }
 
             // Fallback: se ainda não tem endereço e o formulário veio vazio,
             // tentar criar a partir dos dados de endereço da tabela usuarios ("Meus Dados").
             if ($enderecoEntregaId <= 0) {
-                $enderecoEntregaId = $this->criarEnderecoAPartirDoUsuario($clienteId);
+                try {
+                    $enderecoEntregaId = $this->criarEnderecoAPartirDoUsuario($clienteId);
+                } catch (\Exception $e) {
+                    // Em rascunho nunca bloqueamos por endereço; no fluxo normal preservamos o comportamento.
+                    if (!$rascunho) {
+                        throw $e;
+                    }
+                    $enderecoEntregaId = 0;
+                }
             }
 
             if ($enderecoEntregaId <= 0) {
-                throw new \Exception('Não foi possível criar o endereço de entrega. Verifique se todos os campos de endereço estão preenchidos (CEP, endereço, número, bairro, cidade e estado).');
+                if ($temColunaEndEntrega && !$rascunho) {
+                    throw new \Exception('Não foi possível criar o endereço de entrega. Verifique se todos os campos de endereço estão preenchidos (CEP, endereço, número, bairro, cidade e estado).');
+                }
+                // Se não tem coluna endereco_entrega_id (ou é rascunho), não bloquear a criação do pedido
             }
         }
 
@@ -1471,7 +1541,7 @@ class PedidoManualService {
         if ($statusCol !== '') {
             $cols[] = $statusCol;
             $vals[] = ':status';
-            $params[':status'] = 'pendente';
+            $params[':status'] = $rascunho ? 'rascunho' : 'pendente';
         }
 
         if ($obsCol !== '') {
@@ -1588,7 +1658,9 @@ class PedidoManualService {
 
             $this->salvarItensPedido($pedidoId, $itens, $moeda);
 
-            if ($formaPagamento !== null) {
+            // Em rascunho não executamos efeitos de pagamento (débito de carteira, pendência PagDev, etc.).
+            // O rascunho fica apenas armazenado até ser efetivado via "Criar Pedido Manual".
+            if (!$rascunho && $formaPagamento !== null) {
                 $fp = strtolower(trim((string) $formaPagamento));
                 if ($fp === 'carteira') {
                     $this->debitarCarteiraParaPedidoManual($clienteId, $pedidoId, (float) $total, (string) $moeda);
@@ -1634,7 +1706,7 @@ class PedidoManualService {
             }
 
             // Se for pagamento offline (PagDev), cria pendência de comprovante quando a tabela existir
-            if ($formaPagamento !== null) {
+            if (!$rascunho && $formaPagamento !== null) {
                 $fp = strtolower(trim((string) $formaPagamento));
                 if ($fp === 'pagdev') {
                     $this->criarPendenciaComprovantePedido($pedidoId, $fp, $adminCriadorId);
@@ -1642,6 +1714,12 @@ class PedidoManualService {
             }
 
             $this->db->commit();
+
+            // Rascunho: não gerar efeitos colaterais (despesas de marketing, QuickBooks).
+            // Estes serão disparados normalmente quando o rascunho for efetivado como pedido manual.
+            if ($rascunho) {
+                return $pedidoId;
+            }
 
             // Registrar despesas automaticamente para pedidos tipo "marketing"
             if ($tipoCompra === 'marketing') {
@@ -1667,6 +1745,48 @@ class PedidoManualService {
         } catch (\Exception $e) {
             $this->db->rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * Verifica se um pedido está atualmente marcado como rascunho.
+     */
+    public function isRascunho(int $pedidoId): bool {
+        if ($pedidoId <= 0) {
+            return false;
+        }
+        try {
+            $st = $this->db->prepare('SELECT status FROM pedidos WHERE id = ? LIMIT 1');
+            $st->execute([(int) $pedidoId]);
+            $status = strtolower(trim((string) ($st->fetchColumn() ?: '')));
+            return $status === 'rascunho';
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Remove um rascunho (pedido + itens). Só remove se o pedido ainda estiver como rascunho,
+     * para nunca afetar pedidos que já entraram no fluxo normal.
+     * Usado ao re-salvar um rascunho existente e ao efetivá-lo como pedido manual.
+     */
+    public function excluirRascunho(int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+        if (!$this->isRascunho($pedidoId)) {
+            return;
+        }
+        try {
+            $itensTable = $this->getItensTable();
+            $this->db->prepare('DELETE FROM ' . $itensTable . ' WHERE pedido_id = ?')->execute([(int) $pedidoId]);
+        } catch (\Throwable $e) {
+            // Ignorar: se a tabela de itens não existir, seguimos removendo o pedido.
+        }
+        try {
+            $this->db->prepare("DELETE FROM pedidos WHERE id = ? AND LOWER(COALESCE(status,'')) = 'rascunho'")->execute([(int) $pedidoId]);
+        } catch (\Throwable $e) {
+            // Ignorar erros de remoção; nunca deve bloquear o fluxo principal.
         }
     }
 

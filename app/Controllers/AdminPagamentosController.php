@@ -281,7 +281,7 @@ class AdminPagamentosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pagamentos - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.payments.page_title', 'Pagamentos - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -306,20 +306,20 @@ class AdminPagamentosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
+                    <h1 class="page-title">' . __('admin.payments.title', 'Pagamentos') . ' (' . $stats['total_transacoes'] . ' ' . __('admin.payments.transactions_word', 'transações') . ')</h1>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
-                            <i class="fas fa-download me-1"></i>Exportar Relatório
+                        <button type="button" class="btn btn-success me-2" onclick="alert(\'' . __('admin.payments.feature_in_development', 'Funcionalidade em desenvolvimento') . '\')">
+                            <i class="fas fa-download me-1"></i>' . __('admin.payments.export_report', 'Exportar Relatório') . '
                         </button>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                            <i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '
                         </button>
-                        <a class="btn btn-outline-primary" href="/admin/pagamentos/configuracoes"><i class="fas fa-cog"></i> Configurações</a>
+                        <a class="btn btn-outline-primary" href="/admin/pagamentos/configuracoes"><i class="fas fa-cog"></i> ' . __('admin.payments.settings', 'Configurações') . '</a>
                     </div>
                 </div>';
 
                 if (!empty($loadError)) {
-                    echo '<div class="alert alert-danger">Erro ao carregar pagamentos: ' . htmlspecialchars($loadError) . '</div>';
+                    echo '<div class="alert alert-danger">' . __('admin.payments.load_error', 'Erro ao carregar pagamentos: ') . htmlspecialchars($loadError) . '</div>';
                 }
                 
                 echo '<div class="row mb-4">
@@ -328,7 +328,7 @@ class AdminPagamentosController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Transações (30 dias)</div>
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">' . __('admin.payments.card_transactions_30d', 'Transações (30 dias)') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">' . $stats['total_transacoes'] . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-credit-card fa-2x text-gray-300"></i></div>
@@ -341,7 +341,7 @@ class AdminPagamentosController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Aprovados</div>
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">' . __('admin.payments.card_approved', 'Aprovados') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">R$ ' . number_format($stats['valor_aprovado'], 2, ',', '.') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-check-circle fa-2x text-gray-300"></i></div>
@@ -354,7 +354,7 @@ class AdminPagamentosController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pendentes</div>
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">' . __('admin.payments.card_pending', 'Pendentes') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">R$ ' . number_format($stats['valor_pendente'], 2, ',', '.') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-clock fa-2x text-gray-300"></i></div>
@@ -367,7 +367,7 @@ class AdminPagamentosController extends Controller {
                             <div class="card-body">
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Recusados</div>
+                                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">' . __('admin.payments.card_rejected', 'Recusados') . '</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">R$ ' . number_format($stats['valor_recusado'], 2, ',', '.') . '</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-times-circle fa-2x text-gray-300"></i></div>
@@ -379,37 +379,37 @@ class AdminPagamentosController extends Controller {
                 
                 <form method="GET" class="row g-3 mb-4">
                     <div class="col-md-3">
-                        <input type="text" class="form-control" name="busca" placeholder="Buscar pedido, cliente ou transação..." value="' . htmlspecialchars($busca) . '">
+                        <input type="text" class="form-control" name="busca" placeholder="' . htmlspecialchars(__('admin.payments.search_placeholder', 'Buscar pedido, cliente ou transação...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca) . '">
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" name="status">
-                            <option value="">Todos status</option>
-                            <option value="approved" ' . ($status === 'approved' ? 'selected' : '') . '>Aprovado</option>
-                            <option value="pending" ' . ($status === 'pending' ? 'selected' : '') . '>Pendente</option>
-                            <option value="rejected" ' . ($status === 'rejected' ? 'selected' : '') . '>Recusado</option>
-                            <option value="refunded" ' . ($status === 'refunded' ? 'selected' : '') . '>Estornado</option>
+                            <option value="">' . __('admin.payments.all_status', 'Todos status') . '</option>
+                            <option value="approved" ' . ($status === 'approved' ? 'selected' : '') . '>' . __('admin.payments.status_approved', 'Aprovado') . '</option>
+                            <option value="pending" ' . ($status === 'pending' ? 'selected' : '') . '>' . __('admin.payments.status_pending', 'Pendente') . '</option>
+                            <option value="rejected" ' . ($status === 'rejected' ? 'selected' : '') . '>' . __('admin.payments.status_rejected', 'Recusado') . '</option>
+                            <option value="refunded" ' . ($status === 'refunded' ? 'selected' : '') . '>' . __('admin.payments.status_refunded', 'Estornado') . '</option>
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" name="metodo">
-                            <option value="">Todos métodos</option>
-                            <option value="CREDIT_CARD" ' . ($metodo === 'CREDIT_CARD' ? 'selected' : '') . '>Cartão</option>
-                            <option value="BOLETO" ' . ($metodo === 'BOLETO' ? 'selected' : '') . '>Boleto</option>
+                            <option value="">' . __('admin.payments.all_methods', 'Todos métodos') . '</option>
+                            <option value="CREDIT_CARD" ' . ($metodo === 'CREDIT_CARD' ? 'selected' : '') . '>' . __('admin.payments.method_card', 'Cartão') . '</option>
+                            <option value="BOLETO" ' . ($metodo === 'BOLETO' ? 'selected' : '') . '>' . __('admin.payments.method_boleto', 'Boleto') . '</option>
                             <option value="PIX" ' . ($metodo === 'PIX' ? 'selected' : '') . '>PIX</option>
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" name="gateway">
-                            <option value="">Todos gateways</option>
+                            <option value="">' . __('admin.payments.all_gateways', 'Todos gateways') . '</option>
                             <option value="stripe" ' . ($gateway === 'stripe' ? 'selected' : '') . '>Stripe</option>
                             <option value="appmax" ' . ($gateway === 'appmax' ? 'selected' : '') . '>AppMax</option>
                             <option value="cambioreal" ' . ($gateway === 'cambioreal' ? 'selected' : '') . '>Câmbio Real</option>
                             <option value="split" ' . ($gateway === 'split' ? 'selected' : '') . '>Split</option>
-                            <option value="carteira" ' . ($gateway === 'carteira' ? 'selected' : '') . '>Carteira</option>
+                            <option value="carteira" ' . ($gateway === 'carteira' ? 'selected' : '') . '>' . __('admin.payments.gateway_wallet', 'Carteira') . '</option>
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Filtrar</button>
+                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> ' . __('common.filter', 'Filtrar') . '</button>
                     </div>
                 </form>
                 
@@ -450,50 +450,50 @@ class AdminPagamentosController extends Controller {
                         }
                     }
 
-                    $statusBadge = 'Pendente';
+                    $statusBadge = __('admin.payments.status_pending', 'Pendente');
                     $statusClass = 'status-pendente';
                     if (in_array($stRow, ['approved', 'aprovado', 'paid', 'pago', 'succeeded', 'success'], true)) {
-                        $statusBadge = 'Aprovado';
+                        $statusBadge = __('admin.payments.status_approved', 'Aprovado');
                         $statusClass = 'status-aprovado';
                     } elseif (in_array($stRow, ['rejected', 'recusado', 'failed', 'canceled', 'cancelled'], true)) {
-                        $statusBadge = 'Recusado';
+                        $statusBadge = __('admin.payments.status_rejected', 'Recusado');
                         $statusClass = 'status-recusado';
                     } elseif (in_array($stRow, ['refunded', 'estornado'], true)) {
-                        $statusBadge = 'Estornado';
+                        $statusBadge = __('admin.payments.status_refunded', 'Estornado');
                         $statusClass = 'status-estornado';
                     }
 
                     echo '<div class="col-md-6 col-lg-4 mb-4">
                         <div class="card payment-card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <strong>Pedido #' . str_pad((string) $pedidoIdRow, 6, '0', STR_PAD_LEFT) . '</strong>
+                                <strong>' . __('admin.payments.order_label', 'Pedido') . ' #' . str_pad((string) $pedidoIdRow, 6, '0', STR_PAD_LEFT) . '</strong>
                                 <span class="badge ' . $statusClass . '">' . $statusBadge . '</span>
                             </div>
                             <div class="card-body">
-                                <h6 class="card-title">' . htmlspecialchars($pagamento['cliente_nome'] ?? 'Visitante') . '</h6>
+                                <h6 class="card-title">' . htmlspecialchars($pagamento['cliente_nome'] ?? __('admin.payments.visitor', 'Visitante')) . '</h6>
                                 <p class="card-text text-muted small">' . htmlspecialchars($pagamento['cliente_email'] ?? 'N/A') . '</p>
                                 <p class="card-text">
-                                    <small class="text-muted">Método: ' . htmlspecialchars((string) ($pagamento['metodo_pagamento'] ?? 'N/A')) . '</small><br>
-                                    <small class="text-muted">Gateway: ' . htmlspecialchars($gwRow !== '' ? strtoupper($gwRow) : 'N/A') . '</small><br>
-                                    <small class="text-muted">Transação: ' . htmlspecialchars((string) ($pagamento['codigo_transacao'] ?? 'N/A')) . '</small><br>
-                                    <strong>Valor: R$ ' . number_format($valorRow, 2, ',', '.') . '</strong>
+                                    <small class="text-muted">' . __('admin.payments.method_label', 'Método:') . ' ' . htmlspecialchars((string) ($pagamento['metodo_pagamento'] ?? 'N/A')) . '</small><br>
+                                    <small class="text-muted">' . __('admin.payments.gateway_label', 'Gateway:') . ' ' . htmlspecialchars($gwRow !== '' ? strtoupper($gwRow) : 'N/A') . '</small><br>
+                                    <small class="text-muted">' . __('admin.payments.transaction_label', 'Transação:') . ' ' . htmlspecialchars((string) ($pagamento['codigo_transacao'] ?? 'N/A')) . '</small><br>
+                                    <strong>' . __('admin.payments.value_label', 'Valor:') . ' R$ ' . number_format($valorRow, 2, ',', '.') . '</strong>
                                 </p>
                                 ' . $splitResumoHtml . '
                                 <div class="d-flex flex-wrap gap-2">
                                     <a href="/admin/pedidos/detalhes/' . $pedidoIdRow . '" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> Ver Pedido
+                                        <i class="fas fa-eye"></i> ' . __('admin.payments.view_order', 'Ver Pedido') . '
                                     </a>
                                     <button class="btn btn-sm btn-outline-info" onclick="refreshPagamento(' . $pedidoIdRow . ')">
-                                        <i class="fas fa-sync"></i> Atualizar status
+                                        <i class="fas fa-sync"></i> ' . __('admin.payments.refresh_status', 'Atualizar status') . '
                                     </button>
                                     <button class="btn btn-sm btn-outline-warning" onclick="cancelarPagamento(' . $pedidoIdRow . ')">
-                                        <i class="fas fa-ban"></i> Cancelar pag.
+                                        <i class="fas fa-ban"></i> ' . __('admin.payments.cancel_payment', 'Cancelar pag.') . '
                                     </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="estornarPagamento(' . $pedidoIdRow . ')">
-                                        <i class="fas fa-undo"></i> Estornar
+                                        <i class="fas fa-undo"></i> ' . __('admin.payments.refund', 'Estornar') . '
                                     </button>
                                     <button class="btn btn-sm btn-danger" onclick="cancelarPedido(' . $pedidoIdRow . ')">
-                                        <i class="fas fa-xmark"></i> Cancelar pedido
+                                        <i class="fas fa-xmark"></i> ' . __('admin.payments.cancel_order', 'Cancelar pedido') . '
                                     </button>
                                 </div>
                             </div>
@@ -504,7 +504,7 @@ class AdminPagamentosController extends Controller {
                 if (empty($pagamentos)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pagamento encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.payments.none_found', 'Nenhum pagamento encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -529,7 +529,7 @@ class AdminPagamentosController extends Controller {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function confirmarPagamento(pedidoId) {
-            if (confirm("Tem certeza que deseja confirmar este pagamento?")) {
+            if (confirm("' . __('admin.payments.js_confirm_payment', 'Tem certeza que deseja confirmar este pagamento?') . '")) {
                 fetch("/admin/pagamentos/confirmar/" + pedidoId, {
                     method: "POST",
                     headers: {
@@ -541,12 +541,12 @@ class AdminPagamentosController extends Controller {
                     if (data.success) {
                         location.reload();
                     } else {
-                        alert("Erro ao confirmar pagamento: " + data.message);
+                        alert("' . __('admin.payments.js_confirm_error', 'Erro ao confirmar pagamento: ') . '" + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao confirmar pagamento");
+                    alert("' . __('admin.payments.js_confirm_error_generic', 'Erro ao confirmar pagamento') . '");
                 });
             }
         }
@@ -561,14 +561,14 @@ class AdminPagamentosController extends Controller {
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert("Erro ao atualizar status: " + (data.error || data.message || ""));
+                    alert("' . __('admin.payments.js_refresh_error', 'Erro ao atualizar status: ') . '" + (data.error || data.message || ""));
                 }
             })
-            .catch(() => alert("Erro ao atualizar status"));
+            .catch(() => alert("' . __('admin.payments.js_refresh_error_generic', 'Erro ao atualizar status') . '"));
         }
 
         function cancelarPagamento(pedidoId) {
-            if (!confirm("Cancelar pagamento no gateway?")) return;
+            if (!confirm("' . __('admin.payments.js_cancel_payment_confirm', 'Cancelar pagamento no gateway?') . '")) return;
             fetch("/admin/pagamentos/cancelar/" + pedidoId, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" }
@@ -578,16 +578,16 @@ class AdminPagamentosController extends Controller {
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert("Erro ao cancelar pagamento: " + (data.error || data.message || ""));
+                    alert("' . __('admin.payments.js_cancel_payment_error', 'Erro ao cancelar pagamento: ') . '" + (data.error || data.message || ""));
                 }
             })
-            .catch(() => alert("Erro ao cancelar pagamento"));
+            .catch(() => alert("' . __('admin.payments.js_cancel_payment_error_generic', 'Erro ao cancelar pagamento') . '"));
         }
 
         function estornarPagamento(pedidoId) {
-            const motivo = prompt("Motivo do estorno (opcional):", "");
+            const motivo = prompt("' . __('admin.payments.js_refund_reason', 'Motivo do estorno (opcional):') . '", "");
             if (motivo === null) return;
-            if (!confirm("Confirmar estorno?")) return;
+            if (!confirm("' . __('admin.payments.js_refund_confirm', 'Confirmar estorno?') . '")) return;
 
             fetch("/admin/pagamentos/estornar/" + pedidoId, {
                 method: "POST",
@@ -599,15 +599,15 @@ class AdminPagamentosController extends Controller {
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert("Erro ao estornar: " + (data.error || data.message || ""));
+                    alert("' . __('admin.payments.js_refund_error', 'Erro ao estornar: ') . '" + (data.error || data.message || ""));
                 }
             })
-            .catch(() => alert("Erro ao estornar"));
+            .catch(() => alert("' . __('admin.payments.js_refund_error_generic', 'Erro ao estornar') . '"));
         }
 
         function cancelarPedido(pedidoId) {
-            if (!confirm("Cancelar o pedido no sistema?")) return;
-            const estornar = confirm("Deseja estornar/cancelar o pagamento também?");
+            if (!confirm("' . __('admin.payments.js_cancel_order_confirm', 'Cancelar o pedido no sistema?') . '")) return;
+            const estornar = confirm("' . __('admin.payments.js_cancel_order_refund_too', 'Deseja estornar/cancelar o pagamento também?') . '");
             fetch("/admin/pagamentos/cancelar-pedido/" + pedidoId, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -618,10 +618,10 @@ class AdminPagamentosController extends Controller {
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert("Erro ao cancelar pedido: " + (data.error || data.message || ""));
+                    alert("' . __('admin.payments.js_cancel_order_error', 'Erro ao cancelar pedido: ') . '" + (data.error || data.message || ""));
                 }
             })
-            .catch(() => alert("Erro ao cancelar pedido"));
+            .catch(() => alert("' . __('admin.payments.js_cancel_order_error_generic', 'Erro ao cancelar pedido') . '"));
         }
     </script>
 </body>
@@ -669,12 +669,12 @@ class AdminPagamentosController extends Controller {
                     'gateway' => $gateway,
                     'payment_id' => $paymentId,
                     'payment_status' => $paymentStatus !== '' ? $paymentStatus : 'approved',
-                    'message' => 'Status da carteira é local (sem refresh externo)'
+                    'message' => __('admin.payments.wallet_status_local', 'Status da carteira é local (sem refresh externo)')
                 ]);
                 return;
             }
 
-            $this->json(['success' => false, 'error' => 'Refresh automático ainda não implementado para este gateway']);
+            $this->json(['success' => false, 'error' => __('admin.payments.refresh_not_implemented', 'Refresh automático ainda não implementado para este gateway')]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -710,7 +710,7 @@ class AdminPagamentosController extends Controller {
                 return;
             }
 
-            $this->json(['success' => false, 'error' => 'Cancelamento ainda não implementado para este gateway']);
+            $this->json(['success' => false, 'error' => __('admin.payments.cancel_not_implemented', 'Cancelamento ainda não implementado para este gateway')]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -763,7 +763,7 @@ class AdminPagamentosController extends Controller {
                 return;
             }
 
-            $this->json(['success' => false, 'error' => 'Estorno ainda não implementado para este gateway']);
+            $this->json(['success' => false, 'error' => __('admin.payments.refund_not_implemented', 'Estorno ainda não implementado para este gateway')]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -792,7 +792,7 @@ class AdminPagamentosController extends Controller {
             $stPedido->execute([$pedidoId]);
             $pedido = $stPedido->fetch(\PDO::FETCH_ASSOC);
             if (!$pedido) {
-                $this->json(['success' => false, 'error' => 'Pedido não encontrado']);
+                $this->json(['success' => false, 'error' => __('admin.payments.order_not_found', 'Pedido não encontrado')]);
                 return;
             }
 
@@ -976,7 +976,7 @@ class AdminPagamentosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comissões gerais - Admin</title>
+    <title>' . htmlspecialchars(__('admin.payments.commissions_page_title', 'Comissões gerais - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -991,14 +991,14 @@ class AdminPagamentosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Comissões gerais</h1>
+                    <h1 class="page-title">' . __('admin.payments.commissions_title', 'Comissões gerais') . '</h1>
                     <div>
-                        <a href="/admin/pagamentos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                        <a href="/admin/pagamentos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> ' . __('common.back', 'Voltar') . '</a>
                     </div>
                 </div>';
 
         if (empty($janelas)) {
-            echo '<div class="alert alert-warning">Schema de Comissões gerais não encontrado. Rode as migrations 052, 053 e 057.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.payments.commissions_schema_missing', 'Schema de Comissões gerais não encontrado. Rode as migrations 052, 053 e 057.') . '</div>';
             echo '</main></div></div>';
             renderAdminScripts();
             echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script></body></html>';
@@ -1007,11 +1007,11 @@ class AdminPagamentosController extends Controller {
 
         echo '<form method="GET" class="row g-3 mb-4">
                 <div class="col-md-6">
-                    <label class="form-label">Janela</label>
+                    <label class="form-label">' . __('admin.payments.window', 'Janela') . '</label>
                     <select class="form-select" name="janela_id" onchange="this.form.submit()">';
         foreach ($janelas as $j) {
             $jid = (int) ($j['id'] ?? 0);
-            $lab = ' #' . $jid . ' - ' . date('d/m/Y', strtotime((string) ($j['data_inicio'] ?? 'now'))) . ' até ' . date('d/m/Y', strtotime((string) ($j['data_fim'] ?? 'now')));
+            $lab = ' #' . $jid . ' - ' . date('d/m/Y', strtotime((string) ($j['data_inicio'] ?? 'now'))) . ' ' . __('admin.payments.to', 'até') . ' ' . date('d/m/Y', strtotime((string) ($j['data_fim'] ?? 'now')));
             $sel = ($jid === $janelaId) ? 'selected' : '';
             echo '<option value="' . $jid . '" ' . $sel . '>' . htmlspecialchars($lab) . '</option>';
         }
@@ -1020,23 +1020,23 @@ class AdminPagamentosController extends Controller {
             </form>';
 
         echo '<div class="card mb-4">
-                <div class="card-header"><strong>Resumo por vendedor</strong></div>
+                <div class="card-header"><strong>' . __('admin.payments.summary_by_seller', 'Resumo por vendedor') . '</strong></div>
                 <div class="card-body">';
 
         if (empty($rows)) {
-            echo '<div class="text-muted">Sem pagamentos nesta janela.</div>';
+            echo '<div class="text-muted">' . __('admin.payments.no_payments_window', 'Sem pagamentos nesta janela.') . '</div>';
         } else {
             echo '<div class="table-responsive"><table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Vendedor</th>
-                            <th>Moeda</th>
-                            <th class="text-end">Comissão calculada</th>
-                            <th class="text-end">Ajustes</th>
-                            <th class="text-end">Total</th>
-                            <th class="text-end">Pago</th>
-                            <th>Status</th>
-                            <th>Ações</th>
+                            <th>' . __('admin.payments.th_seller', 'Vendedor') . '</th>
+                            <th>' . __('admin.payments.th_currency', 'Moeda') . '</th>
+                            <th class="text-end">' . __('admin.payments.th_calculated_commission', 'Comissão calculada') . '</th>
+                            <th class="text-end">' . __('admin.payments.th_adjustments', 'Ajustes') . '</th>
+                            <th class="text-end">' . __('common.total', 'Total') . '</th>
+                            <th class="text-end">' . __('admin.payments.th_paid', 'Pago') . '</th>
+                            <th>' . __('common.status', 'Status') . '</th>
+                            <th>' . __('common.actions', 'Ações') . '</th>
                         </tr>
                     </thead>
                     <tbody>';
@@ -1054,7 +1054,7 @@ class AdminPagamentosController extends Controller {
                 $vLabel = trim($vendedorNome . ($vendedorEmail !== '' ? (' <' . $vendedorEmail . '>') : ''));
 
                 echo '<tr>'
-                    . '<td>' . htmlspecialchars($vLabel !== '' ? $vLabel : ('Vendedor #' . (int) ($r['vendedor_id'] ?? 0))) . '</td>'
+                    . '<td>' . htmlspecialchars($vLabel !== '' ? $vLabel : (__('admin.payments.seller_label', 'Vendedor #') . (int) ($r['vendedor_id'] ?? 0))) . '</td>'
                     . '<td>' . htmlspecialchars($moeda) . '</td>'
                     . '<td class="text-end">' . $fmt($calc, $moeda) . '</td>'
                     . '<td class="text-end">' . $fmt($aj, $moeda) . '</td>'
@@ -1062,16 +1062,16 @@ class AdminPagamentosController extends Controller {
                     . '<td class="text-end">' . $fmt($pago, $moeda) . '</td>'
                     . '<td>' . htmlspecialchars($st) . '</td>'
                     . '<td class="text-nowrap">'
-                    . '<button class="btn btn-sm btn-outline-primary me-1" type="button" onclick="abrirAjuste(' . (int) ($r['vendedor_id'] ?? 0) . ', \' ' . htmlspecialchars($moeda, ENT_QUOTES, 'UTF-8') . '\')">Ajuste</button>'
-                    . '<button class="btn btn-sm btn-outline-success me-1" type="button" onclick="abrirPagamento(' . (int) ($r['vendedor_id'] ?? 0) . ', \' ' . htmlspecialchars($moeda, ENT_QUOTES, 'UTF-8') . '\', ' . number_format($total, 2, '.', '') . ')">Pagamento</button>'
+                    . '<button class="btn btn-sm btn-outline-primary me-1" type="button" onclick="abrirAjuste(' . (int) ($r['vendedor_id'] ?? 0) . ', \' ' . htmlspecialchars($moeda, ENT_QUOTES, 'UTF-8') . '\')">' . __('admin.payments.adjustment', 'Ajuste') . '</button>'
+                    . '<button class="btn btn-sm btn-outline-success me-1" type="button" onclick="abrirPagamento(' . (int) ($r['vendedor_id'] ?? 0) . ', \' ' . htmlspecialchars($moeda, ENT_QUOTES, 'UTF-8') . '\', ' . number_format($total, 2, '.', '') . ')">' . __('admin.payments.payment', 'Pagamento') . '</button>'
                     . (($st !== 'aprovado' && $pagamentoId > 0)
                         ? ('<form method="POST" action="/admin/pagamentos/comissoes-gerais/aprovar/' . $pagamentoId . '" style="display:inline-block">'
-                            . '<button class="btn btn-sm btn-success me-1" type="submit">Aprovar</button>'
+                            . '<button class="btn btn-sm btn-success me-1" type="submit">' . __('admin.payments.approve', 'Aprovar') . '</button>'
                             . '</form>')
                         : '')
                     . (($pagamentoId > 0)
-                        ? ('<form method="POST" action="/admin/pagamentos/comissoes-gerais/deletar/' . $pagamentoId . '" style="display:inline-block" onsubmit="return confirm(\'Remover este pagamento?\')">'
-                            . '<button class="btn btn-sm btn-outline-danger" type="submit">Deletar</button>'
+                        ? ('<form method="POST" action="/admin/pagamentos/comissoes-gerais/deletar/' . $pagamentoId . '" style="display:inline-block" onsubmit="return confirm(\'' . __('admin.payments.remove_payment_confirm', 'Remover este pagamento?') . '\')">'
+                            . '<button class="btn btn-sm btn-outline-danger" type="submit">' . __('admin.payments.delete', 'Deletar') . '</button>'
                             . '</form>')
                         : '')
                     . '</td>'
@@ -1088,7 +1088,7 @@ class AdminPagamentosController extends Controller {
                     <div class="modal-content">
                         <form method="POST" action="/admin/pagamentos/comissoes-gerais/ajuste">
                             <div class="modal-header">
-                                <h5 class="modal-title">Criar ajuste</h5>
+                                <h5 class="modal-title">' . __('admin.payments.create_adjustment', 'Criar ajuste') . '</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
@@ -1096,24 +1096,24 @@ class AdminPagamentosController extends Controller {
                                 <input type="hidden" name="vendedor_id" id="aj_vendedor_id" value="">
                                 <input type="hidden" name="moeda" id="aj_moeda" value="USD">
                                 <div class="mb-3">
-                                    <label class="form-label">Tipo</label>
+                                    <label class="form-label">' . __('admin.payments.type', 'Tipo') . '</label>
                                     <select class="form-select" name="tipo" required>
-                                        <option value="credito">Crédito</option>
-                                        <option value="debito">Débito</option>
+                                        <option value="credito">' . __('admin.payments.credit', 'Crédito') . '</option>
+                                        <option value="debito">' . __('admin.payments.debit', 'Débito') . '</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Valor</label>
+                                    <label class="form-label">' . __('admin.payments.value', 'Valor') . '</label>
                                     <input class="form-control" name="valor" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Motivo</label>
+                                    <label class="form-label">' . __('admin.payments.reason', 'Motivo') . '</label>
                                     <input class="form-control" name="motivo">
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="submit" class="btn btn-primary">Salvar ajuste</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.cancel', 'Cancelar') . '</button>
+                                <button type="submit" class="btn btn-primary">' . __('admin.payments.save_adjustment', 'Salvar ajuste') . '</button>
                             </div>
                         </form>
                     </div>
@@ -1125,7 +1125,7 @@ class AdminPagamentosController extends Controller {
                     <div class="modal-content">
                         <form method="POST" action="/admin/pagamentos/comissoes-gerais/pagamento">
                             <div class="modal-header">
-                                <h5 class="modal-title">Registrar pagamento</h5>
+                                <h5 class="modal-title">' . __('admin.payments.register_payment', 'Registrar pagamento') . '</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
@@ -1133,21 +1133,21 @@ class AdminPagamentosController extends Controller {
                                 <input type="hidden" name="vendedor_id" id="pg_vendedor_id" value="">
                                 <input type="hidden" name="moeda" id="pg_moeda" value="USD">
                                 <div class="mb-3">
-                                    <label class="form-label">Valor pago</label>
+                                    <label class="form-label">' . __('admin.payments.value_paid', 'Valor pago') . '</label>
                                     <input class="form-control" name="valor_pago" id="pg_valor_pago" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Método</label>
+                                    <label class="form-label">' . __('admin.payments.method', 'Método') . '</label>
                                     <input class="form-control" name="metodo">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Observação</label>
+                                    <label class="form-label">' . __('admin.payments.observation', 'Observação') . '</label>
                                     <textarea class="form-control" name="observacao" rows="3"></textarea>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="submit" class="btn btn-success">Salvar pagamento</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.cancel', 'Cancelar') . '</button>
+                                <button type="submit" class="btn btn-success">' . __('admin.payments.save_payment', 'Salvar pagamento') . '</button>
                             </div>
                         </form>
                     </div>
@@ -1503,7 +1503,7 @@ class AdminPagamentosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações de Pagamento - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.payments.config_page_title', 'Configurações de Pagamento - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -1523,21 +1523,21 @@ class AdminPagamentosController extends Controller {
                         <div class="sidebar-brand-text mx-3">Braziliana Admin</div>
                     </a>
                     <ul class="nav flex-column">
-                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>Produtos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
-                        <li class="nav-item"><a class="nav-link active" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>' . __('admin.payments.nav_dashboard', 'Dashboard') . '</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>' . __('admin.payments.nav_products', 'Produtos') . '</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>' . __('admin.payments.nav_orders', 'Pedidos') . '</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>' . __('admin.payments.nav_users', 'Usuários') . '</span></a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>' . __('admin.payments.title', 'Pagamentos') . '</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>' . __('admin.payments.settings', 'Configurações') . '</span></a></li>
                     </ul>
                     <hr class="sidebar-divider">
-                    <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
+                    <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>' . __('common.logout', 'Sair') . '</span></a></div>
                 </div>
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Configurações de Pagamento</h1>
-                    <a href="/admin/pagamentos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <h1 class="page-title">' . __('admin.payments.config_title', 'Configurações de Pagamento') . '</h1>
+                    <a href="/admin/pagamentos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> ' . __('common.back', 'Voltar') . '</a>
                 </div>
                 
                 <form method="POST" action="/admin/pagamentos/salvar-configuracoes">
@@ -1549,11 +1549,11 @@ class AdminPagamentosController extends Controller {
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Chave Pública</label>
+                                        <label class="form-label">' . __('admin.payments.public_key', 'Chave Pública') . '</label>
                                         <input type="text" class="form-control" name="stripe_public_key" value="' . htmlspecialchars($config['stripe_public_key'] ?? '') . '">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Chave Secreta</label>
+                                        <label class="form-label">' . __('admin.payments.secret_key', 'Chave Secreta') . '</label>
                                         <input type="password" class="form-control" name="stripe_secret_key" value="' . htmlspecialchars($config['stripe_secret_key'] ?? '') . '">
                                     </div>
                                     <div class="mb-3">
@@ -1562,7 +1562,7 @@ class AdminPagamentosController extends Controller {
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="stripe_enabled" ' . ($config['stripe_enabled'] ?? false ? 'checked' : '') . '>
-                                        <label class="form-check-label">Habilitar Stripe</label>
+                                        <label class="form-check-label">' . __('admin.payments.enable_stripe', 'Habilitar Stripe') . '</label>
                                     </div>
                                 </div>
                             </div>
@@ -1588,14 +1588,14 @@ class AdminPagamentosController extends Controller {
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="cambioreal_enabled" ' . (!empty($config['cambioreal_enabled']) && (string) $config['cambioreal_enabled'] !== '0' ? 'checked' : '') . '>
-                                        <label class="form-check-label">Habilitar Câmbio Real</label>
+                                        <label class="form-check-label">' . __('admin.payments.enable_cambioreal', 'Habilitar Câmbio Real') . '</label>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="card mb-4 border-info">
                                 <div class="card-header bg-info bg-opacity-10">
-                                    <h5 class="mb-0">Câmbio Real Taxas <small class="text-muted fs-6">(taxa de serviço e impostos)</small></h5>
+                                    <h5 class="mb-0">Câmbio Real Taxas <small class="text-muted fs-6">' . __('admin.payments.cambioreal_fees_note', '(taxa de serviço e impostos)') . '</small></h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
@@ -1634,7 +1634,7 @@ class AdminPagamentosController extends Controller {
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="mercadopago_enabled" ' . ($config['mercadopago_enabled'] ?? false ? 'checked' : '') . '>
-                                        <label class="form-check-label">Habilitar Mercado Pago</label>
+                                        <label class="form-check-label">' . __('admin.payments.enable_mercadopago', 'Habilitar Mercado Pago') . '</label>
                                     </div>
                                 </div>
                             </div>
@@ -1649,22 +1649,22 @@ class AdminPagamentosController extends Controller {
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Chave PIX</label>
+                                        <label class="form-label">' . __('admin.payments.pix_key', 'Chave PIX') . '</label>
                                         <input type="text" class="form-control" name="pix_key" value="' . htmlspecialchars($config['pix_key'] ?? '') . '">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Tipo da Chave</label>
+                                        <label class="form-label">' . __('admin.payments.key_type', 'Tipo da Chave') . '</label>
                                         <select class="form-select" name="pix_key_type">
                                             <option value="cpf" ' . (($config['pix_key_type'] ?? '') === 'cpf' ? 'selected' : '') . '>CPF</option>
                                             <option value="cnpj" ' . (($config['pix_key_type'] ?? '') === 'cnpj' ? 'selected' : '') . '>CNPJ</option>
                                             <option value="email" ' . (($config['pix_key_type'] ?? '') === 'email' ? 'selected' : '') . '>Email</option>
-                                            <option value="telefone" ' . (($config['pix_key_type'] ?? '') === 'telefone' ? 'selected' : '') . '>Telefone</option>
-                                            <option value="aleatoria" ' . (($config['pix_key_type'] ?? '') === 'aleatoria' ? 'selected' : '') . '>Aleatória</option>
+                                            <option value="telefone" ' . (($config['pix_key_type'] ?? '') === 'telefone' ? 'selected' : '') . '>' . __('common.phone', 'Telefone') . '</option>
+                                            <option value="aleatoria" ' . (($config['pix_key_type'] ?? '') === 'aleatoria' ? 'selected' : '') . '>' . __('admin.payments.pix_random', 'Aleatória') . '</option>
                                         </select>
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="pix_enabled" ' . ($config['pix_enabled'] ?? false ? 'checked' : '') . '>
-                                        <label class="form-check-label">Habilitar PIX</label>
+                                        <label class="form-check-label">' . __('admin.payments.enable_pix', 'Habilitar PIX') . '</label>
                                     </div>
                                 </div>
                             </div>
@@ -1673,21 +1673,21 @@ class AdminPagamentosController extends Controller {
                         <div class="col-md-6">
                             <div class="card mb-4">
                                 <div class="card-header">
-                                    <h5 class="mb-0">Configurações Gerais</h5>
+                                    <h5 class="mb-0">' . __('admin.payments.general_settings', 'Configurações Gerais') . '</h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Moeda Padrão</label>
+                                        <label class="form-label">' . __('admin.payments.default_currency', 'Moeda Padrão') . '</label>
                                         <select class="form-select" name="default_currency">
-                                            <option value="BRL" ' . (($config['default_currency'] ?? 'BRL') === 'BRL' ? 'selected' : '') . '>Real (BRL)</option>
-                                            <option value="USD" ' . (($config['default_currency'] ?? '') === 'USD' ? 'selected' : '') . '>Dólar (USD)</option>
+                                            <option value="BRL" ' . (($config['default_currency'] ?? 'BRL') === 'BRL' ? 'selected' : '') . '>' . __('admin.payments.currency_brl', 'Real (BRL)') . '</option>
+                                            <option value="USD" ' . (($config['default_currency'] ?? '') === 'USD' ? 'selected' : '') . '>' . __('admin.payments.currency_usd', 'Dólar (USD)') . '</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Método Padrão</label>
+                                        <label class="form-label">' . __('admin.payments.default_method', 'Método Padrão') . '</label>
                                         <select class="form-select" name="default_payment_method">
-                                            <option value="cartao" ' . (($config['default_payment_method'] ?? '') === 'cartao' ? 'selected' : '') . '>Cartão de Crédito</option>
-                                            <option value="boleto" ' . (($config['default_payment_method'] ?? '') === 'boleto' ? 'selected' : '') . '>Boleto</option>
+                                            <option value="cartao" ' . (($config['default_payment_method'] ?? '') === 'cartao' ? 'selected' : '') . '>' . __('admin.payments.credit_card', 'Cartão de Crédito') . '</option>
+                                            <option value="boleto" ' . (($config['default_payment_method'] ?? '') === 'boleto' ? 'selected' : '') . '>' . __('admin.payments.method_boleto', 'Boleto') . '</option>
                                             <option value="pix" ' . (($config['default_payment_method'] ?? '') === 'pix' ? 'selected' : '') . '>PIX</option>
                                         </select>
                                     </div>
@@ -1703,14 +1703,14 @@ class AdminPagamentosController extends Controller {
                                     <h5 class="mb-0"><i class="fas fa-file-invoice-dollar"></i> Carnê Braziliana</h5>
                                 </div>
                                 <div class="card-body">
-                                    <p class="text-muted small mb-3">Controla se o método de pagamento Carnê Braziliana aparece no checkout para novas compras. Desativar não afeta carnês já existentes.</p>
+                                    <p class="text-muted small mb-3">' . __('admin.payments.carne_note', 'Controla se o método de pagamento Carnê Braziliana aparece no checkout para novas compras. Desativar não afeta carnês já existentes.') . '</p>
                                     <div class="form-check form-switch">
                                         <input type="hidden" name="carne_ativo" value="0">
                                         <input class="form-check-input" type="checkbox" name="carne_ativo" value="1" id="carne_ativo" ' . ((!empty($config['carne_ativo']) && (string) $config['carne_ativo'] !== '0') ? 'checked' : '') . '>
-                                        <label class="form-check-label" for="carne_ativo">Exibir Carnê Braziliana no Checkout</label>
+                                        <label class="form-check-label" for="carne_ativo">' . __('admin.payments.carne_show_checkout', 'Exibir Carnê Braziliana no Checkout') . '</label>
                                     </div>
                                     <div class="mt-3">
-                                        <a href="/admin/carnes/configuracoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-cog"></i> Configurações avançadas do Carnê</a>
+                                        <a href="/admin/carnes/configuracoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-cog"></i> ' . __('admin.payments.carne_advanced_settings', 'Configurações avançadas do Carnê') . '</a>
                                     </div>
                                 </div>
                             </div>
@@ -1719,7 +1719,7 @@ class AdminPagamentosController extends Controller {
 
                     <div class="d-flex justify-content-end">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Salvar Configurações
+                            <i class="fas fa-save"></i> ' . __('admin.payments.save_settings', 'Salvar Configurações') . '
                         </button>
                     </div>
                 </form>
@@ -1776,7 +1776,7 @@ class AdminPagamentosController extends Controller {
                 $table = 'configuracoes';
             }
             if ($table === null) {
-                throw new \Exception('Tabela de configurações não encontrada');
+                throw new \Exception(__('admin.payments.config_table_not_found', 'Tabela de configurações não encontrada'));
             }
 
             foreach ($keys as $k) {

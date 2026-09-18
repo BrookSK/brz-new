@@ -334,7 +334,7 @@ class AdminRelatoriosController extends Controller {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Movimentação do Fluxo - Admin</title>
+  <title>' . htmlspecialchars(__('admin.reports.flow_page_title', 'Movimentação do Fluxo - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -342,55 +342,55 @@ class AdminRelatoriosController extends Controller {
         renderAdminSidebar('relatorios');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
-            . '<h1 class="page-title">Movimentação do Fluxo</h1>'
+            . '<h1 class="page-title">' . __('admin.reports.flow_title', 'Movimentação do Fluxo') . '</h1>'
             . '</div>';
 
         if (!$hasMov) {
-            echo '<div class="alert alert-warning">A tabela <strong>estoque_movimentacao</strong> não existe no banco.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.reports.table_estoque_movimentacao_missing', 'A tabela <strong>estoque_movimentacao</strong> não existe no banco.') . '</div>';
         }
         if (!$hasAuditoria) {
-            echo '<div class="alert alert-warning">A tabela <strong>auditoria_logs</strong> não existe no banco. Rode as migrations 068 e 069.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.reports.table_auditoria_missing', 'A tabela <strong>auditoria_logs</strong> não existe no banco. Rode as migrations 068 e 069.') . '</div>';
         }
 
         echo '<div class="card mb-3"><div class="card-body">'
             . '<form method="GET" class="row g-2 align-items-end">'
-            . '<div class="col-md-3"><label class="form-label">Usuário</label><select class="form-select" name="usuario_id">'
-            . '<option value="0">Todos</option>';
+            . '<div class="col-md-3"><label class="form-label">' . __('admin.reports.user', 'Usuário') . '</label><select class="form-select" name="usuario_id">'
+            . '<option value="0">' . __('common.all', 'Todos') . '</option>';
         foreach ($usuarios as $u) {
             $uid = (int) ($u['id'] ?? 0);
             $label = trim((string) (($u['nome'] ?? '') . ' ' . ($u['email'] ?? '')));
-            if ($label === '') $label = 'Usuário #' . $uid;
+            if ($label === '') $label = __('admin.reports.user_label', 'Usuário #') . $uid;
             echo '<option value="' . $uid . '" ' . ($usuarioId === $uid ? 'selected' : '') . '>' . htmlspecialchars($label) . '</option>';
         }
         echo '</select></div>'
-            . '<div class="col-md-2"><label class="form-label">De</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Até</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Tipo</label><select class="form-select" name="tipo">'
-            . '<option value="" ' . ($tipo === '' ? 'selected' : '') . '>Todos</option>'
-            . '<option value="fluxo" ' . ($tipo === 'fluxo' ? 'selected' : '') . '>Fluxo (Pedidos/Compras)</option>'
-            . '<option value="estoque" ' . ($tipo === 'estoque' ? 'selected' : '') . '>Estoque</option>'
-            . '<option value="pedidos" ' . ($tipo === 'pedidos' ? 'selected' : '') . '>Pedidos</option>'
-            . '<option value="compras" ' . ($tipo === 'compras' ? 'selected' : '') . '>Compras</option>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.from', 'De') . '</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.to', 'Até') . '</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.type', 'Tipo') . '</label><select class="form-select" name="tipo">'
+            . '<option value="" ' . ($tipo === '' ? 'selected' : '') . '>' . __('common.all', 'Todos') . '</option>'
+            . '<option value="fluxo" ' . ($tipo === 'fluxo' ? 'selected' : '') . '>' . __('admin.reports.type_flow', 'Fluxo (Pedidos/Compras)') . '</option>'
+            . '<option value="estoque" ' . ($tipo === 'estoque' ? 'selected' : '') . '>' . __('admin.reports.type_stock', 'Estoque') . '</option>'
+            . '<option value="pedidos" ' . ($tipo === 'pedidos' ? 'selected' : '') . '>' . __('admin.reports.type_orders', 'Pedidos') . '</option>'
+            . '<option value="compras" ' . ($tipo === 'compras' ? 'selected' : '') . '>' . __('admin.reports.type_purchases', 'Compras') . '</option>'
             . '</select></div>'
-            . '<div class="col-md-2"><label class="form-label">Buscar</label><input type="text" class="form-control" name="q" value="' . htmlspecialchars($q) . '" placeholder="pedido, produto, sku..."></div>'
-            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('common.search', 'Buscar') . '</label><input type="text" class="form-control" name="q" value="' . htmlspecialchars($q) . '" placeholder="' . htmlspecialchars(__('admin.reports.search_placeholder', 'pedido, produto, sku...'), ENT_QUOTES, 'UTF-8') . '"></div>'
+            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">' . __('common.filter', 'Filtrar') . '</button></div>'
             . '</form>'
             . '</div></div>';
 
         echo '<div class="d-flex justify-content-between align-items-center mb-2">'
-            . '<div class="text-muted small">Total: <strong>' . number_format($totalRows) . '</strong> registros</div>'
-            . '<div class="text-muted small">Página <strong>' . $page . '</strong> de <strong>' . $totalPages . '</strong></div>'
+            . '<div class="text-muted small">' . __('common.total', 'Total') . ': <strong>' . number_format($totalRows) . '</strong> ' . __('admin.reports.records', 'registros') . '</div>'
+            . '<div class="text-muted small">' . __('admin.reports.page', 'Página') . ' <strong>' . $page . '</strong> ' . __('admin.reports.of', 'de') . ' <strong>' . $totalPages . '</strong></div>'
             . '</div>';
 
         echo '<div class="card"><div class="card-body">'
             . '<div class="table-responsive">'
             . '<table class="table table-sm table-hover">'
             . '<thead><tr>'
-            . '<th>Data</th><th>Origem</th><th>Usuário</th><th>Ação</th><th>Alvo</th><th>Detalhes</th>'
+            . '<th>' . __('admin.reports.th_date', 'Data') . '</th><th>' . __('admin.reports.th_origin', 'Origem') . '</th><th>' . __('admin.reports.user', 'Usuário') . '</th><th>' . __('admin.reports.th_action', 'Ação') . '</th><th>' . __('admin.reports.th_target', 'Alvo') . '</th><th>' . __('admin.reports.th_details', 'Detalhes') . '</th>'
             . '</tr></thead><tbody>';
 
         if (empty($rows)) {
-            echo '<tr><td colspan="6" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted">' . __('admin.reports.no_records', 'Nenhum registro encontrado.') . '</td></tr>';
         } else {
             foreach ($rows as $r) {
                 $dt = !empty($r['data']) ? date('d/m/Y H:i:s', strtotime((string) $r['data'])) : '-';
@@ -411,7 +411,7 @@ class AdminRelatoriosController extends Controller {
                     . '<td><code>' . htmlspecialchars($acao) . '</code></td>'
                     . '<td>' . htmlspecialchars($alvo) . '</td>'
                     . '<td>'
-                    . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">Ver</button>'
+                    . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">' . __('common.view', 'Ver') . '</button>'
                     . '<div class="collapse mt-2" id="' . $detailId . '">'
                     . '<pre class="small mb-0" style="white-space:pre-wrap;">' . htmlspecialchars($pretty) . '</pre>'
                     . '</div>'
@@ -427,9 +427,9 @@ class AdminRelatoriosController extends Controller {
         $prev = max(1, $page - 1);
         $next = min($totalPages, $page + 1);
         $qs['page'] = $prev;
-        echo '<li class="page-item ' . ($page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Anterior</a></li>';
+        echo '<li class="page-item ' . ($page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">' . __('common.previous', 'Anterior') . '</a></li>';
         $qs['page'] = $next;
-        echo '<li class="page-item ' . ($page >= $totalPages ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Próxima</a></li>';
+        echo '<li class="page-item ' . ($page >= $totalPages ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">' . __('common.next', 'Próxima') . '</a></li>';
         echo '</ul></nav>';
 
         echo '</main></div></div>'
@@ -532,7 +532,7 @@ class AdminRelatoriosController extends Controller {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auditoria de Ações - Admin</title>
+  <title>' . htmlspecialchars(__('admin.reports.audit_page_title', 'Auditoria de Ações - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -540,28 +540,28 @@ class AdminRelatoriosController extends Controller {
         renderAdminSidebar('relatorios');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
-            . '<h1 class="page-title">Auditoria / Logs de Uso</h1>'
+            . '<h1 class="page-title">' . __('admin.reports.audit_title', 'Auditoria / Logs de Uso') . '</h1>'
             . '</div>';
 
         if (!$hasLogs) {
-            echo '<div class="alert alert-warning">A tabela <strong>auditoria_logs</strong> não existe no banco. Rode a migration <code>068_create_auditoria_logs.sql</code>.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.reports.table_auditoria_missing2', 'A tabela <strong>auditoria_logs</strong> não existe no banco. Rode a migration <code>068_create_auditoria_logs.sql</code>.') . '</div>';
         }
 
         echo '<div class="card mb-3"><div class="card-body">'
             . '<form method="GET" class="row g-2 align-items-end">'
-            . '<div class="col-md-3"><label class="form-label">Usuário</label><select class="form-select" name="usuario_id">'
-            . '<option value="0">Todos</option>';
+            . '<div class="col-md-3"><label class="form-label">' . __('admin.reports.user', 'Usuário') . '</label><select class="form-select" name="usuario_id">'
+            . '<option value="0">' . __('common.all', 'Todos') . '</option>';
         foreach ($usuarios as $u) {
             $uid = (int) ($u['id'] ?? 0);
             $label = trim((string) (($u['nome'] ?? '') . ' ' . ($u['email'] ?? '')));
-            if ($label === '') $label = 'Usuário #' . $uid;
+            if ($label === '') $label = __('admin.reports.user_label', 'Usuário #') . $uid;
             echo '<option value="' . $uid . '" ' . ($usuarioId === $uid ? 'selected' : '') . '>' . htmlspecialchars($label) . '</option>';
         }
         echo '</select></div>'
-            . '<div class="col-md-2"><label class="form-label">De</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Até</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>'
-            . '<div class="col-md-4"><label class="form-label">Buscar</label><input type="text" class="form-control" name="q" value="' . htmlspecialchars($q) . '" placeholder="ação, rota, tabela..."></div>'
-            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.from', 'De') . '</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.to', 'Até') . '</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>'
+            . '<div class="col-md-4"><label class="form-label">' . __('common.search', 'Buscar') . '</label><input type="text" class="form-control" name="q" value="' . htmlspecialchars($q) . '" placeholder="' . htmlspecialchars(__('admin.reports.audit_search_placeholder', 'ação, rota, tabela...'), ENT_QUOTES, 'UTF-8') . '"></div>'
+            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">' . __('common.filter', 'Filtrar') . '</button></div>'
             . '</form>'
             . '</div></div>';
 
@@ -569,19 +569,19 @@ class AdminRelatoriosController extends Controller {
         if ($totalPages < 1) $totalPages = 1;
 
         echo '<div class="d-flex justify-content-between align-items-center mb-2">'
-            . '<div class="text-muted small">Total: <strong>' . number_format($totalRows) . '</strong> registros</div>'
-            . '<div class="text-muted small">Página <strong>' . $page . '</strong> de <strong>' . $totalPages . '</strong></div>'
+            . '<div class="text-muted small">' . __('common.total', 'Total') . ': <strong>' . number_format($totalRows) . '</strong> ' . __('admin.reports.records', 'registros') . '</div>'
+            . '<div class="text-muted small">' . __('admin.reports.page', 'Página') . ' <strong>' . $page . '</strong> ' . __('admin.reports.of', 'de') . ' <strong>' . $totalPages . '</strong></div>'
             . '</div>';
 
         echo '<div class="card"><div class="card-body">'
             . '<div class="table-responsive">'
             . '<table class="table table-sm table-hover">'
             . '<thead><tr>'
-            . '<th>Data</th><th>Usuário</th><th>Ação</th><th>IP</th><th>Detalhes</th>'
+            . '<th>' . __('admin.reports.th_date', 'Data') . '</th><th>' . __('admin.reports.user', 'Usuário') . '</th><th>' . __('admin.reports.th_action', 'Ação') . '</th><th>IP</th><th>' . __('admin.reports.th_details', 'Detalhes') . '</th>'
             . '</tr></thead><tbody>';
 
         if (empty($rows)) {
-            echo '<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+            echo '<tr><td colspan="5" class="text-center text-muted">' . __('admin.reports.no_records', 'Nenhum registro encontrado.') . '</td></tr>';
         } else {
             foreach ($rows as $r) {
                 $dt = !empty($r['created_at']) ? date('d/m/Y H:i:s', strtotime((string) $r['created_at'])) : '-';
@@ -589,7 +589,7 @@ class AdminRelatoriosController extends Controller {
                 $uEmail = (string) ($r['usuario_email'] ?? '');
                 $uLabel = trim($uName !== '' ? ($uName . ($uEmail !== '' ? (' (' . $uEmail . ')') : '')) : ($uEmail !== '' ? $uEmail : ''));
                 if ($uLabel === '') {
-                    $uLabel = 'Usuário #' . (int) ($r['usuario_id'] ?? 0);
+                    $uLabel = __('admin.reports.user_label', 'Usuário #') . (int) ($r['usuario_id'] ?? 0);
                 }
 
                 $acao = (string) ($r['acao'] ?? '');
@@ -640,17 +640,17 @@ class AdminRelatoriosController extends Controller {
                 $keys = array_slice($keys, 0, 6);
                 $resumoCampos = '';
                 if (!empty($keys)) {
-                    $resumoCampos = 'Campos: ' . implode(', ', $keys);
+                    $resumoCampos = __('admin.reports.fields_label', 'Campos: ') . implode(', ', $keys);
                 }
 
                 // resumo especial (algumas ações comuns)
                 $resumoExtra = '';
                 if (strpos($route, '/admin/pedidos/novo-manual/gerar-link') !== false) {
-                    $resumoExtra = 'Gerou link de pagamento';
+                    $resumoExtra = __('admin.reports.action_generated_payment_link', 'Gerou link de pagamento');
                 } elseif (strpos($route, '/admin/pedidos/novo-manual/criar') !== false) {
-                    $resumoExtra = 'Criou pedido manual';
+                    $resumoExtra = __('admin.reports.action_created_manual_order', 'Criou pedido manual');
                 } elseif (stripos($handler, 'atualizar_perfil') !== false) {
-                    $resumoExtra = 'Atualizou perfil';
+                    $resumoExtra = __('admin.reports.action_updated_profile', 'Atualizou perfil');
                 }
 
                 $detailId = 'log_' . (int) ($r['id'] ?? 0);
@@ -676,7 +676,7 @@ class AdminRelatoriosController extends Controller {
                     . '</td>'
                     . '<td>' . htmlspecialchars($ip) . '</td>'
                     . '<td>'
-                    . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">Ver</button>'
+                    . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">' . __('common.view', 'Ver') . '</button>'
                     . '<div class="collapse mt-2" id="' . $detailId . '">'
                     . '<pre class="small mb-0" style="white-space:pre-wrap;">' . htmlspecialchars($pretty) . '</pre>'
                     . '</div>'
@@ -693,9 +693,9 @@ class AdminRelatoriosController extends Controller {
         $prev = max(1, $page - 1);
         $next = min($totalPages, $page + 1);
         $qs['page'] = $prev;
-        echo '<li class="page-item ' . ($page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Anterior</a></li>';
+        echo '<li class="page-item ' . ($page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">' . __('common.previous', 'Anterior') . '</a></li>';
         $qs['page'] = $next;
-        echo '<li class="page-item ' . ($page >= $totalPages ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Próxima</a></li>';
+        echo '<li class="page-item ' . ($page >= $totalPages ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">' . __('common.next', 'Próxima') . '</a></li>';
         echo '</ul></nav>';
 
         echo '</main></div></div>'
@@ -1033,7 +1033,7 @@ class AdminRelatoriosController extends Controller {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Relatório Financeiro - Admin</title>
+  <title>' . htmlspecialchars(__('admin.reports.financial_page_title', 'Relatório Financeiro - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -1041,50 +1041,50 @@ class AdminRelatoriosController extends Controller {
         renderAdminSidebar('relatorios');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
-            . '<h1 class="page-title">Relatório Financeiro (Completo)</h1>'
+            . '<h1 class="page-title">' . __('admin.reports.financial_title', 'Relatório Financeiro (Completo)') . '</h1>'
             . '</div>';
 
         echo '<div class="card mb-3"><div class="card-body">'
             . '<form method="GET" class="row g-2 align-items-end">'
-            . '<div class="col-md-2"><label class="form-label">Criação (de)</label><input type="date" class="form-control" name="data_inicio_criacao" value="' . htmlspecialchars($dataInicioCriacao) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Criação (até)</label><input type="date" class="form-control" name="data_fim_criacao" value="' . htmlspecialchars($dataFimCriacao) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Pagamento (de)</label><input type="date" class="form-control" name="data_inicio_pagamento" value="' . htmlspecialchars($dataInicioPagamento) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Pagamento (até)</label><input type="date" class="form-control" name="data_fim_pagamento" value="' . htmlspecialchars($dataFimPagamento) . '"></div>'
-            . '<div class="col-md-2"><label class="form-label">Status</label><input type="text" class="form-control" name="status" value="' . htmlspecialchars($status) . '" placeholder="ex: pago"></div>'
-            . '<div class="col-md-1"><label class="form-label">Moeda</label><select class="form-select" name="moeda">'
-            . '<option value="" ' . ($moeda === '' ? 'selected' : '') . '>Todas</option>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.creation_from', 'Criação (de)') . '</label><input type="date" class="form-control" name="data_inicio_criacao" value="' . htmlspecialchars($dataInicioCriacao) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.creation_to', 'Criação (até)') . '</label><input type="date" class="form-control" name="data_fim_criacao" value="' . htmlspecialchars($dataFimCriacao) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.payment_from', 'Pagamento (de)') . '</label><input type="date" class="form-control" name="data_inicio_pagamento" value="' . htmlspecialchars($dataInicioPagamento) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('admin.reports.payment_to', 'Pagamento (até)') . '</label><input type="date" class="form-control" name="data_fim_pagamento" value="' . htmlspecialchars($dataFimPagamento) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">' . __('common.status', 'Status') . '</label><input type="text" class="form-control" name="status" value="' . htmlspecialchars($status) . '" placeholder="' . htmlspecialchars(__('admin.reports.status_placeholder', 'ex: pago'), ENT_QUOTES, 'UTF-8') . '"></div>'
+            . '<div class="col-md-1"><label class="form-label">' . __('admin.reports.currency', 'Moeda') . '</label><select class="form-select" name="moeda">'
+            . '<option value="" ' . ($moeda === '' ? 'selected' : '') . '>' . __('admin.reports.all_currencies', 'Todas') . '</option>'
             . '<option value="USD" ' . ($moeda === 'USD' ? 'selected' : '') . '>USD</option>'
             . '<option value="BRL" ' . ($moeda === 'BRL' ? 'selected' : '') . '>BRL</option>'
             . '</select></div>'
-            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>'
+            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">' . __('common.filter', 'Filtrar') . '</button></div>'
             . '</form>'
             . '<div class="mt-3 d-flex gap-2">'
-            . '<a class="btn btn-outline-secondary btn-sm" target="_blank" href="/admin/estoque/relatorios/financeiro/export?format=csv&' . http_build_query($_GET) . '">Exportar CSV</a>'
-            . '<a class="btn btn-outline-danger btn-sm" target="_blank" href="/admin/estoque/relatorios/financeiro/export?format=pdf&' . http_build_query($_GET) . '">Exportar PDF</a>'
+            . '<a class="btn btn-outline-secondary btn-sm" target="_blank" href="/admin/estoque/relatorios/financeiro/export?format=csv&' . http_build_query($_GET) . '">' . __('admin.reports.export_csv', 'Exportar CSV') . '</a>'
+            . '<a class="btn btn-outline-danger btn-sm" target="_blank" href="/admin/estoque/relatorios/financeiro/export?format=pdf&' . http_build_query($_GET) . '">' . __('admin.reports.export_pdf', 'Exportar PDF') . '</a>'
             . '</div>'
             . '</div></div>';
 
         echo '<div class="row g-3 mb-3">'
             . '<div class="col-md-3"><div class="card"><div class="card-body">'
-            . '<div class="text-muted small">Quantidade de vendas</div>'
+            . '<div class="text-muted small">' . __('admin.reports.sales_quantity', 'Quantidade de vendas') . '</div>'
             . '<div class="h4 mb-0">' . number_format($qtdPedidos) . '</div>'
             . '<div class="small text-muted">USD: ' . number_format($qtdPedidosUsd) . ' | BRL: ' . number_format($qtdPedidosBrl) . '</div>'
             . '</div></div></div>'
 
             . '<div class="col-md-3"><div class="card"><div class="card-body">'
-            . '<div class="text-muted small">Total arrecadado (origem)</div>'
+            . '<div class="text-muted small">' . __('admin.reports.total_collected_origin', 'Total arrecadado (origem)') . '</div>'
             . '<div class="h6 mb-0">US$ ' . number_format($totalOrigUsd, 2, '.', ',') . '</div>'
             . '<div class="h6 mb-0">R$ ' . number_format($totalOrigBrl, 2, ',', '.') . '</div>'
             . '</div></div></div>'
 
             . '<div class="col-md-3"><div class="card"><div class="card-body">'
-            . '<div class="text-muted small">Impostos arrecadados (origem)</div>'
+            . '<div class="text-muted small">' . __('admin.reports.taxes_collected_origin', 'Impostos arrecadados (origem)') . '</div>'
             . '<div class="h6 mb-0">US$ ' . number_format($impostosOrigUsd, 2, '.', ',') . '</div>'
             . '<div class="h6 mb-0">R$ ' . number_format($impostosOrigBrl, 2, ',', '.') . '</div>'
             . '</div></div></div>'
 
             . '<div class="col-md-3"><div class="card"><div class="card-body">'
-            . '<div class="text-muted small">Lucro (consolidado)</div>'
+            . '<div class="text-muted small">' . __('admin.reports.profit_consolidated', 'Lucro (consolidado)') . '</div>'
             . '<div class="h6 mb-0">US$ ' . number_format($totais['lucro_usd'], 2, '.', ',') . '</div>'
             . '<div class="h6 mb-0">R$ ' . number_format($totais['lucro_brl'], 2, ',', '.') . '</div>'
             . '</div></div></div>'
@@ -1092,35 +1092,35 @@ class AdminRelatoriosController extends Controller {
 
         echo '<div class="row g-3 mb-3">'
             . '<div class="col-md-6"><div class="card"><div class="card-body">'
-            . '<div class="fw-bold mb-2">Consolidado (USD)</div>'
-            . '<div>Total arrecadado: <strong>$ ' . number_format($totais['total_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div>Subtotal produtos: <strong>$ ' . number_format($totais['subtotal_produtos_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div>Impostos (pass-through): <strong>$ ' . number_format($totais['impostos_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div>Taxa de serviço: <strong>$ ' . number_format($totais['taxa_servico_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div>Custo envio fixo: <strong>$ ' . number_format($totais['envio_fixo_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div>Custo produtos: <strong>$ ' . number_format($totais['custo_produtos_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div>Comissão: <strong>$ ' . number_format($totais['comissao_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div class="mt-2 pt-2 border-top">Lucro: <strong class="text-success">$ ' . number_format($totais['lucro_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div class="fw-bold mb-2">' . __('admin.reports.consolidated_usd', 'Consolidado (USD)') . '</div>'
+            . '<div>' . __('admin.reports.total_collected', 'Total arrecadado:') . ' <strong>$ ' . number_format($totais['total_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>' . __('admin.reports.subtotal_products', 'Subtotal produtos:') . ' <strong>$ ' . number_format($totais['subtotal_produtos_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>' . __('admin.reports.taxes_passthrough', 'Impostos (pass-through):') . ' <strong>$ ' . number_format($totais['impostos_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>' . __('admin.reports.service_fee', 'Taxa de serviço:') . ' <strong>$ ' . number_format($totais['taxa_servico_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>' . __('admin.reports.fixed_shipping_cost', 'Custo envio fixo:') . ' <strong>$ ' . number_format($totais['envio_fixo_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>' . __('admin.reports.product_cost', 'Custo produtos:') . ' <strong>$ ' . number_format($totais['custo_produtos_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>' . __('admin.reports.commission', 'Comissão:') . ' <strong>$ ' . number_format($totais['comissao_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div class="mt-2 pt-2 border-top">' . __('admin.reports.profit', 'Lucro:') . ' <strong class="text-success">$ ' . number_format($totais['lucro_usd'], 2, '.', ',') . '</strong></div>'
             . '</div></div></div>'
             . '<div class="col-md-6"><div class="card"><div class="card-body">'
-            . '<div class="fw-bold mb-2">Consolidado (BRL)</div>'
-            . '<div>Total arrecadado: <strong>R$ ' . number_format($totais['total_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div>Subtotal produtos: <strong>R$ ' . number_format($totais['subtotal_produtos_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div>Impostos (pass-through): <strong>R$ ' . number_format($totais['impostos_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div>Taxa de serviço: <strong>R$ ' . number_format($totais['taxa_servico_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div>Custo envio fixo: <strong>R$ ' . number_format($totais['envio_fixo_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div>Custo produtos: <strong>R$ ' . number_format($totais['custo_produtos_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div>Comissão: <strong>R$ ' . number_format($totais['comissao_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div class="mt-2 pt-2 border-top">Lucro: <strong class="text-success">R$ ' . number_format($totais['lucro_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div class="fw-bold mb-2">' . __('admin.reports.consolidated_brl', 'Consolidado (BRL)') . '</div>'
+            . '<div>' . __('admin.reports.total_collected', 'Total arrecadado:') . ' <strong>R$ ' . number_format($totais['total_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>' . __('admin.reports.subtotal_products', 'Subtotal produtos:') . ' <strong>R$ ' . number_format($totais['subtotal_produtos_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>' . __('admin.reports.taxes_passthrough', 'Impostos (pass-through):') . ' <strong>R$ ' . number_format($totais['impostos_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>' . __('admin.reports.service_fee', 'Taxa de serviço:') . ' <strong>R$ ' . number_format($totais['taxa_servico_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>' . __('admin.reports.fixed_shipping_cost', 'Custo envio fixo:') . ' <strong>R$ ' . number_format($totais['envio_fixo_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>' . __('admin.reports.product_cost', 'Custo produtos:') . ' <strong>R$ ' . number_format($totais['custo_produtos_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>' . __('admin.reports.commission', 'Comissão:') . ' <strong>R$ ' . number_format($totais['comissao_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div class="mt-2 pt-2 border-top">' . __('admin.reports.profit', 'Lucro:') . ' <strong class="text-success">R$ ' . number_format($totais['lucro_brl'], 2, ',', '.') . '</strong></div>'
             . '</div></div></div>'
             . '</div>';
 
         echo '<div class="card"><div class="card-body">'
             . '<div class="table-responsive"><table class="table table-sm table-hover">'
             . '<thead><tr>'
-            . '<th>ID</th><th>Número</th><th>Status</th><th>Criado</th><th>Pago</th><th>Moeda</th><th>Tx</th><th>Itens</th>'
-            . '<th>Total USD</th><th>Subtotal Prod USD</th><th>Impostos USD</th><th>Taxa Serv USD</th><th>Envio USD</th><th>Custo Prod USD</th><th>Comissão USD</th><th>Lucro USD</th>'
-            . '<th>Total BRL</th><th>Subtotal Prod BRL</th><th>Impostos BRL</th><th>Taxa Serv BRL</th><th>Envio BRL</th><th>Custo Prod BRL</th><th>Comissão BRL</th><th>Lucro BRL</th>'
+            . '<th>ID</th><th>' . __('admin.reports.th_number', 'Número') . '</th><th>' . __('common.status', 'Status') . '</th><th>' . __('admin.reports.th_created', 'Criado') . '</th><th>' . __('admin.reports.th_paid', 'Pago') . '</th><th>' . __('admin.reports.currency', 'Moeda') . '</th><th>' . __('admin.reports.th_rate', 'Tx') . '</th><th>' . __('admin.reports.th_items', 'Itens') . '</th>'
+            . '<th>Total USD</th><th>' . __('admin.reports.th_subtotal_prod_usd', 'Subtotal Prod USD') . '</th><th>' . __('admin.reports.th_taxes_usd', 'Impostos USD') . '</th><th>' . __('admin.reports.th_service_usd', 'Taxa Serv USD') . '</th><th>' . __('admin.reports.th_shipping_usd', 'Envio USD') . '</th><th>' . __('admin.reports.th_cost_prod_usd', 'Custo Prod USD') . '</th><th>' . __('admin.reports.th_commission_usd', 'Comissão USD') . '</th><th>' . __('admin.reports.th_profit_usd', 'Lucro USD') . '</th>'
+            . '<th>Total BRL</th><th>' . __('admin.reports.th_subtotal_prod_brl', 'Subtotal Prod BRL') . '</th><th>' . __('admin.reports.th_taxes_brl', 'Impostos BRL') . '</th><th>' . __('admin.reports.th_service_brl', 'Taxa Serv BRL') . '</th><th>' . __('admin.reports.th_shipping_brl', 'Envio BRL') . '</th><th>' . __('admin.reports.th_cost_prod_brl', 'Custo Prod BRL') . '</th><th>' . __('admin.reports.th_commission_brl', 'Comissão BRL') . '</th><th>' . __('admin.reports.th_profit_brl', 'Lucro BRL') . '</th>'
             . '</tr></thead><tbody>';
 
         foreach ($out as $r) {
@@ -1509,7 +1509,7 @@ class AdminRelatoriosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatórios - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.reports.page_title', 'Relatórios - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         
@@ -1526,22 +1526,22 @@ class AdminRelatoriosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Relatórios e Análises</h1>
+                    <h1 class="page-title">' . __('admin.reports.title', 'Relatórios e Análises') . '</h1>
                     <div>
                         <a class="btn btn-primary me-2" href="/admin/estoque/relatorios/financeiro">
-                            <i class="fas fa-chart-line me-1"></i>Financeiro (Completo)
+                            <i class="fas fa-chart-line me-1"></i>' . __('admin.reports.btn_financial_complete', 'Financeiro (Completo)') . '
                         </a>
                         <button type="button" class="btn btn-danger me-2" onclick="gerarPDFCompleto()">
-                            <i class="fas fa-file-pdf me-1"></i>Relatório Completo
+                            <i class="fas fa-file-pdf me-1"></i>' . __('admin.reports.btn_complete_report', 'Relatório Completo') . '
                         </button>
                         <button type="button" class="btn btn-warning me-2" onclick="gerarPDFEstoque()">
-                            <i class="fas fa-warehouse me-1"></i>Estoque
+                            <i class="fas fa-warehouse me-1"></i>' . __('admin.reports.btn_stock', 'Estoque') . '
                         </button>
                         <button type="button" class="btn btn-info me-2" onclick="gerarPDFCompras()">
-                            <i class="fas fa-shopping-basket me-1"></i>Compras
+                            <i class="fas fa-shopping-basket me-1"></i>' . __('admin.reports.btn_purchases', 'Compras') . '
                         </button>
                         <a class="btn btn-success" href="/admin/estoque/relatorios/movimentacao">
-                            <i class="fas fa-exchange-alt me-1"></i>Movimentação
+                            <i class="fas fa-exchange-alt me-1"></i>' . __('admin.reports.btn_movement', 'Movimentação') . '
                         </a>
                     </div>
                 </div>';
@@ -1552,36 +1552,36 @@ class AdminRelatoriosController extends Controller {
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Total Produtos</h5>
+                                <h5 class="card-title">' . __('admin.reports.card_total_products', 'Total Produtos') . '</h5>
                                 <h3>' . number_format($estatisticas['total_produtos']) . '</h3>
-                                <small>Cadastrados no sistema</small>
+                                <small>' . __('admin.reports.card_registered', 'Cadastrados no sistema') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-success text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Com Estoque</h5>
+                                <h5 class="card-title">' . __('admin.reports.card_with_stock', 'Com Estoque') . '</h5>
                                 <h3>' . number_format($estatisticas['produtos_com_estoque']) . '</h3>
-                                <small>Com itens em estoque</small>
+                                <small>' . __('admin.reports.card_with_stock_items', 'Com itens em estoque') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-warning text-dark">
                             <div class="card-body">
-                                <h5 class="card-title">Precisa Comprar</h5>
+                                <h5 class="card-title">' . __('admin.reports.card_needs_buy', 'Precisa Comprar') . '</h5>
                                 <h3>' . number_format($estatisticas['produtos_comprar']) . '</h3>
-                                <small>Na lista de compras</small>
+                                <small>' . __('admin.reports.card_in_shopping_list', 'Na lista de compras') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-danger text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Vencendo</h5>
+                                <h5 class="card-title">' . __('admin.reports.card_expiring', 'Vencendo') . '</h5>
                                 <h3>' . number_format($estatisticas['produtos_vencendo']) . '</h3>
-                                <small>Próximos 30 dias</small>
+                                <small>' . __('admin.reports.card_next_30_days', 'Próximos 30 dias') . '</small>
                             </div>
                         </div>
                     </div>
@@ -1590,47 +1590,47 @@ class AdminRelatoriosController extends Controller {
                 <!-- Filtros para Relatórios -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h6><i class="fas fa-filter me-2"></i>Filtros para Relatórios</h6>
+                        <h6><i class="fas fa-filter me-2"></i>' . __('admin.reports.filters_for_reports', 'Filtros para Relatórios') . '</h6>
                     </div>
                     <div class="card-body">
                         <form id="formRelatorio">
                             <div class="row">
                                 <div class="col-md-3">
-                                    <label class="form-label">Tipo de Relatório</label>
+                                    <label class="form-label">' . __('admin.reports.report_type', 'Tipo de Relatório') . '</label>
                                     <select class="form-select" id="tipo_relatorio" name="tipo_relatorio">
-                                        <option value="completo">Relatório Completo</option>
-                                        <option value="estoque">Apenas Estoque</option>
-                                        <option value="compras">Apenas Compras</option>
-                                        <option value="movimentacao">Apenas Movimentação</option>
-                                        <option value="validades">Produtos por Validade</option>
-                                        <option value="criticos">Produtos Críticos</option>
+                                        <option value="completo">' . __('admin.reports.btn_complete_report', 'Relatório Completo') . '</option>
+                                        <option value="estoque">' . __('admin.reports.only_stock', 'Apenas Estoque') . '</option>
+                                        <option value="compras">' . __('admin.reports.only_purchases', 'Apenas Compras') . '</option>
+                                        <option value="movimentacao">' . __('admin.reports.only_movement', 'Apenas Movimentação') . '</option>
+                                        <option value="validades">' . __('admin.reports.products_by_expiry', 'Produtos por Validade') . '</option>
+                                        <option value="criticos">' . __('admin.reports.critical_products', 'Produtos Críticos') . '</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Data Inicial</label>
+                                    <label class="form-label">' . __('admin.reports.start_date', 'Data Inicial') . '</label>
                                     <input type="date" class="form-control" id="data_inicial" name="data_inicial">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Data Final</label>
+                                    <label class="form-label">' . __('admin.reports.end_date', 'Data Final') . '</label>
                                     <input type="date" class="form-control" id="data_final" name="data_final">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Loja</label>
+                                    <label class="form-label">' . __('admin.reports.store', 'Loja') . '</label>
                                     <select class="form-select" id="loja_filtro" name="loja_filtro">
-                                        <option value="">Todas</option>
+                                        <option value="">' . __('admin.reports.all_currencies', 'Todas') . '</option>
                                         <option value="sams">Sams</option>
                                         <option value="costco">Costco</option>
-                                        <option value="outro">Outro</option>
+                                        <option value="outro">' . __('admin.reports.store_other', 'Outro') . '</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="row mt-3">
                                 <div class="col-md-12">
                                     <button type="button" class="btn btn-primary" onclick="gerarRelatorioPersonalizado()">
-                                        <i class="fas fa-file-pdf me-1"></i>Gerar Relatório Personalizado
+                                        <i class="fas fa-file-pdf me-1"></i>' . __('admin.reports.generate_custom_report', 'Gerar Relatório Personalizado') . '
                                     </button>
                                     <button type="button" class="btn btn-secondary ms-2" onclick="limparFiltros()">
-                                        <i class="fas fa-times me-1"></i>Limpar Filtros
+                                        <i class="fas fa-times me-1"></i>' . __('admin.reports.clear_filters', 'Limpar Filtros') . '
                                     </button>
                                 </div>
                             </div>
@@ -1643,23 +1643,23 @@ class AdminRelatoriosController extends Controller {
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header bg-danger text-white">
-                                <h6><i class="fas fa-exclamation-triangle me-2"></i>Produtos Críticos</h6>
+                                <h6><i class="fas fa-exclamation-triangle me-2"></i>' . __('admin.reports.critical_products', 'Produtos Críticos') . '</h6>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm">
                                         <thead>
                                             <tr>
-                                                <th>Produto</th>
-                                                <th>Estoque</th>
-                                                <th>Mínimo</th>
-                                                <th>Status</th>
+                                                <th>' . __('admin.reports.th_product', 'Produto') . '</th>
+                                                <th>' . __('admin.reports.th_stock', 'Estoque') . '</th>
+                                                <th>' . __('admin.reports.th_minimum', 'Mínimo') . '</th>
+                                                <th>' . __('common.status', 'Status') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
                                         
                                         foreach ($produtos_criticos as $produto) {
-                                            $status = $produto['quantidade_estoque'] == 0 ? 'Esgotado' : 'Crítico';
+                                            $status = $produto['quantidade_estoque'] == 0 ? __('admin.reports.status_out_of_stock', 'Esgotado') : __('admin.reports.status_critical', 'Crítico');
                                             echo '<tr>
                                                 <td>
                                                     <strong>' . htmlspecialchars((string) ($produto['produto_nome'] ?? '')) . '</strong>
@@ -1680,17 +1680,17 @@ class AdminRelatoriosController extends Controller {
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header bg-warning text-dark">
-                                <h6><i class="fas fa-shopping-basket me-2"></i>Compras Urgentes</h6>
+                                <h6><i class="fas fa-shopping-basket me-2"></i>' . __('admin.reports.urgent_purchases', 'Compras Urgentes') . '</h6>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm">
                                         <thead>
                                             <tr>
-                                                <th>Produto</th>
-                                                <th>Faltante</th>
-                                                <th>Prioridade</th>
-                                                <th>Valor</th>
+                                                <th>' . __('admin.reports.th_product', 'Produto') . '</th>
+                                                <th>' . __('admin.reports.th_missing', 'Faltante') . '</th>
+                                                <th>' . __('admin.reports.th_priority', 'Prioridade') . '</th>
+                                                <th>' . __('admin.reports.th_value', 'Valor') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -1720,21 +1720,21 @@ class AdminRelatoriosController extends Controller {
                 <!-- Movimentações Recentes -->
                 <div class="card">
                     <div class="card-header">
-                        <h6><i class="fas fa-history me-2"></i>Movimentações Recentes</h6>
+                        <h6><i class="fas fa-history me-2"></i>' . __('admin.reports.recent_movements', 'Movimentações Recentes') . '</h6>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Data</th>
-                                        <th>Produto</th>
-                                        <th>Tipo</th>
-                                        <th>Quantidade</th>
-                                        <th>Anterior</th>
-                                        <th>Nova</th>
-                                        <th>Motivo</th>
-                                        <th>Usuário</th>
+                                        <th>' . __('admin.reports.th_date', 'Data') . '</th>
+                                        <th>' . __('admin.reports.th_product', 'Produto') . '</th>
+                                        <th>' . __('admin.reports.type', 'Tipo') . '</th>
+                                        <th>' . __('admin.reports.th_quantity', 'Quantidade') . '</th>
+                                        <th>' . __('admin.reports.th_previous', 'Anterior') . '</th>
+                                        <th>' . __('admin.reports.th_new', 'Nova') . '</th>
+                                        <th>' . __('admin.reports.th_reason', 'Motivo') . '</th>
+                                        <th>' . __('admin.reports.user', 'Usuário') . '</th>
                                     </tr>
                                 </thead>
                                 <tbody>';
@@ -1754,7 +1754,7 @@ class AdminRelatoriosController extends Controller {
                                         <td>' . $mov['quantidade_anterior'] . '</td>
                                         <td>' . $mov['quantidade_nova'] . '</td>
                                         <td>' . htmlspecialchars($mov['motivo']) . '</td>
-                                        <td>' . htmlspecialchars($mov['usuario_nome'] ?? 'Sistema') . '</td>
+                                        <td>' . htmlspecialchars($mov['usuario_nome'] ?? __('admin.reports.system', 'Sistema')) . '</td>
                                     </tr>';
                                 }
                                 
@@ -1836,7 +1836,7 @@ class AdminRelatoriosController extends Controller {
             $this->gerarArquivoPDF($dados, $tipo);
 
         } catch (\Exception $e) {
-            echo "Erro ao gerar PDF: " . $e->getMessage();
+            echo __('admin.reports.pdf_error', 'Erro ao gerar PDF: ') . $e->getMessage();
         }
     }
 
@@ -2000,7 +2000,7 @@ class AdminRelatoriosController extends Controller {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Relatório de ' . ucfirst($tipo) . '</title>
+    <title>' . __('admin.reports.pdf_report_of', 'Relatório de ') . ucfirst($tipo) . '</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
@@ -2019,8 +2019,8 @@ class AdminRelatoriosController extends Controller {
 </head>
 <body>
     <div class="header">
-        <h1>Relatório de ' . ucfirst($tipo) . '</h1>
-        <p>Gerado em: ' . date('d/m/Y H:i') . '</p>
+        <h1>' . __('admin.reports.pdf_report_of', 'Relatório de ') . ucfirst($tipo) . '</h1>
+        <p>' . __('admin.reports.pdf_generated_at', 'Gerado em: ') . date('d/m/Y H:i') . '</p>
     </div>
 
     <div class="content">
@@ -2031,22 +2031,22 @@ class AdminRelatoriosController extends Controller {
         // Cabeçalho da tabela conforme o tipo
         switch ($tipo) {
             case 'estoque':
-                echo '<th>Produto</th><th>SKU</th><th>Loja</th><th>Estoque</th><th>Mínimo</th><th>Ideal</th><th>Status</th>';
+                echo '<th>' . __('admin.reports.th_product', 'Produto') . '</th><th>SKU</th><th>' . __('admin.reports.store', 'Loja') . '</th><th>' . __('admin.reports.th_stock', 'Estoque') . '</th><th>' . __('admin.reports.th_minimum', 'Mínimo') . '</th><th>' . __('admin.reports.th_ideal', 'Ideal') . '</th><th>' . __('common.status', 'Status') . '</th>';
                 break;
             case 'compras':
-                echo '<th>Produto</th><th>SKU</th><th>Loja</th><th>Necessário</th><th>Em Estoque</th><th>Faltante</th><th>Prioridade</th><th>Status</th>';
+                echo '<th>' . __('admin.reports.th_product', 'Produto') . '</th><th>SKU</th><th>' . __('admin.reports.store', 'Loja') . '</th><th>' . __('admin.reports.th_needed', 'Necessário') . '</th><th>' . __('admin.reports.th_in_stock', 'Em Estoque') . '</th><th>' . __('admin.reports.th_missing', 'Faltante') . '</th><th>' . __('admin.reports.th_priority', 'Prioridade') . '</th><th>' . __('common.status', 'Status') . '</th>';
                 break;
             case 'movimentacao':
-                echo '<th>Data</th><th>Produto</th><th>SKU</th><th>Tipo</th><th>Quantidade</th><th>Anterior</th><th>Nova</th><th>Motivo</th>';
+                echo '<th>' . __('admin.reports.th_date', 'Data') . '</th><th>' . __('admin.reports.th_product', 'Produto') . '</th><th>SKU</th><th>' . __('admin.reports.type', 'Tipo') . '</th><th>' . __('admin.reports.th_quantity', 'Quantidade') . '</th><th>' . __('admin.reports.th_previous', 'Anterior') . '</th><th>' . __('admin.reports.th_new', 'Nova') . '</th><th>' . __('admin.reports.th_reason', 'Motivo') . '</th>';
                 break;
             case 'validades':
-                echo '<th>Produto</th><th>SKU</th><th>Loja</th><th>Quantidade</th><th>Data Validade</th><th>Dias para Vencer</th>';
+                echo '<th>' . __('admin.reports.th_product', 'Produto') . '</th><th>SKU</th><th>' . __('admin.reports.store', 'Loja') . '</th><th>' . __('admin.reports.th_quantity', 'Quantidade') . '</th><th>' . __('admin.reports.th_expiry_date', 'Data Validade') . '</th><th>' . __('admin.reports.th_days_to_expire', 'Dias para Vencer') . '</th>';
                 break;
             case 'criticos':
-                echo '<th>Produto</th><th>SKU</th><th>Loja</th><th>Estoque</th><th>Mínimo</th><th>Faltante</th><th>Preço Unit.</th>';
+                echo '<th>' . __('admin.reports.th_product', 'Produto') . '</th><th>SKU</th><th>' . __('admin.reports.store', 'Loja') . '</th><th>' . __('admin.reports.th_stock', 'Estoque') . '</th><th>' . __('admin.reports.th_minimum', 'Mínimo') . '</th><th>' . __('admin.reports.th_missing', 'Faltante') . '</th><th>' . __('admin.reports.th_unit_price', 'Preço Unit.') . '</th>';
                 break;
             default:
-                echo '<th>Produto</th><th>SKU</th><th>Loja</th><th>Quantidade</th><th>Status</th>';
+                echo '<th>' . __('admin.reports.th_product', 'Produto') . '</th><th>SKU</th><th>' . __('admin.reports.store', 'Loja') . '</th><th>' . __('admin.reports.th_quantity', 'Quantidade') . '</th><th>' . __('common.status', 'Status') . '</th>';
         }
 
         echo '</tr>
@@ -2102,7 +2102,7 @@ class AdminRelatoriosController extends Controller {
                     echo '<td>' . ucfirst($item['loja']) . '</td>';
                     echo '<td>' . $item['quantidade'] . '</td>';
                     echo '<td>' . date('d/m/Y', strtotime($item['data_validade'])) . '</td>';
-                    echo '<td>' . $item['dias_para_vencer'] . ' dias</td>';
+                    echo '<td>' . $item['dias_para_vencer'] . ' ' . __('admin.reports.days', 'dias') . '</td>';
                     break;
 
                 case 'criticos':
@@ -2131,7 +2131,7 @@ class AdminRelatoriosController extends Controller {
     </div>
 
     <div class="footer">
-        <p>Relatório gerado pelo Sistema Braziliana Estoque - Página ' . date('d/m/Y H:i') . '</p>
+        <p>' . __('admin.reports.pdf_footer', 'Relatório gerado pelo Sistema Braziliana Estoque - Página ') . date('d/m/Y H:i') . '</p>
     </div>
 </body>
 </html>';

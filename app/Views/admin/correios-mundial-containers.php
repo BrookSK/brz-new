@@ -23,10 +23,10 @@
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Correios Mundial (PACKET) - Containers</h1>
+        <h1 class="page-title"><?= __('admin.correios_mundial.containers_title','Correios Mundial (PACKET) - Containers') ?></h1>
         <div>
-            <a class="btn btn-sm btn-outline-secondary" href="/admin/correios-mundial">Voltar</a>
-            <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/containers/novo">Novo container</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/admin/correios-mundial"><?= __('admin.correios_mundial.back','Voltar') ?></a>
+            <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/containers/novo"><?= __('admin.correios_mundial.new_container','Novo container') ?></a>
         </div>
     </div>
 
@@ -39,26 +39,26 @@
     <?php endif; ?>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header"><strong>Containers criados</strong></div>
+        <div class="card-header"><strong><?= __('admin.correios_mundial.containers_created','Containers criados') ?></strong></div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
                             <th style="width:30px"></th>
-                            <th>Remessa</th>
-                            <th>Unit Code</th>
-                            <th>Pacotes</th>
-                            <th>Status</th>
-                            <th>Data</th>
-                            <th>PDF</th>
-                            <th>Acoes</th>
+                            <th><?= __('admin.correios_mundial.col_dispatch','Remessa') ?></th>
+                            <th><?= __('admin.correios_mundial.col_unit_code','Unit Code') ?></th>
+                            <th><?= __('admin.correios_mundial.col_packages','Pacotes') ?></th>
+                            <th><?= __('admin.correios_mundial.col_status','Status') ?></th>
+                            <th><?= __('admin.correios_mundial.col_date','Data') ?></th>
+                            <th><?= __('admin.correios_mundial.col_pdf','PDF') ?></th>
+                            <th><?= __('admin.correios_mundial.col_actions','Acoes') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $containers = isset($containers) && is_array($containers) ? $containers : []; ?>
                         <?php if (empty($containers)): ?>
-                            <tr><td colspan="8" class="text-muted">Nenhum container criado.</td></tr>
+                            <tr><td colspan="8" class="text-muted"><?= __('admin.correios_mundial.no_containers','Nenhum container criado.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($containers as $c): ?>
                                 <?php $cid = (int) ($c['id'] ?? 0); ?>
@@ -73,11 +73,11 @@
                                     <td><span class="badge bg-secondary"><?= $packagesCount ?></span></td>
                                     <td>
                                         <?php if ($status === 'created'): ?>
-                                            <span class="badge badge-status-created">Criado</span>
+                                            <span class="badge badge-status-created"><?= __('admin.correios_mundial.status_created','Criado') ?></span>
                                         <?php elseif ($status === 'faturado'): ?>
-                                            <span class="badge badge-status-gerada">Faturado</span>
+                                            <span class="badge badge-status-gerada"><?= __('admin.correios_mundial.status_invoiced','Faturado') ?></span>
                                         <?php elseif ($status === 'cancelled'): ?>
-                                            <span class="badge badge-status-cancelled">Cancelado</span>
+                                            <span class="badge badge-status-cancelled"><?= __('admin.correios_mundial.status_cancelled','Cancelado') ?></span>
                                         <?php else: ?>
                                             <span class="badge badge-status-default"><?= htmlspecialchars($status !== '' ? $status : '-') ?></span>
                                         <?php endif; ?>
@@ -94,11 +94,11 @@
                                     </td>
                                     <td>
                                         <?php if ($cid > 0): ?>
-                                            <form method="post" action="/admin/correios-mundial/container/<?= $cid ?>/cancelar" style="display:inline-block" onsubmit="event.stopPropagation(); return confirm('Cancelar o despacho (dispatch) deste container?');">
-                                                <button type="submit" class="btn btn-sm btn-outline-warning" <?= $status === 'cancelled' ? 'disabled' : '' ?> onclick="event.stopPropagation();">Cancelar</button>
+                                            <form method="post" action="/admin/correios-mundial/container/<?= $cid ?>/cancelar" style="display:inline-block" onsubmit="event.stopPropagation(); return confirm(<?= htmlspecialchars(json_encode(__('admin.correios_mundial.confirm_cancel_dispatch','Cancelar o despacho (dispatch) deste container?')), ENT_QUOTES, 'UTF-8') ?>);">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning" <?= $status === 'cancelled' ? 'disabled' : '' ?> onclick="event.stopPropagation();"><?= __('admin.correios_mundial.cancel','Cancelar') ?></button>
                                             </form>
-                                            <form method="post" action="/admin/correios-mundial/container/<?= $cid ?>/deletar" style="display:inline-block" onsubmit="event.stopPropagation(); return confirm('Deletar o container? Isso vai liberar os pacotes para uso em outro container.');">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" <?= $status === 'cancelled' ? '' : 'disabled' ?> onclick="event.stopPropagation();">Deletar</button>
+                                            <form method="post" action="/admin/correios-mundial/container/<?= $cid ?>/deletar" style="display:inline-block" onsubmit="event.stopPropagation(); return confirm(<?= htmlspecialchars(json_encode(__('admin.correios_mundial.confirm_delete_container','Deletar o container? Isso vai liberar os pacotes para uso em outro container.')), ENT_QUOTES, 'UTF-8') ?>);">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" <?= $status === 'cancelled' ? '' : 'disabled' ?> onclick="event.stopPropagation();"><?= __('admin.correios_mundial.delete','Deletar') ?></button>
                                             </form>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
@@ -109,7 +109,7 @@
                                     <td colspan="8">
                                         <div class="detail-wrapper" id="detail-content-<?= $cid ?>">
                                             <div class="detail-loading">
-                                                <i class="fas fa-spinner fa-spin"></i> Carregando detalhes...
+                                                <i class="fas fa-spinner fa-spin"></i> <?= __('admin.correios_mundial.loading_details','Carregando detalhes...') ?>
                                             </div>
                                         </div>
                                     </td>
@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderDetails(containerId, data);
             })
             .catch(function() {
-                renderError(containerId, 'Erro ao carregar detalhes.');
+                renderError(containerId, <?= json_encode(__('admin.correios_mundial.load_details_error','Erro ao carregar detalhes.')) ?>);
             });
     }
 
@@ -185,29 +185,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Info grid
         html += '<div class="info-grid">';
-        html += infoItem('Pais Origem', data.origin_country || '-');
-        html += infoItem('Operador Origem', data.origin_operator_name || '-');
-        html += infoItem('Operador Destino', data.destination_operator_name || '-');
-        html += infoItem('Categoria Postal', data.postal_category_code || '-');
-        html += infoItem('Subclasse', data.service_subclass_code || '-');
-        html += infoItem('Tipo Unidade', formatUnitType(data.unit_type));
-        html += infoItem('AWB', data.awb || '-');
-        html += infoItem('Grupo Triagem', data.triage_group || '-');
-        html += infoItem('Total Pacotes', data.packages_count || 0);
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.origin_country','Pais Origem')) ?>, data.origin_country || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.origin_operator','Operador Origem')) ?>, data.origin_operator_name || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.destination_operator','Operador Destino')) ?>, data.destination_operator_name || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.postal_category','Categoria Postal')) ?>, data.postal_category_code || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.subclass','Subclasse')) ?>, data.service_subclass_code || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.unit_type','Tipo Unidade')) ?>, formatUnitType(data.unit_type));
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.awb','AWB')) ?>, data.awb || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.triage_group','Grupo Triagem')) ?>, data.triage_group || '-');
+        html += infoItem(<?= json_encode(__('admin.correios_mundial.total_packages','Total Pacotes')) ?>, data.packages_count || 0);
         html += '</div>';
 
         // Tabela de pacotes/etiquetas
         if (data.etiquetas && data.etiquetas.length > 0) {
-            html += '<h6 class="mt-3 mb-2"><i class="fas fa-box"></i> Pacotes / Etiquetas (' + data.etiquetas.length + ')</h6>';
+            html += '<h6 class="mt-3 mb-2"><i class="fas fa-box"></i> ' + <?= json_encode(__('admin.correios_mundial.packages_labels','Pacotes / Etiquetas ({n})')) ?>.replace('{n}', data.etiquetas.length) + '</h6>';
             html += '<div class="table-responsive">';
             html += '<table class="table table-sm table-bordered packages-table mb-0">';
             html += '<thead><tr>';
-            html += '<th>Tracking</th>';
-            html += '<th>Pedido</th>';
-            html += '<th>Cliente</th>';
-            html += '<th>Peso (g)</th>';
-            html += '<th>Status</th>';
-            html += '<th>Data</th>';
+            html += '<th>' + <?= json_encode(__('admin.correios_mundial.col_tracking_short','Tracking')) ?> + '</th>';
+            html += '<th>' + <?= json_encode(__('admin.correios_mundial.col_order','Pedido')) ?> + '</th>';
+            html += '<th>' + <?= json_encode(__('admin.correios_mundial.col_customer','Cliente')) ?> + '</th>';
+            html += '<th>' + <?= json_encode(__('admin.correios_mundial.col_weight_g','Peso (g)')) ?> + '</th>';
+            html += '<th>' + <?= json_encode(__('admin.correios_mundial.col_status','Status')) ?> + '</th>';
+            html += '<th>' + <?= json_encode(__('admin.correios_mundial.col_date','Data')) ?> + '</th>';
             html += '</tr></thead><tbody>';
 
             data.etiquetas.forEach(function(et) {
@@ -224,14 +224,14 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '</tbody></table></div>';
         } else if (data.tracking_numbers && data.tracking_numbers.length > 0) {
             // Se nao achou etiquetas no banco mas tem tracking numbers
-            html += '<h6 class="mt-3 mb-2"><i class="fas fa-box"></i> Tracking Numbers (' + data.tracking_numbers.length + ')</h6>';
+            html += '<h6 class="mt-3 mb-2"><i class="fas fa-box"></i> ' + <?= json_encode(__('admin.correios_mundial.tracking_numbers','Tracking Numbers ({n})')) ?>.replace('{n}', data.tracking_numbers.length) + '</h6>';
             html += '<div class="d-flex flex-wrap gap-1">';
             data.tracking_numbers.forEach(function(tn) {
                 html += '<span class="badge bg-light text-dark border"><code>' + escHtml(tn) + '</code></span>';
             });
             html += '</div>';
         } else {
-            html += '<p class="text-muted mb-0"><i class="fas fa-info-circle"></i> Nenhum pacote vinculado a este container.</p>';
+            html += '<p class="text-muted mb-0"><i class="fas fa-info-circle"></i> ' + <?= json_encode(__('admin.correios_mundial.no_packages_linked','Nenhum pacote vinculado a este container.')) ?> + '</p>';
         }
 
         el.innerHTML = html;
@@ -242,16 +242,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function formatUnitType(type) {
-        const map = {'1': '1 - Saco', '2': '2 - Caixa pallet ate 500kg', '3': '3 - Caixa pallet ate 1000kg'};
+        const map = {'1': <?= json_encode(__('admin.correios_mundial.unit_type_bag','1 - Saco')) ?>, '2': <?= json_encode(__('admin.correios_mundial.unit_type_pallet_500','2 - Caixa pallet ate 500kg')) ?>, '3': <?= json_encode(__('admin.correios_mundial.unit_type_pallet_1000','3 - Caixa pallet ate 1000kg')) ?>};
         return map[type] || type || '-';
     }
 
     function statusBadge(status) {
         if (!status) return '<span class="badge badge-status-default">-</span>';
         const s = status.toLowerCase();
-        if (s === 'gerada') return '<span class="badge badge-status-gerada">Gerada</span>';
-        if (s === 'created') return '<span class="badge badge-status-created">Criado</span>';
-        if (s === 'cancelled') return '<span class="badge badge-status-cancelled">Cancelado</span>';
+        if (s === 'gerada') return '<span class="badge badge-status-gerada">' + <?= json_encode(__('admin.correios_mundial.status_generated','Gerada')) ?> + '</span>';
+        if (s === 'created') return '<span class="badge badge-status-created">' + <?= json_encode(__('admin.correios_mundial.status_created','Criado')) ?> + '</span>';
+        if (s === 'cancelled') return '<span class="badge badge-status-cancelled">' + <?= json_encode(__('admin.correios_mundial.status_cancelled','Cancelado')) ?> + '</span>';
         return '<span class="badge badge-status-default">' + escHtml(status) + '</span>';
     }
 

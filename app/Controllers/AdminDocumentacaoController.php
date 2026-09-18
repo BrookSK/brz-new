@@ -9,7 +9,7 @@ class AdminDocumentacaoController {
         $auth = new \App\Services\AuthService();
         $auth->requerPerfis(['admin']);
 
-        $title = 'Documentação - Webhook Ticket';
+        $title = __('admin.docs.webhook_ticket_title', 'Documentação - Webhook Ticket');
         $sidebarActive = 'documentacao-webhook';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();

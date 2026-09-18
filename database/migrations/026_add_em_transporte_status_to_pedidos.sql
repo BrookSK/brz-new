@@ -9,6 +9,9 @@ SET @sql := (
   SELECT
     CASE
       WHEN COLUMN_TYPE IS NULL THEN 'SELECT 1'
+      -- Se a coluna já não é ENUM (ex.: virou varchar em migration posterior),
+      -- estender o ENUM não se aplica: varchar já aceita 'em_transporte'. No-op.
+      WHEN LOWER(COLUMN_TYPE) NOT LIKE 'enum(%' THEN 'SELECT 1'
       WHEN LOCATE("'em_transporte'", COLUMN_TYPE) > 0 THEN 'SELECT 1'
       ELSE CONCAT(
         'ALTER TABLE pedidos MODIFY COLUMN status ENUM(',

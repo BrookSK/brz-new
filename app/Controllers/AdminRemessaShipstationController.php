@@ -210,7 +210,7 @@ class AdminRemessaShipstationController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa ShipStation (UPS) - Braziliana Admin</title>
+    <title>' . __('admin.shipstation.page_title', 'Remessa ShipStation (UPS)') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -222,26 +222,26 @@ class AdminRemessaShipstationController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Remessa ShipStation (UPS)</h1>
+                <h1 class="page-title">' . __('admin.shipstation.heading', 'Remessa ShipStation (UPS)') . '</h1>
                 <div>
-                    <button type="button" class="btn btn-outline-secondary" onclick="location.reload()"><i class="fas fa-sync"></i> Atualizar</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="location.reload()"><i class="fas fa-sync"></i> ' . __('common.refresh', 'Atualizar') . '</button>
                 </div>
             </div>';
 
         if (!$enabled) {
-            echo '<div class="alert alert-warning">ShipStation está desabilitado ou não configurado. Vá em <strong>/admin/configuracoes</strong> &gt; <strong>Entrega</strong> e ative/configure.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.shipstation.disabled_warning', 'ShipStation está desabilitado ou não configurado. Vá em') . ' <strong>/admin/configuracoes</strong> &gt; <strong>' . __('admin.shipstation.delivery_menu', 'Entrega') . '</strong> ' . __('admin.shipstation.enable_configure', 'e ative/configure.') . '</div>';
         }
 
         echo '<div class="card mb-4">
-            <div class="card-header"><strong>Pedidos pagos (exterior) - prontos para etiqueta</strong></div>
+            <div class="card-header"><strong>' . __('admin.shipstation.orders_ready_label', 'Pedidos pagos (exterior) - prontos para etiqueta') . '</strong></div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>País</th><th>Data</th><th>Ação</th></tr></thead>
+                        <thead><tr><th>' . __('admin.shipstation.th_order', 'Pedido') . '</th><th>' . __('common.customer', 'Cliente') . '</th><th>' . __('admin.shipstation.th_country', 'País') . '</th><th>' . __('admin.shipstation.th_date', 'Data') . '</th><th>' . __('common.actions', 'Ação') . '</th></tr></thead>
                         <tbody>';
 
         if (empty($pedidos)) {
-            echo '<tr><td colspan="5" class="text-center text-muted">Nenhum pedido exterior aguardando etiqueta.</td></tr>';
+            echo '<tr><td colspan="5" class="text-center text-muted">' . __('admin.shipstation.no_orders_waiting', 'Nenhum pedido exterior aguardando etiqueta.') . '</td></tr>';
         } else {
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['pedido_id'] ?? 0);
@@ -251,8 +251,8 @@ class AdminRemessaShipstationController extends Controller {
                     . '<td>' . htmlspecialchars((string) ($p['pais'] ?? '')) . '</td>'
                     . '<td>' . (!empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-') . '</td>'
                     . '<td>'
-                    . '<button class="btn btn-sm btn-primary" onclick="gerarEtiqueta(' . $pid . ')"><i class="fas fa-tag"></i> Gerar etiqueta</button>'
-                    . ' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i> Pedido</a>'
+                    . '<button class="btn btn-sm btn-primary" onclick="gerarEtiqueta(' . $pid . ')"><i class="fas fa-tag"></i> ' . __('admin.shipstation.generate_label', 'Gerar etiqueta') . '</button>'
+                    . ' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i> ' . __('admin.shipstation.order', 'Pedido') . '</a>'
                     . '</td>'
                     . '</tr>';
             }
@@ -261,15 +261,15 @@ class AdminRemessaShipstationController extends Controller {
         echo '</tbody></table></div></div></div>';
 
         echo '<div class="card">
-            <div class="card-header"><strong>Etiquetas geradas</strong></div>
+            <div class="card-header"><strong>' . __('admin.shipstation.generated_labels', 'Etiquetas geradas') . '</strong></div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>Tracking</th><th>Carrier</th><th>Label</th><th>Data</th></tr></thead>
+                        <thead><tr><th>' . __('admin.shipstation.th_order', 'Pedido') . '</th><th>' . __('common.customer', 'Cliente') . '</th><th>' . __('admin.shipstation.th_tracking', 'Tracking') . '</th><th>' . __('admin.shipstation.th_carrier', 'Carrier') . '</th><th>' . __('admin.shipstation.th_label', 'Label') . '</th><th>' . __('admin.shipstation.th_date', 'Data') . '</th></tr></thead>
                         <tbody>';
 
         if (empty($etiquetas)) {
-            echo '<tr><td colspan="6" class="text-center text-muted">Nenhuma etiqueta gerada.</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted">' . __('admin.shipstation.no_labels', 'Nenhuma etiqueta gerada.') . '</td></tr>';
         } else {
             foreach ($etiquetas as $e) {
                 $pid = (int) ($e['pedido_id'] ?? 0);
@@ -281,7 +281,7 @@ class AdminRemessaShipstationController extends Controller {
                     . '<td>' . htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) . '</td>'
                     . '<td>' . htmlspecialchars($trk) . '</td>'
                     . '<td>' . htmlspecialchars($car) . '</td>'
-                    . '<td>' . ($url !== '' ? ('<a href="' . htmlspecialchars($url) . '" target="_blank">Abrir</a>') : '-') . '</td>'
+                    . '<td>' . ($url !== '' ? ('<a href="' . htmlspecialchars($url) . '" target="_blank">' . __('admin.shipstation.open', 'Abrir') . '</a>') : '-') . '</td>'
                     . '<td>' . (!empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-') . '</td>'
                     . '</tr>';
             }
@@ -293,7 +293,7 @@ class AdminRemessaShipstationController extends Controller {
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function gerarEtiqueta(pedidoId) {
-    if (!confirm("Gerar etiqueta ShipStation para o pedido #" + pedidoId + "?")) return;
+    if (!confirm("' . __('admin.shipstation.confirm_generate', 'Gerar etiqueta ShipStation para o pedido') . ' #" + pedidoId + "?")) return;
     fetch("/admin/remessa-shipstation/gerar-etiqueta", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -305,9 +305,9 @@ function gerarEtiqueta(pedidoId) {
             location.reload();
             return;
         }
-        alert("Erro: " + (data.message || data.error || JSON.stringify(data)));
+        alert("' . __('common.error', 'Erro') . ': " + (data.message || data.error || JSON.stringify(data)));
     })
-    .catch(err => alert("Erro: " + err.message));
+    .catch(err => alert("' . __('common.error', 'Erro') . ': " + err.message));
 }
 </script>
 </body>
@@ -366,12 +366,12 @@ function gerarEtiqueta(pedidoId) {
         $fromJson = trim((string) $this->getConfigEntregaValue('shipstation_from_address_json', ''));
         $from = $fromJson !== '' ? json_decode($fromJson, true) : null;
         if (!is_array($from)) {
-            throw new \Exception('ShipStation: configure shipstation_from_address_json (JSON) em /admin/configuracoes > Entrega');
+            throw new \Exception(__('admin.shipstation.err_from_address', 'ShipStation: configure shipstation_from_address_json (JSON) em /admin/configuracoes > Entrega'));
         }
 
         $carrierId = trim((string) $this->getConfigEntregaValue('shipstation_carrier_id', ''));
         if ($carrierId === '') {
-            throw new \Exception('ShipStation: configure shipstation_carrier_id em /admin/configuracoes > Entrega');
+            throw new \Exception(__('admin.shipstation.err_carrier_id', 'ShipStation: configure shipstation_carrier_id em /admin/configuracoes > Entrega'));
         }
 
         $serviceCode = trim((string) $this->getConfigEntregaValue('shipstation_service_code', ''));
@@ -405,7 +405,7 @@ function gerarEtiqueta(pedidoId) {
             $to['name'] = 'Cliente';
         }
         if (trim((string) ($to['address_line1'] ?? '')) === '') {
-            throw new \Exception('ShipStation: endereço de entrega incompleto no pedido (address_line1).');
+            throw new \Exception(__('admin.shipstation.err_incomplete_address', 'ShipStation: endereço de entrega incompleto no pedido (address_line1).'));
         }
         if (trim((string) ($to['city_locality'] ?? '')) === '') {
             $to['city_locality'] = 'City';
@@ -484,13 +484,13 @@ function gerarEtiqueta(pedidoId) {
             }
             $pedidoId = (int) $raw;
             if ($pedidoId <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Pedido inválido']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipstation.invalid_order', 'Pedido inválido')]);
                 return;
             }
 
             $this->ensureShipstationEtiquetasTable();
             if (!$this->tableExists('shipstation_etiquetas')) {
-                echo json_encode(['success' => false, 'message' => 'Tabela shipstation_etiquetas não encontrada. Rode a migration database/migrations/070_create_shipstation_etiquetas_schema.sql']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipstation.table_missing', 'Tabela shipstation_etiquetas não encontrada. Rode a migration database/migrations/070_create_shipstation_etiquetas_schema.sql')]);
                 return;
             }
 
@@ -498,14 +498,14 @@ function gerarEtiqueta(pedidoId) {
             $stCheck->execute([$pedidoId]);
             $exists = (int) ($stCheck->fetchColumn() ?: 0);
             if ($exists > 0) {
-                echo json_encode(['success' => false, 'message' => 'Já existe etiqueta ShipStation para este pedido']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipstation.label_exists', 'Já existe etiqueta ShipStation para este pedido')]);
                 return;
             }
 
             $pedidoModel = new PedidoEcommerce();
             $pedido = $pedidoModel->getComDetalhes($pedidoId);
             if (!is_array($pedido) || empty($pedido['id'])) {
-                echo json_encode(['success' => false, 'message' => 'Pedido não encontrado']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipstation.order_not_found', 'Pedido não encontrado')]);
                 return;
             }
 
@@ -538,7 +538,7 @@ function gerarEtiqueta(pedidoId) {
                 }
             }
             if (trim($shipmentId) === '') {
-                echo json_encode(['success' => false, 'message' => 'ShipStation: shipment_id não retornou.']);
+                echo json_encode(['success' => false, 'message' => __('admin.shipstation.no_shipment_id', 'ShipStation: shipment_id não retornou.')]);
                 return;
             }
 

@@ -225,7 +225,7 @@
                                 <label for="quantity" class="form-label"><?= __('product_details.quantity', 'Quantidade') ?></label>
                                 <div class="input-group" style="max-width: 220px;">
                                     <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
-                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $variacoesEnabled ? 1 : (int) ($produto['estoque'] ?? 0) ?>">
+                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="9999">
                                     <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
                                 </div>
                             </div>

@@ -123,6 +123,10 @@ $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 $router->post('/checkout/cupom/aplicar', 'CheckoutController', 'aplicarCupom');
 $router->post('/checkout/cupom/remover', 'CheckoutController', 'removerCupom');
+$router->post('/checkout/envio-pais', 'CheckoutController', 'calcularEnvioPais');
+$router->post('/checkout/salvar-endereco', 'CheckoutController', 'salvarEnderecoCheckout');
+$router->post('/checkout/atualizar-endereco', 'CheckoutController', 'atualizarEnderecoCheckout');
+$router->post('/checkout/excluir-endereco', 'CheckoutController', 'excluirEnderecoCheckout');
 
 // Assessoria de Compras
 $router->get('/assessoria', 'AssessoriaController', 'index');
@@ -411,6 +415,9 @@ $router->get('/admin/pedidos/novo-manual/clientes', 'AdminPedidosManualControlle
 $router->get('/admin/pedidos/novo-manual/cliente-endereco/{id}', 'AdminPedidosManualController', 'clienteEndereco');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
 $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');
+$router->post('/admin/pedidos/novo-manual/rascunho', 'AdminPedidosManualController', 'criarRascunho');
+$router->post('/admin/pedidos/novo-manual/rascunho/excluir', 'AdminPedidosManualController', 'excluirRascunho');
+$router->get('/admin/pedidos/rascunhos', 'AdminPedidosManualController', 'rascunhos');
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
 $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
 
@@ -656,6 +663,16 @@ $router->post('/admin/remessa-stamps/gerar-etiqueta', 'AdminRemessaStampsControl
 // Rotas de Remessa ShipStation (UPS) - pedidos exterior
 $router->get('/admin/remessa-shipstation', 'AdminRemessaShipstationController', 'index');
 $router->post('/admin/remessa-shipstation/gerar-etiqueta', 'AdminRemessaShipstationController', 'gerarEtiqueta');
+
+// Shippo - Etiquetas internacionais (mundo todo, exceto Brasil)
+$router->get('/admin/shippo', 'AdminShippoController', 'index');
+$router->get('/admin/shippo/diagnostico-carriers', 'AdminShippoController', 'diagnosticoCarriers');
+$router->get('/admin/shippo/pedido/{id}', 'AdminShippoController', 'pedido');
+$router->post('/admin/shippo/pedido/{id}/gerar-etiqueta', 'AdminShippoController', 'gerarEtiqueta');
+$router->post('/admin/shippo/pedido/{id}/confirmar-etiqueta', 'AdminShippoController', 'confirmarEtiqueta');
+$router->post('/admin/shippo/pedido/{id}/regerar', 'AdminShippoController', 'regerarEtiqueta');
+$router->post('/admin/shippo/gerar-etiquetas-massa', 'AdminShippoController', 'gerarEtiquetasMassa');
+$router->get('/admin/shippo/pedido/{id}/rates', 'AdminShippoController', 'rates');
 
 // Rotas de Carteira
 $router->post('/admin/usuarios/adicionar-credito', 'AdminCarteiraController', 'adicionarCredito');

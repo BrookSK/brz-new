@@ -29,7 +29,7 @@ class AdminInvoiceController extends Controller {
     public function liberar(Request $request): void {
         $pedidoId = (int) ($request->getParams()['id'] ?? 0);
         if ($pedidoId <= 0) {
-            $this->setFlash('Pedido inválido.', 'danger');
+            $this->setFlash(__('admin.invoice.invalid_order', 'Pedido inválido.'), 'danger');
             $this->redirect('/admin/pedidos');
             return;
         }
@@ -40,7 +40,7 @@ class AdminInvoiceController extends Controller {
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$pedido) {
-            $this->setFlash('Pedido não encontrado.', 'danger');
+            $this->setFlash(__('admin.invoice.order_not_found', 'Pedido não encontrado.'), 'danger');
             $this->redirect('/admin/pedidos');
             return;
         }
@@ -48,7 +48,7 @@ class AdminInvoiceController extends Controller {
         // Verificar se já existe invoice ativo
         $invoiceExistente = $this->invoiceModel->getByPedido($pedidoId);
         if ($invoiceExistente && $invoiceExistente['status'] === 'liberado') {
-            $this->setFlash('Este pedido já tem um invoice liberado.', 'warning');
+            $this->setFlash(__('admin.invoice.already_released', 'Este pedido já tem um invoice liberado.'), 'warning');
             $this->redirect('/admin/pedidos/' . $pedidoId);
             return;
         }
@@ -60,7 +60,7 @@ class AdminInvoiceController extends Controller {
             // Buscar itens do pedido para copiar ao invoice
             $itens = $this->getItensPedido($pedidoId);
             if (empty($itens)) {
-                $this->setFlash('Pedido não possui itens.', 'danger');
+                $this->setFlash(__('admin.invoice.order_no_items', 'Pedido não possui itens.'), 'danger');
                 $this->redirect('/admin/pedidos/' . $pedidoId);
                 return;
             }
@@ -81,7 +81,7 @@ class AdminInvoiceController extends Controller {
         // Enviar e-mail ao cliente informando que o invoice foi liberado
         $this->enviarEmailInvoiceLiberado($pedido, $pedidoId);
 
-        $this->setFlash('Invoice liberado com sucesso. O cliente pode agora conferir os dados.', 'success');
+        $this->setFlash(__('admin.invoice.released_success', 'Invoice liberado com sucesso. O cliente pode agora conferir os dados.'), 'success');
         $this->redirect('/admin/pedidos/' . $pedidoId);
     }
 
@@ -103,7 +103,7 @@ class AdminInvoiceController extends Controller {
                 $item = [
                     'pedido_item_id' => $row['id'] ?? null,
                     'pacote_id' => $row['pacote_id'] ?? null,
-                    'nome_produto' => $row['nome'] ?? $row['produto_nome'] ?? $row['nome_produto'] ?? 'Produto',
+                    'nome_produto' => $row['nome'] ?? $row['produto_nome'] ?? $row['nome_produto'] ?? __('admin.invoice.product_default', 'Produto'),
                     'ncm' => $row['ncm'] ?? null,
                     'declaration_value' => $row['declaration_value'] ?? $row['valor_unitario'] ?? $row['preco_unitario'] ?? 0,
                     'peso_kg' => $row['peso_kg'] ?? $row['peso'] ?? 0,
@@ -120,7 +120,7 @@ class AdminInvoiceController extends Controller {
                         $stPacote->execute([$item['pacote_id']]);
                         $pacote = $stPacote->fetch(\PDO::FETCH_ASSOC);
                         if ($pacote) {
-                            if (empty($item['nome_produto']) || $item['nome_produto'] === 'Produto') {
+                            if (empty($item['nome_produto']) || $item['nome_produto'] === __('admin.invoice.product_default', 'Produto')) {
                                 $item['nome_produto'] = $pacote['nome'];
                             }
                             if (empty($item['ncm'])) {
@@ -186,8 +186,23 @@ class AdminInvoiceController extends Controller {
             $usuario = $stUser->fetch(\PDO::FETCH_ASSOC);
             if (!$usuario || empty($usuario['email'])) return;
 
-            $nome = htmlspecialchars($usuario['nome'] ?? 'Cliente');
+            $nome = htmlspecialchars($usuario['nome'] ?? __('admin.invoice.email_customer', 'Cliente'));
             $linkInvoice = 'https://brazilianashop.com.br/minha-conta/invoice?pedido_id=' . $pedidoId;
+
+            $emailTitle = __('admin.invoice.email_title', 'Confira os dados do seu envio');
+            $emailGreeting = __('admin.invoice.email_greeting', 'Olá, ');
+            $emailIntro = __('admin.invoice.email_intro', 'O invoice do seu pedido <strong>#{id}</strong> foi liberado para conferência.', ['id' => $pedidoId]);
+            $emailBefore = __('admin.invoice.email_before_ship', 'Antes de enviarmos seu pacote, precisamos que você confira e confirme os dados que irão na etiqueta de envio (declaração aduaneira).');
+            $emailWhatToDo = __('admin.invoice.email_what_to_do', 'O que você precisa fazer:');
+            $emailItem1 = __('admin.invoice.email_item_name', 'Conferir o nome de cada produto (será usado na etiqueta)');
+            $emailItem2 = __('admin.invoice.email_item_values', 'Verificar os valores declarados');
+            $emailItem3 = __('admin.invoice.email_item_battery', 'Informar se contém bateria ou perfume/líquido');
+            $emailItem4 = __('admin.invoice.email_item_address', 'Confirmar o endereço de entrega');
+            $emailButton = __('admin.invoice.email_button', 'Conferir Invoice Agora');
+            $emailImportant = __('admin.invoice.email_important', 'Importante:');
+            $emailImportantText = __('admin.invoice.email_important_text', ' Seu pacote só será enviado após a confirmação dos dados. Se houver algo incorreto, você pode contestar e nossa equipe ajustará.');
+            $emailFooter = __('admin.invoice.email_footer', 'Braziliana - Seu parceiro em compras internacionais');
+            $emailSubject = __('admin.invoice.email_subject', 'Confira os dados do seu envio - Pedido #{id}', ['id' => $pedidoId]);
 
             $html = <<<HTML
 <!DOCTYPE html>
@@ -197,33 +212,33 @@ class AdminInvoiceController extends Controller {
         <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana</h1>
     </div>
     <div style="padding: 30px 20px;">
-        <h2 style="color: #1a3a5c;">Confira os dados do seu envio</h2>
-        <p>Olá, <strong>{$nome}</strong>!</p>
-        <p>O invoice do seu pedido <strong>#{$pedidoId}</strong> foi liberado para conferência.</p>
-        <p>Antes de enviarmos seu pacote, precisamos que você confira e confirme os dados que irão na etiqueta de envio (declaração aduaneira).</p>
+        <h2 style="color: #1a3a5c;">{$emailTitle}</h2>
+        <p>{$emailGreeting}<strong>{$nome}</strong>!</p>
+        <p>{$emailIntro}</p>
+        <p>{$emailBefore}</p>
         
         <div style="background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 5px; padding: 15px; margin: 20px 0;">
-            <strong>O que você precisa fazer:</strong><br>
+            <strong>{$emailWhatToDo}</strong><br>
             <ul style="margin: 10px 0; padding-left: 20px;">
-                <li>Conferir o nome de cada produto (será usado na etiqueta)</li>
-                <li>Verificar os valores declarados</li>
-                <li>Informar se contém bateria ou perfume/líquido</li>
-                <li>Confirmar o endereço de entrega</li>
+                <li>{$emailItem1}</li>
+                <li>{$emailItem2}</li>
+                <li>{$emailItem3}</li>
+                <li>{$emailItem4}</li>
             </ul>
         </div>
 
         <p style="text-align: center; margin-top: 30px;">
             <a href="{$linkInvoice}" style="background: #1a3a5c; color: #fff; text-decoration: none; padding: 14px 35px; border-radius: 5px; display: inline-block; font-size: 16px;">
-                Conferir Invoice Agora
+                {$emailButton}
             </a>
         </p>
 
         <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 25px 0;">
-            <strong>Importante:</strong> Seu pacote só será enviado após a confirmação dos dados. Se houver algo incorreto, você pode contestar e nossa equipe ajustará.
+            <strong>{$emailImportant}</strong>{$emailImportantText}
         </div>
     </div>
     <div style="background: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666;">
-        Braziliana - Seu parceiro em compras internacionais
+        {$emailFooter}
     </div>
 </body></html>
 HTML;
@@ -231,13 +246,13 @@ HTML;
             $emailService = new \App\Services\EmailService();
             $emailService->send(
                 $usuario['email'],
-                'Confira os dados do seu envio - Pedido #' . $pedidoId,
+                $emailSubject,
                 $html,
                 'invoice_liberado_' . $pedidoId,
                 [
                     'evento' => 'invoice_liberado',
                     'to_email' => $usuario['email'],
-                    'subject' => 'Confira os dados do seu envio - Pedido #' . $pedidoId,
+                    'subject' => $emailSubject,
                     'pedido_id' => $pedidoId,
                     'usuario_id' => $usuarioId,
                 ]

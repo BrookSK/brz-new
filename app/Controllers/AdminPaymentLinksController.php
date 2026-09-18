@@ -20,7 +20,7 @@ class AdminPaymentLinksController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Links - Admin</title>
+    <title>' . htmlspecialchars(__('admin.payment_links.page_title', 'Payment Links - Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -35,15 +35,15 @@ class AdminPaymentLinksController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Payment Links</h1>
+                <h1 class="page-title">' . __('admin.payment_links.title', 'Payment Links') . '</h1>
             </div>';
 
         echo '<div class="card mb-4">
-                <div class="card-header"><strong>Criar link</strong></div>
+                <div class="card-header"><strong>' . __('admin.payment_links.create_link', 'Criar link') . '</strong></div>
                 <div class="card-body">
                     <form method="POST" action="/admin/payment-links/criar" class="row g-3">
                         <div class="col-md-2">
-                            <label class="form-label">Moeda</label>
+                            <label class="form-label">' . __('admin.payment_links.currency', 'Moeda') . '</label>
                             <select class="form-select" name="currency" required>
                                 <option value="USD" selected>USD</option>
                                 <option value="BRL">BRL</option>
@@ -51,57 +51,57 @@ class AdminPaymentLinksController extends Controller {
                         </div>
                         <input type="hidden" name="produto_valor" value="0" id="produto_valor_hidden">
                         <div class="col-md-3">
-                            <label class="form-label">Taxa de serviço (valor)</label>
+                            <label class="form-label">' . __('admin.payment_links.service_fee_value', 'Taxa de serviço (valor)') . '</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="taxa_servico_valor" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Impostos (valor)</label>
+                            <label class="form-label">' . __('admin.payment_links.taxes_value', 'Impostos (valor)') . '</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="impostos_valor" value="0">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Produtos</label>
+                            <label class="form-label">' . __('admin.payment_links.products', 'Produtos') . '</label>
                             <div id="pl-products" class="d-flex flex-column gap-2"></div>
                             <div class="d-flex gap-2 mt-2">
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="pl-add-product"><i class="fas fa-plus"></i> Adicionar produto</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="pl-add-product"><i class="fas fa-plus"></i> ' . __('admin.payment_links.add_product', 'Adicionar produto') . '</button>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Subtotal produtos</label>
+                            <label class="form-label">' . __('admin.payment_links.products_subtotal', 'Subtotal produtos') . '</label>
                             <input type="text" class="form-control" id="pl-subtotal" value="0,00" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Descrição</label>
-                            <input type="text" class="form-control" name="descricao" placeholder="Ex: Pagamento avulso">
+                            <label class="form-label">' . __('admin.payment_links.description', 'Descrição') . '</label>
+                            <input type="text" class="form-control" name="descricao" placeholder="' . htmlspecialchars(__('admin.payment_links.description_placeholder', 'Ex: Pagamento avulso'), ENT_QUOTES, 'UTF-8') . '">
                         </div>
                         <div class="col-12">
-                            <div class="form-text">O link expira automaticamente em 30 dias.</div>
+                            <div class="form-text">' . __('admin.payment_links.expires_note', 'O link expira automaticamente em 30 dias.') . '</div>
                         </div>
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-link"></i> Gerar link</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-link"></i> ' . __('admin.payment_links.generate_link', 'Gerar link') . '</button>
                         </div>
                     </form>
                 </div>
             </div>';
 
         echo '<div class="card">
-                <div class="card-header"><strong>Links gerados</strong></div>
+                <div class="card-header"><strong>' . __('admin.payment_links.generated_links', 'Links gerados') . '</strong></div>
                 <div class="card-body">
                     <div class="table-responsive">
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Moeda</th>
-                                <th>Total</th>
-                                <th>Status</th>
-                                <th>Expira</th>
-                                <th>Ações</th>
+                                <th>' . __('admin.payment_links.currency', 'Moeda') . '</th>
+                                <th>' . __('common.total', 'Total') . '</th>
+                                <th>' . __('common.status', 'Status') . '</th>
+                                <th>' . __('admin.payment_links.expires', 'Expira') . '</th>
+                                <th>' . __('common.actions', 'Ações') . '</th>
                             </tr>
                         </thead>
                         <tbody>';
 
         if (empty($links)) {
-            echo '<tr><td colspan="6" class="text-muted">Nenhum link criado.</td></tr>';
+            echo '<tr><td colspan="6" class="text-muted">' . __('admin.payment_links.no_links', 'Nenhum link criado.') . '</td></tr>';
         } else {
             foreach ($links as $l) {
                 $id = (int) ($l['id'] ?? 0);
@@ -119,12 +119,12 @@ class AdminPaymentLinksController extends Controller {
                     . '<td>' . $status . '</td>'
                     . '<td>' . $exp . '</td>'
                     . '<td class="d-flex flex-wrap gap-2">'
-                    . '  <a class="btn btn-sm btn-outline-primary" href="/admin/payment-links/' . $id . '"><i class="fas fa-clock"></i> Histórico</a>'
+                    . '  <a class="btn btn-sm btn-outline-primary" href="/admin/payment-links/' . $id . '"><i class="fas fa-clock"></i> ' . __('admin.payment_links.history', 'Histórico') . '</a>'
                     . '  <form method="POST" action="/admin/payment-links/duplicar/' . $id . '" style="display:inline;">
-                            <button type="submit" class="btn btn-sm btn-outline-warning"><i class="fas fa-clone"></i> Duplicar</button>
+                            <button type="submit" class="btn btn-sm btn-outline-warning"><i class="fas fa-clone"></i> ' . __('admin.payment_links.duplicate', 'Duplicar') . '</button>
                         </form>'
-                    . '  <button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> Copiar</button>'
-                    . '  <a class="btn btn-sm btn-outline-secondary" href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank"><i class="fas fa-external-link-alt"></i> Abrir</a>'
+                    . '  <button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> ' . __('common.copy', 'Copiar') . '</button>'
+                    . '  <a class="btn btn-sm btn-outline-secondary" href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank"><i class="fas fa-external-link-alt"></i> ' . __('admin.payment_links.open', 'Abrir') . '</a>'
                     . '</td>'
                     . '</tr>';
             }
@@ -299,7 +299,7 @@ HTML;
             if (session_status() === PHP_SESSION_NONE) {
                 @session_start();
             }
-            $_SESSION['message'] = (string) ($res['error'] ?? 'Falha ao criar link');
+            $_SESSION['message'] = (string) ($res['error'] ?? __('admin.payment_links.create_failed', 'Falha ao criar link'));
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/payment-links');
             exit;
@@ -308,7 +308,7 @@ HTML;
         if (session_status() === PHP_SESSION_NONE) {
             @session_start();
         }
-        $_SESSION['message'] = 'Link criado: <a href="' . htmlspecialchars((string) ($res['public_url'] ?? ''), ENT_QUOTES, 'UTF-8') . '" target="_blank">abrir link</a>';
+        $_SESSION['message'] = __('admin.payment_links.link_created', 'Link criado: ') . '<a href="' . htmlspecialchars((string) ($res['public_url'] ?? ''), ENT_QUOTES, 'UTF-8') . '" target="_blank">' . __('admin.payment_links.open_link', 'abrir link') . '</a>';
         $_SESSION['message_type'] = 'success';
         header('Location: /admin/payment-links');
         exit;
@@ -325,7 +325,7 @@ HTML;
 
         $id = (int) $request->getParam('id', 0);
         if ($id <= 0) {
-            $_SESSION['message'] = 'Link inválido.';
+            $_SESSION['message'] = __('admin.payment_links.invalid_link', 'Link inválido.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/payment-links');
             exit;
@@ -334,13 +334,13 @@ HTML;
         $svc = new PaymentLinkService();
         $res = $svc->duplicateLink($id, $adminId);
         if (empty($res['success'])) {
-            $_SESSION['message'] = (string) ($res['error'] ?? 'Falha ao duplicar link');
+            $_SESSION['message'] = (string) ($res['error'] ?? __('admin.payment_links.duplicate_failed', 'Falha ao duplicar link'));
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/payment-links');
             exit;
         }
 
-        $_SESSION['message'] = 'Link duplicado: <a href="' . htmlspecialchars((string) ($res['public_url'] ?? ''), ENT_QUOTES, 'UTF-8') . '" target="_blank">abrir link</a>';
+        $_SESSION['message'] = __('admin.payment_links.link_duplicated', 'Link duplicado: ') . '<a href="' . htmlspecialchars((string) ($res['public_url'] ?? ''), ENT_QUOTES, 'UTF-8') . '" target="_blank">' . __('admin.payment_links.open_link', 'abrir link') . '</a>';
         $_SESSION['message_type'] = 'success';
         header('Location: /admin/payment-links');
         exit;
@@ -371,7 +371,7 @@ HTML;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histórico - Payment Link</title>
+    <title>' . htmlspecialchars(__('admin.payment_links.detail_page_title', 'Histórico - Payment Link'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -388,53 +388,53 @@ HTML;
             <div class="d-flex justify-content-between align-items-center mb-3">'
             . '<h2 class="mb-0">Payment Link #' . (int) $link['id'] . '</h2>'
             . '<div class="d-flex gap-2">'
-            . '<a class="btn btn-outline-primary" target="_blank" href="/pagar/' . rawurlencode((string) ($link['token'] ?? '')) . '/comprovante"><i class="fas fa-print"></i> Comprovante (PDF)</a>'
-            . '<a class="btn btn-outline-secondary" href="/admin/payment-links"><i class="fas fa-arrow-left"></i> Voltar</a>'
+            . '<a class="btn btn-outline-primary" target="_blank" href="/pagar/' . rawurlencode((string) ($link['token'] ?? '')) . '/comprovante"><i class="fas fa-print"></i> ' . __('admin.payment_links.receipt_pdf', 'Comprovante (PDF)') . '</a>'
+            . '<a class="btn btn-outline-secondary" href="/admin/payment-links"><i class="fas fa-arrow-left"></i> ' . __('common.back', 'Voltar') . '</a>'
             . '</div>'
             . '</div>';
 
         if (!is_array($link)) {
-            echo '<div class="alert alert-danger">Link não encontrado.</div>';
+            echo '<div class="alert alert-danger">' . __('admin.payment_links.link_not_found', 'Link não encontrado.') . '</div>';
         } else {
             $token = (string) ($link['token'] ?? '');
             $publicUrl = '/pagar/' . rawurlencode($token);
             echo '<div class="card mb-3"><div class="card-body">'
-                . '<div class="d-flex flex-wrap align-items-center gap-2"><strong>URL:</strong> <a href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '</a>'
-                . '<button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> Copiar</button>'
+                . '<div class="d-flex flex-wrap align-items-center gap-2"><strong>' . __('admin.payment_links.url_label', 'URL:') . '</strong> <a href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '</a>'
+                . '<button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> ' . __('common.copy', 'Copiar') . '</button>'
                 . '</div>'
-                . '<div><strong>Moeda:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>'
-                . '<div><strong>Produto:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['produto_valor'] ?? 0), 2, ',', '.') . '</div>'
-                . '<div><strong>Taxa de serviço:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['taxa_servico_valor'] ?? 0), 2, ',', '.') . '</div>'
-                . '<div><strong>Impostos:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['impostos_valor'] ?? 0), 2, ',', '.') . '</div>'
-                . '<div><strong>Total:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['total_valor'] ?? 0), 2, ',', '.') . '</div>'
+                . '<div><strong>' . __('admin.payment_links.currency', 'Moeda') . ':</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>'
+                . '<div><strong>' . __('admin.payment_links.product', 'Produto') . ':</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['produto_valor'] ?? 0), 2, ',', '.') . '</div>'
+                . '<div><strong>' . __('admin.payment_links.service_fee', 'Taxa de serviço') . ':</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['taxa_servico_valor'] ?? 0), 2, ',', '.') . '</div>'
+                . '<div><strong>' . __('admin.payment_links.taxes', 'Impostos') . ':</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['impostos_valor'] ?? 0), 2, ',', '.') . '</div>'
+                . '<div><strong>' . __('common.total', 'Total') . ':</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['total_valor'] ?? 0), 2, ',', '.') . '</div>'
                 . '</div></div>';
         }
 
         echo '<div class="card">
-                <div class="card-header"><strong>Pagamentos</strong></div>
+                <div class="card-header"><strong>' . __('admin.payment_links.payments', 'Pagamentos') . '</strong></div>
                 <div class="card-body">
                     <div class="table-responsive">
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Componente</th>
-                                <th>Status</th>
-                                <th>Gateway</th>
-                                <th>Método</th>
-                                <th>Cliente</th>
-                                <th>Dados</th>
-                                <th>Produto</th>
-                                <th>Taxa</th>
-                                <th>Impostos</th>
-                                <th>Total</th>
-                                <th>Criado</th>
+                                <th>' . __('admin.payment_links.th_component', 'Componente') . '</th>
+                                <th>' . __('common.status', 'Status') . '</th>
+                                <th>' . __('admin.payment_links.th_gateway', 'Gateway') . '</th>
+                                <th>' . __('admin.payment_links.th_method', 'Método') . '</th>
+                                <th>' . __('admin.payment_links.th_customer', 'Cliente') . '</th>
+                                <th>' . __('admin.payment_links.th_data', 'Dados') . '</th>
+                                <th>' . __('admin.payment_links.product', 'Produto') . '</th>
+                                <th>' . __('admin.payment_links.th_fee', 'Taxa') . '</th>
+                                <th>' . __('admin.payment_links.taxes', 'Impostos') . '</th>
+                                <th>' . __('common.total', 'Total') . '</th>
+                                <th>' . __('admin.payment_links.th_created', 'Criado') . '</th>
                             </tr>
                         </thead>
                         <tbody>';
 
         if (empty($payments)) {
-            echo '<tr><td colspan="12" class="text-muted">Nenhum pagamento registrado.</td></tr>';
+            echo '<tr><td colspan="12" class="text-muted">' . __('admin.payment_links.no_payments', 'Nenhum pagamento registrado.') . '</td></tr>';
         } else {
             foreach ($payments as $p) {
                 $pid = (int) ($p['id'] ?? 0);
@@ -479,17 +479,17 @@ HTML;
                     $dn = trim((string) ($form['data_nascimento'] ?? ''));
 
                     $parts = [];
-                    if ($dn !== '') $parts[] = 'Nascimento: ' . htmlspecialchars($dn, ENT_QUOTES, 'UTF-8');
+                    if ($dn !== '') $parts[] = __('admin.payment_links.birth', 'Nascimento: ') . htmlspecialchars($dn, ENT_QUOTES, 'UTF-8');
                     if ($addr !== '' || $cidade !== '' || $estado !== '' || $cep !== '') {
                         $linha = trim($addr . ($num !== '' ? ', ' . $num : '') . ($bairro !== '' ? ' - ' . $bairro : ''));
                         $linha2 = trim($cidade . ($estado !== '' ? '/' . $estado : '') . ($cep !== '' ? ' - ' . $cep : ''));
                         $linha3 = trim($pais);
                         $addrTxt = trim($linha . ( $linha2 !== '' ? ' | ' . $linha2 : '') . ($linha3 !== '' ? ' | ' . $linha3 : ''));
-                        if ($addrTxt !== '') $parts[] = 'Endereço: ' . htmlspecialchars($addrTxt, ENT_QUOTES, 'UTF-8');
+                        if ($addrTxt !== '') $parts[] = __('admin.payment_links.address', 'Endereço: ') . htmlspecialchars($addrTxt, ENT_QUOTES, 'UTF-8');
                     }
                     if ($destNome !== '' || $destTel !== '') {
                         $destTxt = trim($destNome . ($destTel !== '' ? ' (' . $destTel . ')' : ''));
-                        $parts[] = 'Destinatário: ' . htmlspecialchars($destTxt, ENT_QUOTES, 'UTF-8');
+                        $parts[] = __('admin.payment_links.recipient', 'Destinatário: ') . htmlspecialchars($destTxt, ENT_QUOTES, 'UTF-8');
                     }
                     $dadosHtml = !empty($parts) ? ('<div class="small">' . implode('<br>', $parts) . '</div>') : '-';
                 }

@@ -19,22 +19,22 @@ class AdminUsuariosViews {
         $perfilLabel = $perfil;
         $perfilBadge = 'bg-secondary';
         if ($perfil === 'admin') {
-            $perfilLabel = 'Admin';
+            $perfilLabel = __('admin.users.role_admin', 'Admin');
             $perfilBadge = 'bg-dark';
         } elseif ($perfil === 'vendedor') {
-            $perfilLabel = 'Vendedor';
+            $perfilLabel = __('admin.users.role_vendedor', 'Vendedor');
             $perfilBadge = 'bg-primary';
         } elseif ($perfil === 'conferente') {
-            $perfilLabel = 'Conferente';
+            $perfilLabel = __('admin.users.role_conferente', 'Conferente');
             $perfilBadge = 'bg-warning text-dark';
         } elseif ($perfil === 'suporte') {
-            $perfilLabel = 'Suporte';
+            $perfilLabel = __('admin.users.role_suporte', 'Suporte');
             $perfilBadge = 'bg-info';
         } elseif ($perfil === 'redirecionador') {
-            $perfilLabel = 'Redirecionador';
+            $perfilLabel = __('admin.users.role_redirecionador', 'Redirecionador');
             $perfilBadge = 'bg-secondary';
         } elseif ($perfil === 'cliente') {
-            $perfilLabel = 'Cliente';
+            $perfilLabel = __('admin.users.role_cliente', 'Cliente');
             $perfilBadge = 'bg-light text-dark';
         }
 
@@ -50,7 +50,7 @@ class AdminUsuariosViews {
         if ($ehCliente) {
             $btnImpersonar = '<form method="POST" action="/admin/usuarios/impersonar/' . (int) $usuario['id'] . '" style="display: inline;">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) $csrf) . '">' 
-                . '<button type="submit" class="btn btn-sm btn-outline-secondary" title="Logar como">'
+                . '<button type="submit" class="btn btn-sm btn-outline-secondary" title="' . htmlspecialchars(__('admin.users.login_as_verb', 'Logar como'), ENT_QUOTES, 'UTF-8') . '">'
                 . '<i class="fas fa-user-secret"></i>'
                 . '</button>'
                 . '</form>';
@@ -65,7 +65,7 @@ class AdminUsuariosViews {
                             <div class="flex-grow-1">
                                 <h6 class="card-title mb-1">' . htmlspecialchars($usuario['nome']) . '</h6>
                                 <p class="text-muted small mb-0">' . htmlspecialchars($usuario['email']) . '</p>
-                                ' . (!empty($usuario['suite']) ? '<p class="text-muted small mb-0">Suite: <strong>' . (int) $usuario['suite'] . '</strong></p>' : '') . '
+                                ' . (!empty($usuario['suite']) ? '<p class="text-muted small mb-0">' . __('admin.users.suite_label', 'Suite:') . ' <strong>' . (int) $usuario['suite'] . '</strong></p>' : '') . '
                             </div>
                             <div class="ms-auto">
                                 <span class="badge ' . $perfilBadge . '">' . htmlspecialchars($perfilLabel) . '</span>
@@ -73,35 +73,35 @@ class AdminUsuariosViews {
                         </div>
                         <div class="row text-center mb-3">
                             <div class="col-4">
-                                <small class="text-muted d-block">Pedidos</small>
+                                <small class="text-muted d-block">' . __('admin.users.orders', 'Pedidos') . '</small>
                                 <strong>' . $usuario['total_pedidos'] . '</strong>
                             </div>
                             <div class="col-4">
-                                <small class="text-muted d-block">Carteira</small>
+                                <small class="text-muted d-block">' . __('admin.users.wallet', 'Carteira') . '</small>
                                 <strong class="text-success">$' . number_format($usuario['carteira_usd'], 2, '.', ',') . '</strong>
                             </div>
                             <div class="col-4">
-                                <small class="text-muted d-block">Status</small>
-                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                                <small class="text-muted d-block">' . __('admin.users.status', 'Status') . '</small>
+                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? __('admin.users.status_active', 'Ativo') : __('admin.users.status_inactive', 'Inativo')) . '</span>
                             </div>
                         </div>
                         <div class="d-flex justify-content-between">
                             <a href="/admin/usuarios/detalhes/' . $usuario['id'] . '" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye me-1"></i>Ver
+                                <i class="fas fa-eye me-1"></i>' . __('admin.users.view', 'Ver') . '
                             </a>
                             <div>
                                 ' . $btnImpersonar . '
                                 <button type="button" class="btn btn-sm btn-success" onclick="adicionarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
                                     <i class="fas fa-dollar-sign"></i>
                                 </button>
-                                <button type="button" class="btn btn-sm btn-danger" onclick="debitarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')" title="Debitar crédito">
+                                <button type="button" class="btn btn-sm btn-danger" onclick="debitarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')" title="' . htmlspecialchars(__('admin.users.debit_credit', 'Debitar crédito'), ENT_QUOTES, 'UTF-8') . '">
                                     <i class="fas fa-minus"></i>
                                 </button>
                                 <a href="/admin/usuarios/editar/' . $usuario['id'] . '" class="btn btn-sm btn-outline-warning">
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <form method="POST" action="/admin/usuarios/excluir/' . $usuario['id'] . '" style="display: inline;">
-                                    <button type="submit" onclick="return confirm(\'Tem certeza que deseja excluir este usuário?\')" class="btn btn-sm btn-outline-danger">
+                                    <button type="submit" onclick="return confirm(\'' . htmlspecialchars(__('admin.users.confirm_delete_user', 'Tem certeza que deseja excluir este usuário?'), ENT_QUOTES, 'UTF-8') . '\')" class="btn btn-sm btn-outline-danger">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
@@ -118,36 +118,36 @@ class AdminUsuariosViews {
                 <div class="col-md-3">
                     <div class="card stats-card bg-primary text-white">
                         <div class="card-body">
-                            <h5 class="card-title">Total Usuários</h5>
+                            <h5 class="card-title">' . __('admin.users.kpi_total_users', 'Total Usuários') . '</h5>
                             <h3>' . ($stats['total_usuarios'] ?? 0) . '</h3>
-                            <small>Cadastrados</small>
+                            <small>' . __('admin.users.registered', 'Cadastrados') . '</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card stats-card carteira-badge text-white">
                         <div class="card-body">
-                            <h5 class="card-title">Total em Carteiras</h5>
+                            <h5 class="card-title">' . __('admin.users.kpi_total_wallets', 'Total em Carteiras') . '</h5>
                             <h3>$ ' . number_format($stats['total_carteira_usd'] ?? 0, 2, '.', ',') . '</h3>
-                            <small>Em USD</small>
+                            <small>' . __('admin.users.in_usd', 'Em USD') . '</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card stats-card bg-success text-white">
                         <div class="card-body">
-                            <h5 class="card-title">Usuários Ativos</h5>
+                            <h5 class="card-title">' . __('admin.users.kpi_active_users', 'Usuários Ativos') . '</h5>
                             <h3>' . ($stats['usuarios_ativos'] ?? 0) . '</h3>
-                            <small>Online recentemente</small>
+                            <small>' . __('admin.users.online_recently', 'Online recentemente') . '</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card stats-card bg-info text-white">
                         <div class="card-body">
-                            <h5 class="card-title">Novos Hoje</h5>
+                            <h5 class="card-title">' . __('admin.users.kpi_new_today', 'Novos Hoje') . '</h5>
                             <h3>' . ($stats['usuarios_hoje'] ?? 0) . '</h3>
-                            <small>Registros</small>
+                            <small>' . __('admin.users.records', 'Registros') . '</small>
                         </div>
                     </div>
                 </div>
@@ -170,19 +170,19 @@ class AdminUsuariosViews {
         $perfilLabel = $perfil;
         $perfilBadge = 'bg-secondary';
         if ($perfil === 'admin') {
-            $perfilLabel = 'Admin';
+            $perfilLabel = __('admin.users.role_admin', 'Admin');
             $perfilBadge = 'bg-dark';
         } elseif ($perfil === 'vendedor') {
-            $perfilLabel = 'Vendedor';
+            $perfilLabel = __('admin.users.role_vendedor', 'Vendedor');
             $perfilBadge = 'bg-primary';
         } elseif ($perfil === 'suporte') {
-            $perfilLabel = 'Suporte';
+            $perfilLabel = __('admin.users.role_suporte', 'Suporte');
             $perfilBadge = 'bg-info';
         } elseif ($perfil === 'redirecionador') {
-            $perfilLabel = 'Redirecionador';
+            $perfilLabel = __('admin.users.role_redirecionador', 'Redirecionador');
             $perfilBadge = 'bg-secondary';
         } elseif ($perfil === 'cliente') {
-            $perfilLabel = 'Cliente';
+            $perfilLabel = __('admin.users.role_cliente', 'Cliente');
             $perfilBadge = 'bg-light text-dark';
         }
 
@@ -195,7 +195,7 @@ class AdminUsuariosViews {
                             <h4>' . htmlspecialchars($usuario['nome']) . '</h4>
                             <p class="text-muted">' . htmlspecialchars($usuario['email']) . '</p>
                             <div>
-                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? __('admin.users.status_active', 'Ativo') : __('admin.users.status_inactive', 'Inativo')) . '</span>
                                 <span class="badge ' . $perfilBadge . ' ms-1">' . htmlspecialchars($perfilLabel) . '</span>
                             </div>
                         </div>
@@ -203,30 +203,30 @@ class AdminUsuariosViews {
                     
                     <div class="card mt-3">
                         <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-wallet me-2"></i>Carteira</h6>
+                            <h6 class="mb-0"><i class="fas fa-wallet me-2"></i>' . __('admin.users.wallet', 'Carteira') . '</h6>
                         </div>
                         <div class="card-body">
                             <div class="text-center">
                                 <h5 class="text-success">$' . number_format($usuario['carteira_usd'], 2, '.', ',') . '</h5>
-                                <small class="text-muted">Saldo em USD</small>
+                                <small class="text-muted">' . __('admin.users.balance_usd', 'Saldo em USD') . '</small>
                             </div>
                             <hr>
                             <div class="text-center">
                                 <h5 class="text-info">R$ ' . number_format($usuario['carteira_brl'], 2, ',', '.') . '</h5>
-                                <small class="text-muted">Saldo em BRL</small>
+                                <small class="text-muted">' . __('admin.users.balance_brl', 'Saldo em BRL') . '</small>
                             </div>
                             <div class="mt-3">
                                 <button type="button" class="btn btn-success btn-sm w-100" onclick="adicionarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
-                                    <i class="fas fa-dollar-sign me-1"></i>Adicionar Crédito
+                                    <i class="fas fa-dollar-sign me-1"></i>' . __('admin.users.add_credit', 'Adicionar Crédito') . '
                                 </button>
                                 <button type="button" class="btn btn-danger btn-sm w-100 mt-2" onclick="debitarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
-                                    <i class="fas fa-minus-circle me-1"></i>Debitar Crédito
+                                    <i class="fas fa-minus-circle me-1"></i>' . __('admin.users.debit_credit', 'Debitar Crédito') . '
                                 </button>
                                 <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="converterMoeda(' . $usuario['id'] . ')">
-                                    <i class="fas fa-exchange-alt me-1"></i>Converter USD → BRL
+                                    <i class="fas fa-exchange-alt me-1"></i>' . __('admin.users.convert_usd_brl', 'Converter USD → BRL') . '
                                 </button>
                                 <button type="button" class="btn btn-outline-info btn-sm w-100 mt-2" onclick="verExtrato(' . $usuario['id'] . ')">
-                                    <i class="fas fa-list me-1"></i>Ver Extrato
+                                    <i class="fas fa-list me-1"></i>' . __('admin.users.view_statement', 'Ver Extrato') . '
                                 </button>
                             </div>
                         </div>
@@ -236,19 +236,19 @@ class AdminUsuariosViews {
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações Pessoais</h6>
+                            <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>' . __('admin.users.personal_info', 'Informações Pessoais') . '</h6>
                         </div>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <p><strong>Nome:</strong> ' . htmlspecialchars($usuario['nome']) . '</p>
-                                    <p><strong>Email:</strong> ' . htmlspecialchars($usuario['email']) . '</p>
-                                    <p><strong>CPF:</strong> ' . htmlspecialchars($usuario['cpf'] ?? 'Não informado') . '</p>
+                                    <p><strong>' . __('admin.users.field_name', 'Nome') . ':</strong> ' . htmlspecialchars($usuario['nome']) . '</p>
+                                    <p><strong>' . __('admin.users.field_email_short', 'Email') . ':</strong> ' . htmlspecialchars($usuario['email']) . '</p>
+                                    <p><strong>' . __('admin.users.field_cpf', 'CPF') . ':</strong> ' . htmlspecialchars($usuario['cpf'] ?? __('admin.users.not_informed', 'Não informado')) . '</p>
                                 </div>
                                 <div class="col-md-6">
-                                    <p><strong>Telefone:</strong> ' . htmlspecialchars($usuario['telefone'] ?? 'Não informado') . '</p>
-                                    <p><strong>Data Cadastro:</strong> ' . date('d/m/Y H:i', strtotime($usuario['created_at'])) . '</p>
-                                    <p><strong>Última Atualização:</strong> ' . date('d/m/Y H:i', strtotime($usuario['updated_at'])) . '</p>
+                                    <p><strong>' . __('admin.users.field_phone', 'Telefone') . ':</strong> ' . htmlspecialchars($usuario['telefone'] ?? __('admin.users.not_informed', 'Não informado')) . '</p>
+                                    <p><strong>' . __('admin.users.registration_date', 'Data Cadastro:') . '</strong> ' . date('d/m/Y H:i', strtotime($usuario['created_at'])) . '</p>
+                                    <p><strong>' . __('admin.users.last_update', 'Última Atualização:') . '</strong> ' . date('d/m/Y H:i', strtotime($usuario['updated_at'])) . '</p>
                                 </div>
                             </div>
                         </div>
@@ -256,23 +256,23 @@ class AdminUsuariosViews {
                     
                     <div class="card mt-3">
                         <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Últimos Pedidos</h6>
+                            <h6 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>' . __('admin.users.latest_orders', 'Últimos Pedidos') . '</h6>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table class="table table-sm">
                                     <thead>
                                         <tr>
-                                            <th>Pedido</th>
-                                            <th>Data</th>
-                                            <th>Total</th>
-                                            <th>Status</th>
+                                            <th>' . __('admin.users.th_order', 'Pedido') . '</th>
+                                            <th>' . __('admin.users.th_date', 'Data') . '</th>
+                                            <th>' . __('admin.users.th_total', 'Total') . '</th>
+                                            <th>' . __('admin.users.status', 'Status') . '</th>
                                         </tr>
                                     </thead>
                                     <tbody>';
                                     
                                     if (empty($pedidos)) {
-                                        $html .= '<tr><td colspan="4" class="text-center text-muted">Nenhum pedido encontrado</td></tr>';
+                                        $html .= '<tr><td colspan="4" class="text-center text-muted">' . __('admin.users.no_orders', 'Nenhum pedido encontrado') . '</td></tr>';
                                     } else {
                                         foreach ($pedidos as $pedido) {
                                             $html .= '
@@ -303,31 +303,31 @@ class AdminUsuariosViews {
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Adicionar Crédito</h5>
+                            <h5 class="modal-title">' . __('admin.users.add_credit', 'Adicionar Crédito') . '</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <form id="formAdicionarCredito">
                                 <input type="hidden" id="creditoUsuarioId">
                                 <div class="mb-3">
-                                    <label class="form-label">Nome do Usuário</label>
+                                    <label class="form-label">' . __('admin.users.user_name', 'Nome do Usuário') . '</label>
                                     <input type="text" class="form-control" id="creditoNomeUsuario" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Valor em USD</label>
+                                    <label class="form-label">' . __('admin.users.value_usd', 'Valor em USD') . '</label>
                                     <input type="number" class="form-control" id="creditoValor" step="0.01" min="0.01" required>
-                                    <small class="text-muted">O valor será adicionado em dólares americanos</small>
+                                    <small class="text-muted">' . __('admin.users.value_added_usd_hint', 'O valor será adicionado em dólares americanos') . '</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Descrição (opcional)</label>
-                                    <input type="text" class="form-control" id="creditoDescricao" placeholder="Crédito adicionado pelo admin">
+                                    <label class="form-label">' . __('admin.users.description_optional', 'Descrição (opcional)') . '</label>
+                                    <input type="text" class="form-control" id="creditoDescricao" placeholder="' . htmlspecialchars(__('admin.users.credit_added_by_admin', 'Crédito adicionado pelo admin'), ENT_QUOTES, 'UTF-8') . '">
                                 </div>
                             </form>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.users.cancel', 'Cancelar') . '</button>
                             <button type="button" class="btn btn-success" onclick="confirmarAdicionarCredito()">
-                                <i class="fas fa-dollar-sign me-1"></i>Adicionar Crédito
+                                <i class="fas fa-dollar-sign me-1"></i>' . __('admin.users.add_credit', 'Adicionar Crédito') . '
                             </button>
                         </div>
                     </div>
@@ -341,36 +341,36 @@ class AdminUsuariosViews {
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-danger text-white">
-                            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Debitar Crédito</h5>
+                            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>' . __('admin.users.debit_credit', 'Debitar Crédito') . '</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <form id="formDebitarCredito">
                                 <input type="hidden" id="debitoUsuarioId">
                                 <div class="mb-3">
-                                    <label class="form-label">Nome do Usuário</label>
+                                    <label class="form-label">' . __('admin.users.user_name', 'Nome do Usuário') . '</label>
                                     <input type="text" class="form-control" id="debitoNomeUsuario" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Saldo atual (USD)</label>
+                                    <label class="form-label">' . __('admin.users.current_balance_usd', 'Saldo atual (USD)') . '</label>
                                     <input type="text" class="form-control fw-bold text-success" id="debitoSaldoAtual" readonly>
-                                    <small class="text-muted">Este é o crédito disponível do usuário</small>
+                                    <small class="text-muted">' . __('admin.users.available_credit_hint', 'Este é o crédito disponível do usuário') . '</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Valor a debitar (USD)</label>
+                                    <label class="form-label">' . __('admin.users.value_to_debit_usd', 'Valor a debitar (USD)') . '</label>
                                     <input type="number" class="form-control" id="debitoValor" step="0.01" min="0.01" required>
-                                    <small class="text-muted">O valor será subtraído do saldo em dólares americanos</small>
+                                    <small class="text-muted">' . __('admin.users.value_subtracted_usd_hint', 'O valor será subtraído do saldo em dólares americanos') . '</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Descrição (opcional)</label>
-                                    <input type="text" class="form-control" id="debitoDescricao" placeholder="Débito realizado pelo admin">
+                                    <label class="form-label">' . __('admin.users.description_optional', 'Descrição (opcional)') . '</label>
+                                    <input type="text" class="form-control" id="debitoDescricao" placeholder="' . htmlspecialchars(__('admin.users.debit_by_admin', 'Débito realizado pelo admin'), ENT_QUOTES, 'UTF-8') . '">
                                 </div>
                             </form>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.users.cancel', 'Cancelar') . '</button>
                             <button type="button" class="btn btn-danger" onclick="confirmarDebitarCredito()">
-                                <i class="fas fa-minus-circle me-1"></i>Debitar Crédito
+                                <i class="fas fa-minus-circle me-1"></i>' . __('admin.users.debit_credit', 'Debitar Crédito') . '
                             </button>
                         </div>
                     </div>
@@ -384,35 +384,35 @@ class AdminUsuariosViews {
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Converter USD → BRL</h5>
+                            <h5 class="modal-title">' . __('admin.users.convert_usd_brl', 'Converter USD → BRL') . '</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <form id="formConverterMoeda">
                                 <input type="hidden" id="conversaoUsuarioId">
                                 <div class="mb-3">
-                                    <label class="form-label">Saldo Atual USD</label>
+                                    <label class="form-label">' . __('admin.users.current_balance_usd_label', 'Saldo Atual USD') . '</label>
                                     <input type="text" class="form-control" id="saldoAtualUSD" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Valor para Converter (USD)</label>
+                                    <label class="form-label">' . __('admin.users.value_to_convert_usd', 'Valor para Converter (USD)') . '</label>
                                     <input type="number" class="form-control" id="valorConverter" step="0.01" min="0.01" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Taxa de Conversão</label>
+                                    <label class="form-label">' . __('admin.users.conversion_rate', 'Taxa de Conversão') . '</label>
                                     <input type="number" class="form-control" id="taxaConversao" step="0.0001" value="' . \App\Core\ExchangeRate::getUsdToBrl() . '" required>
-                                    <small class="text-muted">1 USD = R$ ' . number_format(\App\Core\ExchangeRate::getUsdToBrl(), 2, ',', '.') . ' (taxa atual)</small>
+                                    <small class="text-muted">1 USD = R$ ' . number_format(\App\Core\ExchangeRate::getUsdToBrl(), 2, ',', '.') . ' ' . __('admin.users.current_rate', '(taxa atual)') . '</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Valor em BRL</label>
+                                    <label class="form-label">' . __('admin.users.value_in_brl', 'Valor em BRL') . '</label>
                                     <input type="text" class="form-control" id="valorBRL" readonly>
                                 </div>
                             </form>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.users.cancel', 'Cancelar') . '</button>
                             <button type="button" class="btn btn-primary" onclick="confirmarConversao()">
-                                <i class="fas fa-exchange-alt me-1"></i>Converter
+                                <i class="fas fa-exchange-alt me-1"></i>' . __('admin.users.convert', 'Converter') . '
                             </button>
                         </div>
                     </div>
@@ -426,26 +426,26 @@ class AdminUsuariosViews {
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Adicionar Créditos em Lote</h5>
+                            <h5 class="modal-title">' . __('admin.users.add_credits_bulk', 'Adicionar Créditos em Lote') . '</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <form id="formCreditosLote">
                                 <div class="mb-3">
-                                    <label class="form-label">Valor em USD (para todos)</label>
+                                    <label class="form-label">' . __('admin.users.value_usd_all', 'Valor em USD (para todos)') . '</label>
                                     <input type="number" class="form-control" id="loteValor" step="0.01" min="0.01" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Descrição</label>
-                                    <input type="text" class="form-control" id="loteDescricao" placeholder="Crédito em lote adicionado pelo admin">
+                                    <label class="form-label">' . __('admin.users.th_description', 'Descrição') . '</label>
+                                    <input type="text" class="form-control" id="loteDescricao" placeholder="' . htmlspecialchars(__('admin.users.bulk_credit_by_admin', 'Crédito em lote adicionado pelo admin'), ENT_QUOTES, 'UTF-8') . '">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Usuários (selecione)</label>
+                                    <label class="form-label">' . __('admin.users.users_select', 'Usuários (selecione)') . '</label>
                                     <div class="border p-3" style="max-height: 300px; overflow-y: auto;">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="selectAllUsers">
                                             <label class="form-check-label" for="selectAllUsers">
-                                                <strong>Selecionar Todos</strong>
+                                                <strong>' . __('admin.users.select_all', 'Selecionar Todos') . '</strong>
                                             </label>
                                         </div>
                                         <hr>
@@ -457,9 +457,9 @@ class AdminUsuariosViews {
                             </form>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.users.cancel', 'Cancelar') . '</button>
                             <button type="button" class="btn btn-success" onclick="confirmarCreditosLote()">
-                                <i class="fas fa-users me-1"></i>Adicionar Créditos
+                                <i class="fas fa-users me-1"></i>' . __('admin.users.add_credits', 'Adicionar Créditos') . '
                             </button>
                         </div>
                     </div>
@@ -487,7 +487,7 @@ class AdminUsuariosViews {
                 document.getElementById("creditoUsuarioId").value = usuarioId;
                 document.getElementById("creditoNomeUsuario").value = nomeUsuario;
                 document.getElementById("creditoValor").value = "";
-                document.getElementById("creditoDescricao").value = "Crédito adicionado pelo admin";
+                document.getElementById("creditoDescricao").value = "' . htmlspecialchars(__('admin.users.credit_added_by_admin', 'Crédito adicionado pelo admin'), ENT_QUOTES, 'UTF-8') . '";
                 
                 const modal = new bootstrap.Modal(document.getElementById("modalAdicionarCredito"));
                 modal.show();
@@ -497,7 +497,7 @@ class AdminUsuariosViews {
                 document.getElementById("debitoUsuarioId").value = usuarioId;
                 document.getElementById("debitoNomeUsuario").value = nomeUsuario;
                 document.getElementById("debitoValor").value = "";
-                document.getElementById("debitoDescricao").value = "Débito realizado pelo admin";
+                document.getElementById("debitoDescricao").value = "' . htmlspecialchars(__('admin.users.debit_by_admin', 'Débito realizado pelo admin'), ENT_QUOTES, 'UTF-8') . '";
 
                 // Buscar saldo atual do usuário
                 const usuario = usuariosData.find(u => u.id == usuarioId);
@@ -515,7 +515,7 @@ class AdminUsuariosViews {
                 const descricao = document.getElementById("creditoDescricao").value;
                 
                 if (!valor || valor <= 0) {
-                    alert("Digite um valor válido maior que zero");
+                    alert("' . htmlspecialchars(__('admin.users.js_enter_valid_value', 'Digite um valor válido maior que zero'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
                 
@@ -533,16 +533,16 @@ class AdminUsuariosViews {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert("Crédito adicionado com sucesso! $" + valor + " USD");
+                        alert("' . htmlspecialchars(__('admin.users.js_credit_added_success', 'Crédito adicionado com sucesso!'), ENT_QUOTES, 'UTF-8') . ' $" + valor + " USD");
                         bootstrap.Modal.getInstance(document.getElementById("modalAdicionarCredito")).hide();
                         location.reload();
                     } else {
-                        alert("Erro ao adicionar crédito: " + data.message);
+                        alert("' . htmlspecialchars(__('admin.users.js_credit_add_error', 'Erro ao adicionar crédito:'), ENT_QUOTES, 'UTF-8') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao adicionar crédito");
+                    alert("' . htmlspecialchars(__('admin.users.js_credit_add_error_generic', 'Erro ao adicionar crédito'), ENT_QUOTES, 'UTF-8') . '");
                 });
             }
 
@@ -552,7 +552,7 @@ class AdminUsuariosViews {
                 const descricao = document.getElementById("debitoDescricao").value;
 
                 if (!valor || valor <= 0) {
-                    alert("Digite um valor válido maior que zero");
+                    alert("' . htmlspecialchars(__('admin.users.js_enter_valid_value', 'Digite um valor válido maior que zero'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
 
@@ -560,11 +560,11 @@ class AdminUsuariosViews {
                 const saldoText = document.getElementById("debitoSaldoAtual").value.replace("$", "");
                 const saldo = parseFloat(saldoText) || 0;
                 if (valor > saldo) {
-                    alert("O valor de débito ($" + valor.toFixed(2) + ") não pode ser maior que o saldo disponível ($" + saldo.toFixed(2) + ")");
+                    alert("' . htmlspecialchars(__('admin.users.js_debit_exceeds_balance_1', 'O valor de débito ($'), ENT_QUOTES, 'UTF-8') . '" + valor.toFixed(2) + "' . htmlspecialchars(__('admin.users.js_debit_exceeds_balance_2', ') não pode ser maior que o saldo disponível ($'), ENT_QUOTES, 'UTF-8') . '" + saldo.toFixed(2) + "' . htmlspecialchars(__('admin.users.js_debit_exceeds_balance_3', ')'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
 
-                if (!confirm("Confirma o débito de $" + valor.toFixed(2) + " USD da carteira deste usuário?")) {
+                if (!confirm("' . htmlspecialchars(__('admin.users.js_confirm_debit_1', 'Confirma o débito de $'), ENT_QUOTES, 'UTF-8') . '" + valor.toFixed(2) + "' . htmlspecialchars(__('admin.users.js_confirm_debit_2', ' USD da carteira deste usuário?'), ENT_QUOTES, 'UTF-8') . '")) {
                     return;
                 }
 
@@ -582,16 +582,16 @@ class AdminUsuariosViews {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert("Débito realizado com sucesso! -$" + valor + " USD");
+                        alert("' . htmlspecialchars(__('admin.users.js_debit_success', 'Débito realizado com sucesso!'), ENT_QUOTES, 'UTF-8') . ' -$" + valor + " USD");
                         bootstrap.Modal.getInstance(document.getElementById("modalDebitarCredito")).hide();
                         location.reload();
                     } else {
-                        alert("Erro ao debitar crédito: " + data.message);
+                        alert("' . htmlspecialchars(__('admin.users.js_debit_error', 'Erro ao debitar crédito:'), ENT_QUOTES, 'UTF-8') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao debitar crédito");
+                    alert("' . htmlspecialchars(__('admin.users.js_debit_error_generic', 'Erro ao debitar crédito'), ENT_QUOTES, 'UTF-8') . '");
                 });
             }
             
@@ -628,7 +628,7 @@ class AdminUsuariosViews {
                 const taxa = parseFloat(document.getElementById("taxaConversao").value);
                 
                 if (!valorUSD || valorUSD <= 0) {
-                    alert("Digite um valor válido maior que zero");
+                    alert("' . htmlspecialchars(__('admin.users.js_enter_valid_value', 'Digite um valor válido maior que zero'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
                 
@@ -646,16 +646,16 @@ class AdminUsuariosViews {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert("Conversão realizada com sucesso! R$ " + data.valor_brl.toFixed(2));
+                        alert("' . htmlspecialchars(__('admin.users.js_conversion_success', 'Conversão realizada com sucesso!'), ENT_QUOTES, 'UTF-8') . ' R$ " + data.valor_brl.toFixed(2));
                         bootstrap.Modal.getInstance(document.getElementById("modalConverterMoeda")).hide();
                         location.reload();
                     } else {
-                        alert("Erro ao converter: " + data.message);
+                        alert("' . htmlspecialchars(__('admin.users.js_convert_error', 'Erro ao converter:'), ENT_QUOTES, 'UTF-8') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao converter moeda");
+                    alert("' . htmlspecialchars(__('admin.users.js_convert_error_generic', 'Erro ao converter moeda'), ENT_QUOTES, 'UTF-8') . '");
                 });
             }
             
@@ -675,12 +675,12 @@ class AdminUsuariosViews {
                 const checkboxes = document.querySelectorAll("#usuariosLoteList input[type=\'checkbox\']:checked");
                 
                 if (!valor || valor <= 0) {
-                    alert("Digite um valor válido maior que zero");
+                    alert("' . htmlspecialchars(__('admin.users.js_enter_valid_value', 'Digite um valor válido maior que zero'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
                 
                 if (checkboxes.length === 0) {
-                    alert("Selecione pelo menos um usuário");
+                    alert("' . htmlspecialchars(__('admin.users.js_select_at_least_one', 'Selecione pelo menos um usuário'), ENT_QUOTES, 'UTF-8') . '");
                     return;
                 }
                 
@@ -704,12 +704,12 @@ class AdminUsuariosViews {
                         bootstrap.Modal.getInstance(document.getElementById("modalCreditosLote")).hide();
                         location.reload();
                     } else {
-                        alert("Erro: " + data.message);
+                        alert("' . htmlspecialchars(__('admin.users.error_label', 'Erro:'), ENT_QUOTES, 'UTF-8') . ' " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    alert("Erro ao adicionar créditos em lote");
+                    alert("' . htmlspecialchars(__('admin.users.js_bulk_credit_error', 'Erro ao adicionar créditos em lote'), ENT_QUOTES, 'UTF-8') . '");
                 });
             }
             

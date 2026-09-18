@@ -1,14 +1,14 @@
 <?php ob_start(); ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="page-title">Correios Mundial (PACKET)</h1>
+        <h1 class="page-title"><?= __('admin.correios_mundial.title','Correios Mundial (PACKET)') ?></h1>
         <div class="d-flex gap-2 align-items-center">
             <div class="input-group input-group-sm" style="width:180px">
-                <input type="text" class="form-control" id="buscarPedidoPacket" placeholder="Nº pedido..." onkeydown="if(event.key==='Enter'){irParaPedidoPacket();event.preventDefault();}">
+                <input type="text" class="form-control" id="buscarPedidoPacket" placeholder="<?= htmlspecialchars(__('admin.correios_mundial.order_number_placeholder','Nº pedido...'), ENT_QUOTES, 'UTF-8') ?>" onkeydown="if(event.key==='Enter'){irParaPedidoPacket();event.preventDefault();}">
                 <button class="btn btn-outline-primary" type="button" onclick="irParaPedidoPacket()"><i class="fas fa-search"></i></button>
             </div>
-            <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/containers">Containers</a>
-            <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/faturas">Faturas (CN38)</a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/containers"><?= __('admin.correios_mundial.containers','Containers') ?></a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/faturas"><?= __('admin.correios_mundial.invoices_cn38','Faturas (CN38)') ?></a>
         </div>
     </div>
 
@@ -16,9 +16,9 @@
         <div class="col-xl-4 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Saldo atual</div>
+                    <div class="text-muted small"><?= __('admin.correios_mundial.current_balance','Saldo atual') ?></div>
                     <div class="h4 mb-0" id="cm_balance">-</div>
-                    <div class="small text-muted mt-1" id="cm_balance_hint">Carregando...</div>
+                    <div class="small text-muted mt-1" id="cm_balance_hint"><?= __('admin.correios_mundial.loading','Carregando...') ?></div>
                 </div>
             </div>
         </div>
@@ -42,9 +42,9 @@
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Pedidos (Caixa Fechada) - prontos para etiqueta</strong>
+            <strong><?= __('admin.correios_mundial.closed_box_orders','Pedidos (Caixa Fechada) - prontos para etiqueta') ?></strong>
             <?php if (!empty($pedidos)): ?>
-                <button class="btn btn-sm btn-warning" id="btnToggleMassa" onclick="toggleModoMassa()"><i class="fas fa-bolt me-1"></i>Gerar em Massa</button>
+                <button class="btn btn-sm btn-warning" id="btnToggleMassa" onclick="toggleModoMassa()"><i class="fas fa-bolt me-1"></i><?= __('admin.correios_mundial.bulk_generate','Gerar em Massa') ?></button>
             <?php endif; ?>
         </div>
         <div class="card-body">
@@ -53,16 +53,16 @@
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Data</th>
-                            <th>Ação</th>
+                            <th><?= __('admin.correios_mundial.col_order','Pedido') ?></th>
+                            <th><?= __('admin.correios_mundial.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.correios_mundial.col_date','Data') ?></th>
+                            <th><?= __('admin.correios_mundial.col_action','Ação') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $pedidos = isset($pedidos) && is_array($pedidos) ? $pedidos : []; ?>
                         <?php if (empty($pedidos)): ?>
-                            <tr><td colspan="4" class="text-muted">Nenhum pedido aguardando etiqueta.</td></tr>
+                            <tr><td colspan="4" class="text-muted"><?= __('admin.correios_mundial.no_pending_orders','Nenhum pedido aguardando etiqueta.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($pedidos as $p): ?>
                                 <?php $pid = (int) ($p['pedido_id'] ?? 0); ?>
@@ -71,9 +71,9 @@
                                     <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
                                     <td><?= !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-' ?></td>
                                     <td>
-                                        <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/pedido/<?= $pid ?>">Abrir</a>
+                                        <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/pedido/<?= $pid ?>"><?= __('admin.correios_mundial.open','Abrir') ?></a>
                                         <?php if (!$cmIsRedirecionador): ?>
-                                            <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/<?= $pid ?>" target="_blank">Pedido</a>
+                                            <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/<?= $pid ?>" target="_blank"><?= __('admin.correios_mundial.order','Pedido') ?></a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -88,31 +88,31 @@
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
                         <input type="checkbox" id="checkAllMassa" onclick="toggleAllMassaCf(this)" class="form-check-input me-2">
-                        <label for="checkAllMassa" class="form-check-label small">Selecionar todos</label>
+                        <label for="checkAllMassa" class="form-check-label small"><?= __('admin.correios_mundial.select_all','Selecionar todos') ?></label>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-success" id="btnGerarMassa" onclick="gerarEtiquetasMassa()" disabled>
-                            <i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">0</span>)
+                            <i class="fas fa-tags me-1"></i><?= __('admin.correios_mundial.generate_labels','Gerar Etiquetas') ?> (<span id="massaCount">0</span>)
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleModoMassa()">Voltar</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleModoMassa()"><?= __('admin.correios_mundial.back','Voltar') ?></button>
                     </div>
                 </div>
                 <table class="table table-sm align-middle table-bordered" style="font-size:.85rem;">
                     <thead class="table-light">
                         <tr>
                             <th style="width:30px;"></th>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Peso (kg)</th>
-                            <th>L×A×C (cm)</th>
-                            <th>Frete USD</th>
-                            <th>Dados OK</th>
-                            <th>Status</th>
+                            <th><?= __('admin.correios_mundial.col_order','Pedido') ?></th>
+                            <th><?= __('admin.correios_mundial.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.correios_mundial.col_weight_kg','Peso (kg)') ?></th>
+                            <th><?= __('admin.correios_mundial.col_dimensions','L×A×C (cm)') ?></th>
+                            <th><?= __('admin.correios_mundial.col_freight_usd','Frete USD') ?></th>
+                            <th><?= __('admin.correios_mundial.col_data_ok','Dados OK') ?></th>
+                            <th><?= __('admin.correios_mundial.col_status','Status') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($pedidos)): ?>
-                            <tr><td colspan="8" class="text-muted">Nenhum pedido.</td></tr>
+                            <tr><td colspan="8" class="text-muted"><?= __('admin.correios_mundial.no_orders','Nenhum pedido.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($pedidos as $p): ?>
                                 <?php
@@ -138,9 +138,9 @@
                                     <td><?= $frete > 0 ? number_format($frete, 2, '.', '') : '-' ?></td>
                                     <td>
                                         <?php if ($dadosOk): ?>
-                                            <span class="badge bg-success">OK</span>
+                                            <span class="badge bg-success"><?= __('admin.correios_mundial.ok','OK') ?></span>
                                         <?php else: ?>
-                                            <span class="badge bg-danger" title="<?= implode(', ', array_filter([!$temPeso?'Peso':'', !$temDim?'Dimensões':'', !$temEmail?'Email':'', !$temTel?'Telefone':'', !$temCpf?'CPF':''])) ?>">Incompleto</span>
+                                            <span class="badge bg-danger" title="<?= htmlspecialchars(implode(', ', array_filter([!$temPeso?__('admin.correios_mundial.field_weight','Peso'):'', !$temDim?__('admin.correios_mundial.field_dimensions','Dimensões'):'', !$temEmail?__('admin.correios_mundial.field_email','Email'):'', !$temTel?__('admin.correios_mundial.field_phone','Telefone'):'', !$temCpf?__('admin.correios_mundial.field_cpf','CPF'):''])), ENT_QUOTES, 'UTF-8') ?>"><?= __('admin.correios_mundial.incomplete','Incompleto') ?></span>
                                         <?php endif; ?>
                                     </td>
                                     <td><span class="massa-status text-muted">-</span></td>
@@ -154,7 +154,7 @@
             <!-- Mobile: Cards -->
             <div class="d-md-none">
                 <?php if (empty($pedidos)): ?>
-                    <div class="text-muted small py-3">Nenhum pedido aguardando etiqueta.</div>
+                    <div class="text-muted small py-3"><?= __('admin.correios_mundial.no_pending_orders','Nenhum pedido aguardando etiqueta.') ?></div>
                 <?php else: ?>
                     <?php foreach ($pedidos as $p): ?>
                         <?php $pid = (int) ($p['pedido_id'] ?? 0); ?>
@@ -164,7 +164,7 @@
                                     <span class="fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
                                     <span class="small ms-2" style="word-break:break-word;"><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></span>
                                 </div>
-                                <a class="btn btn-sm btn-primary py-0 px-2" href="/admin/correios-mundial/pedido/<?= $pid ?>">Abrir</a>
+                                <a class="btn btn-sm btn-primary py-0 px-2" href="/admin/correios-mundial/pedido/<?= $pid ?>"><?= __('admin.correios_mundial.open','Abrir') ?></a>
                             </div>
                             <div class="text-muted small"><?= !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '' ?></div>
                         </div>
@@ -176,10 +176,10 @@
 
     <div class="card border-0 shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Etiquetas geradas (PACKET)</strong>
+            <strong><?= __('admin.correios_mundial.generated_labels','Etiquetas geradas (PACKET)') ?></strong>
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-success" onclick="exportarCsvSelecionadas()" id="btnExportarCsv" disabled><i class="fas fa-file-csv me-1"></i>Exportar selecionadas</button>
-                <button class="btn btn-sm btn-warning" onclick="regerarSelecionadas()" id="btnRegerarMassa" disabled><i class="fas fa-redo me-1"></i>Regerar selecionadas</button>
+                <button class="btn btn-sm btn-success" onclick="exportarCsvSelecionadas()" id="btnExportarCsv" disabled><i class="fas fa-file-csv me-1"></i><?= __('admin.correios_mundial.export_selected','Exportar selecionadas') ?></button>
+                <button class="btn btn-sm btn-warning" onclick="regerarSelecionadas()" id="btnRegerarMassa" disabled><i class="fas fa-redo me-1"></i><?= __('admin.correios_mundial.regenerate_selected','Regerar selecionadas') ?></button>
             </div>
         </div>
         <div class="card-body">
@@ -189,18 +189,18 @@
                     <thead>
                         <tr>
                             <th><input type="checkbox" id="checkAllPacket" onclick="toggleAllPacket(this)"></th>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Rastreio</th>
-                            <th>Etiqueta</th>
-                            <th>Data</th>
-                            <th>Ações</th>
+                            <th><?= __('admin.correios_mundial.col_order','Pedido') ?></th>
+                            <th><?= __('admin.correios_mundial.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.correios_mundial.col_tracking','Rastreio') ?></th>
+                            <th><?= __('admin.correios_mundial.col_label','Etiqueta') ?></th>
+                            <th><?= __('admin.correios_mundial.col_date','Data') ?></th>
+                            <th><?= __('admin.correios_mundial.col_actions','Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $etiquetas = isset($etiquetas) && is_array($etiquetas) ? $etiquetas : []; ?>
                         <?php if (empty($etiquetas)): ?>
-                            <tr><td colspan="7" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
+                            <tr><td colspan="7" class="text-muted"><?= __('admin.correios_mundial.no_labels','Nenhuma etiqueta gerada.') ?></td></tr>
                         <?php else: ?>
                             <?php foreach ($etiquetas as $e): ?>
                                 <?php $pid = (int) ($e['pedido_id'] ?? 0); ?>
@@ -219,7 +219,7 @@
                                     </td>
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
-                                        <button class="btn btn-sm btn-warning" onclick="regerarPacket(<?= $pid ?>)" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>
+                                        <button class="btn btn-sm btn-warning" onclick="regerarPacket(<?= $pid ?>)" title="<?= htmlspecialchars(__('admin.correios_mundial.regenerate_label','Regerar etiqueta'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-redo"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -230,7 +230,7 @@
             <!-- Mobile: Cards -->
             <div class="d-md-none">
                 <?php if (empty($etiquetas)): ?>
-                    <div class="text-muted small py-3">Nenhuma etiqueta gerada.</div>
+                    <div class="text-muted small py-3"><?= __('admin.correios_mundial.no_labels','Nenhuma etiqueta gerada.') ?></div>
                 <?php else: ?>
                     <?php foreach ($etiquetas as $e): ?>
                         <?php $pid = (int) ($e['pedido_id'] ?? 0); ?>
@@ -295,22 +295,22 @@
 
     async function loadBalance(){
         setError('');
-        setHint('Carregando...');
+        setHint(<?= json_encode(__('admin.correios_mundial.loading','Carregando...')) ?>);
         try{
             const r = await fetch('/admin/correios-mundial/balance', { headers: { 'Accept': 'application/json' } });
             const data = await r.json();
             if(!data || !data.success){
                 setBalance('-');
-                setHint('Falha ao carregar');
-                setError((data && (data.error || data.message)) ? (data.error || data.message) : 'Falha ao consultar saldo');
+                setHint(<?= json_encode(__('admin.correios_mundial.load_failed','Falha ao carregar')) ?>);
+                setError((data && (data.error || data.message)) ? (data.error || data.message) : <?= json_encode(__('admin.correios_mundial.balance_query_failed','Falha ao consultar saldo')) ?>);
                 return;
             }
             setBalance(data.currentBalance);
-            setHint('Atualizado agora');
+            setHint(<?= json_encode(__('admin.correios_mundial.updated_now','Atualizado agora')) ?>);
         }catch(e){
             setBalance('-');
-            setHint('Falha ao carregar');
-            setError('Falha ao consultar saldo');
+            setHint(<?= json_encode(__('admin.correios_mundial.load_failed','Falha ao carregar')) ?>);
+            setError(<?= json_encode(__('admin.correios_mundial.balance_query_failed','Falha ao consultar saldo')) ?>);
         }
     }
 
@@ -319,7 +319,7 @@
 
 function irParaPedidoPacket(){
     var v = document.getElementById('buscarPedidoPacket').value.replace(/\D/g,'');
-    if(v===''){alert('Digite o número do pedido');return;}
+    if(v===''){alert(<?= json_encode(__('admin.correios_mundial.enter_order_number','Digite o número do pedido')) ?>);return;}
     window.location.href='/admin/correios-mundial/pedido/'+parseInt(v,10);
 }
 
@@ -334,18 +334,18 @@ function updateBtnMassa() {
     const btnExport = document.getElementById('btnExportarCsv');
     if (btn) {
         btn.disabled = checked === 0;
-        btn.textContent = checked > 0 ? 'Regerar selecionadas (' + checked + ')' : 'Regerar selecionadas';
+        btn.textContent = checked > 0 ? <?= json_encode(__('admin.correios_mundial.regenerate_selected_count','Regerar selecionadas ({n})')) ?>.replace('{n}', checked) : <?= json_encode(__('admin.correios_mundial.regenerate_selected','Regerar selecionadas')) ?>;
     }
     if (btnExport) {
         btnExport.disabled = checked === 0;
         btnExport.innerHTML = checked > 0
-            ? '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas (' + checked + ')'
-            : '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas';
+            ? '<i class="fas fa-file-csv me-1"></i>' + <?= json_encode(__('admin.correios_mundial.export_selected_count','Exportar selecionadas ({n})')) ?>.replace('{n}', checked)
+            : '<i class="fas fa-file-csv me-1"></i>' + <?= json_encode(__('admin.correios_mundial.export_selected','Exportar selecionadas')) ?>;
     }
 }
 
 async function regerarPacket(pedidoId) {
-    if (!confirm('Regerar etiqueta do pedido #' + pedidoId + '? A etiqueta atual será deletada e uma nova será gerada.')) return;
+    if (!confirm(<?= json_encode(__('admin.correios_mundial.confirm_regenerate','Regerar etiqueta do pedido #{n}? A etiqueta atual será deletada e uma nova será gerada.')) ?>.replace('{n}', pedidoId))) return;
     try {
         const r = await fetch('/admin/correios-mundial/pedido/' + pedidoId + '/regerar-etiqueta', {
             method: 'POST',
@@ -353,13 +353,13 @@ async function regerarPacket(pedidoId) {
         });
         const data = await r.json();
         if (data && data.success) {
-            alert('Etiqueta regerada! Novo rastreio: ' + (data.tracking_number || ''));
+            alert(<?= json_encode(__('admin.correios_mundial.label_regenerated','Etiqueta regerada! Novo rastreio: {n}')) ?>.replace('{n}', (data.tracking_number || '')));
             location.reload();
         } else {
-            alert('Erro: ' + (data.error || data.message || 'Falha ao regerar'));
+            alert(<?= json_encode(__('admin.correios_mundial.error_prefix','Erro:')) ?> + ' ' + (data.error || data.message || <?= json_encode(__('admin.correios_mundial.regenerate_failed','Falha ao regerar')) ?>));
         }
     } catch (e) {
-        alert('Erro de rede: ' + e.message);
+        alert(<?= json_encode(__('admin.correios_mundial.network_error','Erro de rede:')) ?> + ' ' + e.message);
     }
 }
 
@@ -367,10 +367,10 @@ async function regerarSelecionadas() {
     const checks = document.querySelectorAll('.packet-check:checked');
     if (checks.length === 0) return;
     const ids = Array.from(checks).map(cb => parseInt(cb.value));
-    if (!confirm('Regerar etiquetas de ' + ids.length + ' pedido(s) selecionados? As etiquetas atuais serão deletadas e novas serão geradas.')) return;
+    if (!confirm(<?= json_encode(__('admin.correios_mundial.confirm_regenerate_bulk','Regerar etiquetas de {n} pedido(s) selecionados? As etiquetas atuais serão deletadas e novas serão geradas.')) ?>.replace('{n}', ids.length))) return;
 
     const btn = document.getElementById('btnRegerarMassa');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regerando...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + <?= json_encode(__('admin.correios_mundial.regenerating','Regerando...')) ?>; }
 
     let ok = 0, erros = [];
     for (const pid of ids) {
@@ -383,15 +383,15 @@ async function regerarSelecionadas() {
             if (data && data.success) {
                 ok++;
             } else {
-                erros.push('#' + pid + ': ' + (data.error || 'erro'));
+                erros.push('#' + pid + ': ' + (data.error || <?= json_encode(__('admin.correios_mundial.error_generic','erro')) ?>));
             }
         } catch (e) {
             erros.push('#' + pid + ': ' + e.message);
         }
     }
 
-    let msg = ok + ' etiqueta(s) regerada(s) com sucesso.';
-    if (erros.length > 0) msg += '\n\nErros:\n' + erros.join('\n');
+    let msg = <?= json_encode(__('admin.correios_mundial.labels_regenerated_success','{n} etiqueta(s) regerada(s) com sucesso.')) ?>.replace('{n}', ok);
+    if (erros.length > 0) msg += '\n\n' + <?= json_encode(__('admin.correios_mundial.errors','Erros:')) ?> + '\n' + erros.join('\n');
     alert(msg);
     location.reload();
 }
@@ -402,7 +402,7 @@ async function exportarCsvSelecionadas() {
     const ids = Array.from(checks).map(cb => parseInt(cb.value));
 
     const btn = document.getElementById('btnExportarCsv');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Exportando...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + <?= json_encode(__('admin.correios_mundial.exporting','Exportando...')) ?>; }
 
     try {
         const r = await fetch('/admin/correios-mundial/exportar-csv', {
@@ -418,15 +418,15 @@ async function exportarCsvSelecionadas() {
             setTimeout(function() {
                 downloadCsvFile('wp_postmeta.csv', data.wp_postmeta_csv);
             }, 500);
-            alert('Exportação concluída! ' + data.total_etiquetas + ' etiqueta(s) exportada(s).\nOs arquivos wp_posts.csv e wp_postmeta.csv foram baixados.');
+            alert(<?= json_encode(__('admin.correios_mundial.export_done','Exportação concluída! {n} etiqueta(s) exportada(s).\nOs arquivos wp_posts.csv e wp_postmeta.csv foram baixados.')) ?>.replace('{n}', data.total_etiquetas));
         } else {
-            alert('Erro: ' + (data.error || data.message || 'Falha ao exportar'));
+            alert(<?= json_encode(__('admin.correios_mundial.error_prefix','Erro:')) ?> + ' ' + (data.error || data.message || <?= json_encode(__('admin.correios_mundial.export_failed','Falha ao exportar')) ?>));
         }
     } catch (e) {
-        alert('Erro de rede: ' + e.message);
+        alert(<?= json_encode(__('admin.correios_mundial.network_error','Erro de rede:')) ?> + ' ' + e.message);
     }
 
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-csv me-1"></i>' + <?= json_encode(__('admin.correios_mundial.export_selected','Exportar selecionadas')) ?>; }
     updateBtnMassa();
 }
 
@@ -452,11 +452,11 @@ function toggleModoMassa() {
     if (isActive) {
         massa.classList.add('d-none');
         normal.classList.remove('d-none');
-        if (btn) btn.innerHTML = '<i class="fas fa-bolt me-1"></i>Gerar em Massa';
+        if (btn) btn.innerHTML = '<i class="fas fa-bolt me-1"></i>' + <?= json_encode(__('admin.correios_mundial.bulk_generate','Gerar em Massa')) ?>;
     } else {
         normal.classList.add('d-none');
         massa.classList.remove('d-none');
-        if (btn) btn.innerHTML = '<i class="fas fa-arrow-left me-1"></i>Voltar ao Normal';
+        if (btn) btn.innerHTML = '<i class="fas fa-arrow-left me-1"></i>' + <?= json_encode(__('admin.correios_mundial.back_to_normal','Voltar ao Normal')) ?>;
     }
 }
 
@@ -477,20 +477,20 @@ async function gerarEtiquetasMassa() {
     var checks = document.querySelectorAll('.massa-check:checked');
     if (checks.length === 0) return;
     var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
-    if (!confirm('Gerar etiquetas PACKET para ' + ids.length + ' pedido(s) selecionados?\n\nO sistema fará todas as validações automaticamente.')) return;
+    if (!confirm(<?= json_encode(__('admin.correios_mundial.confirm_bulk_generate','Gerar etiquetas PACKET para {n} pedido(s) selecionados?\n\nO sistema fará todas as validações automaticamente.')) ?>.replace('{n}', ids.length))) return;
 
     var btn = document.getElementById('btnGerarMassa');
     var tabelaMassa = document.getElementById('tabelaMassa');
 
     // Bloquear toda a interface
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando... 0/' + ids.length; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + <?= json_encode(__('admin.correios_mundial.generating_progress','Gerando... {done}/{total}')) ?>.replace('{done}', '0').replace('{total}', ids.length); }
     // Desabilitar todos os checkboxes e botões dentro da tabela
     tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = 'none'; el.style.opacity = '0.5'; });
     // Overlay de loading
     var overlay = document.createElement('div');
     overlay.id = 'massaOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div id="massaOverlayText" style="font-size:1.1rem;font-weight:600;color:#333;">Gerando etiquetas... 0/' + ids.length + '</div><div class="text-muted small mt-2">Não feche esta página</div></div>';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div id="massaOverlayText" style="font-size:1.1rem;font-weight:600;color:#333;">' + <?= json_encode(__('admin.correios_mundial.generating_labels_progress','Gerando etiquetas... {done}/{total}')) ?>.replace('{done}', '0').replace('{total}', ids.length) + '</div><div class="text-muted small mt-2">' + <?= json_encode(__('admin.correios_mundial.do_not_close','Não feche esta página')) ?> + '</div></div>';
     document.body.appendChild(overlay);
 
     // Marcar todos como "processando"
@@ -528,10 +528,10 @@ async function gerarEtiquetasMassa() {
                 }
             });
 
-            if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>' + ok + ' gerada(s)'; }
+            if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>' + <?= json_encode(__('admin.correios_mundial.generated_count','{n} gerada(s)')) ?>.replace('{n}', ok); }
 
-            var msg = ok + ' etiqueta(s) gerada(s) com sucesso.';
-            if (erros.length > 0) msg += '\n\n' + erros.length + ' erro(s):\n' + erros.join('\n');
+            var msg = <?= json_encode(__('admin.correios_mundial.labels_generated_success','{n} etiqueta(s) gerada(s) com sucesso.')) ?>.replace('{n}', ok);
+            if (erros.length > 0) msg += '\n\n' + <?= json_encode(__('admin.correios_mundial.errors_count','{n} erro(s):')) ?>.replace('{n}', erros.length) + '\n' + erros.join('\n');
             alert(msg);
 
             if (ok > 0) {
@@ -539,21 +539,21 @@ async function gerarEtiquetasMassa() {
             } else {
                 // Desbloquear interface
                 tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = ''; el.style.opacity = ''; });
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">' + ids.length + '</span>)'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>' + <?= json_encode(__('admin.correios_mundial.generate_labels','Gerar Etiquetas')) ?> + ' (<span id="massaCount">' + ids.length + '</span>)'; }
             }
         } else {
-            alert('Erro: ' + (data.error || 'Falha desconhecida'));
+            alert(<?= json_encode(__('admin.correios_mundial.error_prefix','Erro:')) ?> + ' ' + (data.error || <?= json_encode(__('admin.correios_mundial.unknown_failure','Falha desconhecida')) ?>));
             var ov2 = document.getElementById('massaOverlay');
             if (ov2) ov2.remove();
             tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = ''; el.style.opacity = ''; });
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">' + ids.length + '</span>)'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>' + <?= json_encode(__('admin.correios_mundial.generate_labels','Gerar Etiquetas')) ?> + ' (<span id="massaCount">' + ids.length + '</span>)'; }
         }
     } catch (e) {
-        alert('Erro de rede: ' + e.message);
+        alert(<?= json_encode(__('admin.correios_mundial.network_error','Erro de rede:')) ?> + ' ' + e.message);
         var ov3 = document.getElementById('massaOverlay');
         if (ov3) ov3.remove();
         tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = ''; el.style.opacity = ''; });
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">' + ids.length + '</span>)'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>' + <?= json_encode(__('admin.correios_mundial.generate_labels','Gerar Etiquetas')) ?> + ' (<span id="massaCount">' + ids.length + '</span>)'; }
     }
 }
 </script>

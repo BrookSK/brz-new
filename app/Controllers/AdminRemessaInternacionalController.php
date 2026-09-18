@@ -509,7 +509,7 @@ class AdminRemessaInternacionalController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Remessa Internacional - Braziliana Admin</title>
+<title>' . __('admin.intl_shipment.page_title', 'Remessa Internacional') . ' - Braziliana Admin</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -518,7 +518,7 @@ class AdminRemessaInternacionalController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">';
 
         if ($errorMsg) {
-            echo '<div class="alert alert-danger mt-3"><strong>Erro:</strong> ' . htmlspecialchars($errorMsg) . '</div>';
+            echo '<div class="alert alert-danger mt-3"><strong>' . __('common.error', 'Erro') . ':</strong> ' . htmlspecialchars($errorMsg) . '</div>';
         }
 
         require __DIR__ . '/../Views/admin/remessa-internacional/index-flat.php';
@@ -574,7 +574,7 @@ class AdminRemessaInternacionalController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa Internacional - Braziliana Admin</title>
+    <title>' . __('admin.intl_shipment.page_title', 'Remessa Internacional') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -613,39 +613,39 @@ class AdminRemessaInternacionalController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Remessa Internacional</h1>
+                    <h1 class="page-title">' . __('admin.intl_shipment.heading', 'Remessa Internacional') . '</h1>
                     <div class="d-flex gap-2 align-items-center">
                         <div class="input-group input-group-sm" style="width:220px">
-                            <input type="text" class="form-control" id="buscarPedidoNum" placeholder="Nº pedido..." onkeydown="if(event.key===\'Enter\'){irParaPedido();event.preventDefault();}">
+                            <input type="text" class="form-control" id="buscarPedidoNum" placeholder="' . __('admin.intl_shipment.search_order_placeholder', 'Nº pedido...') . '" onkeydown="if(event.key===\'Enter\'){irParaPedido();event.preventDefault();}">
                             <button class="btn btn-outline-primary" type="button" onclick="irParaPedido()"><i class="fas fa-search"></i></button>
                         </div>
                         <button type="button" class="btn btn-info btn-sm" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                            <i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '
                         </button>
                     </div>
                 </div>
                 <script>
                 function irParaPedido(){
                     var v = document.getElementById("buscarPedidoNum").value.replace(/\D/g,"");
-                    if(v===""){alert("Digite o número do pedido");return;}
+                    if(v===""){alert("' . __('admin.intl_shipment.enter_order_number', 'Digite o número do pedido') . '");return;}
                     fetch("/admin/remessa-internacional/buscar-pedido/"+parseInt(v,10))
                         .then(r=>r.json())
                         .then(data=>{
                             if(data.success && data.url){
                                 window.location.href=data.url;
                             } else {
-                                alert(data.error || "Pedido não encontrado em nenhuma janela");
+                                alert(data.error || "' . __('admin.intl_shipment.order_not_found_window', 'Pedido não encontrado em nenhuma janela') . '");
                             }
                         })
-                        .catch(()=>alert("Erro ao buscar pedido"));
+                        .catch(()=>alert("' . __('admin.intl_shipment.err_search_order', 'Erro ao buscar pedido') . '"));
                 }
                 </script>';
 
         if (!empty($errorMsg)) {
             echo '<div class="alert alert-danger">'
-                . '<strong>Erro ao carregar Remessa Internacional:</strong> '
+                . '<strong>' . __('admin.intl_shipment.err_load', 'Erro ao carregar Remessa Internacional:') . '</strong> '
                 . htmlspecialchars((string) $errorMsg)
-                . '<br><small class="text-muted">Verifique se você rodou as migrations de remessa (ex: database/migrations/016_create_remessa_janelas.sql) e se a tabela/colunas existem.</small>'
+                . '<br><small class="text-muted">' . __('admin.intl_shipment.err_load_hint', 'Verifique se você rodou as migrations de remessa (ex: database/migrations/016_create_remessa_janelas.sql) e se a tabela/colunas existem.') . '</small>'
                 . '</div>';
         }
 
@@ -655,36 +655,36 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Abertas</h5>
+                                <h5 class="card-title">' . __('admin.intl_shipment.stat_open', 'Abertas') . '</h5>
                                 <h3>' . (int) ($stats['abertas'] ?? 0) . '</h3>
-                                <small>Janelas ativas</small>
+                                <small>' . __('admin.intl_shipment.stat_active_windows', 'Janelas ativas') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-danger text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Atraso</h5>
+                                <h5 class="card-title">' . __('admin.intl_shipment.stat_late', 'Atraso') . '</h5>
                                 <h3>' . (int) ($stats['atraso'] ?? 0) . '</h3>
-                                <small>Janelas em atraso</small>
+                                <small>' . __('admin.intl_shipment.stat_late_windows', 'Janelas em atraso') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-info text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Remessa Gerada</h5>
+                                <h5 class="card-title">' . __('admin.intl_shipment.stat_generated', 'Remessa Gerada') . '</h5>
                                 <h3>' . (int) ($stats['geradas'] ?? 0) . '</h3>
-                                <small>Janelas fechadas</small>
+                                <small>' . __('admin.intl_shipment.stat_closed_windows', 'Janelas fechadas') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-secondary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Finalizadas</h5>
+                                <h5 class="card-title">' . __('admin.intl_shipment.stat_finalized', 'Finalizadas') . '</h5>
                                 <h3>' . (int) ($stats['finalizadas'] ?? 0) . '</h3>
-                                <small>Esperando etiquetas</small>
+                                <small>' . __('admin.intl_shipment.stat_waiting_labels', 'Esperando etiquetas') . '</small>
                             </div>
                         </div>
                     </div>
@@ -695,7 +695,7 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Janelas Abertas (13 dias)</h5>
+                                <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>' . __('admin.intl_shipment.section_open_windows', 'Janelas Abertas (13 dias)') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">';
@@ -707,17 +707,17 @@ class AdminRemessaInternacionalController extends Controller {
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
-                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <h6 class="card-title">' . __('admin.intl_shipment.window', 'Janela') . ' #' . $janela['id'] . '</h6>
                                                 <p class="card-text">
                                                     <small class="text-muted">
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
                                                     <span class="badge bg-' . $statusClass . '">' . ucfirst($janela['status']) . '</span>
-                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' pedido(s)</span>
+                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' ' . __('admin.intl_shipment.orders_count', 'pedido(s)') . '</span>
                                                 </p>'
-                                                . ($pendentes > 0 ? '<div class="alert alert-warning py-1 px-2 mb-2 small"><i class="fas fa-tag me-1"></i><strong>' . $pendentes . ' etiqueta(s) pendente(s)</strong></div>' : '')
+                                                . ($pendentes > 0 ? '<div class="alert alert-warning py-1 px-2 mb-2 small"><i class="fas fa-tag me-1"></i><strong>' . $pendentes . ' ' . __('admin.intl_shipment.labels_pending', 'etiqueta(s) pendente(s)') . '</strong></div>' : '')
                                                 . '<button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
-                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                    <i class="fas fa-eye"></i> ' . __('admin.intl_shipment.view_orders', 'Ver Pedidos') . '
                                                 </button>
                                             </div>
                                         </div>
@@ -727,7 +727,7 @@ class AdminRemessaInternacionalController extends Controller {
                                 if (empty($janelasAbertas)) {
                                     echo '<div class="col-12 text-center py-4">
                                         <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-                                        <p class="text-muted">Nenhuma janela de remessa encontrada</p>
+                                        <p class="text-muted">' . __('admin.intl_shipment.no_windows', 'Nenhuma janela de remessa encontrada') . '</p>
                                     </div>';
                                 }
                                 
@@ -742,7 +742,7 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-secondary text-white">
-                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Janelas Finalizadas</h5>
+                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>' . __('admin.intl_shipment.section_finalized_windows', 'Janelas Finalizadas') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">';
@@ -753,17 +753,17 @@ class AdminRemessaInternacionalController extends Controller {
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
-                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <h6 class="card-title">' . __('admin.intl_shipment.window', 'Janela') . ' #' . $janela['id'] . '</h6>
                                                 <p class="card-text">
                                                     <small class="text-muted">
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
-                                                    <span class="badge bg-secondary">Finalizada</span>
-                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' pedido(s)</span>
+                                                    <span class="badge bg-secondary">' . __('admin.intl_shipment.badge_finalized', 'Finalizada') . '</span>
+                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' ' . __('admin.intl_shipment.orders_count', 'pedido(s)') . '</span>
                                                 </p>'
-                                                . ($pendentes > 0 ? '<div class="alert alert-warning py-1 px-2 mb-2 small"><i class="fas fa-tag me-1"></i><strong>' . $pendentes . ' etiqueta(s) pendente(s)</strong> — não pode ser fechada</div>' : '')
+                                                . ($pendentes > 0 ? '<div class="alert alert-warning py-1 px-2 mb-2 small"><i class="fas fa-tag me-1"></i><strong>' . $pendentes . ' ' . __('admin.intl_shipment.labels_pending', 'etiqueta(s) pendente(s)') . '</strong> ' . __('admin.intl_shipment.cannot_close', '— não pode ser fechada') . '</div>' : '')
                                                 . '<button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
-                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                    <i class="fas fa-eye"></i> ' . __('admin.intl_shipment.view_orders', 'Ver Pedidos') . '
                                                 </button>
                                             </div>
                                         </div>
@@ -772,7 +772,7 @@ class AdminRemessaInternacionalController extends Controller {
 
                                 if (empty($janelasFinalizadas)) {
                                     echo '<div class="col-12 text-center py-2">
-                                        <p class="text-muted mb-0">Nenhuma janela finalizada</p>
+                                        <p class="text-muted mb-0">' . __('admin.intl_shipment.no_finalized_windows', 'Nenhuma janela finalizada') . '</p>
                                     </div>';
                                 }
 
@@ -787,7 +787,7 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Janelas em Atraso (15+ dias)</h5>
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>' . __('admin.intl_shipment.section_late_windows', 'Janelas em Atraso (15+ dias)') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">';
@@ -798,17 +798,17 @@ class AdminRemessaInternacionalController extends Controller {
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
-                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <h6 class="card-title">' . __('admin.intl_shipment.window', 'Janela') . ' #' . $janela['id'] . '</h6>
                                                 <p class="card-text">
                                                     <small class="text-muted">
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
-                                                    <span class="badge bg-danger">Atraso</span>
-                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' pedido(s)</span>
+                                                    <span class="badge bg-danger">' . __('admin.intl_shipment.badge_late', 'Atraso') . '</span>
+                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' ' . __('admin.intl_shipment.orders_count', 'pedido(s)') . '</span>
                                                 </p>'
-                                                . ($pendentes > 0 ? '<div class="alert alert-danger py-1 px-2 mb-2 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>' . $pendentes . ' etiqueta(s) pendente(s)</strong> — gere as etiquetas para fechar</div>' : '')
+                                                . ($pendentes > 0 ? '<div class="alert alert-danger py-1 px-2 mb-2 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>' . $pendentes . ' ' . __('admin.intl_shipment.labels_pending', 'etiqueta(s) pendente(s)') . '</strong> ' . __('admin.intl_shipment.generate_to_close', '— gere as etiquetas para fechar') . '</div>' : '')
                                                 . '<button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
-                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                    <i class="fas fa-eye"></i> ' . __('admin.intl_shipment.view_orders', 'Ver Pedidos') . '
                                                 </button>
                                             </div>
                                         </div>
@@ -817,7 +817,7 @@ class AdminRemessaInternacionalController extends Controller {
 
                                 if (empty($janelasAtraso)) {
                                     echo '<div class="col-12 text-center py-2">
-                                        <p class="text-muted mb-0">Nenhuma janela em atraso</p>
+                                        <p class="text-muted mb-0">' . __('admin.intl_shipment.no_late_windows', 'Nenhuma janela em atraso') . '</p>
                                     </div>';
                                 }
 
@@ -832,7 +832,7 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Remessas Geradas</h5>
+                                <h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>' . __('admin.intl_shipment.section_generated_shipments', 'Remessas Geradas') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">';
@@ -841,15 +841,15 @@ class AdminRemessaInternacionalController extends Controller {
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
-                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <h6 class="card-title">' . __('admin.intl_shipment.window', 'Janela') . ' #' . $janela['id'] . '</h6>
                                                 <p class="card-text">
                                                     <small class="text-muted">
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
-                                                    <span class="badge bg-info">Remessa Gerada</span>
+                                                    <span class="badge bg-info">' . __('admin.intl_shipment.badge_generated', 'Remessa Gerada') . '</span>
                                                 </p>
                                                 <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
-                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                    <i class="fas fa-eye"></i> ' . __('admin.intl_shipment.view_orders', 'Ver Pedidos') . '
                                                 </button>
                                             </div>
                                         </div>
@@ -858,7 +858,7 @@ class AdminRemessaInternacionalController extends Controller {
 
                                 if (empty($janelasGeradas)) {
                                     echo '<div class="col-12 text-center py-2">
-                                        <p class="text-muted mb-0">Nenhuma remessa gerada</p>
+                                        <p class="text-muted mb-0">' . __('admin.intl_shipment.no_generated_shipments', 'Nenhuma remessa gerada') . '</p>
                                     </div>';
                                 }
 
@@ -873,20 +873,20 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-warning text-dark">
-                                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Pedidos Pendentes de Envio</h5>
+                                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>' . __('admin.intl_shipment.section_pending_orders', 'Pedidos Pendentes de Envio') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
-                                                <th>Pedido</th>
-                                                <th>Cliente</th>
-                                                <th>Data</th>
-                                                <th>Dias</th>
-                                                <th>Total</th>
-                                                <th>Status</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.intl_shipment.th_order', 'Pedido') . '</th>
+                                                <th>' . __('common.customer', 'Cliente') . '</th>
+                                                <th>' . __('admin.intl_shipment.th_date', 'Data') . '</th>
+                                                <th>' . __('admin.intl_shipment.th_days', 'Dias') . '</th>
+                                                <th>' . __('common.total', 'Total') . '</th>
+                                                <th>' . __('common.status', 'Status') . '</th>
+                                                <th>' . __('common.actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -898,12 +898,12 @@ class AdminRemessaInternacionalController extends Controller {
                                                 <td><strong>#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</strong></td>
                                                 <td>' . htmlspecialchars($pedido['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y', strtotime($pedido['created_at'])) . '</td>
-                                                <td><span class="badge bg-' . ($dias >= 15 ? 'danger' : 'warning') . '">' . $dias . ' dias</span></td>
+                                                <td><span class="badge bg-' . ($dias >= 15 ? 'danger' : 'warning') . '">' . $dias . ' ' . __('admin.intl_shipment.days', 'dias') . '</span></td>
                                                 <td>R$ ' . number_format($pedido['total'], 2, ',', '.') . '</td>
                                                 <td><span class="badge bg-' . $statusBadge . '">' . ucfirst($statusBadge) . '</span></td>
                                                 <td>
                                                     <button class="btn btn-sm btn-success" onclick="gerarRemessa(' . $pedido['id'] . ')">
-                                                        <i class="fas fa-globe"></i> Gerar Remessa
+                                                        <i class="fas fa-globe"></i> ' . __('admin.intl_shipment.generate_shipment', 'Gerar Remessa') . '
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-primary" onclick="verDetalhes(' . $pedido['id'] . ')">
                                                         <i class="fas fa-eye"></i>
@@ -913,7 +913,7 @@ class AdminRemessaInternacionalController extends Controller {
                                         }
                                         
                                         if (empty($pedidosPendentes)) {
-                                            echo '<tr><td colspan="7" class="text-center text-muted">Nenhum pedido pendente encontrado</td></tr>';
+                                            echo '<tr><td colspan="7" class="text-center text-muted">' . __('admin.intl_shipment.no_pending_orders', 'Nenhum pedido pendente encontrado') . '</td></tr>';
                                         }
                                         
                                         echo '</tbody>
@@ -929,7 +929,7 @@ class AdminRemessaInternacionalController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Pedidos em Atraso (15+ dias)</h5>
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>' . __('admin.intl_shipment.section_late_orders', 'Pedidos em Atraso (15+ dias)') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">

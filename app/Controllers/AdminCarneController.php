@@ -107,7 +107,7 @@ class AdminCarneController extends Controller {
             $atividadeRecente = $stAr->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $title = 'Gestão de Carnês';
+        $title = __('admin.installment.title', 'Gestão de Carnês');
         $sidebarActive = 'carnes';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -179,7 +179,7 @@ class AdminCarneController extends Controller {
     public function detalhes(Request $request, $id) {
         $carne = $this->carneModel->getCompleto($id);
         if (!$carne) {
-            $_SESSION['message'] = 'Carnê não encontrado.';
+            $_SESSION['message'] = __('admin.installment.not_found', 'Carnê não encontrado.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
         }
@@ -300,7 +300,7 @@ class AdminCarneController extends Controller {
 
         $mesAtual = $request->getParam('mes', '');
 
-        $title = 'Compras Carnê — Mensal';
+        $title = __('admin.installment.purchases_monthly_title', 'Compras Carnê — Mensal');
         $sidebarActive = 'carnes';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -315,7 +315,7 @@ class AdminCarneController extends Controller {
     public function reemitirBoleto(Request $request, $parcelaId) {
         $parcela = $this->carneModel->getParcela($parcelaId);
         if (!$parcela) {
-            $_SESSION['message'] = 'Parcela não encontrada.';
+            $_SESSION['message'] = __('admin.installment.installment_not_found', 'Parcela não encontrada.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
         }
@@ -328,7 +328,7 @@ class AdminCarneController extends Controller {
         $this->carneModel->registrarHistorico($parcela['carne_id'], $parcelaId, 'boleto_reemitido',
             "Boleto reemitido pelo admin", null, $_SESSION['usuario_id'] ?? null);
 
-        $_SESSION['message'] = 'Boleto reemitido com sucesso.';
+        $_SESSION['message'] = __('admin.installment.boleto_reissued', 'Boleto reemitido com sucesso.');
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$parcela['carne_id']}");
     }
@@ -356,7 +356,7 @@ class AdminCarneController extends Controller {
         $this->carneModel->registrarHistorico($carneId, null, 'produto_comprado',
             'Produto marcado como comprado internamente', null, $_SESSION['usuario_id'] ?? null);
 
-        $_SESSION['message'] = 'Produto marcado como comprado.';
+        $_SESSION['message'] = __('admin.installment.product_marked_bought', 'Produto marcado como comprado.');
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$carneId}");
     }
@@ -674,7 +674,7 @@ class AdminCarneController extends Controller {
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$row) {
-            $_SESSION['message'] = 'Registro não encontrado.';
+            $_SESSION['message'] = __('admin.installment.record_not_found', 'Registro não encontrado.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes/compras-internas');
             return;
@@ -707,7 +707,7 @@ class AdminCarneController extends Controller {
         $this->carneModel->registrarHistorico($carneId, null, 'compra_desfeita',
             'Status da compra interna revertido para aguardando_compra', null, $_SESSION['usuario_id'] ?? null);
 
-        $_SESSION['message'] = 'Status revertido para aguardando compra.';
+        $_SESSION['message'] = __('admin.installment.status_reverted', 'Status revertido para aguardando compra.');
         $_SESSION['message_type'] = 'success';
         $this->redirect($carneId > 0 ? "/admin/carnes/detalhes/{$carneId}" : '/admin/carnes/compras-internas');
     }
@@ -728,7 +728,7 @@ class AdminCarneController extends Controller {
         $this->carneModel->registrarHistorico($carneId, null, 'produto_recebido',
             'Produto marcado como recebido internamente', null, $_SESSION['usuario_id'] ?? null);
 
-        $_SESSION['message'] = 'Produto marcado como recebido.';
+        $_SESSION['message'] = __('admin.installment.product_marked_received', 'Produto marcado como recebido.');
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$carneId}");
     }
@@ -743,9 +743,9 @@ class AdminCarneController extends Controller {
 
         if ($acao === 'credito_carteira') {
             $this->carneService->gerarCreditoCarteira($id, $valor, $obs, $_SESSION['usuario_id'] ?? null);
-            $_SESSION['message'] = 'Crédito em carteira gerado com sucesso.';
+            $_SESSION['message'] = __('admin.installment.wallet_credit_generated', 'Crédito em carteira gerado com sucesso.');
         } else {
-            $_SESSION['message'] = 'Ação inválida.';
+            $_SESSION['message'] = __('admin.installment.invalid_action', 'Ação inválida.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect("/admin/carnes/detalhes/{$id}");
             return;
@@ -773,12 +773,12 @@ class AdminCarneController extends Controller {
         header('Content-Type: application/json; charset=UTF-8');
         try {
             $carne = $this->carneModel->find($id);
-            if (!$carne) { echo json_encode(['success' => false, 'error' => 'Carnê não encontrado']); return; }
+            if (!$carne) { echo json_encode(['success' => false, 'error' => __('admin.installment.not_found_short', 'Carnê não encontrado')]); return; }
 
             $body = $request->getBody();
             $valor = floatval($body['valor'] ?? 0);
             $obs = trim((string) ($body['observacoes'] ?? ''));
-            if ($valor <= 0) { echo json_encode(['success' => false, 'error' => 'Valor deve ser maior que zero']); return; }
+            if ($valor <= 0) { echo json_encode(['success' => false, 'error' => __('admin.installment.value_gt_zero', 'Valor deve ser maior que zero')]); return; }
 
             $pedidoId = (int) $carne['pedido_id'];
             $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
@@ -791,7 +791,7 @@ class AdminCarneController extends Controller {
                 'taxa_servico_valor' => 0, 'impostos_valor' => 0, 'descricao' => $descricao,
             ], $adminId);
 
-            if (empty($result['success'])) { echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Falha ao criar link']); return; }
+            if (empty($result['success'])) { echo json_encode(['success' => false, 'error' => $result['error'] ?? __('admin.installment.create_link_failed', 'Falha ao criar link')]); return; }
 
             // Registrar no pedido
             try {
@@ -822,7 +822,7 @@ class AdminCarneController extends Controller {
     public function liberarEnvio(Request $request, $id) {
         $carne = $this->carneModel->find($id);
         if (!$carne || $carne['status'] !== 'quitado') {
-            $_SESSION['message'] = 'Carnê precisa estar quitado para liberar envio.';
+            $_SESSION['message'] = __('admin.installment.must_be_paid_to_ship', 'Carnê precisa estar quitado para liberar envio.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect("/admin/carnes/detalhes/{$id}");
         }
@@ -833,7 +833,7 @@ class AdminCarneController extends Controller {
 
         $this->carneService->dispararNotificacao($id, null, 'envio_liberado');
 
-        $_SESSION['message'] = 'Envio liberado com sucesso.';
+        $_SESSION['message'] = __('admin.installment.shipping_released', 'Envio liberado com sucesso.');
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$id}");
     }
@@ -847,7 +847,7 @@ class AdminCarneController extends Controller {
 
         $this->carneService->dispararNotificacao($carneId, $parcelaId, $evento);
 
-        $_SESSION['message'] = 'Notificação reenviada.';
+        $_SESSION['message'] = __('admin.installment.notification_resent', 'Notificação reenviada.');
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$carneId}");
     }
@@ -879,7 +879,7 @@ class AdminCarneController extends Controller {
                     }
                 }
             }
-            $_SESSION['message'] = 'Configurações salvas.';
+            $_SESSION['message'] = __('admin.installment.settings_saved', 'Configurações salvas.');
             $_SESSION['message_type'] = 'success';
             $this->redirect('/admin/carnes/configuracoes');
         }
@@ -1203,7 +1203,7 @@ class AdminCarneController extends Controller {
         }
         krsort($porMes);
 
-        $title = 'Compras do Carnê';
+        $title = __('admin.installment.purchases_title', 'Compras do Carnê');
         $sidebarActive = 'carnes-compras';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -1387,7 +1387,7 @@ class AdminCarneController extends Controller {
 
         $parcela = $this->carneModel->getParcela($parcelaId);
         if (!$parcela) {
-            $_SESSION['message'] = 'Parcela não encontrada.';
+            $_SESSION['message'] = __('admin.installment.installment_not_found', 'Parcela não encontrada.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1437,7 +1437,7 @@ class AdminCarneController extends Controller {
         if ($qtdParcelas < 1 || $qtdParcelas > 12) $qtdParcelas = 4;
 
         if ($pedidoId <= 0) {
-            $_SESSION['message'] = 'ID do pedido inválido.';
+            $_SESSION['message'] = __('admin.installment.invalid_order_id', 'ID do pedido inválido.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1447,7 +1447,7 @@ class AdminCarneController extends Controller {
         $stCheck = $this->db->prepare('SELECT id FROM carnes WHERE pedido_id = ? LIMIT 1');
         $stCheck->execute([$pedidoId]);
         if ($stCheck->fetchColumn()) {
-            $_SESSION['message'] = 'Já existe um carnê para o pedido #' . $pedidoId . '.';
+            $_SESSION['message'] = __('admin.installment.already_exists_for_order', 'Já existe um carnê para o pedido #{id}.', ['id' => $pedidoId]);
             $_SESSION['message_type'] = 'warning';
             $this->redirect('/admin/carnes');
             return;
@@ -1458,7 +1458,7 @@ class AdminCarneController extends Controller {
         $stPed->execute([$pedidoId]);
         $pedido = $stPed->fetch(\PDO::FETCH_ASSOC);
         if (!$pedido) {
-            $_SESSION['message'] = 'Pedido #' . $pedidoId . ' não encontrado.';
+            $_SESSION['message'] = __('admin.installment.order_not_found', 'Pedido #{id} não encontrado.', ['id' => $pedidoId]);
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1466,7 +1466,7 @@ class AdminCarneController extends Controller {
 
         $clienteId = (int) ($pedido['usuario_id'] ?? 0);
         if ($clienteId <= 0) {
-            $_SESSION['message'] = 'Pedido #' . $pedidoId . ' não tem cliente vinculado.';
+            $_SESSION['message'] = __('admin.installment.order_no_customer', 'Pedido #{id} não tem cliente vinculado.', ['id' => $pedidoId]);
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1498,7 +1498,7 @@ class AdminCarneController extends Controller {
         }
 
         if ($subtotalProdutos <= 0 && $totalTaxas <= 0) {
-            $_SESSION['message'] = 'Pedido #' . $pedidoId . ' tem valores zerados. Não é possível criar carnê.';
+            $_SESSION['message'] = __('admin.installment.order_zero_values', 'Pedido #{id} tem valores zerados. Não é possível criar carnê.', ['id' => $pedidoId]);
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1531,7 +1531,7 @@ class AdminCarneController extends Controller {
                 ]
             );
 
-            $_SESSION['message'] = 'Carnê criado com sucesso para o pedido #' . $pedidoId . ' (ID: ' . $carneId . ', ' . $qtdParcelas . ' parcelas, Produtos: R$ ' . number_format($subtotalProdutos, 2, ',', '.') . ', Taxas: R$ ' . number_format($totalTaxas, 2, ',', '.') . ')';
+            $_SESSION['message'] = __('admin.installment.created_success', 'Carnê criado com sucesso para o pedido #{oid} (ID: {cid}, {qty} parcelas, Produtos: R$ {prod}, Taxas: R$ {fees})', ['oid' => $pedidoId, 'cid' => $carneId, 'qty' => $qtdParcelas, 'prod' => number_format($subtotalProdutos, 2, ',', '.'), 'fees' => number_format($totalTaxas, 2, ',', '.')]);
             $_SESSION['message_type'] = 'success';
             // Redirecionar de volta ao pedido se veio de lá
             $referer = $_SERVER['HTTP_REFERER'] ?? '';
@@ -1542,7 +1542,7 @@ class AdminCarneController extends Controller {
             }
         } catch (\Exception $e) {
             error_log('[ADMIN CARNE] Erro ao recriar carnê pedido #' . $pedidoId . ': ' . $e->getMessage());
-            $_SESSION['message'] = 'Erro ao criar carnê: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.installment.create_error', 'Erro ao criar carnê: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
             $referer = $_SERVER['HTTP_REFERER'] ?? '';
             if (strpos($referer, '/admin/pedidos/detalhes/') !== false) {
@@ -1560,7 +1560,7 @@ class AdminCarneController extends Controller {
     public function enviarCobranca(Request $request, $parcelaId) {
         $parcela = $this->carneModel->getParcela($parcelaId);
         if (!$parcela) {
-            $_SESSION['message'] = 'Parcela não encontrada.';
+            $_SESSION['message'] = __('admin.installment.installment_not_found', 'Parcela não encontrada.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1569,7 +1569,7 @@ class AdminCarneController extends Controller {
         $carneId = (int) $parcela['carne_id'];
         $carne = $this->carneModel->getCompleto($carneId);
         if (!$carne) {
-            $_SESSION['message'] = 'Carnê não encontrado.';
+            $_SESSION['message'] = __('admin.installment.not_found', 'Carnê não encontrado.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/carnes');
             return;
@@ -1595,27 +1595,27 @@ class AdminCarneController extends Controller {
         $urlMeuCarne = $baseUrl . '/meu-carne/' . $carneId;
         $clienteNome = $destinatarioNome;
 
-        $assunto = "Cobrança - Parcela {$numeroParcela}/{$totalParcelas} do Carnê #{$carneId}";
+        $assunto = __('admin.installment.email_subject', 'Cobrança - Parcela {n}/{total} do Carnê #{id}', ['n' => $numeroParcela, 'total' => $totalParcelas, 'id' => $carneId]);
         if ($statusParcela === 'em_atraso' || $statusParcela === 'vencida') {
-            $assunto = "⚠️ Parcela em atraso - {$numeroParcela}/{$totalParcelas} do Carnê #{$carneId}";
+            $assunto = __('admin.installment.email_subject_overdue', '⚠️ Parcela em atraso - {n}/{total} do Carnê #{id}', ['n' => $numeroParcela, 'total' => $totalParcelas, 'id' => $carneId]);
         }
 
         // Renderizar template HTML
         $titulo = $assunto;
-        $mensagem = 'Estamos entrando em contato para lembrar sobre o pagamento da parcela do seu carnê.';
+        $mensagem = __('admin.installment.email_message', 'Estamos entrando em contato para lembrar sobre o pagamento da parcela do seu carnê.');
         $detalhes = [
-            'Carnê' => "#{$carneId} (Pedido #{$pedidoId})",
-            'Parcela' => "{$numeroParcela} de {$totalParcelas}",
-            'Vencimento' => $vencimento,
-            'Produtos' => "R$ {$valorProdutos}",
-            'Taxas' => "R$ {$valorTaxas}",
-            'Total da parcela' => "R$ {$valorTotal}",
+            __('admin.installment.email_detail_installment_book', 'Carnê') => "#{$carneId} (" . __('admin.installment.order_word_short', 'Pedido') . " #{$pedidoId})",
+            __('admin.installment.email_detail_installment', 'Parcela') => __('admin.installment.email_installment_of', '{n} de {total}', ['n' => $numeroParcela, 'total' => $totalParcelas]),
+            __('admin.installment.email_detail_due', 'Vencimento') => $vencimento,
+            __('admin.installment.email_detail_products', 'Produtos') => "R$ {$valorProdutos}",
+            __('admin.installment.email_detail_fees', 'Taxas') => "R$ {$valorTaxas}",
+            __('admin.installment.email_detail_total', 'Total da parcela') => "R$ {$valorTotal}",
         ];
         $alerta = ($statusParcela === 'em_atraso' || $statusParcela === 'vencida') ? 'danger' : 'warning';
         $alertaMensagem = ($statusParcela === 'em_atraso' || $statusParcela === 'vencida')
-            ? '<strong>⚠️ Atenção:</strong> Esta parcela está <strong>' . ($statusParcela === 'em_atraso' ? 'em atraso' : 'vencida') . '</strong>. Regularize o pagamento para evitar o cancelamento do seu carnê.'
-            : '<strong>⏰ Lembrete:</strong> Realize o pagamento da sua parcela.';
-        $ctaTexto = 'Ver meu carnê e pagar';
+            ? '<strong>⚠️ ' . __('admin.installment.email_attention', 'Atenção:') . '</strong> ' . __('admin.installment.email_overdue_notice', 'Esta parcela está <strong>{status}</strong>. Regularize o pagamento para evitar o cancelamento do seu carnê.', ['status' => ($statusParcela === 'em_atraso' ? __('admin.installment.status_late', 'em atraso') : __('admin.installment.status_expired', 'vencida'))])
+            : '<strong>⏰ ' . __('admin.installment.email_reminder', 'Lembrete:') . '</strong> ' . __('admin.installment.email_pay_notice', 'Realize o pagamento da sua parcela.');
+        $ctaTexto = __('admin.installment.email_cta', 'Ver meu carnê e pagar');
 
         ob_start();
         include __DIR__ . '/../Views/emails/carne-notificacao.php';
@@ -1661,10 +1661,10 @@ class AdminCarneController extends Controller {
         }
 
         if ($status === 'enviado') {
-            $_SESSION['message'] = 'Email de cobrança enviado com sucesso para ' . htmlspecialchars($destinatarioEmail) . '.';
+            $_SESSION['message'] = __('admin.installment.billing_email_sent', 'Email de cobrança enviado com sucesso para ') . htmlspecialchars($destinatarioEmail) . '.';
             $_SESSION['message_type'] = 'success';
         } else {
-            $_SESSION['message'] = 'Erro ao enviar email de cobrança: ' . ($erroMsg ?: 'erro desconhecido');
+            $_SESSION['message'] = __('admin.installment.billing_email_error', 'Erro ao enviar email de cobrança: ') . ($erroMsg ?: __('admin.installment.unknown_error', 'erro desconhecido'));
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -1708,7 +1708,7 @@ class AdminCarneController extends Controller {
         // Filtrar apenas os arquivados
         $carnes = array_filter($carnes, fn($c) => !empty($c['arquivado']));
 
-        $title = 'Carnês Arquivados';
+        $title = __('admin.installment.archived_title', 'Carnês Arquivados');
         $sidebarActive = 'carnes';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();

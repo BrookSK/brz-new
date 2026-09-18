@@ -24,7 +24,7 @@ class AdminMigracaoController extends Controller
         include __DIR__ . '/../Views/admin/migracao/index.php';
         $content = ob_get_clean();
 
-        $title = 'Migração de Produtos - Braziliana Admin';
+        $title = __('admin.migration.page_title', 'Migração de Produtos - Braziliana Admin');
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -118,7 +118,7 @@ class AdminMigracaoController extends Controller
 
         if (!class_exists('ZipArchive')) {
             http_response_code(500);
-            echo json_encode(['error' => 'Extensão ZIP não disponível no servidor']);
+            echo json_encode(['error' => __('admin.migration.zip_unavailable', 'Extensão ZIP não disponível no servidor')]);
             exit;
         }
 
@@ -143,7 +143,7 @@ class AdminMigracaoController extends Controller
         $zip = new \ZipArchive();
         if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             http_response_code(500);
-            echo json_encode(['error' => 'Não foi possível criar o arquivo ZIP']);
+            echo json_encode(['error' => __('admin.migration.zip_create_failed', 'Não foi possível criar o arquivo ZIP')]);
             exit;
         }
 
@@ -169,7 +169,7 @@ class AdminMigracaoController extends Controller
         if ($added === 0) {
             @unlink($zipPath);
             http_response_code(404);
-            echo json_encode(['error' => 'Nenhuma imagem encontrada para exportar']);
+            echo json_encode(['error' => __('admin.migration.no_images', 'Nenhuma imagem encontrada para exportar')]);
             exit;
         }
 
@@ -192,7 +192,7 @@ class AdminMigracaoController extends Controller
 
         if (!isset($_FILES['arquivo']) || $_FILES['arquivo']['error'] !== UPLOAD_ERR_OK) {
             http_response_code(400);
-            echo json_encode(['error' => 'Nenhum arquivo enviado ou erro no upload']);
+            echo json_encode(['error' => __('admin.migration.no_file_uploaded', 'Nenhum arquivo enviado ou erro no upload')]);
             exit;
         }
 
@@ -201,7 +201,7 @@ class AdminMigracaoController extends Controller
 
         if (!$data || !isset($data['produtos'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'Arquivo JSON inválido ou sem dados de produtos']);
+            echo json_encode(['error' => __('admin.migration.invalid_json', 'Arquivo JSON inválido ou sem dados de produtos')]);
             exit;
         }
 
@@ -370,7 +370,7 @@ class AdminMigracaoController extends Controller
                     $mapProduto[$oldId] = (int) $pdo->lastInsertId();
                     $stats['produtos_importados']++;
                 } catch (\Exception $e) {
-                    $stats['erros'][] = "Produto '{$prod['name']}' (ID orig {$oldId}): " . $e->getMessage();
+                    $stats['erros'][] = __('admin.migration.err_product', "Produto '{name}' (ID orig {id}): {msg}", ['name' => $prod['name'], 'id' => $oldId, 'msg' => $e->getMessage()]);
                 }
             }
 
@@ -394,7 +394,7 @@ class AdminMigracaoController extends Controller
                         ]);
                         $stats['fotos_importadas']++;
                     } catch (\Exception $e) {
-                        $stats['erros'][] = "Foto produto (ID orig {$oldProdId}): " . $e->getMessage();
+                        $stats['erros'][] = __('admin.migration.err_photo', 'Foto produto (ID orig {id}): {msg}', ['id' => $oldProdId, 'msg' => $e->getMessage()]);
                     }
                 }
             }
@@ -439,7 +439,7 @@ class AdminMigracaoController extends Controller
                         $mapProdVar[$oldVarId] = (int) $pdo->lastInsertId();
                         $stats['variacoes_importadas']++;
                     } catch (\Exception $e) {
-                        $stats['erros'][] = "Variação (ID orig {$oldVarId}): " . $e->getMessage();
+                        $stats['erros'][] = __('admin.migration.err_variation', 'Variação (ID orig {id}): {msg}', ['id' => $oldVarId, 'msg' => $e->getMessage()]);
                     }
                 }
             }
@@ -495,7 +495,7 @@ class AdminMigracaoController extends Controller
             $pdo->rollBack();
             http_response_code(500);
             echo json_encode([
-                'error'   => 'Erro na importação: ' . $e->getMessage(),
+                'error'   => __('admin.migration.import_error', 'Erro na importação: {msg}', ['msg' => $e->getMessage()]),
             ]);
         }
 

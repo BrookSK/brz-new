@@ -1,6 +1,6 @@
 <?php
 $sidebarActive = 'redirecionamento-envios';
-$title = 'Novo Envio';
+$title = __('admin.redirect.new_shipment', 'Novo Envio');
 $redirecionadores = is_array($redirecionadores ?? null) ? $redirecionadores : [];
 $tabela = is_array($tabela ?? null) ? $tabela : [];
 $stripePublicKey = $stripePublicKey ?? '';
@@ -66,14 +66,14 @@ ksort($ncmOpcoes);
     <div class="d-flex align-items-center gap-3 mb-4">
         <a href="/admin/redirecionamento/envios" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left"></i></a>
         <div>
-            <h1 class="h2 mb-0">Novo Envio</h1>
-            <div class="text-muted small">Preencha os passos abaixo</div>
+            <h1 class="h2 mb-0"><?= __('admin.redirect.new_shipment', 'Novo Envio') ?></h1>
+            <div class="text-muted small"><?= __('admin.redirect.fill_steps_below', 'Preencha os passos abaixo') ?></div>
         </div>
     </div>
 
     <!-- Steps nav -->
     <div class="d-flex gap-2 mb-4 flex-wrap" id="stepsNav">
-        <?php foreach ([1=>'Pedido',2=>'Destinatário',3=>'Envio',4=>'Produtos',5=>'Pagamento'] as $n=>$l): ?>
+        <?php foreach ([1=>__('admin.redirect.step_order','Pedido'),2=>__('admin.redirect.step_recipient','Destinatário'),3=>__('admin.redirect.step_shipment','Envio'),4=>__('admin.redirect.step_products','Produtos'),5=>__('admin.redirect.step_payment','Pagamento')] as $n=>$l): ?>
         <div class="step-pill d-flex align-items-center gap-2 px-3 py-2 rounded-pill border <?= $n===1?'border-primary bg-primary text-white':'border-secondary text-muted' ?>"
              data-step="<?= $n ?>" style="font-size:.85rem">
             <span class="fw-bold"><?= $n ?></span> <?= $l ?>
@@ -88,15 +88,15 @@ ksort($ncmOpcoes);
     <div class="step-content" data-step="1">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <h5 class="mb-3">Informações do pedido</h5>
+                <h5 class="mb-3"><?= __('admin.redirect.order_info', 'Informações do pedido') ?></h5>
                 <div class="row g-3">
                     <?php if ($redirecionadorFixo): ?>
                     <input type="hidden" name="redirecionador_id" value="<?= (int)$redirecionadorFixo['id'] ?>">
                     <?php else: ?>
                     <div class="col-md-6">
-                        <label class="form-label">Redirecionador <span class="text-danger">*</span></label>
+                        <label class="form-label"><?= __('admin.redirect.redirector', 'Redirecionador') ?> <span class="text-danger">*</span></label>
                         <select class="form-select" name="redirecionador_id" id="selRedirecionador" required>
-                            <option value="">Selecione...</option>
+                            <option value=""><?= __('admin.redirect.select', 'Selecione...') ?></option>
                             <?php foreach ($redirecionadores as $r): ?>
                             <option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['nome'],ENT_QUOTES,'UTF-8') ?></option>
                             <?php endforeach; ?>
@@ -104,8 +104,8 @@ ksort($ncmOpcoes);
                     </div>
                     <?php endif; ?>
                     <div class="col-md-6">
-                        <label class="form-label">ID do pedido (site do cliente) <span class="text-danger">*</span></label>
-                        <input class="form-control" type="text" name="id_pedido_cliente" id="idPedidoCliente" required placeholder="Ex: 1234">
+                        <label class="form-label"><?= __('admin.redirect.order_id_client_site', 'ID do pedido (site do cliente)') ?> <span class="text-danger">*</span></label>
+                        <input class="form-control" type="text" name="id_pedido_cliente" id="idPedidoCliente" required placeholder="<?= htmlspecialchars(__('admin.redirect.eg_1234', 'Ex: 1234'), ENT_QUOTES, 'UTF-8') ?>">
                     </div>
                 </div>
             </div>
@@ -117,41 +117,41 @@ ksort($ncmOpcoes);
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">Destinatário</h5>
+                    <h5 class="mb-0"><?= __('admin.redirect.recipient', 'Destinatário') ?></h5>
                     <div class="d-flex gap-2 align-items-center">
                         <select class="form-select form-select-sm" id="selCliente" style="min-width:240px">
-                            <option value="">— Selecione um cliente —</option>
+                            <option value="">— <?= __('admin.redirect.select_a_client', 'Selecione um cliente') ?> —</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalNovoCliente">
-                            <i class="fas fa-plus me-1"></i>Novo cliente
+                            <i class="fas fa-plus me-1"></i><?= __('admin.redirect.new_client', 'Novo cliente') ?>
                         </button>
                         <a id="linkEditarCliente" href="/admin/redirecionamento/clientes" target="_blank"
-                           class="btn btn-sm btn-outline-secondary d-none" title="Editar dados do cliente">
-                            <i class="fas fa-pen"></i> Editar cliente
+                           class="btn btn-sm btn-outline-secondary d-none" title="<?= htmlspecialchars(__('admin.redirect.edit_client_data', 'Editar dados do cliente'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="fas fa-pen"></i> <?= __('admin.redirect.edit_client', 'Editar cliente') ?>
                         </a>
                     </div>
                 </div>
                 <div id="destPlaceholder" class="text-center py-5 text-muted">
                     <i class="fas fa-user-circle fa-3x mb-3 d-block opacity-25"></i>
-                    Selecione um cliente cadastrado ou cadastre um novo para continuar.
+                    <?= __('admin.redirect.select_or_register_client', 'Selecione um cliente cadastrado ou cadastre um novo para continuar.') ?>
                 </div>
                 <div id="destDados" class="d-none">
                     <input type="hidden" name="cliente_id" id="destClienteId">
                     <div class="row g-3">
-                        <div class="col-md-6"><label class="form-label">Nome</label><input class="form-control bg-light" type="text" name="destinatario_nome" id="destNome" readonly></div>
+                        <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.name', 'Nome') ?></label><input class="form-control bg-light" type="text" name="destinatario_nome" id="destNome" readonly></div>
                         <div class="col-md-3"><label class="form-label">CPF</label><input class="form-control bg-light" type="text" name="destinatario_cpf" id="destCpf" readonly></div>
-                        <div class="col-md-3"><label class="form-label">Data de nascimento</label><input class="form-control bg-light" type="date" name="destinatario_data_nascimento" id="destNasc" readonly></div>
-                        <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control bg-light" type="email" name="destinatario_email" id="destEmail" readonly></div>
-                        <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control bg-light" type="text" name="destinatario_telefone" id="destTel" readonly></div>
-                        <div class="col-md-8"><label class="form-label">Logradouro</label><input class="form-control bg-light" type="text" name="dest_logradouro" id="destLogr" readonly></div>
-                        <div class="col-md-2"><label class="form-label">Número</label><input class="form-control bg-light" type="text" name="dest_numero" id="destNum" readonly></div>
-                        <div class="col-md-2"><label class="form-label">Complemento</label><input class="form-control bg-light" type="text" name="dest_complemento" id="destComp" readonly></div>
-                        <div class="col-md-4"><label class="form-label">Bairro</label><input class="form-control bg-light" type="text" name="dest_bairro" id="destBairro" readonly></div>
-                        <div class="col-md-4"><label class="form-label">Cidade</label><input class="form-control bg-light" type="text" name="dest_cidade" id="destCidade" readonly></div>
-                        <div class="col-md-2"><label class="form-label">Estado</label><input class="form-control bg-light" type="text" name="dest_estado" id="destEstado" readonly></div>
+                        <div class="col-md-3"><label class="form-label"><?= __('admin.redirect.birth_date', 'Data de nascimento') ?></label><input class="form-control bg-light" type="date" name="destinatario_data_nascimento" id="destNasc" readonly></div>
+                        <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.email', 'E-mail') ?></label><input class="form-control bg-light" type="email" name="destinatario_email" id="destEmail" readonly></div>
+                        <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.phone', 'Telefone') ?></label><input class="form-control bg-light" type="text" name="destinatario_telefone" id="destTel" readonly></div>
+                        <div class="col-md-8"><label class="form-label"><?= __('admin.redirect.street', 'Logradouro') ?></label><input class="form-control bg-light" type="text" name="dest_logradouro" id="destLogr" readonly></div>
+                        <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.number', 'Número') ?></label><input class="form-control bg-light" type="text" name="dest_numero" id="destNum" readonly></div>
+                        <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.complement', 'Complemento') ?></label><input class="form-control bg-light" type="text" name="dest_complemento" id="destComp" readonly></div>
+                        <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.neighborhood', 'Bairro') ?></label><input class="form-control bg-light" type="text" name="dest_bairro" id="destBairro" readonly></div>
+                        <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.city', 'Cidade') ?></label><input class="form-control bg-light" type="text" name="dest_cidade" id="destCidade" readonly></div>
+                        <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.state', 'Estado') ?></label><input class="form-control bg-light" type="text" name="dest_estado" id="destEstado" readonly></div>
                         <div class="col-md-2"><label class="form-label">CEP</label><input class="form-control bg-light" type="text" name="dest_cep" id="destCep" readonly></div>
                     </div>
-                    <div class="mt-3 small text-muted"><i class="fas fa-info-circle me-1"></i>Para alterar os dados, clique em "Editar cliente".</div>
+                    <div class="mt-3 small text-muted"><i class="fas fa-info-circle me-1"></i><?= __('admin.redirect.to_change_click_edit_client', 'Para alterar os dados, clique em "Editar cliente".') ?></div>
                 </div>
             </div>
         </div>
@@ -161,30 +161,30 @@ ksort($ncmOpcoes);
     <div class="step-content d-none" data-step="3">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <h5 class="mb-3">Informações de envio</h5>
-                <div class="alert alert-warning small mb-3"><i class="fas fa-triangle-exclamation me-2"></i>Preencha o peso e dimensões corretos da caixa.</div>
+                <h5 class="mb-3"><?= __('admin.redirect.shipment_info', 'Informações de envio') ?></h5>
+                <div class="alert alert-warning small mb-3"><i class="fas fa-triangle-exclamation me-2"></i><?= __('admin.redirect.fill_correct_weight_dimensions', 'Preencha o peso e dimensões corretos da caixa.') ?></div>
                 <div class="row g-3">
-                    <div class="col-md-2"><label class="form-label">Moeda</label><input class="form-control" type="text" value="USD" readonly></div>
+                    <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.currency', 'Moeda') ?></label><input class="form-control" type="text" value="USD" readonly></div>
                     <div class="col-md-3">
-                        <label class="form-label">Peso total (kg) <span class="text-danger">*</span></label>
+                        <label class="form-label"><?= __('admin.redirect.total_weight_kg', 'Peso total (kg)') ?> <span class="text-danger">*</span></label>
                         <input class="form-control" type="number" step="0.001" min="0.001" name="peso_kg" id="inputPeso" required>
-                        <div class="form-text">Preencha com precisão — base da cobrança.</div>
+                        <div class="form-text"><?= __('admin.redirect.fill_precisely_charge_base', 'Preencha com precisão — base da cobrança.') ?></div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Valor do frete cobrado ao cliente (USD)</label>
+                        <label class="form-label"><?= __('admin.redirect.freight_charged_to_client_usd', 'Valor do frete cobrado ao cliente (USD)') ?></label>
                         <input class="form-control" type="number" step="0.01" min="0" name="valor_frete_usd" id="inputFrete">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Valor a pagar (calculado)</label>
+                        <label class="form-label"><?= __('admin.redirect.amount_to_pay_calculated', 'Valor a pagar (calculado)') ?></label>
                         <div class="input-group">
                             <span class="input-group-text">US$</span>
                             <input class="form-control fw-bold" type="text" id="valorCalculado" readonly placeholder="—">
                         </div>
                         <div class="form-text" id="faixaInfo"></div>
                     </div>
-                    <div class="col-md-4"><label class="form-label">Largura (cm) <span class="text-danger">*</span></label><input class="form-control" type="number" step="0.1" min="1" name="largura_cm" id="larguraCm" required></div>
-                    <div class="col-md-4"><label class="form-label">Altura (cm) <span class="text-danger">*</span></label><input class="form-control" type="number" step="0.1" min="1" name="altura_cm" id="alturaCm" required></div>
-                    <div class="col-md-4"><label class="form-label">Comprimento (cm) <span class="text-danger">*</span></label><input class="form-control" type="number" step="0.1" min="1" name="comprimento_cm" id="comprimentoCm" required></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.width_cm', 'Largura (cm)') ?> <span class="text-danger">*</span></label><input class="form-control" type="number" step="0.1" min="1" name="largura_cm" id="larguraCm" required></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.height_cm', 'Altura (cm)') ?> <span class="text-danger">*</span></label><input class="form-control" type="number" step="0.1" min="1" name="altura_cm" id="alturaCm" required></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.length_cm', 'Comprimento (cm)') ?> <span class="text-danger">*</span></label><input class="form-control" type="number" step="0.1" min="1" name="comprimento_cm" id="comprimentoCm" required></div>
                 </div>
             </div>
         </div>
@@ -195,11 +195,11 @@ ksort($ncmOpcoes);
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">Produtos <span class="text-danger">*</span></h5>
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddProduto"><i class="fas fa-plus me-1"></i>Adicionar produto</button>
+                    <h5 class="mb-0"><?= __('admin.redirect.products', 'Produtos') ?> <span class="text-danger">*</span></h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddProduto"><i class="fas fa-plus me-1"></i><?= __('admin.redirect.add_product', 'Adicionar produto') ?></button>
                 </div>
                 <div id="listaProdutos"></div>
-                <div class="text-muted small mt-2">Adicione ao menos um produto para continuar.</div>
+                <div class="text-muted small mt-2"><?= __('admin.redirect.add_at_least_one_product', 'Adicione ao menos um produto para continuar.') ?></div>
             </div>
         </div>
     </div>
@@ -208,26 +208,26 @@ ksort($ncmOpcoes);
     <div class="step-content d-none" data-step="5">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <h5 class="mb-3">Pagamento</h5>
+                <h5 class="mb-3"><?= __('admin.redirect.payment', 'Pagamento') ?></h5>
                 <div id="resumoPagamento" class="alert alert-info mb-3"></div>
                 <div id="stripeContainer" class="mb-3"></div>
                 <div id="msgPagamento"></div>
                 <div class="mt-3">
-                    <label class="form-label">Upload do comprovante de pagamento</label>
+                    <label class="form-label"><?= __('admin.redirect.upload_payment_receipt', 'Upload do comprovante de pagamento') ?></label>
                     <input type="file" class="form-control" id="inputComprovante" accept=".jpg,.jpeg,.png,.pdf">
-                    <div class="form-text">Após o pagamento, envie o comprovante.</div>
+                    <div class="form-text"><?= __('admin.redirect.after_payment_send_receipt', 'Após o pagamento, envie o comprovante.') ?></div>
                 </div>
-                <div class="alert alert-warning small mt-3"><i class="fas fa-info-circle me-2"></i>Após a coleta, verificaremos as dimensões e peso reais.</div>
+                <div class="alert alert-warning small mt-3"><i class="fas fa-info-circle me-2"></i><?= __('admin.redirect.after_collection_verify_real', 'Após a coleta, verificaremos as dimensões e peso reais.') ?></div>
             </div>
         </div>
     </div>
 
     <!-- Navegação -->
     <div class="d-flex justify-content-between mt-4">
-        <button type="button" class="btn btn-outline-secondary" id="btnAnterior" style="display:none!important">Anterior</button>
+        <button type="button" class="btn btn-outline-secondary" id="btnAnterior" style="display:none!important"><?= __('admin.redirect.previous', 'Anterior') ?></button>
         <div class="ms-auto d-flex gap-2">
-            <button type="button" class="btn btn-primary" id="btnProximo">Próximo</button>
-            <button type="button" class="btn btn-success d-none" id="btnGerarEnvio"><i class="fas fa-check me-1"></i>Gerar envio e ir para pagamento</button>
+            <button type="button" class="btn btn-primary" id="btnProximo"><?= __('admin.redirect.next', 'Próximo') ?></button>
+            <button type="button" class="btn btn-success d-none" id="btnGerarEnvio"><i class="fas fa-check me-1"></i><?= __('admin.redirect.generate_shipment_go_payment', 'Gerar envio e ir para pagamento') ?></button>
         </div>
     </div>
     </form>
@@ -237,23 +237,23 @@ ksort($ncmOpcoes);
 <div class="modal fade" id="modalNovoCliente" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Cadastrar cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title"><?= __('admin.redirect.register_client', 'Cadastrar cliente') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="row g-3">
-                    <div class="col-md-6"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.name', 'Nome') ?> <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
                     <div class="col-md-3">
                         <label class="form-label">CPF <span class="text-danger">*</span></label>
                         <input class="form-control" type="text" id="ncCpf" placeholder="000.000.000-00" maxlength="14">
                         <div class="invalid-feedback" id="ncCpfFeedback"></div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Data nascimento <span class="text-danger">*</span></label>
+                        <label class="form-label"><?= __('admin.redirect.birth_date_short', 'Data nascimento') ?> <span class="text-danger">*</span></label>
                         <input class="form-control" type="date" id="ncNasc">
                         <div class="invalid-feedback" id="ncNascFeedback"></div>
                     </div>
-                    <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control" type="email" id="ncEmail"></div>
-                    <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" type="text" id="ncTel"></div>
-                    <div class="col-12"><hr class="my-1"><small class="text-muted fw-semibold">Endereço principal</small></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.email', 'E-mail') ?></label><input class="form-control" type="email" id="ncEmail"></div>
+                    <div class="col-md-6"><label class="form-label"><?= __('admin.redirect.phone', 'Telefone') ?></label><input class="form-control" type="text" id="ncTel"></div>
+                    <div class="col-12"><hr class="my-1"><small class="text-muted fw-semibold"><?= __('admin.redirect.main_address', 'Endereço principal') ?></small></div>
                     <div class="col-md-3">
                         <label class="form-label">CEP</label>
                         <div class="input-group">
@@ -261,18 +261,18 @@ ksort($ncmOpcoes);
                             <span class="input-group-text" id="ncCepSpinner" style="display:none"><i class="fas fa-spinner fa-spin"></i></span>
                         </div>
                     </div>
-                    <div class="col-md-7"><label class="form-label">Logradouro</label><input class="form-control" type="text" id="ncLogr"></div>
-                    <div class="col-md-2"><label class="form-label">Número</label><input class="form-control" type="text" id="ncNum"></div>
-                    <div class="col-md-3"><label class="form-label">Complemento</label><input class="form-control" type="text" id="ncComp"></div>
-                    <div class="col-md-3"><label class="form-label">Bairro</label><input class="form-control" type="text" id="ncBairro"></div>
-                    <div class="col-md-4"><label class="form-label">Cidade <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncCidade"></div>
-                    <div class="col-md-2"><label class="form-label">Estado</label><input class="form-control" type="text" id="ncEstado" maxlength="2"></div>
+                    <div class="col-md-7"><label class="form-label"><?= __('admin.redirect.street', 'Logradouro') ?></label><input class="form-control" type="text" id="ncLogr"></div>
+                    <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.number', 'Número') ?></label><input class="form-control" type="text" id="ncNum"></div>
+                    <div class="col-md-3"><label class="form-label"><?= __('admin.redirect.complement', 'Complemento') ?></label><input class="form-control" type="text" id="ncComp"></div>
+                    <div class="col-md-3"><label class="form-label"><?= __('admin.redirect.neighborhood', 'Bairro') ?></label><input class="form-control" type="text" id="ncBairro"></div>
+                    <div class="col-md-4"><label class="form-label"><?= __('admin.redirect.city', 'Cidade') ?> <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncCidade"></div>
+                    <div class="col-md-2"><label class="form-label"><?= __('admin.redirect.state', 'Estado') ?></label><input class="form-control" type="text" id="ncEstado" maxlength="2"></div>
                 </div>
                 <div id="msgCliente" class="mt-2"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnSalvarCliente">Salvar cliente</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('admin.redirect.cancel', 'Cancelar') ?></button>
+                <button type="button" class="btn btn-primary" id="btnSalvarCliente"><?= __('admin.redirect.save_client', 'Salvar cliente') ?></button>
             </div>
         </div>
     </div>
@@ -315,7 +315,7 @@ if(ncCpf){
     ncCpf.addEventListener('input', function(){ this.value=mascaraCPF(this.value); });
     ncCpf.addEventListener('blur', function(){
         const cpf=this.value.replace(/\D/g,''), fb=document.getElementById('ncCpfFeedback');
-        if(cpf && !validarCPF(cpf)){ this.classList.add('is-invalid'); if(fb) fb.textContent='CPF inválido.'; }
+        if(cpf && !validarCPF(cpf)){ this.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.cpf_invalid', 'CPF inválido.'), ENT_QUOTES, 'UTF-8') ?>'; }
         else { this.classList.remove('is-invalid'); if(fb) fb.textContent=''; }
     });
 }
@@ -325,7 +325,7 @@ const ncNasc = document.getElementById('ncNasc');
 if(ncNasc){
     ncNasc.addEventListener('change', function(){
         const fb=document.getElementById('ncNascFeedback');
-        if(this.value && !validarIdade18(this.value)){ this.classList.add('is-invalid'); if(fb) fb.textContent='Cliente deve ter pelo menos 18 anos.'; }
+        if(this.value && !validarIdade18(this.value)){ this.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.client_min_18', 'Cliente deve ter pelo menos 18 anos.'), ENT_QUOTES, 'UTF-8') ?>'; }
         else { this.classList.remove('is-invalid'); if(fb) fb.textContent=''; }
     });
 }
@@ -353,12 +353,12 @@ function validarFormCliente(){
     const g=id=>document.getElementById(id);
     const nome=g('ncNome'); if(!nome?.value.trim()){ nome?.classList.add('is-invalid'); ok=false; } else nome?.classList.remove('is-invalid');
     const cpfEl=g('ncCpf'), fb=g('ncCpfFeedback'), cpf=cpfEl?.value.replace(/\D/g,'')||'';
-    if(!cpf){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='CPF obrigatório.'; ok=false; }
-    else if(!validarCPF(cpf)){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='CPF inválido.'; ok=false; }
+    if(!cpf){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.cpf_required', 'CPF obrigatório.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
+    else if(!validarCPF(cpf)){ cpfEl?.classList.add('is-invalid'); if(fb) fb.textContent='<?= htmlspecialchars(__('admin.redirect.cpf_invalid', 'CPF inválido.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
     else { cpfEl?.classList.remove('is-invalid'); if(fb) fb.textContent=''; }
     const nascEl=g('ncNasc'), fb2=g('ncNascFeedback');
-    if(!nascEl?.value){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='Data obrigatória.'; ok=false; }
-    else if(!validarIdade18(nascEl.value)){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='Cliente deve ter pelo menos 18 anos.'; ok=false; }
+    if(!nascEl?.value){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='<?= htmlspecialchars(__('admin.redirect.date_required', 'Data obrigatória.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
+    else if(!validarIdade18(nascEl.value)){ nascEl?.classList.add('is-invalid'); if(fb2) fb2.textContent='<?= htmlspecialchars(__('admin.redirect.client_min_18', 'Cliente deve ter pelo menos 18 anos.'), ENT_QUOTES, 'UTF-8') ?>'; ok=false; }
     else { nascEl?.classList.remove('is-invalid'); if(fb2) fb2.textContent=''; }
     const cidade=g('ncCidade'); if(!cidade?.value.trim()){ cidade?.classList.add('is-invalid'); ok=false; } else cidade?.classList.remove('is-invalid');
     return ok;
@@ -370,28 +370,28 @@ function validarStep(n) {
     err.classList.add('d-none'); err.textContent = '';
     if (n === 1) {
         const idPedido = document.getElementById('idPedidoCliente')?.value.trim();
-        if (!idPedido) { mostrarErro('Informe o ID do pedido.'); return false; }
+        if (!idPedido) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.enter_order_id', 'Informe o ID do pedido.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
         const selRed = document.getElementById('selRedirecionador');
-        if (selRed && !selRed.value) { mostrarErro('Selecione o redirecionador.'); return false; }
+        if (selRed && !selRed.value) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.select_redirector', 'Selecione o redirecionador.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
     }
     if (n === 2) {
         const clienteId = document.getElementById('destClienteId')?.value;
-        if (!clienteId) { mostrarErro('Selecione um cliente ou cadastre um novo antes de continuar.'); return false; }
+        if (!clienteId) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.select_or_register_before_continue', 'Selecione um cliente ou cadastre um novo antes de continuar.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
     }
     if (n === 3) {
         const peso = parseFloat(document.getElementById('inputPeso')?.value) || 0;
         const larg = parseFloat(document.getElementById('larguraCm')?.value) || 0;
         const alt  = parseFloat(document.getElementById('alturaCm')?.value) || 0;
         const comp = parseFloat(document.getElementById('comprimentoCm')?.value) || 0;
-        if (peso <= 0) { mostrarErro('Informe o peso total.'); return false; }
-        if (larg <= 0 || alt <= 0 || comp <= 0) { mostrarErro('Informe largura, altura e comprimento.'); return false; }
+        if (peso <= 0) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.enter_total_weight', 'Informe o peso total.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
+        if (larg <= 0 || alt <= 0 || comp <= 0) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.enter_dimensions', 'Informe largura, altura e comprimento.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
     }
     if (n === 4) {
         const rows = document.querySelectorAll('.produto-row');
-        if (rows.length === 0) { mostrarErro('Adicione ao menos um produto.'); return false; }
+        if (rows.length === 0) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.add_at_least_one_product_dot', 'Adicione ao menos um produto.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
         for (const row of rows) {
             const desc = row.querySelector('[name*="[descricao]"]')?.value.trim();
-            if (!desc) { mostrarErro('Preencha a descrição de todos os produtos.'); return false; }
+            if (!desc) { mostrarErro('<?= htmlspecialchars(__('admin.redirect.fill_all_product_descriptions', 'Preencha a descrição de todos os produtos.'), ENT_QUOTES, 'UTF-8') ?>'); return false; }
         }
     }
     return true;
@@ -410,7 +410,7 @@ function calcularValorTabela(peso) {
 document.getElementById('inputPeso')?.addEventListener('input', function() {
     const peso = parseFloat(this.value) || 0;
     const row = calcularValorTabela(peso);
-    if (row) { document.getElementById('valorCalculado').value = row.valor.toFixed(2); document.getElementById('faixaInfo').textContent = 'Faixa: até ' + row.peso.toFixed(1) + ' kg'; valorUsd = row.valor; }
+    if (row) { document.getElementById('valorCalculado').value = row.valor.toFixed(2); document.getElementById('faixaInfo').textContent = '<?= htmlspecialchars(__('admin.redirect.range_up_to', 'Faixa: até'), ENT_QUOTES, 'UTF-8') ?> ' + row.peso.toFixed(1) + ' kg'; valorUsd = row.valor; }
     else { document.getElementById('valorCalculado').value = ''; document.getElementById('faixaInfo').textContent = ''; }
 });
 
@@ -441,16 +441,16 @@ document.getElementById('btnAddProduto').addEventListener('click', () => {
     div.innerHTML = `
         <div class="col-md-3"><label class="form-label small">NCM</label>
             <select class="form-select form-select-sm ncm-select" name="produtos[${i}][ncm]">
-                <option value="">Selecione o NCM...</option>
+                <option value=""><?= htmlspecialchars(__('admin.redirect.select_ncm', 'Selecione o NCM...'), ENT_QUOTES, 'UTF-8') ?></option>
                 ${NCM_LIST.map(n => `<option value="${n.cod}">${n.cod} — ${n.desc}</option>`).join('')}
             </select></div>
-        <div class="col-md-4"><label class="form-label small">Descrição <span class="text-danger">*</span></label>
+        <div class="col-md-4"><label class="form-label small"><?= htmlspecialchars(__('admin.redirect.description', 'Descrição'), ENT_QUOTES, 'UTF-8') ?> <span class="text-danger">*</span></label>
             <input class="form-control form-control-sm" type="text" name="produtos[${i}][descricao]" required></div>
-        <div class="col-md-2"><label class="form-label small">Preço (USD)</label>
+        <div class="col-md-2"><label class="form-label small"><?= htmlspecialchars(__('admin.redirect.price_usd', 'Preço (USD)'), ENT_QUOTES, 'UTF-8') ?></label>
             <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="produtos[${i}][preco_usd]" value="0"></div>
-        <div class="col-md-1"><label class="form-label small">Peso (kg)</label>
+        <div class="col-md-1"><label class="form-label small"><?= htmlspecialchars(__('admin.redirect.weight_kg', 'Peso (kg)'), ENT_QUOTES, 'UTF-8') ?></label>
             <input class="form-control form-control-sm" type="number" step="0.001" min="0" name="produtos[${i}][peso_kg]" value="0"></div>
-        <div class="col-md-1"><label class="form-label small">Qtd</label>
+        <div class="col-md-1"><label class="form-label small"><?= htmlspecialchars(__('admin.redirect.qty', 'Qtd'), ENT_QUOTES, 'UTF-8') ?></label>
             <input class="form-control form-control-sm" type="number" min="1" name="produtos[${i}][quantidade]" value="1"></div>
         <div class="col-md-1 text-end pt-3"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.produto-row').remove()"><i class="fas fa-trash"></i></button></div>`;
     document.getElementById('listaProdutos').appendChild(div);
@@ -471,35 +471,35 @@ const NCM_LIST = <?= json_encode(array_map(fn($cod,$desc)=>['cod'=>$cod,'desc'=>
 document.getElementById('btnGerarEnvio').addEventListener('click', async () => {
     if (!validarStep(4)) return;
     const btn=document.getElementById('btnGerarEnvio');
-    btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
+    btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i><?= htmlspecialchars(__('admin.redirect.generating', 'Gerando...'), ENT_QUOTES, 'UTF-8') ?>';
     const resp=await fetch('/admin/redirecionamento/envios/salvar',{method:'POST',body:new FormData(document.getElementById('formEnvio'))});
     const json=await resp.json();
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-check me-1"></i>Gerar envio e ir para pagamento';
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-check me-1"></i><?= htmlspecialchars(__('admin.redirect.generate_shipment_go_payment', 'Gerar envio e ir para pagamento'), ENT_QUOTES, 'UTF-8') ?>';
     if(json.ok){ envioId=json.envio_id; valorUsd=json.valor_usd; currentStep=5; showStep(5); }
-    else { mostrarErro('Erro: '+(json.msg||'Tente novamente')); }
+    else { mostrarErro('<?= htmlspecialchars(__('admin.redirect.error_colon', 'Erro:'), ENT_QUOTES, 'UTF-8') ?> '+(json.msg||'<?= htmlspecialchars(__('admin.redirect.try_again', 'Tente novamente'), ENT_QUOTES, 'UTF-8') ?>')); }
 });
 
 // ── Pagamento Stripe ────────────────────────────────────────────────────────
 function setupPagamento() {
-    document.getElementById('resumoPagamento').innerHTML=`Envio <strong>#${envioId}</strong> gerado. Valor a pagar: <strong>US$ ${valorUsd.toFixed(2)}</strong>`;
-    if(!stripe||!envioId){ document.getElementById('stripeContainer').innerHTML='<div class="alert alert-warning">Pagamento via Stripe não configurado. Envie o comprovante abaixo.</div>'; return; }
-    document.getElementById('stripeContainer').innerHTML='<div class="text-muted small mb-2"><i class="fas fa-spinner fa-spin me-1"></i>Carregando formulário de pagamento...</div>';
+    document.getElementById('resumoPagamento').innerHTML=`<?= htmlspecialchars(__('admin.redirect.shipment_word', 'Envio'), ENT_QUOTES, 'UTF-8') ?> <strong>#${envioId}</strong> <?= htmlspecialchars(__('admin.redirect.generated_lc', 'gerado.'), ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars(__('admin.redirect.amount_to_pay_colon', 'Valor a pagar:'), ENT_QUOTES, 'UTF-8') ?> <strong>US$ ${valorUsd.toFixed(2)}</strong>`;
+    if(!stripe||!envioId){ document.getElementById('stripeContainer').innerHTML='<div class="alert alert-warning"><?= htmlspecialchars(__('admin.redirect.stripe_not_configured_send_receipt', 'Pagamento via Stripe não configurado. Envie o comprovante abaixo.'), ENT_QUOTES, 'UTF-8') ?></div>'; return; }
+    document.getElementById('stripeContainer').innerHTML='<div class="text-muted small mb-2"><i class="fas fa-spinner fa-spin me-1"></i><?= htmlspecialchars(__('admin.redirect.loading_payment_form', 'Carregando formulário de pagamento...'), ENT_QUOTES, 'UTF-8') ?></div>';
     fetch('/admin/redirecionamento/pagamento/criar-intent',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'envio_id='+envioId})
     .then(r=>r.json()).then(data=>{
-        if(!data.ok){ document.getElementById('stripeContainer').innerHTML='<div class="alert alert-danger">'+(data.msg||'Erro')+'</div>'; return; }
+        if(!data.ok){ document.getElementById('stripeContainer').innerHTML='<div class="alert alert-danger">'+(data.msg||'<?= htmlspecialchars(__('admin.redirect.error', 'Erro'), ENT_QUOTES, 'UTF-8') ?>')+'</div>'; return; }
         elements=stripe.elements(); cardElement=elements.create('card',{style:{base:{fontSize:'16px'}}});
-        document.getElementById('stripeContainer').innerHTML='<div id="cardElement" class="form-control p-3 mb-3"></div><button type="button" class="btn btn-success w-100" id="btnPagar"><i class="fas fa-lock me-2"></i>Pagar US$ '+valorUsd.toFixed(2)+'</button>';
+        document.getElementById('stripeContainer').innerHTML='<div id="cardElement" class="form-control p-3 mb-3"></div><button type="button" class="btn btn-success w-100" id="btnPagar"><i class="fas fa-lock me-2"></i><?= htmlspecialchars(__('admin.redirect.pay', 'Pagar'), ENT_QUOTES, 'UTF-8') ?> US$ '+valorUsd.toFixed(2)+'</button>';
         cardElement.mount('#cardElement');
         document.getElementById('btnPagar').addEventListener('click',async()=>{
-            const btn=document.getElementById('btnPagar'); btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-2"></i>Processando...';
+            const btn=document.getElementById('btnPagar'); btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-2"></i><?= htmlspecialchars(__('admin.redirect.processing', 'Processando...'), ENT_QUOTES, 'UTF-8') ?>';
             const{paymentIntent,error}=await stripe.confirmCardPayment(data.client_secret,{payment_method:{card:cardElement}});
-            if(error){ document.getElementById('msgPagamento').innerHTML='<div class="alert alert-danger">'+error.message+'</div>'; btn.disabled=false; btn.innerHTML='<i class="fas fa-lock me-2"></i>Pagar US$ '+valorUsd.toFixed(2); return; }
+            if(error){ document.getElementById('msgPagamento').innerHTML='<div class="alert alert-danger">'+error.message+'</div>'; btn.disabled=false; btn.innerHTML='<i class="fas fa-lock me-2"></i><?= htmlspecialchars(__('admin.redirect.pay', 'Pagar'), ENT_QUOTES, 'UTF-8') ?> US$ '+valorUsd.toFixed(2); return; }
             const conf=await fetch('/admin/redirecionamento/pagamento/confirmar',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'envio_id='+envioId+'&payment_intent_id='+paymentIntent.id});
             const cj=await conf.json();
-            document.getElementById('msgPagamento').innerHTML=cj.ok?'<div class="alert alert-success"><i class="fas fa-check me-2"></i>Pagamento confirmado! Envie o comprovante abaixo.</div>':'<div class="alert alert-warning">Pagamento processado, aguardando confirmação.</div>';
+            document.getElementById('msgPagamento').innerHTML=cj.ok?'<div class="alert alert-success"><i class="fas fa-check me-2"></i><?= htmlspecialchars(__('admin.redirect.payment_confirmed_send_receipt', 'Pagamento confirmado! Envie o comprovante abaixo.'), ENT_QUOTES, 'UTF-8') ?></div>':'<div class="alert alert-warning"><?= htmlspecialchars(__('admin.redirect.payment_processed_awaiting', 'Pagamento processado, aguardando confirmação.'), ENT_QUOTES, 'UTF-8') ?></div>';
             btn.style.display='none';
         });
-    }).catch(()=>{ document.getElementById('stripeContainer').innerHTML='<div class="alert alert-danger">Erro ao conectar com o Stripe.</div>'; });
+    }).catch(()=>{ document.getElementById('stripeContainer').innerHTML='<div class="alert alert-danger"><?= htmlspecialchars(__('admin.redirect.error_connecting_stripe', 'Erro ao conectar com o Stripe.'), ENT_QUOTES, 'UTF-8') ?></div>'; });
 }
 
 // ── Upload comprovante ──────────────────────────────────────────────────────
@@ -508,7 +508,7 @@ document.getElementById('inputComprovante')?.addEventListener('change', async fu
     const fd=new FormData(); fd.append('comprovante',this.files[0]); fd.append('envio_id',envioId); fd.append('tipo','envio');
     const r=await fetch('/admin/redirecionamento/comprovantes/upload',{method:'POST',body:fd});
     const j=await r.json();
-    if(j.ok){ const el=document.createElement('div'); el.className='alert alert-success mt-2'; el.innerHTML='<i class="fas fa-check me-2"></i>Comprovante enviado.'; this.parentNode.appendChild(el); }
+    if(j.ok){ const el=document.createElement('div'); el.className='alert alert-success mt-2'; el.innerHTML='<i class="fas fa-check me-2"></i><?= htmlspecialchars(__('admin.redirect.receipt_sent', 'Comprovante enviado.'), ENT_QUOTES, 'UTF-8') ?>'; this.parentNode.appendChild(el); }
 });
 
 // ── Clientes ────────────────────────────────────────────────────────────────
@@ -522,7 +522,7 @@ document.getElementById('inputComprovante')?.addEventListener('change', async fu
 })();
 <?php else: ?>
 document.getElementById('selRedirecionador')?.addEventListener('change',async function(){
-    const sel=document.getElementById('selCliente'); sel.innerHTML='<option value="">— Selecione um cliente —</option>';
+    const sel=document.getElementById('selCliente'); sel.innerHTML='<option value="">— <?= htmlspecialchars(__('admin.redirect.select_a_client', 'Selecione um cliente'), ENT_QUOTES, 'UTF-8') ?> —</option>';
     if(!this.value) return;
     const r=await fetch('/admin/redirecionamento/clientes/lista?redirecionador_id='+this.value);
     const j=await r.json(); if(j.ok&&j.clientes) j.clientes.forEach(c=>sel.appendChild(new Option(c.nome,c.id)));
@@ -568,7 +568,7 @@ document.getElementById('btnSalvarCliente')?.addEventListener('click', async () 
         bootstrap.Modal.getInstance(document.getElementById('modalNovoCliente')).hide();
         document.getElementById('selCliente').value=j.id;
         document.getElementById('selCliente').dispatchEvent(new Event('change'));
-    } else { if(msgEl) msgEl.innerHTML='<div class="alert alert-danger py-1 small">'+(j.msg||'Erro ao salvar')+'</div>'; }
+    } else { if(msgEl) msgEl.innerHTML='<div class="alert alert-danger py-1 small">'+(j.msg||'<?= htmlspecialchars(__('admin.redirect.error_saving', 'Erro ao salvar'), ENT_QUOTES, 'UTF-8') ?>')+'</div>'; }
 });
 
 showStep(1);

@@ -1,19 +1,19 @@
 <?php
 $statusLabels = [
-    'pendente'                       => 'Pendente',
-    'processando'                    => 'Processando',
-    'pago'                           => 'Pago',
-    'produto_consolidado'            => 'Caixa Fechada',
-    'itens_comprados'                => 'Itens Comprados',
-    'etiqueta_gerada'                => 'Etiqueta Gerada',
-    'enviado'                        => 'Etiqueta Gerada',
-    'em_transporte'                  => 'Em Transporte',
-    'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
-    'enviado_ao_destinatario'        => 'Enviado ao Destinatário',
-    'entregue'                       => 'Entregue',
-    'cancelado'                      => 'Cancelado',
-    'carne_pagando'                  => 'Carnê em Pagamento',
-    'carne_aguardando'               => 'Carnê Aguardando',
+    'pendente'                       => __('admin.orders_report.status.pendente', 'Pendente'),
+    'processando'                    => __('admin.orders_report.status.processando', 'Processando'),
+    'pago'                           => __('admin.orders_report.status.pago', 'Pago'),
+    'produto_consolidado'            => __('admin.orders_report.status.produto_consolidado', 'Caixa Fechada'),
+    'itens_comprados'                => __('admin.orders_report.status.itens_comprados', 'Itens Comprados'),
+    'etiqueta_gerada'                => __('admin.orders_report.status.etiqueta_gerada', 'Etiqueta Gerada'),
+    'enviado'                        => __('admin.orders_report.status.etiqueta_gerada', 'Etiqueta Gerada'),
+    'em_transporte'                  => __('admin.orders_report.status.em_transporte', 'Em Transporte'),
+    'aguardando_liberacao_aduaneira' => __('admin.orders_report.status.aguardando_liberacao_aduaneira', 'Aguardando Liberação Aduaneira'),
+    'enviado_ao_destinatario'        => __('admin.orders_report.status.enviado_ao_destinatario', 'Enviado ao Destinatário'),
+    'entregue'                       => __('admin.orders_report.status.entregue', 'Entregue'),
+    'cancelado'                      => __('admin.orders_report.status.cancelado', 'Cancelado'),
+    'carne_pagando'                  => __('admin.orders_report.status.carne_pagando', 'Carnê em Pagamento'),
+    'carne_aguardando'               => __('admin.orders_report.status.carne_aguardando', 'Carnê Aguardando'),
 ];
 $statusColors = [
     'pendente'                       => 'warning',
@@ -38,10 +38,10 @@ $statusColors = [
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="page-title">Relatório de Pedidos</h1>
-            <p class="page-subtitle">Análise detalhada dos pedidos</p>
+            <h1 class="page-title"><?= __('admin.orders_report.title', 'Relatório de Pedidos') ?></h1>
+            <p class="page-subtitle"><?= __('admin.orders_report.subtitle', 'Análise detalhada dos pedidos') ?></p>
         </div>
-        <button class="btn btn-outline-dark" onclick="imprimirTodos()"><i class="fas fa-print me-1"></i>Imprimir Tudo</button>
+        <button class="btn btn-outline-dark" onclick="imprimirTodos()"><i class="fas fa-print me-1"></i><?= __('admin.orders_report.print_all', 'Imprimir Tudo') ?></button>
     </div>
 
     <!-- Filtros -->
@@ -49,24 +49,24 @@ $statusColors = [
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label">Data Inicial</label>
+                    <label class="form-label"><?= __('admin.orders_report.date_start', 'Data Inicial') ?></label>
                     <input type="date" name="date_start" class="form-control" value="<?= htmlspecialchars($dateStart) ?>">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Data Final</label>
+                    <label class="form-label"><?= __('admin.orders_report.date_end', 'Data Final') ?></label>
                     <input type="date" name="date_end" class="form-control" value="<?= htmlspecialchars($dateEnd) ?>">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Status</label>
+                    <label class="form-label"><?= __('common.status', 'Status') ?></label>
                     <div class="dropdown w-100">
                         <button class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" type="button" id="statusDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-                            <span id="statusLabel"><?= empty($selectedStatuses) ? 'Todos' : count($selectedStatuses) . ' selecionado(s)' ?></span>
+                            <span id="statusLabel"><?= empty($selectedStatuses) ? __('admin.orders_report.all', 'Todos') : count($selectedStatuses) . ' ' . __('admin.orders_report.selected_count', 'selecionado(s)') ?></span>
                             <i class="fas fa-chevron-down ms-2"></i>
                         </button>
                         <div class="dropdown-menu w-100 p-2 shadow" style="max-height:280px;overflow-y:auto;" aria-labelledby="statusDropdown">
                             <div class="mb-2 d-flex gap-1">
-                                <button type="button" class="btn btn-sm btn-outline-primary flex-fill" onclick="toggleAllStatus(true)">Todos</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="toggleAllStatus(false)">Limpar</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary flex-fill" onclick="toggleAllStatus(true)"><?= __('admin.orders_report.all', 'Todos') ?></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="toggleAllStatus(false)"><?= __('admin.orders_report.clear', 'Limpar') ?></button>
                             </div>
                             <?php
                             $selectedStatuses = is_array($statusFilter) ? $statusFilter : ($statusFilter !== '' ? [$statusFilter] : []);
@@ -84,16 +84,16 @@ $statusColors = [
                     </div>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i><?= __('admin.orders_report.filter', 'Filtrar') ?></button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="small text-muted mb-3"><?= count($pedidos) ?> pedido(s) encontrado(s)</div>
+    <div class="small text-muted mb-3"><?= count($pedidos) ?> <?= __('admin.orders_report.orders_found', 'pedido(s) encontrado(s)') ?></div>
 
     <?php if (empty($pedidos)): ?>
-        <div class="alert alert-info">Nenhum pedido encontrado no período selecionado.</div>
+        <div class="alert alert-info"><?= __('admin.orders_report.none_in_period', 'Nenhum pedido encontrado no período selecionado.') ?></div>
     <?php else: ?>
         <?php foreach ($pedidos as $p):
             $pid = (int)$p['id'];
@@ -114,15 +114,15 @@ $statusColors = [
                     <span class="badge bg-<?= $cor ?>"><?= $label ?></span>
                     <span class="fw-bold">#<?= str_pad($pid, 6, '0', STR_PAD_LEFT) ?></span>
                     <span class="text-muted small"><?= date('d/m/Y H:i', strtotime($p['created_at'])) ?></span>
-                    <span class="fw-semibold"><?= htmlspecialchars($p['cliente_nome'] ?? 'Sem nome') ?></span>
+                    <span class="fw-semibold"><?= htmlspecialchars($p['cliente_nome'] ?? __('admin.orders_report.no_name', 'Sem nome')) ?></span>
                     <span class="small text-muted"><?= htmlspecialchars($p['cliente_email'] ?? '') ?></span>
                     <span class="fw-bold text-primary"><?= $fmt($p['total'] ?? 0) ?></span>
                 </div>
                 <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
                     <?php if ($imp['count'] > 0): ?>
-                        <span class="badge bg-success small me-1">Impresso <?= $imp['count'] ?>x por <?= htmlspecialchars($imp['by']) ?></span>
+                        <span class="badge bg-success small me-1"><?= __('admin.orders_report.printed', 'Impresso') ?> <?= $imp['count'] ?>x <?= __('admin.orders_report.by', 'por') ?> <?= htmlspecialchars($imp['by']) ?></span>
                     <?php else: ?>
-                        <span class="badge bg-secondary small me-1">Não impresso</span>
+                        <span class="badge bg-secondary small me-1"><?= __('admin.orders_report.not_printed', 'Não impresso') ?></span>
                     <?php endif; ?>
                     <a href="/admin/relatorio-pedidos/imprimir/<?= $pid ?>" target="_blank" class="btn btn-sm btn-outline-dark" onclick="return confirmarImpressao(<?= $pid ?>, <?= (int)$imp['count'] ?>, '<?= htmlspecialchars(addslashes($imp['by']), ENT_QUOTES) ?>')"><i class="fas fa-print"></i></a>
                     <a href="/admin/pedidos/detalhes/<?= $pid ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
@@ -132,35 +132,35 @@ $statusColors = [
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h6>Cliente</h6>
+                            <h6><?= __('admin.orders_report.customer', 'Cliente') ?></h6>
                             <table class="table table-sm table-bordered">
-                                <tr><th style="width:35%">Nome</th><td><?= htmlspecialchars($p['cliente_nome'] ?? ($p['u_nome'] ?? '')) ?></td></tr>
-                                <tr><th>Email</th><td><?= htmlspecialchars($p['cliente_email'] ?? ($p['u_email'] ?? '')) ?></td></tr>
+                                <tr><th style="width:35%"><?= __('admin.orders_report.name', 'Nome') ?></th><td><?= htmlspecialchars($p['cliente_nome'] ?? ($p['u_nome'] ?? '')) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.email', 'Email') ?></th><td><?= htmlspecialchars($p['cliente_email'] ?? ($p['u_email'] ?? '')) ?></td></tr>
                                 <tr><th>CPF</th><td><?= htmlspecialchars($p['cliente_cpf'] ?? ($p['cliente_documento'] ?? ($p['u_documento'] ?? ''))) ?></td></tr>
-                                <tr><th>Telefone</th><td><?= htmlspecialchars($p['cliente_telefone'] ?? ($p['u_telefone'] ?? '')) ?></td></tr>
-                                <tr><th>Código</th><td><?= htmlspecialchars($p['codigo_pedido'] ?? '') ?></td></tr>
-                                <?php if ($tracking): ?><tr><th>Rastreio</th><td class="text-danger fw-bold"><?= htmlspecialchars($tracking) ?></td></tr><?php endif; ?>
+                                <tr><th><?= __('admin.orders_report.phone', 'Telefone') ?></th><td><?= htmlspecialchars($p['cliente_telefone'] ?? ($p['u_telefone'] ?? '')) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.code', 'Código') ?></th><td><?= htmlspecialchars($p['codigo_pedido'] ?? '') ?></td></tr>
+                                <?php if ($tracking): ?><tr><th><?= __('admin.orders_report.tracking', 'Rastreio') ?></th><td class="text-danger fw-bold"><?= htmlspecialchars($tracking) ?></td></tr><?php endif; ?>
                             </table>
                         </div>
                         <div class="col-md-6">
-                            <h6>Financeiro</h6>
+                            <h6><?= __('admin.orders_report.financial', 'Financeiro') ?></h6>
                             <table class="table table-sm table-bordered">
-                                <tr><th style="width:35%">Subtotal</th><td><?= $fmt($p['subtotal'] ?? 0) ?></td></tr>
-                                <tr><th>Taxa Serviço</th><td><?= $fmt($p['servicos'] ?? 0) ?></td></tr>
-                                <tr><th>Impostos</th><td><?= $fmt($p['impostos'] ?? 0) ?></td></tr>
-                                <tr><th>Frete</th><td><?= ((float)($p['frete'] ?? 0)) <= 0 ? 'Grátis' : $fmt($p['frete']) ?></td></tr>
-                                <tr><th>Total</th><td class="fw-bold"><?= $fmt($p['total'] ?? 0) ?></td></tr>
-                                <tr><th>Pagamento</th><td><?= htmlspecialchars($p['forma_pagamento'] ?? '') ?> <?= !empty($p['pago_em']) ? '— ' . date('d/m/Y H:i', strtotime($p['pago_em'])) : '' ?></td></tr>
+                                <tr><th style="width:35%"><?= __('admin.orders_report.subtotal', 'Subtotal') ?></th><td><?= $fmt($p['subtotal'] ?? 0) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.service_fee', 'Taxa Serviço') ?></th><td><?= $fmt($p['servicos'] ?? 0) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.taxes', 'Impostos') ?></th><td><?= $fmt($p['impostos'] ?? 0) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.shipping', 'Frete') ?></th><td><?= ((float)($p['frete'] ?? 0)) <= 0 ? __('admin.orders_report.free', 'Grátis') : $fmt($p['frete']) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.total', 'Total') ?></th><td class="fw-bold"><?= $fmt($p['total'] ?? 0) ?></td></tr>
+                                <tr><th><?= __('admin.orders_report.payment', 'Pagamento') ?></th><td><?= htmlspecialchars($p['forma_pagamento'] ?? '') ?> <?= !empty($p['pago_em']) ? '— ' . date('d/m/Y H:i', strtotime($p['pago_em'])) : '' ?></td></tr>
                             </table>
                         </div>
                     </div>
 
                     <?php if (!empty($itens)): ?>
-                    <h6 class="mt-3">Itens (<?= count($itens) ?>)</h6>
+                    <h6 class="mt-3"><?= __('admin.orders_report.items', 'Itens') ?> (<?= count($itens) ?>)</h6>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered">
                             <thead class="table-light">
-                                <tr><th style="width:60px">Foto</th><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Subtotal</th></tr>
+                                <tr><th style="width:60px"><?= __('admin.orders_report.photo', 'Foto') ?></th><th><?= __('admin.orders_report.product', 'Produto') ?></th><th><?= __('admin.orders_report.qty', 'Qtd') ?></th><th><?= __('admin.orders_report.unit_price', 'Preço Unit.') ?></th><th><?= __('admin.orders_report.subtotal', 'Subtotal') ?></th></tr>
                             </thead>
                             <tbody>
                             <?php
@@ -188,7 +188,7 @@ $statusColors = [
                     <?php endif; ?>
 
                     <?php if (!empty($p['observacoes'])): ?>
-                    <div class="alert alert-secondary small mt-2"><strong>Observações:</strong> <?= htmlspecialchars($p['observacoes']) ?></div>
+                    <div class="alert alert-secondary small mt-2"><strong><?= __('admin.orders_report.notes', 'Observações') ?>:</strong> <?= htmlspecialchars($p['observacoes']) ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -198,15 +198,22 @@ $statusColors = [
 </div>
 
 <script>
+var ORDERS_REPORT_I18N = {
+    all: <?= json_encode(__('admin.orders_report.all', 'Todos'), JSON_UNESCAPED_UNICODE) ?>,
+    selected_count: <?= json_encode(__('admin.orders_report.selected_count', 'selecionado(s)'), JSON_UNESCAPED_UNICODE) ?>,
+    printed_now: <?= json_encode(__('admin.orders_report.printed_now', '✓ Impresso agora'), JSON_UNESCAPED_UNICODE) ?>,
+    reprint_confirm: <?= json_encode(__('admin.orders_report.reprint_confirm', '⚠️ Este pedido já foi impresso {n}x por {by}.\n\nDeseja imprimir novamente?'), JSON_UNESCAPED_UNICODE) ?>,
+    none_to_print: <?= json_encode(__('admin.orders_report.none_to_print', 'Nenhum pedido para imprimir.'), JSON_UNESCAPED_UNICODE) ?>
+};
 function updateStatusLabel() {
     var checked = document.querySelectorAll('.status-cb:checked');
     var label = document.getElementById('statusLabel');
     if (checked.length === 0) {
-        label.textContent = 'Todos';
+        label.textContent = ORDERS_REPORT_I18N.all;
     } else if (checked.length === 1) {
         label.textContent = checked[0].parentElement.textContent.trim();
     } else {
-        label.textContent = checked.length + ' selecionado(s)';
+        label.textContent = checked.length + ' ' + ORDERS_REPORT_I18N.selected_count;
     }
 }
 function toggleAllStatus(selectAll) {
@@ -232,7 +239,7 @@ function registrarImpressao(pedidoId) {
             badges.forEach(function(badge) {
                 if (badge.textContent.indexOf('impresso') !== -1 || badge.textContent.indexOf('Impresso') !== -1) {
                     badge.className = 'badge bg-success small me-1';
-                    badge.textContent = '✓ Impresso agora';
+                    badge.textContent = ORDERS_REPORT_I18N.printed_now;
                 }
             });
         }
@@ -241,7 +248,8 @@ function registrarImpressao(pedidoId) {
 
 function confirmarImpressao(pedidoId, printCount, lastBy) {
     if (printCount > 0) {
-        if (!confirm('⚠️ Este pedido já foi impresso ' + printCount + 'x por ' + lastBy + '.\n\nDeseja imprimir novamente?')) {
+        var msg = ORDERS_REPORT_I18N.reprint_confirm.replace('{n}', printCount).replace('{by}', lastBy);
+        if (!confirm(msg)) {
             return false;
         }
     }
@@ -254,7 +262,7 @@ function imprimirTodos() {
     document.querySelectorAll('[id^="pedido-"]').forEach(function(el) {
         ids.push(el.id.replace('pedido-', ''));
     });
-    if (ids.length === 0) { alert('Nenhum pedido para imprimir.'); return; }
+    if (ids.length === 0) { alert(ORDERS_REPORT_I18N.none_to_print); return; }
     // Abrir todos em sequência
     ids.forEach(function(id) {
         registrarImpressao(id);

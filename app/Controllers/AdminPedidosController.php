@@ -30,6 +30,18 @@ class AdminPedidosController extends Controller {
             ]);
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
 
+            // Garantir que exista uma coluna dedicada para o país de entrega no pedido.
+            // Sem ela, o país de pedidos com endereço internacional editado não persiste
+            // de forma confiável (dependeria do endereço vinculado / endereço do usuário).
+            if (is_array($cols) && !in_array('pais_entrega', $cols, true)) {
+                try {
+                    $pdo->exec("ALTER TABLE pedidos ADD COLUMN pais_entrega VARCHAR(50) NULL");
+                    $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
+                } catch (\Throwable $e) {
+                    // Se falhar (ex.: permissão), seguir com o schema atual.
+                }
+            }
+
             $usuarioLogado = $auth->getUsuarioLogado();
             $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
             $oldRow = [];
@@ -218,7 +230,7 @@ class AdminPedidosController extends Controller {
             $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
             $enderecoIdAtualizado = 0;
 
-            if ($endEntregaIdCol !== '' && $this->tableExistsPdo($pdo, 'enderecos')) {
+            if ($this->tableExistsPdo($pdo, 'enderecos')) {
                 try {
                     $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
                     $pickEnd = function(array $candidates) use ($colsEnd): string {
@@ -277,7 +289,8 @@ class AdminPedidosController extends Controller {
 
                         foreach ($endFields as $col => $val) {
                             $insertCols[] = $col;
-                            $insertVals[] = ($val !== '') ? $val : ($col === 'pais' ? 'BR' : '');
+                            $isPaisCol = in_array($col, ['pais', 'country', 'country_code'], true);
+                            $insertVals[] = ($val !== '') ? $val : ($isPaisCol ? 'BR' : '');
                             $insertPlaceholders[] = '?';
                         }
 
@@ -293,8 +306,10 @@ class AdminPedidosController extends Controller {
                         $newEndId = (int) $pdo->lastInsertId();
 
                         // Atualizar o pedido para apontar para o novo endereço exclusivo
-                        if ($newEndId > 0) {
+                        if ($newEndId > 0 && $endEntregaIdCol !== '') {
                             $pdo->prepare('UPDATE pedidos SET ' . $endEntregaIdCol . ' = ? WHERE id = ?')->execute([$newEndId, $pedidoId]);
+                            $enderecoIdAtualizado = $newEndId;
+                        } elseif ($newEndId > 0) {
                             $enderecoIdAtualizado = $newEndId;
                         }
                     }
@@ -2220,7 +2235,9 @@ JS;
             };
 
             // Campos opcionais para enriquecer a listagem (sem depender de schema fixo)
-            $colPais = $pickCol($colsPedidos, ['pais', 'country', 'pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'pais_entrega_nome']);
+            // IMPORTANTE: priorizar a coluna de país de ENTREGA (pais_entrega) sobre a coluna
+            // legada "pais", pois é ela que é atualizada ao editar o endereço do pedido.
+            $colPais = $pickCol($colsPedidos, ['pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'pais', 'country', 'pais_entrega_nome']);
             $colOrigem = $pickCol($colsPedidos, ['origem', 'canal', 'channel', 'source', 'utm_source', 'pedido_origem']);
             $colManual = $pickCol($colsPedidos, ['pedido_manual', 'manual', 'is_manual', 'criado_manual', 'admin_criou', 'criado_por_admin']);
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
@@ -2261,6 +2278,11 @@ JS;
 
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
+            }
+
+            // Excluir RASCUNHOS de pedidos manuais da lista principal (eles têm aba própria: "Rascunhos").
+            if (in_array('status', $colsPedidos, true)) {
+                $sql .= " AND LOWER(COALESCE(p.status,'')) != 'rascunho'";
             }
 
             // Excluir pedidos arquivados (cancelados automaticamente por carnê expirado)
@@ -2616,6 +2638,10 @@ JS;
             if ($temDeletedAt) {
                 $sqlTotal .= " AND p.deleted_at IS NULL";
             }
+            // Excluir RASCUNHOS da contagem da lista principal (aba própria: "Rascunhos").
+            if (in_array('status', $colsPedidos, true)) {
+                $sqlTotal .= " AND LOWER(COALESCE(p.status,'')) != 'rascunho'";
+            }
             if (in_array('arquivado', $colsPedidos, true)) {
                 $sqlTotal .= " AND p.arquivado = 0";
             }
@@ -2692,14 +2718,20 @@ JS;
         // Helper para resolver país do pedido (com fallback para tabela enderecos)
         $__paisEndCache = [];
         $paisNomes = ['BR'=>'Brazil','US'=>'United States','PT'=>'Portugal','JP'=>'Japan','GB'=>'United Kingdom','DE'=>'Germany','FR'=>'France','ES'=>'Spain','IT'=>'Italy','CA'=>'Canada','AU'=>'Australia','AR'=>'Argentina','CL'=>'Chile','CO'=>'Colombia','MX'=>'Mexico'];
-        $resolverPaisPedido = function($pedido) use ($colPais, $pdo, &$__paisEndCache, $paisNomes) {
+        $__paisUserCache = [];
+        $resolverPaisPedido = function($pedido) use ($colPais, $pdo, &$__paisEndCache, &$__paisUserCache, $paisNomes) {
             $paisTxt = '';
-            if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
-                $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+
+            // Prioridade 1: coluna de país de ENTREGA do próprio pedido (mesma fonte usada
+            // na tela de detalhes/edição, que é atualizada ao salvar o endereço).
+            foreach (['pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino'] as $c) {
+                if (array_key_exists($c, $pedido) && trim((string) ($pedido[$c] ?? '')) !== '') {
+                    $paisTxt = trim((string) $pedido[$c]);
+                    break;
+                }
             }
-            if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
-                $paisTxt = trim((string) ($pedido['pais'] ?? ''));
-            }
+
+            // Prioridade 2: país do endereço vinculado ao pedido (endereco_entrega_id)
             if ($paisTxt === '' && !empty($pedido['endereco_entrega_id'])) {
                 $endId = (int) $pedido['endereco_entrega_id'];
                 if ($endId > 0) {
@@ -2715,6 +2747,35 @@ JS;
                     }
                 }
             }
+
+            // Prioridade 3: coluna resolvida dinamicamente e coluna legada "pais"
+            if ($paisTxt === '' && !empty($colPais) && array_key_exists($colPais, $pedido)) {
+                $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+            }
+            if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+            }
+
+            // Prioridade 4: endereço PRINCIPAL do usuário (mesmo fallback usado na tela de
+            // detalhes via getComDetalhes). Cobre pedidos sem endereco_entrega_id e sem país
+            // nas colunas do pedido — que é o caso de pedidos com endereço internacional
+            // editado quando o endereço foi salvo apenas na tabela enderecos.
+            if ($paisTxt === '' && !empty($pedido['usuario_id'])) {
+                $uid = (int) $pedido['usuario_id'];
+                if ($uid > 0) {
+                    if (!isset($__paisUserCache[$uid])) {
+                        try {
+                            $stPU = $pdo->prepare("SELECT pais FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
+                            $stPU->execute([$uid]);
+                            $__paisUserCache[$uid] = trim((string) ($stPU->fetchColumn() ?: ''));
+                        } catch (\Exception $e) { $__paisUserCache[$uid] = ''; }
+                    }
+                    if ($__paisUserCache[$uid] !== '') {
+                        $paisTxt = $__paisUserCache[$uid];
+                    }
+                }
+            }
+
             if ($paisTxt === '') {
                 $paisTxt = 'Brazil';
             }
@@ -2729,11 +2790,11 @@ JS;
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . htmlspecialchars((class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocaleHtml() : 'pt-BR'), ENT_QUOTES, 'UTF-8') . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.orders.page_title', 'Pedidos'), ENT_QUOTES, 'UTF-8') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -2779,57 +2840,61 @@ JS;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Pedidos (' . $total . ')</h1>
+                    <h1 class="page-title">' . __('admin.sidebar.orders', 'Pedidos') . ' (' . $total . ')</h1>
                     <!-- Desktop: buttons inline -->
                     <div class="d-none d-md-flex gap-2">
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>Novo Pedido Manual
+                            <i class="fas fa-plus me-1"></i>' . __('admin.orders.new_manual_order', 'Novo Pedido Manual') . '
+                        </a>
+                        <a href="/admin/pedidos/rascunhos" class="btn btn-outline-primary">
+                            <i class="fas fa-file-alt me-1"></i>' . __('admin.orders_manual.drafts', 'Rascunhos') . '
                         </a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary">
-                            <i class="fas fa-percentage me-1"></i>Minhas Comissões
+                            <i class="fas fa-percentage me-1"></i>' . __('admin.orders.my_commissions', 'Minhas Comissões') . '
                         </a>
                         <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger">
-                            <i class="fas fa-trash me-1"></i>Lixeira
+                            <i class="fas fa-trash me-1"></i>' . __('admin.orders.trash', 'Lixeira') . '
                         </a>
                         <a href="/admin/pedidos/arquivados" class="btn btn-outline-secondary">
-                            <i class="fas fa-archive me-1"></i>Arquivados
+                            <i class="fas fa-archive me-1"></i>' . __('admin.orders.archived', 'Arquivados') . '
                         </a>
                         <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
-                            <i class="fas fa-download me-1"></i>Exportar XLSX
+                            <i class="fas fa-download me-1"></i>' . __('admin.orders.export_xlsx', 'Exportar XLSX') . '
                         </a>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                            <i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '
                         </button>
                     </div>
                     <!-- Mobile: toggle button -->
                     <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'pedidosActionsCollapse\').classList.toggle(\'d-none\')">
-                        <i class="fas fa-ellipsis-v me-1"></i>Ações
+                        <i class="fas fa-ellipsis-v me-1"></i>' . __('admin.orders.actions', 'Ações') . '
                     </button>
                 </div>
                 <!-- Mobile: collapsible actions -->
                 <div id="pedidosActionsCollapse" class="d-none d-md-none mb-3">
                     <div class="d-flex flex-wrap gap-2">
-                        <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Novo Pedido</a>
-                        <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
-                        <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Lixeira</a>
-                        <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>Arquivados</a>
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>' . __('admin.orders.new_order', 'Novo Pedido') . '</a>
+                        <a href="/admin/pedidos/rascunhos" class="btn btn-sm btn-outline-primary"><i class="fas fa-file-alt me-1"></i>' . __('admin.orders_manual.drafts', 'Rascunhos') . '</a>
+                        <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>' . __('admin.orders.commissions', 'Comissões') . '</a>
+                        <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>' . __('admin.orders.trash', 'Lixeira') . '</a>
+                        <a href="/admin/pedidos/arquivados" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i>' . __('admin.orders.archived', 'Arquivados') . '</a>
                         <a class="btn btn-sm btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download me-1"></i>XLSX</a>
-                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('common.refresh', 'Atualizar') . '</button>
                     </div>
                 </div>
                 
                 <form method="GET" class="row g-2 mb-4" id="pedidosFilterForm">
                     <div class="col-md-5">
                         <div class="input-group">
-                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="' . htmlspecialchars(__('admin.orders.search_placeholder_list', 'Buscar pedido, cliente ou email...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca) . '">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <select class="form-select" name="status" id="pedidosStatusSelect">
-                            <option value="">Todos status</option>
+                            <option value="">' . __('admin.orders.all_statuses', 'Todos status') . '</option>
                             ' . $this->buildStatusOptions($status) . '
-                            <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
+                            <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>' . __('admin.orders.awaiting_receipt', 'Aguardando Comprovante') . '</option>
                         </select>
                     </div>
                 </form>
@@ -2843,12 +2908,12 @@ JS;
                     echo '<!-- Mobile: Dropdown -->
                     <div class="d-md-none mb-2">
                         <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
-                            <option value="todos" ' . (!$isSpecialFilter ? 'selected' : '') . '>Todos os Pedidos</option>
-                            <option value="dolar">Dólar</option>
-                            <option value="real">Reais</option>
-                            <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>Carnê</option>
-                            <option value="parcial" ' . ($isParcialFiltro ? 'selected' : '') . '>Parcialmente Comprado</option>
-                            <option value="comprado" ' . ($isCompradoFiltro ? 'selected' : '') . '>Comprado</option>
+                            <option value="todos" ' . (!$isSpecialFilter ? 'selected' : '') . '>' . __('admin.orders.tab_all', 'Todos os Pedidos') . '</option>
+                            <option value="dolar">' . __('admin.orders.tab_dollar', 'Dólar') . '</option>
+                            <option value="real">' . __('admin.orders.tab_real', 'Reais') . '</option>
+                            <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>' . __('admin.orders.tab_installment', 'Carnê') . '</option>
+                            <option value="parcial" ' . ($isParcialFiltro ? 'selected' : '') . '>' . __('admin.orders.tab_partially_purchased', 'Parcialmente Comprado') . '</option>
+                            <option value="comprado" ' . ($isCompradoFiltro ? 'selected' : '') . '>' . __('admin.orders.tab_purchased', 'Comprado') . '</option>
                         </select>
                     </div>
                     <!-- Desktop: Pills -->
@@ -2856,25 +2921,25 @@ JS;
                     echo '
                         <li class="nav-item" role="presentation">';
                     if ($isSpecialFilter) {
-                        echo '<a class="nav-link" href="/admin/pedidos">Todos os Pedidos</a>';
+                        echo '<a class="nav-link" href="/admin/pedidos">' . __('admin.orders.tab_all', 'Todos os Pedidos') . '</a>';
                     } else {
-                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">Todos os Pedidos</button>';
+                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">' . __('admin.orders.tab_all', 'Todos os Pedidos') . '</button>';
                     }
                     echo '</li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">Dólar</button>
+                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">' . __('admin.orders.tab_dollar', 'Dólar') . '</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">Reais</button>
+                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">' . __('admin.orders.tab_real', 'Reais') . '</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">Carnê</a>
+                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">' . __('admin.orders.tab_installment', 'Carnê') . '</a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isParcialFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=parcial" style="' . ($isParcialFiltro ? '' : 'color:#fd7e14;') . '">Parcial</a>
+                            <a class="nav-link ' . ($isParcialFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=parcial" style="' . ($isParcialFiltro ? '' : 'color:#fd7e14;') . '">' . __('admin.orders.tab_partial', 'Parcial') . '</a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isCompradoFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=comprado">Comprado</a>
+                            <a class="nav-link ' . ($isCompradoFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=comprado">' . __('admin.orders.tab_purchased', 'Comprado') . '</a>
                         </li>
                     </ul>';
                     echo '
@@ -2895,21 +2960,21 @@ JS;
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">' . __('admin.orders.cost_zero_empty', 'Custo 0/vazio') . '</span>';
                         }
                         if (!empty($warn['missing_ncm'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">' . __('admin.orders.no_ncm', 'Sem NCM') . '</span>';
                         }
                         if (!empty($warn['cpf_invalid'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">' . __('admin.orders.invalid_cpf', 'CPF inválido') . '</span>';
                         }
                         if (!empty($warn['valor_informado_cliente'])) {
-                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders.customer_value', 'Valor cliente') . '</span>';
                         }
                     }
                     $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
                     if ($aguardandoComprovante) {
-                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>' . __('admin.orders.awaiting_receipt_badge', 'Aguardando comprovante') . '</span>';
                     }
                     
                     $paisTxt = $resolverPaisPedido($pedido);
@@ -2930,7 +2995,7 @@ JS;
                         $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
                         $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+                    $origemTxt = $isManualBool ? __('admin.orders.origin_manual', 'Manual') : __('admin.orders.origin_organic', 'Orgânica');
 
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
@@ -2946,34 +3011,39 @@ JS;
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? __('common.not_informed', 'Não informado')) . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">' . __('admin.orders.user_id', 'UID') . ': <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
-                                        <div class="text-center">
-                                            <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
-                                            <small class="text-muted">Total do Pedido</small>
-                                            <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'Moeda: R$' : 'Moeda: US$') . '</span></div>
-                                            ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
+                                        <div class="text-center">' . (function() use ($pedido, $carneInfoMap) {
+                                            $mo = strtoupper(trim((string) ($pedido['moeda'] ?? '')));
+                                            $ehBrl = ($mo === 'BRL');
+                                            $valor = (float) ($pedido['total'] ?? 0);
+                                            return '
+                                            <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($valor, $mo) . '</h5>
+                                            <small class="text-muted">' . __('admin.orders.order_total', 'Total do Pedido') . '</small>
+                                            <div class="mt-1"><span class="badge ' . ($ehBrl ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . __('admin.orders.order_currency', 'Moeda do pedido') . ($ehBrl ? ': R$' : ': US$') . '</span></div>
+                                            ' . $this->getCarneProgressHtml($pedido, $carneInfoMap);
+                                        })() . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
+                                                <i class="fas fa-eye"></i> ' . __('common.view', 'Ver') . '
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
+                                                <option value="">' . __('common.status', 'Status') . '</option>
                                                 ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
@@ -2987,7 +3057,7 @@ JS;
                 if (empty($pedidos)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.none_found', 'Nenhum pedido encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -2998,9 +3068,9 @@ JS;
                             <div class="tab-pane fade" id="pedidos-dolar" role="tabpanel">
                                 <div class="row">';
                 
-                // Filtrar pedidos em USD
+                // Filtrar pedidos em USD (normalizar para tolerar variações como 'usd', ' USD ')
                 $pedidosUSD = array_filter($pedidos, function($pedido) {
-                    return $pedido['moeda'] === 'USD';
+                    return strtoupper(trim((string) ($pedido['moeda'] ?? ''))) === 'USD';
                 });
                 
                 foreach ($pedidosUSD as $pedido) {
@@ -3016,21 +3086,21 @@ JS;
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">' . __('admin.orders.cost_zero_empty', 'Custo 0/vazio') . '</span>';
                         }
                         if (!empty($warn['missing_ncm'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">' . __('admin.orders.no_ncm', 'Sem NCM') . '</span>';
                         }
                         if (!empty($warn['cpf_invalid'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">' . __('admin.orders.invalid_cpf', 'CPF inválido') . '</span>';
                         }
                         if (!empty($warn['valor_informado_cliente'])) {
-                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders.customer_value', 'Valor cliente') . '</span>';
                         }
                     }
                     $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
                     if ($aguardandoComprovante) {
-                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>' . __('admin.orders.awaiting_receipt_badge', 'Aguardando comprovante') . '</span>';
                     }
 
                     $paisTxt = $resolverPaisPedido($pedido);
@@ -3051,7 +3121,7 @@ JS;
                         $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
                         $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+                    $origemTxt = $isManualBool ? __('admin.orders.origin_manual', 'Manual') : __('admin.orders.origin_organic', 'Orgânica');
 
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
@@ -3067,34 +3137,34 @@ JS;
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? __('common.not_informed', 'Não informado')) . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">' . __('admin.orders.user_id', 'UID') . ': <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
                                             <h5 class="mb-0 text-success text-nowrap">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
-                                            <small class="text-muted">Total (USD)</small>
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (USD)</small>
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
+                                                <i class="fas fa-eye"></i> ' . __('common.view', 'Ver') . '
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
+                                                <option value="">' . __('common.status', 'Status') . '</option>
                                                 ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
@@ -3108,7 +3178,7 @@ JS;
                 if (empty($pedidosUSD)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-dollar-sign fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido em dólar encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.none_found_dollar', 'Nenhum pedido em dólar encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -3120,7 +3190,7 @@ JS;
                                 <div class="row">';
                 
                 $pedidosBRL = array_filter($pedidos, function($pedido) {
-                    return $pedido['moeda'] === 'BRL';
+                    return strtoupper(trim((string) ($pedido['moeda'] ?? ''))) !== 'USD';
                 });
                 
                 foreach ($pedidosBRL as $pedido) {
@@ -3136,21 +3206,21 @@ JS;
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">' . __('admin.orders.cost_zero_empty', 'Custo 0/vazio') . '</span>';
                         }
                         if (!empty($warn['missing_ncm'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">' . __('admin.orders.no_ncm', 'Sem NCM') . '</span>';
                         }
                         if (!empty($warn['cpf_invalid'])) {
-                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">' . __('admin.orders.invalid_cpf', 'CPF inválido') . '</span>';
                         }
                         if (!empty($warn['valor_informado_cliente'])) {
-                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.orders.customer_value', 'Valor cliente') . '</span>';
                         }
                     }
                     $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
                     if ($aguardandoComprovante) {
-                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>' . __('admin.orders.awaiting_receipt_badge', 'Aguardando comprovante') . '</span>';
                     }
 
                     $paisTxt = $resolverPaisPedido($pedido);
@@ -3171,7 +3241,7 @@ JS;
                         $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
                         $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+                    $origemTxt = $isManualBool ? __('admin.orders.origin_manual', 'Manual') : __('admin.orders.origin_organic', 'Orgânica');
 
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
@@ -3187,34 +3257,34 @@ JS;
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.orders.guest', 'Visitante')) . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? __('common.not_informed', 'Não informado')) . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">' . __('admin.orders.needs_review_items', 'Precisa revisar itens do pedido (editar produto)') . '</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
+                                            <span class="me-3">' . __('admin.orders.user_id', 'UID') . ': <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">' . __('admin.orders.origin', 'Origem') . ': <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . (!empty($desapegoMap[(int) $pedido['id']]) ? '<span class="badge me-2" style="background:rgba(8,145,178,.15);color:#0891b2;font-size:.65rem;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.orders.desapego', 'Desapego') . '</span>' : '') . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
-                                            <small class="text-muted">Total (BRL)</small>
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format((float) ($pedido['total'] ?? 0), 2, ',', '.') . '</h5>
+                                            <small class="text-muted">' . __('admin.orders.total', 'Total') . ' (BRL)</small>
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">' . __('admin.orders.local_tax', 'Imposto local') . '</span></div>' : '') . '
                                             ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
+                                                <i class="fas fa-eye"></i> ' . __('common.view', 'Ver') . '
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
+                                                <option value="">' . __('common.status', 'Status') . '</option>
                                                 ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
@@ -3228,7 +3298,7 @@ JS;
                 if (empty($pedidosBRL)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-currency-brl fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido em real encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.none_found_real', 'Nenhum pedido em real encontrado') . '</h5>
                     </div>';
                 }
                 
@@ -3251,22 +3321,29 @@ JS;
                 
                 echo '</main></div></div>';
 
-        echo <<<'HTML'
+        $trashTitle = __('admin.commissions.trash_modal_title', 'Enviar pedido para lixeira');
+        $trashClose = __('common.close', 'Fechar');
+        $trashConfirmPre = __('admin.commissions.trash_confirm_pre', 'Confirma enviar o pedido');
+        $trashConfirmPost = __('admin.commissions.trash_confirm_post', 'para a lixeira?');
+        $trashCancel = __('admin.commissions.cancel', 'Cancelar');
+        $trashSend = __('admin.commissions.trash_send', 'Enviar para lixeira');
+
+        echo <<<HTML
 
     <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST" action="" id="formLixeiraPedido">
                     <div class="modal-header">
-                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                        <h5 class="modal-title">{$trashTitle}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{$trashClose}"></button>
                     </div>
                     <div class="modal-body">
-                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                        <div>{$trashConfirmPre} <strong id="lixeiraPedidoIdLabel"></strong> {$trashConfirmPost}</div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{$trashCancel}</button>
+                        <button type="submit" class="btn btn-danger">{$trashSend}</button>
                     </div>
                 </form>
             </div>
@@ -3274,11 +3351,29 @@ JS;
     </div>
 HTML;
 
+    $bulkI18n = json_encode([
+        'clearSelection' => __('admin.orders.bulk.clear_selection', 'Limpar seleção'),
+        'changeStatusPlaceholder' => __('admin.orders.bulk.change_status_placeholder', 'Alterar status para...'),
+        'apply' => __('admin.orders.bulk.apply', 'Aplicar em massa'),
+        'selectedOrder' => __('admin.orders.bulk.selected_order', 'pedido selecionado'),
+        'selectedOrders' => __('admin.orders.bulk.selected_orders', 'pedidos selecionados'),
+        'selectOrder' => __('admin.orders.bulk.select_order', 'Selecionar pedido #{id}'),
+        'orderFallback' => __('admin.orders.bulk.order_fallback', 'Pedido #{id}'),
+        'confirmClear' => __('admin.orders.bulk.confirm_clear', 'Limpar toda a seleção em massa?'),
+        'confirmChangeStatus' => __('admin.orders.bulk.confirm_change_status', 'Alterar o status de {count} pedido(s) para "{status}"?'),
+        'applying' => __('admin.orders.bulk.applying', 'Aplicando...'),
+        'statusUpdated' => __('admin.orders.bulk.status_updated', 'Status atualizado com sucesso para {count} pedido(s).'),
+        'unknownError' => __('admin.orders.bulk.unknown_error', 'Falha desconhecida'),
+        'errorPrefix' => __('common.error', 'Erro'),
+        'networkError' => __('admin.orders.bulk.network_error', 'Erro de rede: {error}'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     // Renderizar scripts
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        var bulkI18n = ' . $bulkI18n . ';
         function handlePedidosTabMobile(val) {
             if (val === "carne") { window.location.href = "/admin/pedidos?fp=carne"; return; }
             if (val === "parcial") { window.location.href = "/admin/pedidos?fp=parcial"; return; }
@@ -3378,7 +3473,7 @@ HTML;
             var bar = document.createElement("div");
             bar.id = "bulkBar";
             bar.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:#1a5276;color:#fff;padding:12px 24px;display:none;align-items:center;justify-content:space-between;z-index:9999;box-shadow:0 -4px 16px rgba(0,0,0,.2);gap:12px;flex-wrap:wrap;";
-            bar.innerHTML = \'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span id="bulkCount" style="font-weight:600;font-size:1rem;"></span><button type="button" id="bulkClearBtn" class="btn btn-sm btn-outline-light">Limpar seleção</button></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><select id="bulkStatusSelect" class="form-select form-select-sm" style="width:auto;min-width:180px;"><option value="">Alterar status para...</option>\' + document.querySelector("[name=status]").innerHTML + \'</select><button type="button" id="bulkApplyBtn" class="btn btn-sm btn-warning fw-bold" disabled><i class="fas fa-check-double me-1"></i>Aplicar em massa</button></div>\';
+            bar.innerHTML = \'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span id="bulkCount" style="font-weight:600;font-size:1rem;"></span><button type="button" id="bulkClearBtn" class="btn btn-sm btn-outline-light">\' + bulkI18n.clearSelection + \'</button></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><select id="bulkStatusSelect" class="form-select form-select-sm" style="width:auto;min-width:180px;"><option value="">\' + bulkI18n.changeStatusPlaceholder + \'</option>\' + document.querySelector("[name=status]").innerHTML + \'</select><button type="button" id="bulkApplyBtn" class="btn btn-sm btn-warning fw-bold" disabled><i class="fas fa-check-double me-1"></i>\' + bulkI18n.apply + \'</button></div>\';
             document.body.appendChild(bar);
 
             var bulkCount = document.getElementById("bulkCount");
@@ -3390,7 +3485,7 @@ HTML;
                 var n = getCount();
                 if (n > 0) {
                     bar.style.display = "flex";
-                    bulkCount.textContent = n + " pedido" + (n > 1 ? "s" : "") + " selecionado" + (n > 1 ? "s" : "");
+                    bulkCount.textContent = n + " " + (n === 1 ? bulkI18n.selectedOrder : bulkI18n.selectedOrders);
                 } else {
                     bar.style.display = "none";
                 }
@@ -3420,7 +3515,7 @@ HTML;
                 cb.className = "form-check-input bulk-check";
                 cb.dataset.pid = pid;
                 cb.style.cssText = "width:20px;height:20px;cursor:pointer;margin-bottom:6px;";
-                cb.title = "Selecionar pedido #" + pid;
+                cb.title = bulkI18n.selectOrder.replace("{id}", pid);
                 wrapper.insertBefore(cb, wrapper.firstChild);
 
                 var sel = getSelecao();
@@ -3430,7 +3525,7 @@ HTML;
                 cb.addEventListener("change", function(){
                     var s = getSelecao();
                     if (cb.checked) {
-                        s[pid] = (h6.closest(".card-body").querySelector("h6.mb-1") || {}).textContent || "Pedido #" + pid;
+                        s[pid] = (h6.closest(".card-body").querySelector("h6.mb-1") || {}).textContent || bulkI18n.orderFallback.replace("{id}", pid);
                     } else {
                         delete s[pid];
                     }
@@ -3440,7 +3535,7 @@ HTML;
             });
 
             bulkClearBtn.addEventListener("click", function(){
-                if (!confirm("Limpar toda a seleção em massa?")) return;
+                if (!confirm(bulkI18n.confirmClear)) return;
                 setSelecao({});
                 updateBar();
             });
@@ -3454,10 +3549,13 @@ HTML;
                 var ids = Object.keys(sel).map(Number);
                 var status = bulkStatusSelect.value;
                 if (!ids.length || !status) return;
-                if (!confirm("Alterar o status de " + ids.length + " pedido(s) para \\"" + bulkStatusSelect.options[bulkStatusSelect.selectedIndex].text + "\\"?")) return;
+                var confirmMessage = bulkI18n.confirmChangeStatus
+                    .replace("{count}", ids.length)
+                    .replace("{status}", bulkStatusSelect.options[bulkStatusSelect.selectedIndex].text);
+                if (!confirm(confirmMessage)) return;
 
                 bulkApplyBtn.disabled = true;
-                bulkApplyBtn.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Aplicando...\';
+                bulkApplyBtn.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>\' + bulkI18n.applying;
 
                 fetch("/admin/pedidos/atualizar-status-massa", {
                     method: "POST",
@@ -3468,18 +3566,18 @@ HTML;
                 .then(function(data){
                     if (data.success) {
                         setSelecao({});
-                        sessionStorage.setItem("brz_pedidos_flash", "Status atualizado com sucesso para " + data.affected + " pedido(s).");
+                        sessionStorage.setItem("brz_pedidos_flash", bulkI18n.statusUpdated.replace("{count}", data.affected));
                         location.reload();
                     } else {
-                        alert("Erro: " + (data.error || "Falha desconhecida"));
+                        alert(bulkI18n.errorPrefix + ": " + (data.error || bulkI18n.unknownError));
                         bulkApplyBtn.disabled = false;
-                        bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>Aplicar em massa\';
+                        bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>\' + bulkI18n.apply;
                     }
                 })
                 .catch(function(err){
-                    alert("Erro de rede: " + err.message);
+                    alert(bulkI18n.networkError.replace("{error}", err.message));
                     bulkApplyBtn.disabled = false;
-                    bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>Aplicar em massa\';
+                    bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>\' + bulkI18n.apply;
                 });
             });
 
@@ -3546,6 +3644,7 @@ HTML;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
+        $pedidoId = (int) $id; // alias usado em trechos internos desta view
         $embed = ((string) $request->getParam('embed', '0') === '1');
         $syncOk = ((string) $request->getParam('sync_ok', '0') === '1');
         $syncErr = (string) $request->getParam('sync_err', '');
@@ -3568,8 +3667,8 @@ HTML;
             $pedido = $pedidoModel->getComDetalhes($id);
             
             if (!$pedido) {
-                echo '<div class="alert alert-danger">Pedido não encontrado</div>';
-                echo '<a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary">Voltar</a>';
+                echo '<div class="alert alert-danger">' . __('admin.order_details.order_not_found', 'Pedido não encontrado') . '</div>';
+                echo '<a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
                 exit;
             }
             
@@ -3601,8 +3700,8 @@ HTML;
             }
             
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
-            echo '<a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('common.error', 'Erro') . ': ' . $e->getMessage() . '</div>';
+            echo '<a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
             exit;
         }
         
@@ -3610,11 +3709,11 @@ HTML;
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedido #' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . ' - Braziliana Admin</title>
+    <title>' . __('admin.order_details.order_hash', 'Pedido') . ' #' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
@@ -3667,7 +3766,7 @@ HTML;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
-                <h1 class="page-title">Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h1>
+                <h1 class="page-title">' . __('admin.order_details.title', 'Detalhes do Pedido') . ' #' . $pedido['codigo_pedido'] . '</h1>
                 <div class="d-flex flex-wrap gap-1">
                     ' . (((string) ($pedido['origem_pedido'] ?? '') === 'manual')
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary btn-sm">'
@@ -3746,7 +3845,7 @@ HTML;
 
             // Badge: sem comissão (já lançado no vendas.braziliana)
             if (!empty($pedido['sem_comissao'])) {
-                echo '<div class="alert alert-info py-2 px-3 d-inline-block mb-3"><i class="fas fa-store me-1"></i> Já lançado no vendas.braziliana <span class="badge bg-secondary ms-1">Sem comissão</span></div>';
+                echo '<div class="alert alert-info py-2 px-3 d-inline-block mb-3"><i class="fas fa-store me-1"></i> ' . __('admin.order_details.already_posted_vendas', 'Já lançado no vendas.braziliana') . ' <span class="badge bg-secondary ms-1">' . __('admin.order_details.no_commission', 'Sem comissão') . '</span></div>';
             }
 
             // Badge: pedido contém itens de desapego
@@ -3758,7 +3857,7 @@ HTML;
                     $stDespDet = $dbDespDet->prepare("SELECT COUNT(*) FROM pedido_itens pi INNER JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = ? AND pr.desapego = 1");
                     $stDespDet->execute([(int) $pedido['id']]);
                     if ((int) $stDespDet->fetchColumn() > 0) {
-                        echo '<div class="alert py-2 px-3 d-inline-block mb-3" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.3);color:#0891b2;border-radius:10px;"><i class="fas fa-hand-holding-heart me-2"></i><strong>Desapego Braziliana</strong> — Este pedido contém produto(s) de desapego (somente EUA)</div>';
+                        echo '<div class="alert py-2 px-3 d-inline-block mb-3" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.3);color:#0891b2;border-radius:10px;"><i class="fas fa-hand-holding-heart me-2"></i><strong>' . __('admin.order_details.desapego_braziliana', 'Desapego Braziliana') . '</strong> — ' . __('admin.order_details.desapego_notice', 'Este pedido contém produto(s) de desapego (somente EUA)') . '</div>';
                     }
                 }
             } catch (\Throwable $e) {}
@@ -3785,20 +3884,20 @@ HTML;
                 $link = $difBoletoUrl !== '' ? $difBoletoUrl : $difInvoiceUrl;
                 echo '<div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <div style="font-weight:800;">Pendência de pagamento (diferença)</div>
-                            <div class="small">Valor: <strong>R$ ' . number_format($difValor, 2, ',', '.') . '</strong>'
-                                . ($difStatus !== '' ? (' | Status: <strong>' . htmlspecialchars($difStatus) . '</strong>') : '')
+                            <div style="font-weight:800;">' . __('admin.order_details.payment_pending_diff', 'Pendência de pagamento (diferença)') . '</div>
+                            <div class="small">' . __('admin.order_details.value', 'Valor') . ': <strong>R$ ' . number_format($difValor, 2, ',', '.') . '</strong>'
+                                . ($difStatus !== '' ? (' | ' . __('common.status', 'Status') . ': <strong>' . htmlspecialchars($difStatus) . '</strong>') : '')
                                 . '</div>
                         </div>
                         <div class="d-flex gap-2">
-                            ' . ($link !== '' ? '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">Abrir link de pagamento</a>' : '') . '
+                            ' . ($link !== '' ? '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">' . __('admin.order_details.open_payment_link', 'Abrir link de pagamento') . '</a>' : '') . '
                         </div>
                     </div>';
             } elseif ($temDif && $difId !== '' && $difPaidAt !== '') {
                 echo '<div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <div style="font-weight:800;">Diferença quitada</div>
-                            <div class="small">Pago em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($difPaidAt))) . '</strong></div>
+                            <div style="font-weight:800;">' . __('admin.order_details.diff_settled', 'Diferença quitada') . '</div>
+                            <div class="small">' . __('admin.order_details.paid_on', 'Pago em') . ': <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($difPaidAt))) . '</strong></div>
                         </div>
                     </div>';
             }
@@ -3813,18 +3912,18 @@ HTML;
                 $warn = isset($warnMap[(int) $id]) && is_array($warnMap[(int) $id]) ? $warnMap[(int) $id] : null;
                 if (is_array($warn) && (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']))) {
                     $parts = [];
-                    if (!empty($warn['missing_cost'])) $parts[] = 'custo do produto vazio/0';
-                    if (!empty($warn['missing_ncm'])) $parts[] = 'NCM não cadastrado';
-                    if (!empty($warn['cpf_invalid'])) $parts[] = 'CPF inválido';
+                    if (!empty($warn['missing_cost'])) $parts[] = __('admin.order_details.warn_missing_cost', 'custo do produto vazio/0');
+                    if (!empty($warn['missing_ncm'])) $parts[] = __('admin.order_details.warn_missing_ncm', 'NCM não cadastrado');
+                    if (!empty($warn['cpf_invalid'])) $parts[] = __('admin.order_details.warn_cpf_invalid', 'CPF inválido');
                     echo '<div class="alert alert-warning">
-                            <div style="font-weight:800;">Atenção: pedido precisa de revisão</div>
-                            <div class="small">Encontrado item com ' . htmlspecialchars(implode(' e ', $parts)) . '. Edite o(s) produto(s) do pedido e cadastre corretamente.</div>
+                            <div style="font-weight:800;">' . __('admin.order_details.warn_needs_review', 'Atenção: pedido precisa de revisão') . '</div>
+                            <div class="small">' . __('admin.order_details.warn_found_item_with', 'Encontrado item com') . ' ' . htmlspecialchars(implode(' ' . __('admin.order_details.and', 'e') . ' ', $parts)) . '. ' . __('admin.order_details.warn_edit_products', 'Edite o(s) produto(s) do pedido e cadastre corretamente.') . '</div>
                         </div>';
                 }
                 if (is_array($warn) && !empty($warn['valor_informado_cliente'])) {
                     echo '<div class="alert alert-danger">
-                            <div style="font-weight:800;"><i class="fas fa-exclamation-triangle me-1"></i>Atenção: valor informado pelo cliente</div>
-                            <div class="small">Este pedido contém itens cujo preço foi informado manualmente pelo cliente (assessoria). Confira os valores antes de processar.</div>
+                            <div style="font-weight:800;"><i class="fas fa-exclamation-triangle me-1"></i>' . __('admin.order_details.warn_customer_value', 'Atenção: valor informado pelo cliente') . '</div>
+                            <div class="small">' . __('admin.order_details.warn_customer_value_desc', 'Este pedido contém itens cujo preço foi informado manualmente pelo cliente (assessoria). Confira os valores antes de processar.') . '</div>
                         </div>';
                 }
             } catch (\Exception $e) {
@@ -3864,7 +3963,7 @@ HTML;
                             $manualTracking = trim((string) ($stManual->fetchColumn() ?: ''));
                             if ($manualTracking !== '') {
                                 $tracking = $manualTracking;
-                                $trackingFonte = 'Manual (Pedido)';
+                                $trackingFonte = __('admin.order_details.tracking_source_manual', 'Manual (Pedido)');
                             }
                         }
                     } catch (\Exception $e) {
@@ -3940,9 +4039,9 @@ HTML;
 
                 if ($tracking !== '') {
                     echo '<div class="alert alert-info mb-3">'
-                        . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($tracking) . '</div>'
-                        . ($trackingFonte !== '' ? ('<div class="small text-muted">Fonte: ' . htmlspecialchars($trackingFonte) . '</div>') : '')
-                        . ($trackingUrl !== '' ? ('<div class="small"><a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" rel="noopener">Ver etiqueta</a></div>') : '')
+                        . '<div><strong>' . __('admin.order_details.tracking_code', 'Código de rastreio') . ':</strong> ' . htmlspecialchars($tracking) . '</div>'
+                        . ($trackingFonte !== '' ? ('<div class="small text-muted">' . __('admin.order_details.source', 'Fonte') . ': ' . htmlspecialchars($trackingFonte) . '</div>') : '')
+                        . ($trackingUrl !== '' ? ('<div class="small"><a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" rel="noopener">' . __('admin.order_details.view_label', 'Ver etiqueta') . '</a></div>') : '')
                         . '</div>';
                 }
             } catch (\Exception $e) {
@@ -3985,9 +4084,9 @@ HTML;
                             $upAt = (string) ($doc['uploaded_at'] ?? '');
                             $path = (string) ($doc['arquivo_path'] ?? '');
                             echo '<div class="alert alert-success mb-3">'
-                                . '<div><strong>Comprovante de compra (Online) anexado.</strong></div>'
-                                . ($upAt !== '' ? ('<div class="small">Enviado em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($upAt))) . '</strong></div>') : '')
-                                . '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($path) . '" target="_blank" rel="noopener">Abrir comprovante</a></div>'
+                                . '<div><strong>' . __('admin.order_details.purchase_receipt_online_attached', 'Comprovante de compra (Online) anexado.') . '</strong></div>'
+                                . ($upAt !== '' ? ('<div class="small">' . __('admin.order_details.sent_on', 'Enviado em') . ': <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($upAt))) . '</strong></div>') : '')
+                                . '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($path) . '" target="_blank" rel="noopener">' . __('admin.order_details.open_receipt', 'Abrir comprovante') . '</a></div>'
                                 . '</div>';
                         }
                     }
@@ -4016,11 +4115,11 @@ HTML;
                             if ($m === '') $m = 'BRL';
                             $dt = (string) ($rowC['created_at'] ?? '');
                             echo '<div class="alert alert-info mb-3">'
-                                . '<div><strong>Comissão de processamento registrada.</strong></div>'
-                                . '<div class="small">Percentual: <strong>' . number_format((float) ($rowC['percentual'] ?? 0), 2, ',', '.') . '%</strong></div>'
-                                . '<div class="small">Base líquida: <strong>' . $this->formatarMoeda((float) ($rowC['base_liquida'] ?? 0), $m) . '</strong></div>'
-                                . '<div class="small">Comissão: <strong>' . $this->formatarMoeda((float) ($rowC['valor_comissao'] ?? 0), $m) . '</strong></div>'
-                                . ($dt !== '' ? ('<div class="small">Registrada em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($dt))) . '</strong></div>') : '')
+                                . '<div><strong>' . __('admin.order_details.processing_commission_registered', 'Comissão de processamento registrada.') . '</strong></div>'
+                                . '<div class="small">' . __('admin.order_details.percentage', 'Percentual') . ': <strong>' . number_format((float) ($rowC['percentual'] ?? 0), 2, ',', '.') . '%</strong></div>'
+                                . '<div class="small">' . __('admin.order_details.net_base', 'Base líquida') . ': <strong>' . $this->formatarMoeda((float) ($rowC['base_liquida'] ?? 0), $m) . '</strong></div>'
+                                . '<div class="small">' . __('admin.order_details.commission', 'Comissão') . ': <strong>' . $this->formatarMoeda((float) ($rowC['valor_comissao'] ?? 0), $m) . '</strong></div>'
+                                . ($dt !== '' ? ('<div class="small">' . __('admin.order_details.registered_on', 'Registrada em') . ': <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($dt))) . '</strong></div>') : '')
                                 . '</div>';
                         }
                     }
@@ -4115,9 +4214,9 @@ HTML;
                     <div class="d-flex align-items-center">
                         <i class="fas fa-gift fa-2x me-3"></i>
                         <div>
-                            <strong>Este pedido contém um produto gratuito promocional</strong>
-                            <div class="small">Produto: ' . htmlspecialchars((string) ($freeOfferItemInfo['nome_produto'] ?? '')) . '</div>
-                            <div class="small">Valor original: $ ' . number_format($freeOrigPrice, 2) . ' | Valor cobrado: $ 0,00 | Imposto não cobrado</div>
+                            <strong>' . __('admin.order_details.free_promo_item_title', 'Este pedido contém um produto gratuito promocional') . '</strong>
+                            <div class="small">' . __('admin.order_details.product', 'Produto') . ': ' . htmlspecialchars((string) ($freeOfferItemInfo['nome_produto'] ?? '')) . '</div>
+                            <div class="small">' . __('admin.order_details.original_value', 'Valor original') . ': $ ' . number_format($freeOrigPrice, 2) . ' | ' . __('admin.order_details.charged_value', 'Valor cobrado') . ': $ 0,00 | ' . __('admin.order_details.tax_not_charged', 'Imposto não cobrado') . '</div>
                         </div>
                     </div>
                 </div>';
@@ -4166,32 +4265,32 @@ HTML;
                     <div class="col-md-12">
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Itens do Pedido</h5>
+                                <h5 class="mb-0">' . __('admin.order_details.items_title', 'Itens do Pedido') . '</h5>
                             </div>
                             <div class="card-body">';
             if ($mostrarAvisoCarnePrecoCheio) {
-                echo '<div class="alert alert-info small mb-3"><i class="fas fa-info-circle me-1"></i><strong>Carnê Braziliana:</strong> Os produtos foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.</div>';
+                echo '<div class="alert alert-info small mb-3"><i class="fas fa-info-circle me-1"></i><strong>' . __('admin.order_details.carne_braziliana', 'Carnê Braziliana') . ':</strong> ' . __('admin.order_details.carne_full_price_notice', 'Os produtos foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.') . '</div>';
             }
             echo '              <div class="table-responsive">
                                     <table class="table table-sm table-bordered">
                                         <thead>
                                             <tr>
-                                                <th>Imagem</th>
-                                                <th>Produto</th>
-                                                <th>ID Produto</th>
-                                                <th>NCM</th>
-                                                <th>Custo</th>
-                                                <th>Quantidade</th>
-                                                <th>Preço Unitário</th>
-                                                <th>Subtotal</th>
-                                                <th>Data de Criação</th>
-                                                <th>Ações</th>
+                                                <th>' . __('admin.order_details.th_image', 'Imagem') . '</th>
+                                                <th>' . __('admin.order_details.th_product', 'Produto') . '</th>
+                                                <th>' . __('admin.order_details.th_product_id', 'ID Produto') . '</th>
+                                                <th>' . __('admin.order_details.th_ncm', 'NCM') . '</th>
+                                                <th>' . __('admin.order_details.th_cost', 'Custo') . '</th>
+                                                <th>' . __('admin.order_details.th_qty', 'Quantidade') . '</th>
+                                                <th>' . __('admin.order_details.th_unit_price', 'Preço Unitário') . '</th>
+                                                <th>' . __('admin.order_details.th_subtotal', 'Subtotal') . '</th>
+                                                <th>' . __('admin.order_details.th_created_at', 'Data de Criação') . '</th>
+                                                <th>' . __('admin.order_details.th_actions', 'Ações') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
                                         
                                         if (empty($itens)) {
-                                            echo '<tr><td colspan="10" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
+                                            echo '<tr><td colspan="10" class="text-center text-warning">' . __('admin.order_details.no_items_found', 'Nenhum item encontrado para este pedido') . '</td></tr>';
                                         }
                                         
                                         foreach ($itens as $item) {
@@ -4236,7 +4335,7 @@ HTML;
                                                 }
                                             }
                                             
-                                            $nomeProduto = (string) ($item['nome_produto'] ?? 'Produto #' . $item['produto_id']);
+                                            $nomeProduto = (string) ($item['nome_produto'] ?? __('admin.order_details.product', 'Produto') . ' #' . $item['produto_id']);
                                             $sku = (string) ($item['nome_produto_sku'] ?? $item['referencia'] ?? '');
                                             $urlOriginal = (string) ($item['url_original'] ?? '');
                                             $variacaoLabel = (string) ($item['variacao_label'] ?? '');
@@ -4252,13 +4351,13 @@ HTML;
                                             // Badge de produto gratuito promocional
                                             $isFreeOfferItem = !empty($item['is_free_offer']);
                                             if ($isFreeOfferItem) {
-                                                $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Produto Gratuito</span>';
+                                                $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-gift me-1"></i>' . __('admin.order_details.badge_free_product', 'Produto Gratuito') . '</span>';
                                             }
 
                                             // Badge de valor informado pelo cliente (assessoria - revisão pendente)
                                             $isValorInformadoCliente = !empty($item['valor_informado_cliente']);
                                             if ($isValorInformadoCliente) {
-                                                $nomeHtml .= ' <span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
+                                                $nomeHtml .= ' <span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>' . __('admin.order_details.badge_customer_informed_value', 'Valor informado pelo cliente') . '</span>';
                                             }
 
                                             // Badge de status de compra (lista de compras)
@@ -4267,13 +4366,13 @@ HTML;
                                             $itemProdId = (int) ($item['produto_id'] ?? 0);
                                             // Pacotes de redirecionamento não precisam ser comprados
                                             if ($itemTipoItem === 'pacote_redirecionamento' || $itemProdId >= 999990) {
-                                                $nomeHtml .= ' <span class="badge bg-info"><i class="fas fa-box-open me-1"></i>Redirecionamento</span>';
+                                                $nomeHtml .= ' <span class="badge bg-info"><i class="fas fa-box-open me-1"></i>' . __('admin.order_details.badge_redirect', 'Redirecionamento') . '</span>';
                                             } elseif ($itemCompraStatus === 'comprado') {
-                                                $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-check me-1"></i>Comprado</span>';
+                                                $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-check me-1"></i>' . __('admin.order_details.badge_purchased', 'Comprado') . '</span>';
                                             } elseif ($itemCompraStatus === 'pendente') {
                                                 $statusPedidoAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
                                                 if (in_array($statusPedidoAtual, ['itens_parcialmente_comprados', 'pago'])) {
-                                                    $nomeHtml .= ' <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Aguardando compra</span>';
+                                                    $nomeHtml .= ' <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>' . __('admin.order_details.badge_awaiting_purchase', 'Aguardando compra') . '</span>';
                                                 }
                                             }
 
@@ -4288,9 +4387,40 @@ HTML;
                                                         $__desapegoCache[$itemProdId] = (int) ($stDesp->fetchColumn() ?: 0);
                                                     }
                                                     if (!empty($__desapegoCache[$itemProdId])) {
-                                                        $nomeHtml .= ' <span class="badge" style="background:rgba(8,145,178,.15);color:#0891b2;"><i class="fas fa-hand-holding-heart me-1"></i>Desapego</span>';
+                                                        $nomeHtml .= ' <span class="badge" style="background:rgba(8,145,178,.15);color:#0891b2;"><i class="fas fa-hand-holding-heart me-1"></i>' . __('admin.order_details.badge_desapego', 'Desapego') . '</span>';
                                                     }
                                                 } catch (\Throwable $e) {}
+                                            }
+
+                                            // Badge de origem do item (estoque, compra online, etc.)
+                                            if ($itemTipoItem === 'pacote_redirecionamento' || $itemProdId >= 999990) {
+                                                // Já tem badge de Redirecionamento
+                                            } else {
+                                                $origemBadge = '';
+                                                // Verificar se tem reserva de estoque para este pedido+produto
+                                                try {
+                                                    if (!isset($__estoqueReservaCache)) $__estoqueReservaCache = [];
+                                                    $cacheKey = $pedidoId . '_' . $itemProdId;
+                                                    if (!isset($__estoqueReservaCache[$cacheKey])) {
+                                                        $dbOrig = \Config\Database::getConnection();
+                                                        $stOrig = $dbOrig->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ? AND status = 'ativa'");
+                                                        $stOrig->execute([$pedidoId, $itemProdId]);
+                                                        $__estoqueReservaCache[$cacheKey] = (int) ($stOrig->fetchColumn() ?: 0);
+                                                    }
+                                                    $qtdReservada = $__estoqueReservaCache[$cacheKey];
+                                                    $qtdItem = (int) ($item['quantidade'] ?? 1);
+
+                                                    if ($qtdReservada >= $qtdItem) {
+                                                        $origemBadge = '<span class="badge" style="background:rgba(16,185,129,.12);color:#065f46;border:1px solid rgba(16,185,129,.3);"><i class="fas fa-warehouse me-1"></i>' . __('admin.order_details.badge_stock', 'Estoque') . '</span>';
+                                                    } elseif ($qtdReservada > 0) {
+                                                        $origemBadge = '<span class="badge" style="background:rgba(245,158,11,.12);color:#92400e;border:1px solid rgba(245,158,11,.3);"><i class="fas fa-warehouse me-1"></i>' . __('admin.order_details.badge_partial_stock', 'Estoque parcial') . ' (' . $qtdReservada . '/' . $qtdItem . ')</span>';
+                                                    } else {
+                                                        $origemBadge = '<span class="badge" style="background:rgba(59,130,246,.12);color:#1e40af;border:1px solid rgba(59,130,246,.3);"><i class="fas fa-shopping-cart me-1"></i>' . __('admin.order_details.badge_online_purchase', 'Compra online') . '</span>';
+                                                    }
+                                                } catch (\Throwable $e) {
+                                                    $origemBadge = '<span class="badge" style="background:rgba(59,130,246,.12);color:#1e40af;border:1px solid rgba(59,130,246,.3);"><i class="fas fa-shopping-cart me-1"></i>' . __('admin.order_details.badge_online_purchase', 'Compra online') . '</span>';
+                                                }
+                                                $nomeHtml .= ' ' . $origemBadge;
                                             }
 
                                             $extraHtml = '';
@@ -4298,7 +4428,7 @@ HTML;
                                             // Observação do cliente (assessoria)
                                             $obsCliente = trim((string) ($item['observacao_cliente'] ?? ''));
                                             if ($obsCliente !== '') {
-                                                $extraHtml .= '<div class="alert alert-warning py-1 px-2 mt-1 mb-1 small"><i class="fas fa-comment me-1"></i><strong>Obs. do cliente:</strong> ' . htmlspecialchars($obsCliente) . '</div>';
+                                                $extraHtml .= '<div class="alert alert-warning py-1 px-2 mt-1 mb-1 small"><i class="fas fa-comment me-1"></i><strong>' . __('admin.order_details.customer_note', 'Obs. do cliente') . ':</strong> ' . htmlspecialchars($obsCliente) . '</div>';
                                             }
 
                                             // Valor real conferido (assessoria)
@@ -4311,16 +4441,16 @@ HTML;
                                                     $diff = $valorRealConf - $precoItem;
                                                     $diffLabel = ' (' . ($diff > 0 ? '+' : '') . number_format($diff, 2) . ')';
                                                 }
-                                                $extraHtml .= '<div class="alert alert-info py-1 px-2 mt-1 mb-1 small"><i class="fas fa-check-circle me-1"></i><strong>Valor conferido:</strong> $ ' . number_format($valorRealConf, 2) . $diffLabel
-                                                    . ($conferidoEm !== '' ? ' <span class="text-muted">em ' . htmlspecialchars(date('d/m/Y H:i', strtotime($conferidoEm))) . '</span>' : '')
+                                                $extraHtml .= '<div class="alert alert-info py-1 px-2 mt-1 mb-1 small"><i class="fas fa-check-circle me-1"></i><strong>' . __('admin.order_details.checked_value', 'Valor conferido') . ':</strong> $ ' . number_format($valorRealConf, 2) . $diffLabel
+                                                    . ($conferidoEm !== '' ? ' <span class="text-muted">' . __('admin.order_details.on_date', 'em') . ' ' . htmlspecialchars(date('d/m/Y H:i', strtotime($conferidoEm))) . '</span>' : '')
                                                     . '</div>';
                                             }
 
                                             if ($sku !== '') {
-                                                $extraHtml .= '<div class="small text-muted">SKU/Ref: ' . htmlspecialchars($sku) . '</div>';
+                                                $extraHtml .= '<div class="small text-muted">' . __('admin.order_details.sku_ref', 'SKU/Ref') . ': ' . htmlspecialchars($sku) . '</div>';
                                             }
                                             if ($urlOriginal !== '') {
-                                                $extraHtml .= '<div class="small text-muted">link de acesso original</div>';
+                                                $extraHtml .= '<div class="small text-muted">' . __('admin.order_details.original_access_link', 'link de acesso original') . '</div>';
                                             }
                                             $variacaoLinha = '';
                                             if (is_array($variacaoAttrs) && !empty($variacaoAttrs)) {
@@ -4346,28 +4476,28 @@ HTML;
                                             }
                                             if ($ncmVal !== '') {
                                                 $ncmHtml = '<span>' . htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8') . '</span>'
-                                                    . ' <a href="#" class="text-muted js-ncm-quick" data-produto-id="' . (int) $pidItem . '" data-ncm-current="' . htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8') . '" title="Editar NCM" style="text-decoration:none;">'
+                                                    . ' <a href="#" class="text-muted js-ncm-quick" data-produto-id="' . (int) $pidItem . '" data-ncm-current="' . htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars(__('admin.order_details.edit_ncm', 'Editar NCM'), ENT_QUOTES, 'UTF-8') . '" style="text-decoration:none;">'
                                                     . '<i class="fas fa-pen-to-square"></i>'
                                                     . '</a>';
                                             } else {
-                                                $ncmHtml = '<a href="#" class="badge bg-warning text-dark js-ncm-quick" data-produto-id="' . (int) $pidItem . '" style="text-decoration:none;">Sem NCM</a>';
+                                                $ncmHtml = '<a href="#" class="badge bg-warning text-dark js-ncm-quick" data-produto-id="' . (int) $pidItem . '" style="text-decoration:none;">' . __('admin.order_details.no_ncm', 'Sem NCM') . '</a>';
                                             }
 
                                             $acoesHtml = '';
                                             if ($pidItem > 0 && ($missingCost || $missingNcm)) {
-                                                $label = 'Editar produto';
+                                                $label = __('admin.order_details.edit_product', 'Editar produto');
                                                 if ($missingCost && $missingNcm) {
-                                                    $label = 'Editar (custo + NCM)';
+                                                    $label = __('admin.order_details.edit_cost_ncm', 'Editar (custo + NCM)');
                                                 } elseif ($missingCost) {
-                                                    $label = 'Editar (custo)';
+                                                    $label = __('admin.order_details.edit_cost_paren', 'Editar (custo)');
                                                 } elseif ($missingNcm) {
-                                                    $label = 'Editar (NCM)';
+                                                    $label = __('admin.order_details.edit_ncm_paren', 'Editar (NCM)');
                                                 }
                                                 $acoesHtml = '<a href="/admin/produtos/editar/' . (int) $pidItem . '" class="btn btn-sm btn-warning">'
                                                     . '<i class="fas fa-pen-to-square me-1"></i>' . htmlspecialchars($label) . '</a>';
                                             } elseif ($pidItem > 0) {
                                                 $acoesHtml = '<a href="/admin/produtos/editar/' . (int) $pidItem . '" class="btn btn-sm btn-outline-secondary">'
-                                                    . '<i class="fas fa-pen-to-square me-1"></i>Editar</a>';
+                                                    . '<i class="fas fa-pen-to-square me-1"></i>' . __('common.edit', 'Editar') . '</a>';
                                             }
 
                                             echo '</td>
@@ -4379,12 +4509,12 @@ HTML;
                                             $custoDisplay = ($custoProd !== null && (float) $custoProd > 0) ? number_format((float) $custoProd, 2, ',', '.') : '';
                                             if ($custoDisplay !== '') {
                                                 echo '<span>' . htmlspecialchars($custoDisplay, ENT_QUOTES, 'UTF-8') . '</span>'
-                                                    . ' <a href="#" class="text-muted js-custo-quick" data-produto-id="' . (int) $pidItem . '" data-custo-current="' . htmlspecialchars(number_format((float) $custoProd, 2, '.', ''), ENT_QUOTES, 'UTF-8') . '" title="Editar Custo" style="text-decoration:none;">'
+                                                    . ' <a href="#" class="text-muted js-custo-quick" data-produto-id="' . (int) $pidItem . '" data-custo-current="' . htmlspecialchars(number_format((float) $custoProd, 2, '.', ''), ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars(__('admin.order_details.edit_cost', 'Editar Custo'), ENT_QUOTES, 'UTF-8') . '" style="text-decoration:none;">'
                                                     . '<i class="fas fa-pen-to-square"></i>'
                                                     . '</a>';
                                             } else {
                                                 if ($pidItem > 0) {
-                                                    echo '<a href="#" class="badge bg-warning text-dark js-custo-quick" data-produto-id="' . (int) $pidItem . '" data-custo-current="" style="text-decoration:none;">Sem custo</a>';
+                                                    echo '<a href="#" class="badge bg-warning text-dark js-custo-quick" data-produto-id="' . (int) $pidItem . '" data-custo-current="" style="text-decoration:none;">' . __('admin.order_details.no_cost', 'Sem custo') . '</a>';
                                                 } else {
                                                     echo '<span class="text-muted">-</span>';
                                                 }
@@ -4396,7 +4526,7 @@ HTML;
                                                     : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . ($isFreeOfferItem
-                                                    ? '<span class="badge bg-success">GRÁTIS</span>'
+                                                    ? '<span class="badge bg-success">' . __('admin.order_details.free', 'GRÁTIS') . '</span>'
                                                     : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . ((!empty($item['created_at'])) ? date('d/m/Y H:i', strtotime($item['created_at'])) : '-') . '</td>
@@ -4456,25 +4586,31 @@ HTML;
                         . '<div class="modal-dialog modal-lg">'
                         . '<div class="modal-content">'
                         . '<div class="modal-header">'
-                        . '<h5 class="modal-title">Selecionar NCM</h5>'
+                        . '<h5 class="modal-title">' . __('admin.order_details.select_ncm', 'Selecionar NCM') . '</h5>'
                         . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
                         . '</div>'
                         . '<div class="modal-body">'
                         . '<div id="ncmQuickAlert" class="alert alert-info" style="display:none;"></div>'
                         . '<input type="hidden" id="ncmQuickProdutoId" value="" />'
                         . '<div class="mb-2">'
-                        . '<input type="text" class="form-control" id="ncmQuickSearch" placeholder="Pesquisar NCM (código ou descrição)..." autocomplete="off" />'
+                        . '<input type="text" class="form-control" id="ncmQuickSearch" placeholder="' . htmlspecialchars(__('admin.order_details.ncm_search_placeholder', 'Pesquisar NCM (código ou descrição)...'), ENT_QUOTES, 'UTF-8') . '" autocomplete="off" />'
                         . '</div>'
                         . '<div class="list-group" id="ncmQuickResults" style="max-height:360px; overflow:auto;"></div>'
                         . '</div>'
                         . '<div class="modal-footer">'
-                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
-                        . '<button type="button" class="btn btn-primary" id="btnNcmQuickSalvar" disabled>Salvar NCM</button>'
+                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.close', 'Fechar') . '</button>'
+                        . '<button type="button" class="btn btn-primary" id="btnNcmQuickSalvar" disabled>' . __('admin.order_details.save_ncm', 'Salvar NCM') . '</button>'
                         . '</div>'
                         . '</div>'
                         . '</div>'
                         . '</div>';
 
+                    $jsNcmSearchHint = json_encode(__('admin.order_details.ncm_search_hint', 'Pesquise e selecione o NCM.'), JSON_UNESCAPED_UNICODE);
+                    $jsNcmSaving = json_encode(__('admin.order_details.saving_ncm', 'Salvando NCM...'), JSON_UNESCAPED_UNICODE);
+                    $jsNcmSaveFail = json_encode(__('admin.order_details.ncm_save_failed', 'Falha ao salvar NCM'), JSON_UNESCAPED_UNICODE);
+                    $jsNcmUpdated = json_encode(__('admin.order_details.ncm_updated', 'NCM atualizado.'), JSON_UNESCAPED_UNICODE);
+                    $jsNcmNetErr = json_encode(__('admin.order_details.ncm_network_error', 'Erro de rede ao salvar NCM'), JSON_UNESCAPED_UNICODE);
+                    $jsEditNcmTitle = str_replace("'", "\\'", __('admin.order_details.edit_ncm', 'Editar NCM'));
                     echo <<<HTML
 <script>(function(){
     function qs(sel, root){ return (root||document).querySelector(sel); }
@@ -4552,7 +4688,7 @@ HTML;
         var input = qs("#ncmQuickSearch");
         if(input) input.value = "";
         setSalvarEnabled(!!state.selectedNcm);
-        setAlert("Pesquise e selecione o NCM.", "alert-info");
+        setAlert({$jsNcmSearchHint}, "alert-info");
         setResults([]);
         openModal();
         if(input){
@@ -4582,22 +4718,22 @@ HTML;
     if(btnSave){
         btnSave.addEventListener("click", function(){
             if(!state.produtoId || !state.selectedNcm) return;
-            setAlert("Salvando NCM...", "alert-info");
+            setAlert({$jsNcmSaving}, "alert-info");
             btnSave.disabled = true;
             doSave(state.produtoId, state.selectedNcm).then(function(j){
                 if(!j || !j.success){
-                    setAlert((j && j.error) ? j.error : "Falha ao salvar NCM", "alert-warning");
+                    setAlert((j && j.error) ? j.error : {$jsNcmSaveFail}, "alert-warning");
                     btnSave.disabled = false;
                     return;
                 }
-                setAlert("NCM atualizado.", "alert-success");
+                setAlert({$jsNcmUpdated}, "alert-success");
                 try {
                     var td = state.triggerEl && state.triggerEl.closest ? state.triggerEl.closest('td') : null;
                     if(td){
                         var ncmNew = String(j.ncm || state.selectedNcm || '');
                         if(ncmNew){
                             td.innerHTML = '<span>' + ncmNew + '</span> ' +
-                                '<a href="#" class="text-muted js-ncm-quick" data-produto-id="' + String(state.produtoId) + '" data-ncm-current="' + ncmNew + '" title="Editar NCM" style="text-decoration:none;">' +
+                                '<a href="#" class="text-muted js-ncm-quick" data-produto-id="' + String(state.produtoId) + '" data-ncm-current="' + ncmNew + '" title="{$jsEditNcmTitle}" style="text-decoration:none;">' +
                                 '<i class="fas fa-pen-to-square"></i>' +
                                 '</a>';
                         }
@@ -4605,7 +4741,7 @@ HTML;
                 } catch(e) {}
                 btnSave.disabled = false;
             }).catch(function(){
-                setAlert("Erro de rede ao salvar NCM", "alert-warning");
+                setAlert({$jsNcmNetErr}, "alert-warning");
                 btnSave.disabled = false;
             });
         });
@@ -4618,24 +4754,30 @@ HTML;
                         . '<div class="modal-dialog modal-sm">'
                         . '<div class="modal-content">'
                         . '<div class="modal-header">'
-                        . '<h5 class="modal-title"><i class="fas fa-dollar-sign me-1"></i>Editar Custo</h5>'
+                        . '<h5 class="modal-title"><i class="fas fa-dollar-sign me-1"></i>' . __('admin.order_details.edit_cost', 'Editar Custo') . '</h5>'
                         . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
                         . '</div>'
                         . '<div class="modal-body">'
                         . '<div id="custoQuickAlert" class="alert alert-info" style="display:none;"></div>'
                         . '<input type="hidden" id="custoQuickProdutoId" value="" />'
-                        . '<label class="form-label">Custo do produto (R$)</label>'
+                        . '<label class="form-label">' . __('admin.order_details.product_cost_brl', 'Custo do produto (R$)') . '</label>'
                         . '<input type="number" step="0.01" min="0" class="form-control" id="custoQuickInput" placeholder="0.00" />'
                         . '</div>'
                         . '<div class="modal-footer">'
-                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
-                        . '<button type="button" class="btn btn-primary" id="btnCustoQuickSalvar">Salvar Custo</button>'
+                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.close', 'Fechar') . '</button>'
+                        . '<button type="button" class="btn btn-primary" id="btnCustoQuickSalvar">' . __('admin.order_details.save_cost', 'Salvar Custo') . '</button>'
                         . '</div>'
                         . '</div>'
                         . '</div>'
                         . '</div>';
 
-                    echo <<<'CUSTOSCRIPT'
+                    $jsCustoInvalid = json_encode(__('admin.order_details.enter_valid_value', 'Informe um valor válido.'), JSON_UNESCAPED_UNICODE);
+                    $jsCustoSaving = json_encode(__('admin.order_details.saving', 'Salvando...'), JSON_UNESCAPED_UNICODE);
+                    $jsCustoSaveFail = json_encode(__('admin.order_details.save_failed', 'Falha ao salvar'), JSON_UNESCAPED_UNICODE);
+                    $jsCustoUpdated = json_encode(__('admin.order_details.cost_updated', 'Custo atualizado!'), JSON_UNESCAPED_UNICODE);
+                    $jsCustoNetErr = json_encode(__('admin.order_details.network_error', 'Erro de rede.'), JSON_UNESCAPED_UNICODE);
+                    $jsEditCustoTitle = str_replace("'", "\\'", __('admin.order_details.edit_cost', 'Editar Custo'));
+                    echo <<<CUSTOSCRIPT
 <script>(function(){
     var cState = { produtoId: 0, triggerEl: null };
     function qs(s){ return document.querySelector(s); }
@@ -4667,8 +4809,8 @@ HTML;
         btnSave.addEventListener("click", function(){
             if(!cState.produtoId) return;
             var val = parseFloat(qs("#custoQuickInput").value || "0");
-            if(isNaN(val) || val < 0){ custoAlert("Informe um valor válido.", "alert-warning"); return; }
-            custoAlert("Salvando...", "alert-info");
+            if(isNaN(val) || val < 0){ custoAlert({$jsCustoInvalid}, "alert-warning"); return; }
+            custoAlert({$jsCustoSaving}, "alert-info");
             btnSave.disabled = true;
             var body = new URLSearchParams();
             body.set("custo", String(val));
@@ -4678,23 +4820,23 @@ HTML;
                 body: body.toString()
             }).then(function(r){ return r.json(); }).then(function(j){
                 if(!j || !j.success){
-                    custoAlert((j && j.error) ? j.error : "Falha ao salvar", "alert-warning");
+                    custoAlert((j && j.error) ? j.error : {$jsCustoSaveFail}, "alert-warning");
                     btnSave.disabled = false;
                     return;
                 }
-                custoAlert("Custo atualizado!", "alert-success");
+                custoAlert({$jsCustoUpdated}, "alert-success");
                 btnSave.disabled = false;
                 try {
                     var td = cState.triggerEl && cState.triggerEl.closest ? cState.triggerEl.closest("td") : null;
                     if(td){
                         var fmt = j.custo_fmt || String(val.toFixed(2)).replace(".", ",");
                         td.innerHTML = '<span>' + fmt + '</span> ' +
-                            '<a href="#" class="text-muted js-custo-quick" data-produto-id="' + String(cState.produtoId) + '" data-custo-current="' + String(val) + '" title="Editar Custo" style="text-decoration:none;">' +
+                            '<a href="#" class="text-muted js-custo-quick" data-produto-id="' + String(cState.produtoId) + '" data-custo-current="' + String(val) + '" title="{$jsEditCustoTitle}" style="text-decoration:none;">' +
                             '<i class="fas fa-pen-to-square"></i></a>';
                     }
                 } catch(e) {}
             }).catch(function(){
-                custoAlert("Erro de rede.", "alert-warning");
+                custoAlert({$jsCustoNetErr}, "alert-warning");
                 btnSave.disabled = false;
             });
         });
@@ -4707,6 +4849,44 @@ CUSTOSCRIPT;
                     $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
                     $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
                     $pais = (string) ($pedido['pais_entrega'] ?? ($pedido['country_entrega'] ?? ($pedido['pais'] ?? '')));
+
+                    // Se país ainda estiver vazio, tentar buscar do endereço vinculado ao pedido
+                    if (trim($pais) === '') {
+                        $endIdForPais = (int) ($pedido['endereco_entrega_id'] ?? 0);
+                        if ($endIdForPais > 0) {
+                            try {
+                                $dbPais = \Config\Database::getConnection();
+                                $stPais = $dbPais->prepare('SELECT * FROM enderecos WHERE id = ? LIMIT 1');
+                                $stPais->execute([$endIdForPais]);
+                                $rowPais = $stPais->fetch(\PDO::FETCH_ASSOC);
+                                if (is_array($rowPais)) {
+                                    $paisEnd = $rowPais['pais'] ?? ($rowPais['country'] ?? ($rowPais['country_code'] ?? ''));
+                                    if (trim((string) $paisEnd) !== '') {
+                                        $pais = trim((string) $paisEnd);
+                                    }
+                                }
+                            } catch (\Throwable $e) {
+                                // Silenciar — manter $pais vazio
+                            }
+                        }
+                        // Fallback: buscar endereço mais recente do usuário
+                        if (trim($pais) === '') {
+                            $uidPais = (int) ($pedido['usuario_id'] ?? 0);
+                            if ($uidPais > 0) {
+                                try {
+                                    $dbPais2 = \Config\Database::getConnection();
+                                    $stPais2 = $dbPais2->prepare('SELECT pais FROM enderecos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1');
+                                    $stPais2->execute([$uidPais]);
+                                    $paisU = $stPais2->fetchColumn();
+                                    if ($paisU !== false && trim((string) $paisU) !== '') {
+                                        $pais = trim((string) $paisU);
+                                    }
+                                } catch (\Throwable $e) {
+                                    // Silenciar
+                                }
+                            }
+                        }
+                    }
                     // Normalizar país para código ISO (ex: "Brasil" → "BR", "Brazil" → "BR")
                     $paisNormMap = [
                         'BRASIL' => 'BR', 'BRAZIL' => 'BR', 'BRA' => 'BR',
@@ -4745,40 +4925,44 @@ CUSTOSCRIPT;
                         . '<div class="modal-dialog modal-lg">'
                         . '<div class="modal-content">'
                         . '<div class="modal-header">'
-                        . '<h5 class="modal-title">Editar dados do cliente / endereço</h5>'
+                        . '<h5 class="modal-title">' . __('admin.order_details.edit_customer_address', 'Editar dados do cliente / endereço') . '</h5>'
                         . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
                         . '</div>'
                         . '<div class="modal-body">'
                         . '<div id="editClienteAlert" class="alert alert-info" style="display:none;"></div>'
                         . '<div class="row g-3">'
-                        . '<div class="col-md-6"><label class="form-label">Nome</label><input type="text" class="form-control" id="editClienteNome" value="' . htmlspecialchars($clienteNome, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-6"><label class="form-label">E-mail</label><input type="email" class="form-control" id="editClienteEmail" value="' . htmlspecialchars($clienteEmail, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">Telefone</label><input type="text" class="form-control" id="editClienteTelefone" value="' . htmlspecialchars($clienteTelefone, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">CPF/CNPJ</label><input type="text" class="form-control" id="editClienteDocumento" value="' . htmlspecialchars($clienteDoc, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">País</label><select class="form-select" id="editClientePais" onchange="onEditPaisChange()"><option value="BR"' . (strtoupper(trim($pais)) === 'BR' || $pais === '' ? ' selected' : '') . '>Brasil</option><option value="US"' . (strtoupper(trim($pais)) === 'US' ? ' selected' : '') . '>Estados Unidos</option><option value="PT"' . (strtoupper(trim($pais)) === 'PT' ? ' selected' : '') . '>Portugal</option><option value="JP"' . (strtoupper(trim($pais)) === 'JP' ? ' selected' : '') . '>Japão</option><option value="GB"' . (strtoupper(trim($pais)) === 'GB' ? ' selected' : '') . '>Reino Unido</option><option value="DE"' . (strtoupper(trim($pais)) === 'DE' ? ' selected' : '') . '>Alemanha</option><option value="FR"' . (strtoupper(trim($pais)) === 'FR' ? ' selected' : '') . '>França</option><option value="ES"' . (strtoupper(trim($pais)) === 'ES' ? ' selected' : '') . '>Espanha</option><option value="IT"' . (strtoupper(trim($pais)) === 'IT' ? ' selected' : '') . '>Itália</option><option value="CA"' . (strtoupper(trim($pais)) === 'CA' ? ' selected' : '') . '>Canadá</option><option value="AU"' . (strtoupper(trim($pais)) === 'AU' ? ' selected' : '') . '>Austrália</option><option value="AR"' . (strtoupper(trim($pais)) === 'AR' ? ' selected' : '') . '>Argentina</option><option value="CL"' . (strtoupper(trim($pais)) === 'CL' ? ' selected' : '') . '>Chile</option><option value="CO"' . (strtoupper(trim($pais)) === 'CO' ? ' selected' : '') . '>Colômbia</option><option value="MX"' . (strtoupper(trim($pais)) === 'MX' ? ' selected' : '') . '>México</option><option value="OTHER"' . (!in_array(strtoupper(trim($pais)), ['','BR','US','PT','JP','GB','DE','FR','ES','IT','CA','AU','AR','CL','CO','MX'], true) ? ' selected' : '') . '>Outro</option></select></div>'
-                        . '<div class="col-md-3" id="editWrapCep"><label class="form-label" id="editLabelCep">CEP</label><input type="text" class="form-control" id="editClienteCep" value="' . htmlspecialchars($cep, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-6"><label class="form-label" id="editLabelEndereco">Endereço</label><input type="text" class="form-control" id="editClienteEndereco" value="' . htmlspecialchars($endereco, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-3" id="editWrapNumero"><label class="form-label" id="editLabelNumero">Número</label><input type="text" class="form-control" id="editClienteNumero" value="' . htmlspecialchars($numero, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label" id="editLabelComplemento">Complemento</label><input type="text" class="form-control" id="editClienteComplemento" value="' . htmlspecialchars($complemento, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4" id="editWrapBairro"><label class="form-label" id="editLabelBairro">Bairro</label><input type="text" class="form-control" id="editClienteBairro" value="' . htmlspecialchars($bairro, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label" id="editLabelCidade">Cidade</label><input type="text" class="form-control" id="editClienteCidade" value="' . htmlspecialchars($cidade, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label" id="editLabelEstado">Estado</label><input type="text" class="form-control" id="editClienteEstado" value="' . htmlspecialchars($estado, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-6"><label class="form-label">' . __('common.name', 'Nome') . '</label><input type="text" class="form-control" id="editClienteNome" value="' . htmlspecialchars($clienteNome, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-6"><label class="form-label">' . __('admin.order_details.email', 'E-mail') . '</label><input type="email" class="form-control" id="editClienteEmail" value="' . htmlspecialchars($clienteEmail, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">' . __('common.phone', 'Telefone') . '</label><input type="text" class="form-control" id="editClienteTelefone" value="' . htmlspecialchars($clienteTelefone, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">' . __('admin.order_details.cpf_cnpj', 'CPF/CNPJ') . '</label><input type="text" class="form-control" id="editClienteDocumento" value="' . htmlspecialchars($clienteDoc, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">' . __('admin.order_details.country', 'País') . '</label><select class="form-select" id="editClientePais" onchange="onEditPaisChange()"><option value="BR"' . (strtoupper(trim($pais)) === 'BR' || $pais === '' ? ' selected' : '') . '>' . __('admin.order_details.country_br', 'Brasil') . '</option><option value="US"' . (strtoupper(trim($pais)) === 'US' ? ' selected' : '') . '>' . __('admin.order_details.country_us', 'Estados Unidos') . '</option><option value="PT"' . (strtoupper(trim($pais)) === 'PT' ? ' selected' : '') . '>' . __('admin.order_details.country_pt', 'Portugal') . '</option><option value="JP"' . (strtoupper(trim($pais)) === 'JP' ? ' selected' : '') . '>' . __('admin.order_details.country_jp', 'Japão') . '</option><option value="GB"' . (strtoupper(trim($pais)) === 'GB' ? ' selected' : '') . '>' . __('admin.order_details.country_gb', 'Reino Unido') . '</option><option value="DE"' . (strtoupper(trim($pais)) === 'DE' ? ' selected' : '') . '>' . __('admin.order_details.country_de', 'Alemanha') . '</option><option value="FR"' . (strtoupper(trim($pais)) === 'FR' ? ' selected' : '') . '>' . __('admin.order_details.country_fr', 'França') . '</option><option value="ES"' . (strtoupper(trim($pais)) === 'ES' ? ' selected' : '') . '>' . __('admin.order_details.country_es', 'Espanha') . '</option><option value="IT"' . (strtoupper(trim($pais)) === 'IT' ? ' selected' : '') . '>' . __('admin.order_details.country_it', 'Itália') . '</option><option value="CA"' . (strtoupper(trim($pais)) === 'CA' ? ' selected' : '') . '>' . __('admin.order_details.country_ca', 'Canadá') . '</option><option value="AU"' . (strtoupper(trim($pais)) === 'AU' ? ' selected' : '') . '>' . __('admin.order_details.country_au', 'Austrália') . '</option><option value="AR"' . (strtoupper(trim($pais)) === 'AR' ? ' selected' : '') . '>' . __('admin.order_details.country_ar', 'Argentina') . '</option><option value="CL"' . (strtoupper(trim($pais)) === 'CL' ? ' selected' : '') . '>' . __('admin.order_details.country_cl', 'Chile') . '</option><option value="CO"' . (strtoupper(trim($pais)) === 'CO' ? ' selected' : '') . '>' . __('admin.order_details.country_co', 'Colômbia') . '</option><option value="MX"' . (strtoupper(trim($pais)) === 'MX' ? ' selected' : '') . '>' . __('admin.order_details.country_mx', 'México') . '</option><option value="OTHER"' . (!in_array(strtoupper(trim($pais)), ['','BR','US','PT','JP','GB','DE','FR','ES','IT','CA','AU','AR','CL','CO','MX'], true) ? ' selected' : '') . '>' . __('admin.order_details.country_other', 'Outro') . '</option></select></div>'
+                        . '<div class="col-md-3" id="editWrapCep"><label class="form-label" id="editLabelCep">' . __('admin.order_details.zip_br', 'CEP') . '</label><input type="text" class="form-control" id="editClienteCep" value="' . htmlspecialchars($cep, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-6"><label class="form-label" id="editLabelEndereco">' . __('common.address', 'Endereço') . '</label><input type="text" class="form-control" id="editClienteEndereco" value="' . htmlspecialchars($endereco, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-3" id="editWrapNumero"><label class="form-label" id="editLabelNumero">' . __('admin.order_details.number', 'Número') . '</label><input type="text" class="form-control" id="editClienteNumero" value="' . htmlspecialchars($numero, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label" id="editLabelComplemento">' . __('admin.order_details.complement', 'Complemento') . '</label><input type="text" class="form-control" id="editClienteComplemento" value="' . htmlspecialchars($complemento, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4" id="editWrapBairro"><label class="form-label" id="editLabelBairro">' . __('admin.order_details.district', 'Bairro') . '</label><input type="text" class="form-control" id="editClienteBairro" value="' . htmlspecialchars($bairro, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label" id="editLabelCidade">' . __('common.city', 'Cidade') . '</label><input type="text" class="form-control" id="editClienteCidade" value="' . htmlspecialchars($cidade, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label" id="editLabelEstado">' . __('common.state', 'Estado') . '</label><input type="text" class="form-control" id="editClienteEstado" value="' . htmlspecialchars($estado, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '</div>'
-                        . '<hr class="mt-3 mb-2"><h6 class="mb-2"><i class="fas fa-user-friends me-1"></i>Destinatário (entrega para outra pessoa)</h6>'
+                        . '<hr class="mt-3 mb-2"><h6 class="mb-2"><i class="fas fa-user-friends me-1"></i>' . __('admin.order_details.recipient_other_person', 'Destinatário (entrega para outra pessoa)') . '</h6>'
                         . '<div class="row g-3">'
-                        . '<div class="col-md-4"><label class="form-label">Nome destinatário</label><input type="text" class="form-control" id="editDestinatarioNome" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_nome'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">CPF/Doc destinatário</label><input type="text" class="form-control" id="editDestinatarioDocumento" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_documento'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">Telefone destinatário</label><input type="text" class="form-control" id="editDestinatarioTelefone" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_telefone'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">' . __('admin.order_details.recipient_name', 'Nome destinatário') . '</label><input type="text" class="form-control" id="editDestinatarioNome" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_nome'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">' . __('admin.order_details.recipient_doc', 'CPF/Doc destinatário') . '</label><input type="text" class="form-control" id="editDestinatarioDocumento" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_documento'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">' . __('admin.order_details.recipient_phone', 'Telefone destinatário') . '</label><input type="text" class="form-control" id="editDestinatarioTelefone" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_telefone'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '</div>'
                         . '</div>'
                         . '<div class="modal-footer">'
-                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
-                        . '<button type="button" class="btn btn-primary" id="btnSalvarClientePedido" data-pedido-id="' . (int) $pedido['id'] . '">Salvar</button>'
+                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.close', 'Fechar') . '</button>'
+                        . '<button type="button" class="btn btn-primary" id="btnSalvarClientePedido" data-pedido-id="' . (int) $pedido['id'] . '">' . __('common.save', 'Salvar') . '</button>'
                         . '</div>'
                         . '</div>'
                         . '</div>'
                         . '</div>';
 
+                    $jsEditSaving = json_encode(__('admin.order_details.saving', 'Salvando...'), JSON_UNESCAPED_UNICODE);
+                    $jsEditSaveFail = json_encode(__('admin.order_details.save_failed', 'Falha ao salvar'), JSON_UNESCAPED_UNICODE);
+                    $jsEditSaved = json_encode(__('admin.order_details.customer_data_saved', 'Dados atualizados. Recarregue a página para ver tudo refletido.'), JSON_UNESCAPED_UNICODE);
+                    $jsEditNetErr = json_encode(__('admin.order_details.save_network_error', 'Erro de rede ao salvar'), JSON_UNESCAPED_UNICODE);
                     echo <<<HTML
 <script>
 function onEditPaisChange() {
@@ -4847,7 +5031,7 @@ document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); })
             var pedidoId = btnSave.getAttribute('data-pedido-id')||'';
             if(!pedidoId) return;
             btnSave.disabled = true;
-            setAlert('Salvando...', 'alert-info');
+            setAlert({$jsEditSaving}, 'alert-info');
 
             var body = new URLSearchParams();
             body.set('nome', (qs('#editClienteNome')||{}).value || '');
@@ -4874,17 +5058,17 @@ document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); })
             .then(function(r){ return r.json().catch(function(){ return null; }); })
             .then(function(j){
                 if(!j || !j.success){
-                    setAlert((j && j.error) ? j.error : 'Falha ao salvar', 'alert-warning');
+                    setAlert((j && j.error) ? j.error : {$jsEditSaveFail}, 'alert-warning');
                     if(j && j.debug) console.log('DEBUG atualizarCliente:', JSON.stringify(j.debug, null, 2));
                     btnSave.disabled = false;
                     return;
                 }
-                setAlert('Dados atualizados. Recarregue a pagina para ver tudo refletido.', 'alert-success');
+                setAlert({$jsEditSaved}, 'alert-success');
                 if(j.debug) console.log('DEBUG atualizarCliente:', JSON.stringify(j.debug, null, 2));
                 btnSave.disabled = false;
             })
             .catch(function(){
-                setAlert('Erro de rede ao salvar', 'alert-warning');
+                setAlert({$jsEditNetErr}, 'alert-warning');
                 btnSave.disabled = false;
             });
         });
@@ -4907,7 +5091,7 @@ HTML;
                             $invoiceHtml .= '<div class="card mb-4 border-' . $invStatusBadge . '"><div class="card-header bg-' . $invStatusBadge . ' bg-opacity-10"><h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Invoice <span class="badge bg-' . $invStatusBadge . ' ms-2">' . ucfirst($invStatus) . '</span></h5></div><div class="card-body">';
 
                             if ($invStatus === 'contestado' && !empty($invoiceData['contestacao_motivo'])) {
-                                $invoiceHtml .= '<div class="alert alert-danger"><strong>Motivo da contestação:</strong><br>' . htmlspecialchars($invoiceData['contestacao_motivo']) . '</div>';
+                                $invoiceHtml .= '<div class="alert alert-danger"><strong>' . __('admin.order_details.dispute_reason', 'Motivo da contestação') . ':</strong><br>' . htmlspecialchars($invoiceData['contestacao_motivo']) . '</div>';
                             }
 
                             // Buscar itens do invoice
@@ -4916,7 +5100,7 @@ HTML;
                             $invItems = $stInvItems->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
                             if (!empty($invItems)) {
-                                $invoiceHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Produto (etiqueta)</th><th>NCM</th><th>Valor (USD)</th><th>Peso</th><th>Qtd</th><th>Bateria</th><th>Perfume</th></tr></thead><tbody>';
+                                $invoiceHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered"><thead class="table-light"><tr><th>' . __('admin.order_details.inv_th_product_label', 'Produto (etiqueta)') . '</th><th>NCM</th><th>' . __('admin.order_details.inv_th_value_usd', 'Valor (USD)') . '</th><th>' . __('admin.order_details.inv_th_weight', 'Peso') . '</th><th>' . __('admin.order_details.inv_th_qty', 'Qtd') . '</th><th>' . __('admin.order_details.inv_th_battery', 'Bateria') . '</th><th>' . __('admin.order_details.inv_th_perfume', 'Perfume') . '</th></tr></thead><tbody>';
                                 foreach ($invItems as $invIt) {
                                     $invoiceHtml .= '<tr>'
                                         . '<td>' . htmlspecialchars($invIt['nome_produto'] ?? '') . '</td>'
@@ -4924,15 +5108,15 @@ HTML;
                                         . '<td>$ ' . number_format((float)($invIt['declaration_value'] ?? 0), 2) . '</td>'
                                         . '<td>' . number_format((float)($invIt['peso_kg'] ?? 0), 3) . ' kg</td>'
                                         . '<td>' . (int)($invIt['quantidade'] ?? 1) . '</td>'
-                                        . '<td>' . (($invIt['tem_bateria'] ?? 'N') === 'S' ? '<span class="badge bg-warning">Sim</span>' : 'Não') . '</td>'
-                                        . '<td>' . (($invIt['tem_perfume'] ?? 'N') === 'S' ? '<span class="badge bg-info">Sim</span>' : 'Não') . '</td>'
+                                        . '<td>' . (($invIt['tem_bateria'] ?? 'N') === 'S' ? '<span class="badge bg-warning">' . __('admin.order_details.yes', 'Sim') . '</span>' : __('admin.order_details.no', 'Não')) . '</td>'
+                                        . '<td>' . (($invIt['tem_perfume'] ?? 'N') === 'S' ? '<span class="badge bg-info">' . __('admin.order_details.yes', 'Sim') . '</span>' : __('admin.order_details.no', 'Não')) . '</td>'
                                         . '</tr>';
                                 }
                                 $invoiceHtml .= '</tbody></table></div>';
                             }
 
                             if ($invoiceData['confirmado_em']) {
-                                $invoiceHtml .= '<small class="text-muted">Confirmado em: ' . date('d/m/Y H:i', strtotime($invoiceData['confirmado_em'])) . '</small>';
+                                $invoiceHtml .= '<small class="text-muted">' . __('admin.order_details.confirmed_on', 'Confirmado em') . ': ' . date('d/m/Y H:i', strtotime($invoiceData['confirmado_em'])) . '</small>';
                             }
 
                             $invoiceHtml .= '</div></div>';
@@ -4946,41 +5130,41 @@ HTML;
                     echo '<div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Dados Completos do Pedido</h5>
+                                <h5 class="mb-0">' . __('admin.order_details.full_order_data', 'Dados Completos do Pedido') . '</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered">
                                         <thead>
                                             <tr>
-                                                <th>Campo</th>
-                                                <th>Valor</th>
+                                                <th>' . __('admin.order_details.field', 'Campo') . '</th>
+                                                <th>' . __('admin.order_details.value', 'Valor') . '</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr><td><strong>ID</strong></td><td>' . $pedido['id'] . '</td></tr>
-                                            <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
-                                            <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
-                                            <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.order_number', 'Número Pedido') . '</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
+                                            <tr><td><strong>' . __('common.status', 'Status') . '</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.customer_name', 'Nome Cliente') . '</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
                                             <tr><td><strong>CPF</strong></td><td>'
                                                 . (
                                                     !empty($pedido['cliente_cpf_cnpj'])
                                                         ? htmlspecialchars((string) $pedido['cliente_cpf_cnpj'])
-                                                        : ('<span class="badge bg-warning text-dark">CPF não informado</span>'
+                                                        : ('<span class="badge bg-warning text-dark">' . __('admin.order_details.cpf_not_informed', 'CPF não informado') . '</span>'
                                                             . (((int) ($pedido['usuario_id'] ?? 0)) > 0
                                                                 ? (' <a href="/admin/usuarios/editar/' . (int) ($pedido['usuario_id'] ?? 0) . '" class="btn btn-sm btn-warning ms-2">'
-                                                                    . '<i class="fas fa-user-pen me-1"></i>Editar cliente</a>')
+                                                                    . '<i class="fas fa-user-pen me-1"></i>' . __('admin.order_details.edit_customer', 'Editar cliente') . '</a>')
                                                                 : '')
                                                         )
                                                 )
                                                 . '</td></tr>
-                                            <tr><td><strong>Suite Cliente</strong></td><td>' . (!empty($pedido['cliente_suite']) ? (int) $pedido['cliente_suite'] : 'N/A') . '</td></tr>
-                                            <tr><td><strong>Data Criação</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
-                                            <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
-                                            <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
-                                            <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
-                                            ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
-                                            <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>';
+                                            <tr><td><strong>' . __('admin.order_details.customer_suite', 'Suite Cliente') . '</strong></td><td>' . (!empty($pedido['cliente_suite']) ? (int) $pedido['cliente_suite'] : 'N/A') . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.created_date', 'Data Criação') . '</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.last_update', 'Última Atualização') . '</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.user_id', 'Usuário ID') . '</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.customer_id', 'Cliente ID') . '</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
+                                            ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>' . __('admin.order_details.origin', 'Origem') . '</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
+                                            <tr><td><strong>' . __('admin.order_details.items_qty', 'Quantidade de itens') . '</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>';
 
             // Função helper: formata valor — NÃO converte (valores do pedido já estão na moeda correta no banco)
             $fmtPedido = function(float $valor) use ($exibirEmBrl) {
@@ -4991,20 +5175,20 @@ HTML;
             };
 
             echo '
-                                            <tr><td><strong>Subtotal</strong></td><td>' . $fmtPedido((float) ($pedido['subtotal'] ?? 0)) . '</td></tr>
-                                            ' . ($temItemGratuito ? '<tr><td><strong><i class="fas fa-gift text-success me-1"></i>Brinde (valor original)</strong></td><td><span class="text-decoration-line-through text-muted">' . $fmtPedido((float) ($freeOfferItemInfo['free_offer_original_price'] ?? 0)) . '</span> <span class="badge bg-success">GRÁTIS</span></td></tr>' : '') . '
-                                            <tr><td><strong>Serviços</strong></td><td>' . $fmtPedido((float) ($pedido['servicos'] ?? 0)) . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.subtotal', 'Subtotal') . '</strong></td><td>' . $fmtPedido((float) ($pedido['subtotal'] ?? 0)) . '</td></tr>
+                                            ' . ($temItemGratuito ? '<tr><td><strong><i class="fas fa-gift text-success me-1"></i>' . __('admin.order_details.gift_original_value', 'Brinde (valor original)') . '</strong></td><td><span class="text-decoration-line-through text-muted">' . $fmtPedido((float) ($freeOfferItemInfo['free_offer_original_price'] ?? 0)) . '</span> <span class="badge bg-success">' . __('admin.order_details.free', 'GRÁTIS') . '</span></td></tr>' : '') . '
+                                            <tr><td><strong>' . __('admin.order_details.services', 'Serviços') . '</strong></td><td>' . $fmtPedido((float) ($pedido['servicos'] ?? 0)) . '</td></tr>
                                             ' . (((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) > 0 ? '
-                                            <tr><td class="small text-muted ps-3">Taxa de serviço original</td><td class="small text-muted">' . $fmtPedido((float) ($pedido['taxa_servico_original'] ?? 0)) . '</td></tr>
-                                            <tr><td class="small text-success ps-3"><i class="fas fa-tags me-1"></i>Desconto promocional' . ((string) ($pedido['taxa_servico_desconto_tipo'] ?? '') === 'percentual' ? ' (' . number_format((float) ($pedido['taxa_servico_desconto_valor'] ?? 0), 2) . '%)' : ' (fixo)') . '</td><td class="small text-success">-' . $fmtPedido((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) . '</td></tr>
-                                            <tr><td class="small fw-semibold ps-3">Taxa de serviço final cobrada</td><td class="small fw-semibold">' . $fmtPedido((float) ($pedido['servicos'] ?? 0)) . '</td></tr>
+                                            <tr><td class="small text-muted ps-3">' . __('admin.order_details.original_service_fee', 'Taxa de serviço original') . '</td><td class="small text-muted">' . $fmtPedido((float) ($pedido['taxa_servico_original'] ?? 0)) . '</td></tr>
+                                            <tr><td class="small text-success ps-3"><i class="fas fa-tags me-1"></i>' . __('admin.order_details.promo_discount', 'Desconto promocional') . ((string) ($pedido['taxa_servico_desconto_tipo'] ?? '') === 'percentual' ? ' (' . number_format((float) ($pedido['taxa_servico_desconto_valor'] ?? 0), 2) . '%)' : ' (' . __('admin.order_details.fixed', 'fixo') . ')') . '</td><td class="small text-success">-' . $fmtPedido((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) . '</td></tr>
+                                            <tr><td class="small fw-semibold ps-3">' . __('admin.order_details.final_service_fee_charged', 'Taxa de serviço final cobrada') . '</td><td class="small fw-semibold">' . $fmtPedido((float) ($pedido['servicos'] ?? 0)) . '</td></tr>
                                             ' : '') . '
-                                            <tr><td><strong>Impostos</strong></td><td>' . $fmtPedido((float) ($pedido['impostos'] ?? 0)) . '</td></tr>
-                                            ' . ($temItemGratuito ? '<tr><td class="small text-muted ps-3">Imposto do brinde (não cobrado)</td><td><span class="text-decoration-line-through text-muted small">' . $fmtPedido(round($freeOrigPrice * (($pedido['subtotal'] > 0 && $pedido['impostos'] > 0) ? ($pedido['impostos'] / $pedido['subtotal']) : 0), 2)) . '</span> <span class="small text-success">pago pela Braziliana</span></td></tr>' : '') . '
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>Imposto local</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $fmtPedido((float) $pedido['imposto_local']) . '</span></td></tr>' : '') . '
-                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $fmtPedido((float) ($pedido['frete'] ?? 0))) . '</td></tr>
-                                            <tr><td><strong>Desconto</strong></td><td>' . $fmtPedido((float) ($pedido['desconto'] ?? 0)) . '</td></tr>
-                                            <tr><td><strong>Total</strong></td><td><strong>' . $fmtPedido(
+                                            <tr><td><strong>' . __('admin.order_details.taxes', 'Impostos') . '</strong></td><td>' . $fmtPedido((float) ($pedido['impostos'] ?? 0)) . '</td></tr>
+                                            ' . ($temItemGratuito ? '<tr><td class="small text-muted ps-3">' . __('admin.order_details.gift_tax_not_charged', 'Imposto do brinde (não cobrado)') . '</td><td><span class="text-decoration-line-through text-muted small">' . $fmtPedido(round($freeOrigPrice * (($pedido['subtotal'] > 0 && $pedido['impostos'] > 0) ? ($pedido['impostos'] / $pedido['subtotal']) : 0), 2)) . '</span> <span class="small text-success">' . __('admin.order_details.paid_by_braziliana', 'pago pela Braziliana') . '</span></td></tr>' : '') . '
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>' . __('admin.order_details.local_tax', 'Imposto local') . '</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $fmtPedido((float) $pedido['imposto_local']) . '</span></td></tr>' : '') . '
+                                            <tr><td><strong>' . __('admin.order_details.shipping', 'Frete') . '</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? __('admin.order_details.free_shipping', 'Frete grátis') : $fmtPedido((float) ($pedido['frete'] ?? 0))) . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.discount', 'Desconto') . '</strong></td><td>' . $fmtPedido((float) ($pedido['desconto'] ?? 0)) . '</td></tr>
+                                            <tr><td><strong>' . __('common.total', 'Total') . '</strong></td><td><strong>' . $fmtPedido(
                                                 // Recalcular total a partir dos componentes (corrige pedidos com total incorreto no DB)
                                                 (function() use ($pedido) {
                                                     $sub = (float) ($pedido['subtotal'] ?? ($pedido['subtotal_produtos'] ?? 0));
@@ -5019,15 +5203,15 @@ HTML;
                                                     return ($calcTotal > $dbTotal && $svc + $imp > 0) ? $calcTotal : $dbTotal;
                                                 })()
                                             ) . '</strong></td></tr>
-                                            <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars((string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
-                                            <tr><td><strong>Taxa Conversão</strong></td><td>' . (
+                                            <tr><td><strong>' . __('admin.order_details.currency', 'Moeda') . '</strong></td><td>' . htmlspecialchars((string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.conversion_rate', 'Taxa Conversão') . '</strong></td><td>' . (
                                                 (strtoupper((string) ($pedido['moeda'] ?? '')) === 'BRL' && (float) ($pedido['taxa_conversao'] ?? 1) > 1.01)
                                                     ? ('1 USD = R$ ' . number_format((float) $pedido['taxa_conversao'], 2, ',', '.'))
                                                     : htmlspecialchars((string) ($pedido['taxa_conversao'] ?? '1'))
                                             ) . '</td></tr>
-                                            <tr><td><strong>End. Entrega ID</strong></td><td>' . ($pedido['endereco_entrega_id'] ?? 'N/A') . '</td></tr>
-                                            <tr><td><strong>End. Cobrança ID</strong></td><td>' . ($pedido['endereco_cobranca_id'] ?? 'N/A') . '</td></tr>
-                                            <tr><td><strong>Observações</strong></td><td>' . htmlspecialchars($pedido['observacoes'] ?? 'Nenhuma') . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.shipping_address_id', 'End. Entrega ID') . '</strong></td><td>' . ($pedido['endereco_entrega_id'] ?? 'N/A') . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.billing_address_id', 'End. Cobrança ID') . '</strong></td><td>' . ($pedido['endereco_cobranca_id'] ?? 'N/A') . '</td></tr>
+                                            <tr><td><strong>' . __('admin.order_details.notes', 'Observações') . '</strong></td><td>' . htmlspecialchars($pedido['observacoes'] ?? __('admin.order_details.none', 'Nenhuma')) . '</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -5038,17 +5222,17 @@ HTML;
                     echo '<div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Informações do Pedido</h5>
+                                <h5 class="mb-0">' . __('admin.order_details.order_info', 'Informações do Pedido') . '</h5>
                                 <hr>
-                                <p><strong>Status:</strong> ' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</p>
-                                <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
-                                <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                <p><strong>Moeda:</strong> ' . htmlspecialchars(strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'N/A'))))) . '</p>
-                                <p><strong>País Entrega:</strong> ' . htmlspecialchars(strtoupper(trim((string) ($pedido['pais_entrega'] ?? ($pedido['pais'] ?? ($pedido['country'] ?? 'N/A')))))) . '</p>
-                                <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</p>
+                                <p><strong>' . __('common.status', 'Status') . ':</strong> ' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</p>
+                                <p><strong>' . __('admin.order_details.date', 'Data') . ':</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
+                                <p><strong>' . __('admin.order_details.payment_method', 'Forma Pagamento') . ':</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
+                                <p><strong>' . __('admin.order_details.currency', 'Moeda') . ':</strong> ' . htmlspecialchars(strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'N/A'))))) . '</p>
+                                <p><strong>' . __('admin.order_details.shipping_country', 'País Entrega') . ':</strong> ' . htmlspecialchars(strtoupper(trim((string) ($pedido['pais_entrega'] ?? ($pedido['pais'] ?? ($pedido['country'] ?? 'N/A')))))) . '</p>
+                                <p><strong>' . __('admin.order_details.shipping', 'Frete') . ':</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? __('admin.order_details.free_shipping', 'Frete grátis') : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</p>
                                 <hr>
                                 <div class="mb-3">
-                                    <h6 class="mb-2">Pagamento</h6>';
+                                    <h6 class="mb-2">' . __('admin.order_details.payment', 'Pagamento') . '</h6>';
 
                                     $pgMetodoView = (string) ($pedido['pagamento_metodo'] ?? ($pedido['forma_pagamento'] ?? ''));
                                     if (trim($pgMetodoView) === '') {
@@ -5070,12 +5254,12 @@ HTML;
                                                         break;
                                                     }
                                                 }
-                                                $pgStatusView = $allPaid ? 'Pago' : 'Pendente';
+                                                $pgStatusView = $allPaid ? __('admin.order_details.status_paid', 'Pago') : __('admin.order_details.status_pending', 'Pendente');
                                             }
                                         } catch (\Exception $e) {}
                                     }
                                     if (trim($pgStatusView) === '') {
-                                        $pgStatusView = 'Pendente';
+                                        $pgStatusView = __('admin.order_details.status_pending', 'Pendente');
                                     }
 
                                     $pgStatusKey = strtolower(trim((string) $pgStatusView));
@@ -5114,18 +5298,18 @@ HTML;
                                     }
                                     $pgDataView = (string) ($pedido['pagamento_data'] ?? ($pedido['pago_em'] ?? ($pedido['paid_at'] ?? ($pedido['data_pagamento'] ?? ''))));
 
-                                    echo '<p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pgMetodoView) . '</p>'
-                                        . '<p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pgStatusView) . '</p>'
+                                    echo '<p class="mb-1"><strong>' . __('admin.order_details.method', 'Método') . ':</strong> ' . htmlspecialchars($pgMetodoView) . '</p>'
+                                        . '<p class="mb-1"><strong>' . __('common.status', 'Status') . ':</strong> ' . htmlspecialchars($pgStatusView) . '</p>'
                                         . '<p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pgGatewayView) . '</p>';
 
                                     // Transação com link para o Stripe Dashboard
                                     if (strtolower($pgGatewayView) === 'stripe' && str_starts_with($pgTransView, 'pi_')) {
-                                        echo '<p class="mb-1"><strong>Transação:</strong> <a href="https://dashboard.stripe.com/payments/' . htmlspecialchars($pgTransView) . '" target="_blank" class="text-primary">' . htmlspecialchars($pgTransView) . ' <i class="fas fa-external-link-alt small"></i></a></p>';
+                                        echo '<p class="mb-1"><strong>' . __('admin.order_details.transaction', 'Transação') . ':</strong> <a href="https://dashboard.stripe.com/payments/' . htmlspecialchars($pgTransView) . '" target="_blank" class="text-primary">' . htmlspecialchars($pgTransView) . ' <i class="fas fa-external-link-alt small"></i></a></p>';
                                     } else {
-                                        echo '<p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pgTransView) . '</p>';
+                                        echo '<p class="mb-1"><strong>' . __('admin.order_details.transaction', 'Transação') . ':</strong> ' . htmlspecialchars($pgTransView) . '</p>';
                                     }
 
-                                    echo '<p class="mb-0"><strong>Data:</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
+                                    echo '<p class="mb-0"><strong>' . __('admin.order_details.date', 'Data') . ':</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
 
                                     // Split: exibir quanto foi para cada conta/gateway (pedido_pagamentos)
                                     try {
@@ -5155,9 +5339,9 @@ HTML;
                                             $gwGateway = $gatewaySplitRow ? strtoupper((string) ($gatewaySplitRow['gateway'] ?? '')) : '';
 
                                             echo '<div class="alert alert-info py-2 px-3 mt-2 mb-2">';
-                                            echo '<div class="fw-bold mb-1"><i class="fas fa-wallet me-1"></i> Pagamento Parcial via Carteira</div>';
+                                            echo '<div class="fw-bold mb-1"><i class="fas fa-wallet me-1"></i> ' . __('admin.order_details.partial_wallet_payment', 'Pagamento Parcial via Carteira') . '</div>';
                                             echo '<div class="small">';
-                                            echo '<div><strong>Carteira:</strong> ' . $walletPrefix . number_format($walletVal, 2, ',', '.') . '</div>';
+                                            echo '<div><strong>' . __('admin.order_details.wallet', 'Carteira') . ':</strong> ' . $walletPrefix . number_format($walletVal, 2, ',', '.') . '</div>';
                                             if ($gatewaySplitRow) {
                                                 echo '<div><strong>Gateway (' . htmlspecialchars($gwMetodo) . '):</strong> ' . $walletPrefix . number_format($gwVal, 2, ',', '.') . '</div>';
                                                 // Verificar se carteira cobriu tudo (gateway = apenas impostos)
@@ -5174,26 +5358,26 @@ HTML;
                                                         if ($rateCheck > 1.01) $eligiblePedido = $eligiblePedido * $rateCheck;
                                                     }
                                                     if ($walletVal >= ($eligiblePedido - 0.01)) {
-                                                        echo '<div class="text-muted mt-1"><em>Apenas impostos cobrados via gateway</em></div>';
+                                                        echo '<div class="text-muted mt-1"><em>' . __('admin.order_details.only_taxes_via_gateway', 'Apenas impostos cobrados via gateway') . '</em></div>';
                                                     }
                                                 }
                                             } else {
-                                                echo '<div class="text-muted"><em>Carteira cobriu 100% — sem cobrança de gateway</em></div>';
+                                                echo '<div class="text-muted"><em>' . __('admin.order_details.wallet_covered_all', 'Carteira cobriu 100% — sem cobrança de gateway') . '</em></div>';
                                             }
                                             echo '</div></div>';
                                         }
 
                                         if (!empty($rowsSplit)) {
-                                            echo '<hr><div class="mb-2"><strong>Split (por conta/gateway):</strong></div>';
+                                            echo '<hr><div class="mb-2"><strong>' . __('admin.order_details.split_by_account_gateway', 'Split (por conta/gateway)') . ':</strong></div>';
                                             echo '<div class="table-responsive"><table class="table table-sm table-bordered">'
                                                 . '<thead><tr>'
-                                                . '<th>Componente</th><th>Gateway</th><th>Método</th><th>Valor</th><th>Status</th><th>Link/PIX</th><th style="width:140px;">Ações</th>'
+                                                . '<th>' . __('admin.order_details.th_component', 'Componente') . '</th><th>Gateway</th><th>' . __('admin.order_details.method', 'Método') . '</th><th>' . __('admin.order_details.value', 'Valor') . '</th><th>' . __('common.status', 'Status') . '</th><th>Link/PIX</th><th style="width:140px;">' . __('admin.order_details.th_actions', 'Ações') . '</th>'
                                                 . '</tr></thead><tbody>';
 
                                             foreach ($rowsSplit as $r) {
                                                 $comp = strtoupper((string) ($r['componente'] ?? ''));
                                                 $compLabel = $comp;
-                                                $compMap = ['PRODUTO' => 'Produtos', 'TAXA_SERVICO' => 'Taxa de Serviço', 'IMPOSTO' => 'Impostos', 'PAGAMENTO' => 'Pagamento Total', 'TAXA' => 'Taxa de Serviço', 'CARTEIRA' => 'Carteira (Wallet)', 'TAXA_GATEWAY' => 'Gateway (Impostos + Diferença)'];
+                                                $compMap = ['PRODUTO' => __('admin.order_details.comp_products', 'Produtos'), 'TAXA_SERVICO' => __('admin.order_details.comp_service_fee', 'Taxa de Serviço'), 'IMPOSTO' => __('admin.order_details.comp_taxes', 'Impostos'), 'PAGAMENTO' => __('admin.order_details.comp_total_payment', 'Pagamento Total'), 'TAXA' => __('admin.order_details.comp_service_fee', 'Taxa de Serviço'), 'CARTEIRA' => __('admin.order_details.comp_wallet', 'Carteira (Wallet)'), 'TAXA_GATEWAY' => __('admin.order_details.comp_gateway_taxes_diff', 'Gateway (Impostos + Diferença)')];
                                                 if (isset($compMap[$comp])) $compLabel = $compMap[$comp];
                                                 $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
                                                 $gwLabel = $gw !== '' ? strtoupper($gw) : 'N/A';
@@ -5217,13 +5401,13 @@ HTML;
 
                                                 $link = '';
                                                 if ($url !== '') {
-                                                    $link = '<a href="' . htmlspecialchars($url) . '" target="_blank" rel="noopener">Abrir</a>';
+                                                    $link = '<a href="' . htmlspecialchars($url) . '" target="_blank" rel="noopener">' . __('admin.order_details.open', 'Abrir') . '</a>';
                                                 } elseif ($boleto !== '') {
-                                                    $link = '<a href="' . htmlspecialchars($boleto) . '" target="_blank" rel="noopener">Abrir boleto</a>';
+                                                    $link = '<a href="' . htmlspecialchars($boleto) . '" target="_blank" rel="noopener">' . __('admin.order_details.open_bank_slip', 'Abrir boleto') . '</a>';
                                                 } elseif ($pix !== '') {
-                                                    $link = '<span class="small text-muted">PIX disponível</span>';
+                                                    $link = '<span class="small text-muted">' . __('admin.order_details.pix_available', 'PIX disponível') . '</span>';
                                                 } elseif ($dig !== '') {
-                                                    $link = '<span class="small text-muted">Linha digitável</span>';
+                                                    $link = '<span class="small text-muted">' . __('admin.order_details.digitable_line', 'Linha digitável') . '</span>';
                                                 }
 
                                                 // Link para Stripe Dashboard quando aplicável
@@ -5244,7 +5428,7 @@ HTML;
                                                         . ' data-componente="' . htmlspecialchars(strtolower(trim((string) ($r['componente'] ?? '')))) . '"'
                                                         . ' data-gateway="' . htmlspecialchars($gw) . '"'
                                                         . ' data-email="' . htmlspecialchars($pedidoEmail) . '">' 
-                                                        . '<i class="fas fa-link me-1"></i>Gerar Link</button>')
+                                                        . '<i class="fas fa-link me-1"></i>' . __('admin.order_details.generate_link', 'Gerar Link') . '</button>')
                                                     : '';
 
                                                 echo '<tr>'
@@ -5252,7 +5436,7 @@ HTML;
                                                     . '<td>' . htmlspecialchars($gwLabel) . '</td>'
                                                     . '<td>' . htmlspecialchars($met !== '' ? $met : 'N/A') . '</td>'
                                                     . '<td class="text-end">' . htmlspecialchars($this->formatarMoeda($val, $moeda)) . '</td>'
-                                                    . '<td>' . htmlspecialchars($st !== '' ? $st : 'pending') . ($isExpired ? ' <span class="badge bg-secondary">EXPIRADO</span>' : '') . '</td>'
+                                                    . '<td>' . htmlspecialchars($st !== '' ? $st : 'pending') . ($isExpired ? ' <span class="badge bg-secondary">' . __('admin.order_details.expired', 'EXPIRADO') . '</span>' : '') . '</td>'
                                                     . '<td>' . $link . '</td>'
                                                     . '<td>' . $acoes . '</td>'
                                                     . '</tr>';
@@ -5264,32 +5448,40 @@ HTML;
                                                 . '<div class="modal-dialog">'
                                                 . '<div class="modal-content">'
                                                 . '<div class="modal-header">'
-                                                . '<h5 class="modal-title"><i class="fas fa-link me-1"></i>Gerar Link de Pagamento</h5>'
+                                                . '<h5 class="modal-title"><i class="fas fa-link me-1"></i>' . __('admin.order_details.generate_payment_link', 'Gerar Link de Pagamento') . '</h5>'
                                                 . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
                                                 . '</div>'
                                                 . '<div class="modal-body">'
                                                 . '<div id="novoLinkAlert" class="alert alert-info" style="display:none;"></div>'
-                                                . '<label class="form-label">E-mail do cliente</label>'
+                                                . '<label class="form-label">' . __('admin.order_details.customer_email', 'E-mail do cliente') . '</label>'
                                                 . '<input type="email" id="novoLinkEmail" class="form-control mb-3" value="' . htmlspecialchars($pedidoEmail) . '" autocomplete="email" />'
-                                                . '<div class="form-text mb-3">Confirme/ajuste o e-mail antes de gerar.</div>'
-                                                . '<label class="form-label">Link de pagamento</label>'
+                                                . '<div class="form-text mb-3">' . __('admin.order_details.confirm_email_before_generate', 'Confirme/ajuste o e-mail antes de gerar.') . '</div>'
+                                                . '<label class="form-label">' . __('admin.order_details.payment_link', 'Link de pagamento') . '</label>'
                                                 . '<div class="input-group">'
-                                                . '<input type="text" id="novoLinkUrl" class="form-control" readonly placeholder="Clique em Gerar Link..." />'
+                                                . '<input type="text" id="novoLinkUrl" class="form-control" readonly placeholder="' . htmlspecialchars(__('admin.order_details.click_generate_link', 'Clique em Gerar Link...'), ENT_QUOTES, 'UTF-8') . '" />'
                                                 . '<button type="button" class="btn btn-outline-secondary" id="btnCopiarLink" disabled><i class="fas fa-copy"></i></button>'
                                                 . '</div>'
                                                 . '<div class="d-flex gap-2 mt-3">'
-                                                . '<button type="button" class="btn btn-primary" id="btnGerarLinkConfirm"><i class="fas fa-link me-1"></i>Gerar Link</button>'
-                                                . '<a href="#" class="btn btn-outline-success" id="btnAbrirLink" target="_blank" rel="noopener" style="display:none;"><i class="fas fa-external-link-alt me-1"></i>Abrir</a>'
+                                                . '<button type="button" class="btn btn-primary" id="btnGerarLinkConfirm"><i class="fas fa-link me-1"></i>' . __('admin.order_details.generate_link', 'Gerar Link') . '</button>'
+                                                . '<a href="#" class="btn btn-outline-success" id="btnAbrirLink" target="_blank" rel="noopener" style="display:none;"><i class="fas fa-external-link-alt me-1"></i>' . __('admin.order_details.open', 'Abrir') . '</a>'
                                                 . '</div>'
                                                 . '</div>'
                                                 . '<div class="modal-footer">'
-                                                . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
+                                                . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('common.close', 'Fechar') . '</button>'
                                                 . '</div>'
                                                 . '</div>'
                                                 . '</div>'
                                                 . '</div>';
 
-                                            echo <<<'LINKSCRIPT'
+                                            $jsLinkConfirmHint = json_encode(__('admin.order_details.link_confirm_email_hint', 'Confirme o e-mail e clique em Gerar Link.'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkInvalidEmail = json_encode(__('admin.order_details.enter_valid_email', 'Informe um e-mail válido.'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkInvalidOrder = json_encode(__('admin.order_details.invalid_order', 'Pedido inválido.'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkGenerating = json_encode(__('admin.order_details.generating_payment_link', 'Gerando link de pagamento...'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkGenFail = json_encode(__('admin.order_details.link_generate_failed', 'Falha ao gerar link'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkGenerated = json_encode(__('admin.order_details.link_generated', 'Link gerado! Copie e envie ao cliente.'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkNetErr = json_encode(__('admin.order_details.link_network_error', 'Erro de rede ao gerar link.'), JSON_UNESCAPED_UNICODE);
+                                            $jsLinkCopied = json_encode(__('admin.order_details.link_copied', 'Link copiado!'), JSON_UNESCAPED_UNICODE);
+                                            echo <<<LINKSCRIPT
 <script>(function(){
     function qs(s){ return document.querySelector(s); }
     var pending = {pedidoId:"", componente:"", gateway:"", email:""};
@@ -5309,7 +5501,7 @@ HTML;
             gateway: btn.getAttribute("data-gateway")||"",
             email: btn.getAttribute("data-email")||""
         };
-        linkAlert("Confirme o e-mail e clique em Gerar Link.", "alert-info");
+        linkAlert({$jsLinkConfirmHint}, "alert-info");
         var emailInput = qs("#novoLinkEmail");
         if(emailInput) emailInput.value = pending.email;
         var urlInput = qs("#novoLinkUrl");
@@ -5328,14 +5520,14 @@ HTML;
         btnGerar.addEventListener("click", function(){
             var email = (qs("#novoLinkEmail")||{}).value||"";
             if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-                linkAlert("Informe um e-mail válido.", "alert-warning");
+                linkAlert({$jsLinkInvalidEmail}, "alert-warning");
                 return;
             }
             if(!pending.pedidoId){
-                linkAlert("Pedido inválido.", "alert-warning");
+                linkAlert({$jsLinkInvalidOrder}, "alert-warning");
                 return;
             }
-            linkAlert("Gerando link de pagamento...", "alert-info");
+            linkAlert({$jsLinkGenerating}, "alert-info");
             btnGerar.disabled = true;
             var body = new URLSearchParams();
             body.set("componente", pending.componente);
@@ -5349,11 +5541,11 @@ HTML;
             .then(function(data){
                 btnGerar.disabled = false;
                 if(!data || !data.success){
-                    linkAlert((data && data.error) ? data.error : "Falha ao gerar link", "alert-warning");
+                    linkAlert((data && data.error) ? data.error : {$jsLinkGenFail}, "alert-warning");
                     return;
                 }
                 var link = data.payment_link || "";
-                linkAlert("Link gerado! Copie e envie ao cliente.", "alert-success");
+                linkAlert({$jsLinkGenerated}, "alert-success");
                 var urlInput = qs("#novoLinkUrl");
                 if(urlInput) urlInput.value = link;
                 var btnCopy = qs("#btnCopiarLink");
@@ -5365,7 +5557,7 @@ HTML;
                 }
             }).catch(function(){
                 btnGerar.disabled = false;
-                linkAlert("Erro de rede ao gerar link.", "alert-warning");
+                linkAlert({$jsLinkNetErr}, "alert-warning");
             });
         });
     }
@@ -5375,10 +5567,10 @@ HTML;
             var v = (qs("#novoLinkUrl")||{}).value||"";
             if(!v) return;
             if(navigator.clipboard && navigator.clipboard.writeText){
-                navigator.clipboard.writeText(v).then(function(){ linkAlert("Link copiado!", "alert-success"); });
+                navigator.clipboard.writeText(v).then(function(){ linkAlert({$jsLinkCopied}, "alert-success"); });
             } else {
                 var inp = qs("#novoLinkUrl");
-                if(inp){ inp.focus(); inp.select(); try{ document.execCommand("copy"); linkAlert("Link copiado!", "alert-success"); } catch(e){} }
+                if(inp){ inp.focus(); inp.select(); try{ document.execCommand("copy"); linkAlert({$jsLinkCopied}, "alert-success"); } catch(e){} }
             }
         });
     }
@@ -5395,7 +5587,7 @@ LINKSCRIPT;
 
                                     if ($podeReemitir) {
                                         echo '<form method="POST" action="/admin/pedidos/reemitir-pagamento/' . (int) $pedido['id'] . '" class="mt-2">'
-                                            . '<button type="submit" class="btn btn-outline-secondary btn-sm">Gerar nova cobrança</button>'
+                                            . '<button type="submit" class="btn btn-outline-secondary btn-sm">' . __('admin.order_details.generate_new_charge', 'Gerar nova cobrança') . '</button>'
                                             . '</form>';
                                     }
 
@@ -5428,23 +5620,23 @@ LINKSCRIPT;
                                     if ($pixPayload !== '') {
                                         $pixPayloadEsc = htmlspecialchars($pixPayload, ENT_QUOTES, 'UTF-8');
                                         echo '<div class="mt-3">'
-                                            . '<div class="small text-muted mb-1">PIX (copia e cola)</div>'
+                                            . '<div class="small text-muted mb-1">' . __('admin.order_details.pix_copy_paste', 'PIX (copia e cola)') . '</div>'
                                             . '<textarea class="form-control" rows="3" readonly id="admin-pix-payload">' . $pixPayloadEsc . '</textarea>'
-                                            . '<button type="button" class="btn btn-sm btn-outline-dark mt-2" id="admin-pix-copy-btn" onclick="copiarPixAdmin()">Copiar PIX</button>'
-                                            . '<div id="admin-pix-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>'
+                                            . '<button type="button" class="btn btn-sm btn-outline-dark mt-2" id="admin-pix-copy-btn" onclick="copiarPixAdmin()">' . __('admin.order_details.copy_pix', 'Copiar PIX') . '</button>'
+                                            . '<div id="admin-pix-copied" class="small text-success mt-1" style="display:none;">' . __('common.copied_success', 'Copiado!') . '</div>'
                                             . '</div>';
                                     }
 
                                     if ($stripeInvoiceUrl !== '') {
                                         $stripeEsc = htmlspecialchars($stripeInvoiceUrl, ENT_QUOTES, 'UTF-8');
                                         echo '<div class="mt-3">'
-                                            . '<div class="small text-muted mb-1">Stripe (link de pagamento)</div>'
+                                            . '<div class="small text-muted mb-1">' . __('admin.order_details.stripe_payment_link', 'Stripe (link de pagamento)') . '</div>'
                                             . '<div class="d-flex gap-2 flex-wrap">'
-                                            . '<a class="btn btn-sm btn-outline-primary" href="' . $stripeEsc . '" target="_blank" rel="noopener">Abrir link</a>'
-                                            . '<button type="button" class="btn btn-sm btn-outline-dark" id="admin-stripe-copy-btn" onclick="copiarStripeAdmin()">Copiar link</button>'
+                                            . '<a class="btn btn-sm btn-outline-primary" href="' . $stripeEsc . '" target="_blank" rel="noopener">' . __('admin.order_details.open_link', 'Abrir link') . '</a>'
+                                            . '<button type="button" class="btn btn-sm btn-outline-dark" id="admin-stripe-copy-btn" onclick="copiarStripeAdmin()">' . __('admin.order_details.copy_link', 'Copiar link') . '</button>'
                                             . '</div>'
                                             . '<textarea class="form-control mt-2" rows="2" readonly id="admin-stripe-link">' . $stripeEsc . '</textarea>'
-                                            . '<div id="admin-stripe-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>'
+                                            . '<div id="admin-stripe-copied" class="small text-success mt-1" style="display:none;">' . __('common.copied_success', 'Copiado!') . '</div>'
                                             . '</div>';
                                     }
 
@@ -5478,14 +5670,14 @@ LINKSCRIPT;
 
                                         echo '<hr>';
                                         echo '<div class="mb-3" id="comprovante">'
-                                            . '<h6 class="mb-2">Comprovantes de Pagamento</h6>';
+                                            . '<h6 class="mb-2">' . __('admin.order_details.payment_receipts', 'Comprovantes de Pagamento') . '</h6>';
 
                                         if (!$hasDocs) {
                                             echo '<div class="alert alert-warning">'
-                                                . '<div><strong>Aguardando comprovantes.</strong> Para anexar, é necessário criar a tabela <code>pedidos_pagamento_documentos</code>.</div>'
-                                                . '<div class="small mt-2">Rode as migrations: <strong>055_create_pedidos_pagamento_documentos.sql</strong>, <strong>056_add_fk_pedidos_pagamento_documentos.sql</strong> e <strong>131_add_tipo_to_pedidos_pagamento_documentos.sql</strong>.</div>'
+                                                . '<div><strong>' . __('admin.order_details.awaiting_receipts', 'Aguardando comprovantes.') . '</strong> ' . __('admin.order_details.need_create_table', 'Para anexar, é necessário criar a tabela') . ' <code>pedidos_pagamento_documentos</code>.</div>'
+                                                . '<div class="small mt-2">' . __('admin.order_details.run_migrations', 'Rode as migrations') . ': <strong>055_create_pedidos_pagamento_documentos.sql</strong>, <strong>056_add_fk_pedidos_pagamento_documentos.sql</strong> ' . __('admin.order_details.and', 'e') . ' <strong>131_add_tipo_to_pedidos_pagamento_documentos.sql</strong>.</div>'
                                                 . '</div>';
-                                            echo '<button type="button" class="btn btn-sm btn-secondary" disabled>Anexar comprovantes</button>';
+                                            echo '<button type="button" class="btn btn-sm btn-secondary" disabled>' . __('admin.order_details.attach_receipts', 'Anexar comprovantes') . '</button>';
                                         } else {
                                             $temColTipo = false;
                                             try {
@@ -5526,19 +5718,19 @@ LINKSCRIPT;
                                             // Bloco Produtos
                                             echo '<div class="col-md-6">';
                                             echo '<div class="card border h-100"><div class="card-body">';
-                                            echo '<h6 class="card-title mb-3"><i class="fas fa-box me-2 text-primary"></i>Comprovante de Produtos</h6>';
+                                            echo '<h6 class="card-title mb-3"><i class="fas fa-box me-2 text-primary"></i>' . __('admin.order_details.products_receipt', 'Comprovante de Produtos') . '</h6>';
                                             if ($okProdutos) {
                                                 $atP = (string)($docProdutos['uploaded_at'] ?? '');
-                                                echo '<div class="alert alert-success py-2 mb-2"><strong>Recebido.</strong>'
-                                                    . (!empty($atP) ? ' <span class="small">Enviado em ' . htmlspecialchars(date('d/m/Y H:i', strtotime($atP))) . '</span>' : '')
+                                                echo '<div class="alert alert-success py-2 mb-2"><strong>' . __('admin.order_details.received', 'Recebido.') . '</strong>'
+                                                    . (!empty($atP) ? ' <span class="small">' . __('admin.order_details.sent_on_no_colon', 'Enviado em') . ' ' . htmlspecialchars(date('d/m/Y H:i', strtotime($atP))) . '</span>' : '')
                                                     . '</div>';
-                                                echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docProdutos['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">Abrir arquivo</a>';
+                                                echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docProdutos['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">' . __('admin.order_details.open_file', 'Abrir arquivo') . '</a>';
                                             } else {
-                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante do pagamento dos produtos.</div>';
+                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>' . __('admin.order_details.awaiting', 'Aguardando.') . '</strong> ' . __('admin.order_details.products_payment_receipt', 'Comprovante do pagamento dos produtos.') . '</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
                                                     . '<input type="hidden" name="tipo_comprovante" value="produtos">'
                                                     . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante[]" accept="image/*,application/pdf" multiple required></div>'
-                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar</button>'
+                                                    . '<button type="submit" class="btn btn-sm btn-primary">' . __('admin.order_details.attach', 'Anexar') . '</button>'
                                                     . '</form>';
                                             }
                                             echo '</div></div></div>';
@@ -5546,21 +5738,21 @@ LINKSCRIPT;
                                             // Bloco Taxas/Impostos
                                             echo '<div class="col-md-6">';
                                             echo '<div class="card border h-100"><div class="card-body">';
-                                            echo '<h6 class="card-title mb-3"><i class="fas fa-receipt me-2 text-warning"></i>Comprovante de Taxas / Impostos</h6>';
+                                            echo '<h6 class="card-title mb-3"><i class="fas fa-receipt me-2 text-warning"></i>' . __('admin.order_details.taxes_receipt', 'Comprovante de Taxas / Impostos') . '</h6>';
                                             if (!$temColTipo) {
-                                                echo '<div class="alert alert-secondary py-2 small">Rode a migration <strong>131_add_tipo_to_pedidos_pagamento_documentos.sql</strong> para habilitar este campo.</div>';
+                                                echo '<div class="alert alert-secondary py-2 small">' . __('admin.order_details.run_migration_enable_field', 'Rode a migration') . ' <strong>131_add_tipo_to_pedidos_pagamento_documentos.sql</strong> ' . __('admin.order_details.to_enable_this_field', 'para habilitar este campo.') . '</div>';
                                             } elseif ($okTaxas) {
                                                 $atT = (string)($docTaxas['uploaded_at'] ?? '');
-                                                echo '<div class="alert alert-success py-2 mb-2"><strong>Recebido.</strong>'
-                                                    . (!empty($atT) ? ' <span class="small">Enviado em ' . htmlspecialchars(date('d/m/Y H:i', strtotime($atT))) . '</span>' : '')
+                                                echo '<div class="alert alert-success py-2 mb-2"><strong>' . __('admin.order_details.received', 'Recebido.') . '</strong>'
+                                                    . (!empty($atT) ? ' <span class="small">' . __('admin.order_details.sent_on_no_colon', 'Enviado em') . ' ' . htmlspecialchars(date('d/m/Y H:i', strtotime($atT))) . '</span>' : '')
                                                     . '</div>';
-                                                echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docTaxas['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">Abrir arquivo</a>';
+                                                echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docTaxas['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">' . __('admin.order_details.open_file', 'Abrir arquivo') . '</a>';
                                             } else {
-                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante de taxas, impostos.</div>';
+                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>' . __('admin.order_details.awaiting', 'Aguardando.') . '</strong> ' . __('admin.order_details.taxes_payment_receipt', 'Comprovante de taxas, impostos.') . '</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
                                                     . '<input type="hidden" name="tipo_comprovante" value="taxas">'
                                                     . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante[]" accept="image/*,application/pdf" multiple required></div>'
-                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar</button>'
+                                                    . '<button type="submit" class="btn btn-sm btn-primary">' . __('admin.order_details.attach', 'Anexar') . '</button>'
                                                     . '</form>';
                                             }
                                             echo '</div></div></div>';
@@ -5574,14 +5766,14 @@ LINKSCRIPT;
                                 echo '</div>
                                 <hr>
                                 <div class="mb-3">
-                                    <label class="form-label">Atualizar Status:</label>
+                                    <label class="form-label">' . __('admin.order_details.update_status', 'Atualizar Status') . ':</label>
                                     <select class="form-select" id="novo_status">
-                                        <option value="">Selecione...</option>
+                                        <option value="">' . __('common.select', 'Selecione...') . '</option>
                                         ' . $this->buildStatusOptions((string)($pedido['status'] ?? ''), false) . '
                                     </select>
                                 </div>
-                                ' . (($statusBloqueadoPorComprovante ?? false) ? '<div class="alert alert-warning">Envie o comprovante para liberar a edição do status.</div>' : '') . '
-                                <button onclick="atualizarStatus()" class="btn btn-primary w-100" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>Atualizar Status</button>
+                                ' . (($statusBloqueadoPorComprovante ?? false) ? '<div class="alert alert-warning">' . __('admin.order_details.send_receipt_to_unlock', 'Envie o comprovante para liberar a edição do status.') . '</div>' : '') . '
+                                <button onclick="atualizarStatus()" class="btn btn-primary w-100" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>' . __('admin.order_details.update_status_btn', 'Atualizar Status') . '</button>
                             </div>
                         </div>';
 
@@ -5604,13 +5796,13 @@ LINKSCRIPT;
                                 $cTotal = (int) ($carneInfo['quantidade_parcelas'] ?? 0);
                                 $cProgresso = $cTotal > 0 ? round(($cPagas / $cTotal) * 100) : 0;
                                 $cStatusMap = [
-                                    'aguardando_primeira_parcela' => ['cor' => 'info', 'label' => 'Aguardando 1ª parcela'],
-                                    'ativo' => ['cor' => 'primary', 'label' => 'Ativo'],
-                                    'em_andamento' => ['cor' => 'primary', 'label' => 'Em andamento'],
-                                    'com_atraso' => ['cor' => 'danger', 'label' => 'Com atraso'],
-                                    'quitado' => ['cor' => 'success', 'label' => 'Quitado'],
-                                    'liberado_envio' => ['cor' => 'success', 'label' => 'Liberado p/ envio'],
-                                    'encerrado' => ['cor' => 'secondary', 'label' => 'Encerrado'],
+                                    'aguardando_primeira_parcela' => ['cor' => 'info', 'label' => __('admin.order_details.carne_status_awaiting_first', 'Aguardando 1ª parcela')],
+                                    'ativo' => ['cor' => 'primary', 'label' => __('admin.order_details.carne_status_active', 'Ativo')],
+                                    'em_andamento' => ['cor' => 'primary', 'label' => __('admin.order_details.carne_status_in_progress', 'Em andamento')],
+                                    'com_atraso' => ['cor' => 'danger', 'label' => __('admin.order_details.carne_status_overdue', 'Com atraso')],
+                                    'quitado' => ['cor' => 'success', 'label' => __('admin.order_details.carne_status_settled', 'Quitado')],
+                                    'liberado_envio' => ['cor' => 'success', 'label' => __('admin.order_details.carne_status_released', 'Liberado p/ envio')],
+                                    'encerrado' => ['cor' => 'secondary', 'label' => __('admin.order_details.carne_status_closed', 'Encerrado')],
                                 ];
                                 $cSt = $cStatusMap[$carneInfo['status']] ?? ['cor' => 'secondary', 'label' => ucfirst(str_replace('_', ' ', $carneInfo['status']))];
                                 $cValorPago = (float) ($carneInfo['valor_pago'] ?? 0);
@@ -5619,21 +5811,21 @@ LINKSCRIPT;
                                 echo '
                         <div class="card mt-3">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Carnê Braziliana</h5>
+                                <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>' . __('admin.order_details.carne_braziliana', 'Carnê Braziliana') . '</h5>
                                 <span class="badge bg-' . $cSt['cor'] . '">' . htmlspecialchars($cSt['label']) . '</span>
                             </div>
                             <div class="card-body">
                                 <div class="row text-center mb-3">
                                     <div class="col-4">
-                                        <small class="text-muted d-block">Parcelas</small>
+                                        <small class="text-muted d-block">' . __('admin.order_details.installments', 'Parcelas') . '</small>
                                         <span class="fw-bold">' . $cPagas . ' / ' . $cTotal . '</span>
                                     </div>
                                     <div class="col-4">
-                                        <small class="text-muted d-block">Valor Pago</small>
+                                        <small class="text-muted d-block">' . __('admin.order_details.amount_paid', 'Valor Pago') . '</small>
                                         <span class="fw-bold text-success">R$ ' . number_format($cValorPago, 2, ',', '.') . '</span>
                                     </div>
                                     <div class="col-4">
-                                        <small class="text-muted d-block">Total Carnê</small>
+                                        <small class="text-muted d-block">' . __('admin.order_details.carne_total', 'Total Carnê') . '</small>
                                         <span class="fw-bold">R$ ' . number_format($cTotalGeral, 2, ',', '.') . '</span>
                                     </div>
                                 </div>
@@ -5641,13 +5833,13 @@ LINKSCRIPT;
                                     <div class="progress-bar bg-' . ($cProgresso >= 100 ? 'success' : 'primary') . '" style="width: ' . $cProgresso . '%"></div>
                                 </div>';
                                 if (!empty($carneInfo['proximo_vencimento'])) {
-                                    echo '<p class="small text-muted mb-2"><i class="fas fa-calendar me-1"></i>Próximo vencimento: <strong>' . date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) . '</strong></p>';
+                                    echo '<p class="small text-muted mb-2"><i class="fas fa-calendar me-1"></i>' . __('admin.order_details.next_due_date', 'Próximo vencimento') . ': <strong>' . date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) . '</strong></p>';
                                 }
                                 if (!empty($carneInfo['ultima_parcela_vencimento'])) {
-                                    echo '<p class="small text-muted mb-2"><i class="fas fa-calendar-check me-1"></i>Última parcela: <strong>' . date('d/m/Y', strtotime($carneInfo['ultima_parcela_vencimento'])) . '</strong></p>';
+                                    echo '<p class="small text-muted mb-2"><i class="fas fa-calendar-check me-1"></i>' . __('admin.order_details.last_installment', 'Última parcela') . ': <strong>' . date('d/m/Y', strtotime($carneInfo['ultima_parcela_vencimento'])) . '</strong></p>';
                                 }
                                 echo '<a href="/admin/carnes/detalhes/' . (int) $carneInfo['id'] . '" class="btn btn-outline-primary btn-sm w-100">
-                                    <i class="fas fa-external-link-alt me-1"></i>Ver detalhes do Carnê
+                                    <i class="fas fa-external-link-alt me-1"></i>' . __('admin.order_details.view_carne_details', 'Ver detalhes do Carnê') . '
                                 </a>
                             </div>
                         </div>';
@@ -5679,29 +5871,29 @@ LINKSCRIPT;
                             echo '
                         <div class="card mt-3 border-danger">
                             <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Carnê Não Criado</h5>
-                                <span class="badge bg-light text-danger">Erro</span>
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>' . __('admin.order_details.carne_not_created', 'Carnê Não Criado') . '</h5>
+                                <span class="badge bg-light text-danger">' . __('common.error', 'Erro') . '</span>
                             </div>
                             <div class="card-body">
-                                <p class="text-danger mb-2">O pedido foi registrado como <strong>Carnê Braziliana</strong>, porém o carnê não foi criado no sistema (possível timeout ou erro na geração).</p>';
+                                <p class="text-danger mb-2">' . __('admin.order_details.carne_not_created_desc_1', 'O pedido foi registrado como') . ' <strong>' . __('admin.order_details.carne_braziliana', 'Carnê Braziliana') . '</strong>, ' . __('admin.order_details.carne_not_created_desc_2', 'porém o carnê não foi criado no sistema (possível timeout ou erro na geração).') . '</p>';
                             if ($metaParcelas) {
                                 echo '<div class="alert alert-info py-2 mb-2">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    <strong>Parcelas selecionadas pelo cliente:</strong> ' . $metaParcelas . 'x';
-                                if ($metaSubtotal) echo ' | Produtos: R$ ' . number_format((float) $metaSubtotal, 2, ',', '.');
-                                if ($metaTaxas) echo ' | Taxas: R$ ' . number_format((float) $metaTaxas, 2, ',', '.');
+                                    <strong>' . __('admin.order_details.installments_selected_by_customer', 'Parcelas selecionadas pelo cliente') . ':</strong> ' . $metaParcelas . 'x';
+                                if ($metaSubtotal) echo ' | ' . __('admin.order_details.comp_products', 'Produtos') . ': R$ ' . number_format((float) $metaSubtotal, 2, ',', '.');
+                                if ($metaTaxas) echo ' | ' . __('admin.order_details.fees', 'Taxas') . ': R$ ' . number_format((float) $metaTaxas, 2, ',', '.');
                                 echo '</div>';
                             } else {
                                 echo '<div class="alert alert-warning py-2 mb-2">
                                     <i class="fas fa-exclamation-circle me-1"></i>
-                                    Informação de parcelas não encontrada no registro (pedido_meta).
+                                    ' . __('admin.order_details.installments_info_not_found', 'Informação de parcelas não encontrada no registro (pedido_meta).') . '
                                 </div>';
                             }
                             echo '
                                 <form method="POST" action="/admin/carnes/recriar" class="mt-2">
                                     <input type="hidden" name="pedido_id" value="' . (int) $pedido['id'] . '">
                                     <div class="mb-2">
-                                        <label class="form-label small fw-bold mb-1">Quantidade de parcelas:</label>
+                                        <label class="form-label small fw-bold mb-1">' . __('admin.order_details.number_of_installments', 'Quantidade de parcelas') . ':</label>
                                         <select name="parcelas" class="form-select form-select-sm" required>';
                             $defaultParcelas = $metaParcelas ?: 0;
                             for ($np = 1; $np <= 12; $np++) {
@@ -5711,12 +5903,12 @@ LINKSCRIPT;
                             echo '
                                         </select>';
                             if ($metaParcelas) {
-                                echo '<div class="form-text text-info"><i class="fas fa-info-circle me-1"></i>Cliente selecionou ' . $metaParcelas . 'x no checkout</div>';
+                                echo '<div class="form-text text-info"><i class="fas fa-info-circle me-1"></i>' . __('admin.order_details.customer_selected', 'Cliente selecionou') . ' ' . $metaParcelas . 'x ' . __('admin.order_details.at_checkout', 'no checkout') . '</div>';
                             }
                             echo '
                                     </div>
-                                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm(\'Deseja recriar o carnê para este pedido com \' + this.form.parcelas.value + \' parcelas?\')">
-                                        <i class="fas fa-redo me-1"></i>Recriar Carnê
+                                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm(\'' . htmlspecialchars(__('admin.order_details.confirm_recreate_carne_1', 'Deseja recriar o carnê para este pedido com'), ENT_QUOTES, 'UTF-8') . ' \' + this.form.parcelas.value + \' ' . htmlspecialchars(__('admin.order_details.confirm_recreate_carne_2', 'parcelas?'), ENT_QUOTES, 'UTF-8') . '\')">
+                                        <i class="fas fa-redo me-1"></i>' . __('admin.order_details.recreate_carne', 'Recriar Carnê') . '
                                     </button>
                                 </form>
                             </div>
@@ -5726,16 +5918,16 @@ LINKSCRIPT;
                         echo '
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <h5 class="mb-0">Dados do Cliente</h5>
-                                <a href="#" class="btn btn-sm btn-outline-primary js-abrir-editar-cliente-pedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a>
+                                <h5 class="mb-0">' . __('admin.order_details.customer_data', 'Dados do Cliente') . '</h5>
+                                <a href="#" class="btn btn-sm btn-outline-primary js-abrir-editar-cliente-pedido"><i class="fas fa-pen-to-square me-1"></i>' . __('admin.order_details.edit_data', 'Editar dados') . '</a>
                             </div>
                             <div class="card-body">
-                                <p><strong>Nome:</strong> ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</p>
+                                <p><strong>' . __('common.name', 'Nome') . ':</strong> ' . htmlspecialchars($pedido['cliente_nome'] ?? __('admin.order_details.visitor', 'Visitante')) . '</p>
                                 <p><strong>Email:</strong> ' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                <p><strong>Telefone:</strong> ' . htmlspecialchars($pedido['cliente_telefone'] ?? 'N/A') . '</p>
+                                <p><strong>' . __('common.phone', 'Telefone') . ':</strong> ' . htmlspecialchars($pedido['cliente_telefone'] ?? 'N/A') . '</p>
                                 <p><strong>Suite:</strong> ' . (!empty($pedido['cliente_suite']) ? (int) $pedido['cliente_suite'] : 'N/A') . '</p>
                                 <hr>
-                                <p><strong>Endereço:</strong><br>' .
+                                <p><strong>' . __('common.address', 'Endereço') . ':</strong><br>' .
                                     htmlspecialchars(
                                         trim(
                                             ($pedido['endereco_entrega'] ?? $pedido['endereco'] ?? $pedido['logradouro'] ?? '') .
@@ -5758,10 +5950,10 @@ LINKSCRIPT;
         if ($temDestinatario) {
             echo '<hr>
                                 <div class="mb-0">
-                                    <span class="badge bg-info text-dark mb-2"><i class="fas fa-user-friends me-1"></i>Entrega para outra pessoa</span>
-                                    <p class="mb-1"><strong>Destinatário:</strong> ' . htmlspecialchars($destNome ?: 'N/A') . '</p>'
-                                    . ($destDoc !== '' ? '<p class="mb-1"><strong>CPF/Doc:</strong> ' . htmlspecialchars($destDoc) . '</p>' : '')
-                                    . ($destTel !== '' ? '<p class="mb-0"><strong>Telefone:</strong> ' . htmlspecialchars($destTel) . '</p>' : '')
+                                    <span class="badge bg-info text-dark mb-2"><i class="fas fa-user-friends me-1"></i>' . __('admin.order_details.delivery_to_other_person', 'Entrega para outra pessoa') . '</span>
+                                    <p class="mb-1"><strong>' . __('admin.order_details.recipient', 'Destinatário') . ':</strong> ' . htmlspecialchars($destNome ?: 'N/A') . '</p>'
+                                    . ($destDoc !== '' ? '<p class="mb-1"><strong>' . __('admin.order_details.cpf_doc', 'CPF/Doc') . ':</strong> ' . htmlspecialchars($destDoc) . '</p>' : '')
+                                    . ($destTel !== '' ? '<p class="mb-0"><strong>' . __('common.phone', 'Telefone') . ':</strong> ' . htmlspecialchars($destTel) . '</p>' : '')
                                 . '</div>';
         }
 
@@ -5820,29 +6012,29 @@ LINKSCRIPT;
                 $auditoriaHtml .= '<div class="row mt-4"><div class="col-12">';
                 $auditoriaHtml .= '<div class="card mb-4 border-secondary">';
                 $auditoriaHtml .= '<div class="card-header bg-light d-flex justify-content-between align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#collapseAuditoria" aria-expanded="false">';
-                $auditoriaHtml .= '<h6 class="mb-0"><i class="fas fa-clock-rotate-left me-2"></i>Auditoria / Histórico</h6>';
+                $auditoriaHtml .= '<h6 class="mb-0"><i class="fas fa-clock-rotate-left me-2"></i>' . __('admin.order_details.audit_history', 'Auditoria / Histórico') . '</h6>';
                 $auditoriaHtml .= '<i class="fas fa-chevron-down small"></i>';
                 $auditoriaHtml .= '</div>';
                 $auditoriaHtml .= '<div class="collapse" id="collapseAuditoria"><div class="card-body">';
 
                 // Histórico de status
                 if (!empty($statusHistRows)) {
-                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-exchange-alt me-1"></i> Histórico de Status</h6>';
-                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Data</th><th>De</th><th>Para</th><th>Observação</th><th>Usuário</th></tr></thead><tbody>';
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-exchange-alt me-1"></i> ' . __('admin.order_details.status_history', 'Histórico de Status') . '</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>' . __('admin.order_details.date', 'Data') . '</th><th>' . __('admin.order_details.from', 'De') . '</th><th>' . __('admin.order_details.to', 'Para') . '</th><th>' . __('admin.order_details.note', 'Observação') . '</th><th>' . __('admin.order_details.user', 'Usuário') . '</th></tr></thead><tbody>';
                     foreach ($statusHistRows as $sh) {
                         $auditoriaHtml .= '<tr><td class="small">' . ($sh['created_at'] ? date('d/m/Y H:i', strtotime($sh['created_at'])) : '-') . '</td>';
                         $auditoriaHtml .= '<td><span class="badge bg-secondary">' . htmlspecialchars($sh['status_anterior'] ?? '-') . '</span></td>';
                         $auditoriaHtml .= '<td><span class="badge bg-primary">' . htmlspecialchars($sh['novo_status'] ?? '-') . '</span></td>';
                         $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['observacao'] ?? '-') . '</td>';
-                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['usuario_nome'] ?? 'Sistema') . '</td></tr>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($sh['usuario_nome'] ?? __('admin.order_details.system', 'Sistema')) . '</td></tr>';
                     }
                     $auditoriaHtml .= '</tbody></table></div>';
                 }
 
                 // Etiquetas
                 if (!empty($etiquetaRows)) {
-                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-barcode me-1"></i> Etiquetas</h6>';
-                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Data</th><th>Tracking</th><th>Status</th><th>WP Post ID</th></tr></thead><tbody>';
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-barcode me-1"></i> ' . __('admin.order_details.labels', 'Etiquetas') . '</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>' . __('admin.order_details.date', 'Data') . '</th><th>Tracking</th><th>' . __('common.status', 'Status') . '</th><th>WP Post ID</th></tr></thead><tbody>';
                     foreach ($etiquetaRows as $et) {
                         $auditoriaHtml .= '<tr><td class="small">' . ($et['created_at'] ? date('d/m/Y H:i', strtotime($et['created_at'])) : '-') . '</td>';
                         $auditoriaHtml .= '<td><code>' . htmlspecialchars($et['tracking_number'] ?? '-') . '</code></td>';
@@ -5854,8 +6046,8 @@ LINKSCRIPT;
 
                 // Log de auditoria (edições)
                 if (!empty($auditRows)) {
-                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-pen me-1"></i> Log de Edições</h6>';
-                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead class="table-light"><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Mudanças</th><th>IP</th></tr></thead><tbody>';
+                    $auditoriaHtml .= '<h6 class="text-muted mb-2"><i class="fas fa-pen me-1"></i> ' . __('admin.order_details.edit_log', 'Log de Edições') . '</h6>';
+                    $auditoriaHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead class="table-light"><tr><th>' . __('admin.order_details.date', 'Data') . '</th><th>' . __('admin.order_details.user', 'Usuário') . '</th><th>' . __('admin.order_details.action', 'Ação') . '</th><th>' . __('admin.order_details.changes', 'Mudanças') . '</th><th>IP</th></tr></thead><tbody>';
                     foreach ($auditRows as $ar) {
                         $antigos = json_decode($ar['valores_antigos'] ?? '', true);
                         $novos = json_decode($ar['valores_novos'] ?? '', true);
@@ -5871,10 +6063,10 @@ LINKSCRIPT;
                                 }
                             }
                             $mudancas = implode('<br>', array_slice($diffs, 0, 5));
-                            if (count($diffs) > 5) $mudancas .= '<br><span class="text-muted">...+' . (count($diffs) - 5) . ' campos</span>';
+                            if (count($diffs) > 5) $mudancas .= '<br><span class="text-muted">...+' . (count($diffs) - 5) . ' ' . __('admin.order_details.fields', 'campos') . '</span>';
                         }
                         $auditoriaHtml .= '<tr><td class="small text-nowrap">' . ($ar['created_at'] ? date('d/m/Y H:i', strtotime($ar['created_at'])) : '-') . '</td>';
-                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['usuario_nome'] ?? 'Sistema') . '</td>';
+                        $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['usuario_nome'] ?? __('admin.order_details.system', 'Sistema')) . '</td>';
                         $auditoriaHtml .= '<td class="small">' . htmlspecialchars($ar['acao'] ?? '-') . '</td>';
                         $auditoriaHtml .= '<td class="small">' . ($mudancas ?: '-') . '</td>';
                         $auditoriaHtml .= '<td class="small text-muted">' . htmlspecialchars($ar['ip'] ?? '-') . '</td></tr>';
@@ -5901,7 +6093,7 @@ LINKSCRIPT;
             if (status) {
                 let estornar = 0;
                 if (status === "cancelado") {
-                    estornar = confirm("Deseja estornar/cancelar o pagamento também?") ? 1 : 0;
+                    estornar = confirm("' . htmlspecialchars(__('admin.order_details.confirm_refund_payment', 'Deseja estornar/cancelar o pagamento também?'), ENT_QUOTES, 'UTF-8') . '") ? 1 : 0;
                 }
                 window.location.href = "/admin/pedidos/atualizar-status/' . $id . '/" + status + "?estornar=" + estornar;
             }
@@ -5922,8 +6114,8 @@ LINKSCRIPT;
                     setTimeout(() => { msg.style.display = "none"; }, 1800);
                 }
                 if (btn) {
-                    btn.innerText = "Copiado";
-                    setTimeout(() => { btn.innerText = old || "Copiar PIX"; }, 1800);
+                    btn.innerText = "' . htmlspecialchars(__('common.copied', 'Copiado'), ENT_QUOTES, 'UTF-8') . '";
+                    setTimeout(() => { btn.innerText = old || "' . htmlspecialchars(__('admin.order_details.copy_pix', 'Copiar PIX'), ENT_QUOTES, 'UTF-8') . '"; }, 1800);
                 }
             };
 
@@ -5959,8 +6151,8 @@ LINKSCRIPT;
                     setTimeout(() => { msg.style.display = "none"; }, 1800);
                 }
                 if (btn) {
-                    btn.innerText = "Copiado";
-                    setTimeout(() => { btn.innerText = old || "Copiar link"; }, 1800);
+                    btn.innerText = "' . htmlspecialchars(__('common.copied', 'Copiado'), ENT_QUOTES, 'UTF-8') . '";
+                    setTimeout(() => { btn.innerText = old || "' . htmlspecialchars(__('admin.order_details.copy_link', 'Copiar link'), ENT_QUOTES, 'UTF-8') . '"; }, 1800);
                 }
             };
 
@@ -6282,7 +6474,7 @@ LINKSCRIPT;
 
         $html = '<div class="mt-1" style="font-size:.72rem;">';
         $html .= '<div class="progress" style="height:6px;border-radius:3px;"><div class="progress-bar ' . $barColor . '" style="width:' . $pct . '%"></div></div>';
-        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' parcelas &middot; R$ ' . number_format($valorPago, 2, ',', '.') . '</span>';
+        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' ' . __('admin.orders.installments', 'parcelas') . ' &middot; <span>R$ ' . number_format($valorPago, 2, ',', '.') . '</span></span>';
         $html .= '</div>';
         return $html;
     }
@@ -6305,7 +6497,10 @@ LINKSCRIPT;
             'carne_aguardando' => 'Carnê Aguardando',
         ]);
         $status = trim($status);
-        return $map[$status] ?? ($status !== '' ? ucfirst($status) : '');
+        if (isset($map[$status])) {
+            return __('admin.order_status.' . $status, $map[$status]);
+        }
+        return $status !== '' ? ucfirst($status) : '';
     }
     
     private function getStatusIcon($status) {
@@ -6473,11 +6668,11 @@ LINKSCRIPT;
 
     /** Gera as <option> de status com o valor atual selecionado. */
     private function buildStatusOptions(string $current, bool $withEmpty = false): string {
-        $html = $withEmpty ? '<option value="">Selecione...</option>' : '';
+        $html = $withEmpty ? '<option value="">' . __('common.select', 'Selecione...') . '</option>' : '';
         $currentLower = strtolower(trim($current));
         foreach (self::getStatusList() as $val => $label) {
             $sel = ($currentLower === strtolower($val)) ? ' selected' : '';
-            $html .= '<option value="' . $val . '"' . $sel . '>' . htmlspecialchars($label) . '</option>';
+            $html .= '<option value="' . $val . '"' . $sel . '>' . htmlspecialchars(__('admin.order_status.' . $val, $label)) . '</option>';
         }
         // Se o status atual não está na lista, adicionar como opção selecionada
         if ($currentLower !== '' && !array_key_exists($currentLower, array_change_key_case(self::getStatusList(), CASE_LOWER))) {
@@ -6777,7 +6972,7 @@ LINKSCRIPT;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minhas Comissões - Admin</title>
+    <title>' . __('admin.commissions.title', 'Minhas Comissões') . ' - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">';
@@ -6813,10 +7008,10 @@ LINKSCRIPT;
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Minhas Comissões</h1>
+                    <h1 class="page-title">' . __('admin.commissions.title', 'Minhas Comissões') . '</h1>
                     <div>
-                        <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
-                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
+                        <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> ' . __('admin.commissions.back', 'Voltar') . '</a>
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> ' . __('admin.commissions.new_manual_order', 'Novo Pedido Manual') . '</a>
                     </div>
                 </div>
 
@@ -6824,11 +7019,11 @@ LINKSCRIPT;
                 <div class="card border-0 shadow-sm mb-4"><div class="card-body py-3">
                     <form method="GET" class="row g-2 align-items-end">
                         <input type="hidden" name="escopo" value="' . htmlspecialchars($escopo) . '">
-                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
-                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data fim</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
-                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Status pedido</label><select name="status_pedido" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
-                        <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
-                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes" class="btn btn-outline-secondary btn-sm">Limpar</a></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">' . __('admin.commissions.date_start', 'Data início') . '</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">' . __('admin.commissions.date_end', 'Data fim') . '</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">' . __('admin.commissions.order_status', 'Status pedido') . '</label><select name="status_pedido" class="form-select form-select-sm"><option value="">' . __('admin.commissions.all', 'Todos') . '</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
+                        <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>' . __('admin.commissions.filter', 'Filtrar') . '</button></div>
+                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes" class="btn btn-outline-secondary btn-sm">' . __('admin.commissions.clear', 'Limpar') . '</a></div>
                     </form>
                 </div></div>
 
@@ -6850,38 +7045,38 @@ LINKSCRIPT;
 
             echo '<div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="mb-0">Moeda: ' . htmlspecialchars($moeda) . '</h5>
+                        <h5 class="mb-0">' . __('admin.commissions.currency', 'Moeda') . ': ' . htmlspecialchars($moeda) . '</h5>
                     </div>
                     <div class="comm-cards">
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Total Faturado (Manuais)</div>
+                            <div class="text-muted small">' . __('admin.commissions.total_billed_manual', 'Total Faturado (Manuais)') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalFaturado, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Custo dos Produtos</div>
+                            <div class="text-muted small">' . __('admin.commissions.products_cost', 'Custo dos Produtos') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalCusto, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Total Líquido</div>
+                            <div class="text-muted small">' . __('admin.commissions.total_net', 'Total Líquido') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalLiquido, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Comissão</div>
+                            <div class="text-muted small">' . __('admin.commissions.commission', 'Comissão') . '</div>
                             <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (' . $formatMoney($valorComissao, $moeda) . ')</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Comissão total</div>
+                            <div class="text-muted small">' . __('admin.commissions.total_commission', 'Comissão total') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
 
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Processamento (Online) - Base líquida</div>
+                            <div class="text-muted small">' . __('admin.commissions.processing_net_base', 'Processamento (Online) - Base líquida') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>
                         </div>
                         <div class="border rounded p-3 comm-card">
-                            <div class="text-muted small">Processamento (Online) - Comissão</div>
+                            <div class="text-muted small">' . __('admin.commissions.processing_commission', 'Processamento (Online) - Comissão') . '</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>
-                            <div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>
+                            <div class="small text-muted">' . __('admin.commissions.avg_percent', '% médio') . ': ' . number_format($procPercMed, 2, ',', '.') . '%</div>
                         </div>
                     </div>
                 </div>';
@@ -6899,12 +7094,12 @@ LINKSCRIPT;
         echo '</div>
 
                 <div class="card mb-4">
-                    <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
+                    <div class="card-header"><strong>' . __('admin.commissions.paid_manual_orders', 'Pedidos Manuais Pagos') . '</strong></div>
                     <div class="card-body">';
 
         $renderTabelaPedidos = function(array $pedidos, string $moedaLabel, float $percentMoeda) use ($formatMoney) {
             if (empty($pedidos)) {
-                echo '<div class="text-muted">Sem pedidos manuais pagos em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                echo '<div class="text-muted">' . __('admin.commissions.no_paid_manual_in', 'Sem pedidos manuais pagos em') . ' ' . htmlspecialchars($moedaLabel) . '.</div>';
                 return;
             }
 
@@ -6912,14 +7107,14 @@ LINKSCRIPT;
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Pedido</th>
-                                <th>Data</th>
-                                <th class="text-end">Faturado</th>
-                                <th class="text-end">Impostos</th>
-                                <th class="text-end">Custo</th>
-                                <th class="text-end">Líquido</th>
-                                <th class="text-end">Comissão</th>
-                                <th>Ações</th>
+                                <th>' . __('admin.commissions.th_order', 'Pedido') . '</th>
+                                <th>' . __('admin.commissions.th_date', 'Data') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_billed', 'Faturado') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_taxes', 'Impostos') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_cost', 'Custo') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_net', 'Líquido') . '</th>
+                                <th class="text-end">' . __('admin.commissions.th_commission', 'Comissão') . '</th>
+                                <th>' . __('admin.commissions.th_actions', 'Ações') . '</th>
                             </tr>
                         </thead>
                         <tbody>';
@@ -6971,17 +7166,17 @@ LINKSCRIPT;
         echo '        </div>
                 </div>
                 <div class="card">
-                    <div class="card-header"><strong>Comissões de Processamento (Online)</strong></div>
+                    <div class="card-header"><strong>' . __('admin.commissions.processing_commissions', 'Comissões de Processamento (Online)') . '</strong></div>
                     <div class="card-body">';
 
         $renderTabelaProc = function(array $linhas, string $moedaLabel) use ($formatMoney) {
             if (empty($linhas)) {
-                echo '<div class="text-muted">Sem comissões de processamento em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                echo '<div class="text-muted">' . __('admin.commissions.no_processing_in', 'Sem comissões de processamento em') . ' ' . htmlspecialchars($moedaLabel) . '.</div>';
                 return;
             }
             echo '<div class="table-responsive">'
                 . '<table class="table table-hover">'
-                . '<thead><tr><th>Pedido</th><th>Data</th><th class="text-end">Pago</th><th class="text-end">Impostos</th><th class="text-end">Custo</th><th class="text-end">Líquido</th><th class="text-end">%</th><th class="text-end">Comissão</th><th>Ações</th></tr></thead><tbody>';
+                . '<thead><tr><th>' . __('admin.commissions.th_order', 'Pedido') . '</th><th>' . __('admin.commissions.th_date', 'Data') . '</th><th class="text-end">' . __('admin.commissions.th_paid', 'Pago') . '</th><th class="text-end">' . __('admin.commissions.th_taxes', 'Impostos') . '</th><th class="text-end">' . __('admin.commissions.th_cost', 'Custo') . '</th><th class="text-end">' . __('admin.commissions.th_net', 'Líquido') . '</th><th class="text-end">%</th><th class="text-end">' . __('admin.commissions.th_commission', 'Comissão') . '</th><th>' . __('admin.commissions.th_actions', 'Ações') . '</th></tr></thead><tbody>';
             foreach ($linhas as $r) {
                 $pid = (int) ($r['pedido_id'] ?? 0);
                 $dt = (string) ($r['created_at'] ?? '');
@@ -7024,22 +7219,29 @@ LINKSCRIPT;
         </div>
     </div>';
 
-        echo <<<'HTML'
+        $trashTitle = __('admin.commissions.trash_modal_title', 'Enviar pedido para lixeira');
+        $trashClose = __('common.close', 'Fechar');
+        $trashConfirmPre = __('admin.commissions.trash_confirm_pre', 'Confirma enviar o pedido');
+        $trashConfirmPost = __('admin.commissions.trash_confirm_post', 'para a lixeira?');
+        $trashCancel = __('admin.commissions.cancel', 'Cancelar');
+        $trashSend = __('admin.commissions.trash_send', 'Enviar para lixeira');
+
+        echo <<<HTML
 
     <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST" action="" id="formLixeiraPedido">
                     <div class="modal-header">
-                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                        <h5 class="modal-title">{$trashTitle}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{$trashClose}"></button>
                     </div>
                     <div class="modal-body">
-                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                        <div>{$trashConfirmPre} <strong id="lixeiraPedidoIdLabel"></strong> {$trashConfirmPost}</div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{$trashCancel}</button>
+                        <button type="submit" class="btn btn-danger">{$trashSend}</button>
                     </div>
                 </form>
             </div>

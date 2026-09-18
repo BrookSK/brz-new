@@ -1,4 +1,4 @@
-<?php $title = 'Logs do Carnê - Admin'; ?>
+<?php $title = __('admin.installment.logs_title', 'Logs do Carnê - Admin'); ?>
 <?php ob_start(); ?>
 <?php
 $tipoBadges = [
@@ -17,10 +17,10 @@ $tipoBadges = [
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="page-title">Logs do Carnê</h1>
+        <h1 class="page-title"><?= __('admin.installment.logs_heading', 'Logs do Carnê') ?></h1>
         <div>
-            <a href="/admin/carnes" class="btn btn-outline-primary"><i class="fas fa-file-invoice-dollar me-1"></i> Carnês</a>
-            <a href="/admin" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Voltar</a>
+            <a href="/admin/carnes" class="btn btn-outline-primary"><i class="fas fa-file-invoice-dollar me-1"></i> <?= __('admin.installment.tab_plans', 'Carnês') ?></a>
+            <a href="/admin" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> <?= __('admin.installment.back', 'Voltar') ?></a>
         </div>
     </div>
 
@@ -29,25 +29,25 @@ $tipoBadges = [
         <div class="card-body">
             <form method="GET" action="/admin/carnes/logs" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label small">Carnê ID</label>
-                    <input type="number" name="carne_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['carne_id'] ?? '') ?>" placeholder="ID do carnê">
+                    <label class="form-label small"><?= __('admin.installment.plan_id', 'Carnê ID') ?></label>
+                    <input type="number" name="carne_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['carne_id'] ?? '') ?>" placeholder="<?= htmlspecialchars(__('admin.installment.plan_id_placeholder', 'ID do carnê'), ENT_QUOTES, 'UTF-8') ?>">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small">Pedido ID</label>
-                    <input type="number" name="pedido_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['pedido_id'] ?? '') ?>" placeholder="ID do pedido">
+                    <label class="form-label small"><?= __('admin.installment.order_id_label', 'Pedido ID') ?></label>
+                    <input type="number" name="pedido_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['pedido_id'] ?? '') ?>" placeholder="<?= htmlspecialchars(__('admin.installment.order_id_placeholder2', 'ID do pedido'), ENT_QUOTES, 'UTF-8') ?>">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small">Tipo</label>
+                    <label class="form-label small"><?= __('admin.installment.type', 'Tipo') ?></label>
                     <select name="tipo" class="form-select form-select-sm">
-                        <option value="">Todos</option>
+                        <option value=""><?= __('admin.installment.filter_all', 'Todos') ?></option>
                         <?php foreach ($tipoBadges as $tipo => $cor): ?>
                             <option value="<?= $tipo ?>" <?= ($filtros['tipo'] ?? '') === $tipo ? 'selected' : '' ?>><?= $tipo ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search me-1"></i> Filtrar</button>
-                    <a href="/admin/carnes/logs" class="btn btn-outline-secondary btn-sm"><i class="fas fa-times me-1"></i> Limpar</a>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search me-1"></i> <?= __('admin.installment.filter', 'Filtrar') ?></button>
+                    <a href="/admin/carnes/logs" class="btn btn-outline-secondary btn-sm"><i class="fas fa-times me-1"></i> <?= __('admin.installment.clear', 'Limpar') ?></a>
                 </div>
             </form>
         </div>
@@ -56,26 +56,26 @@ $tipoBadges = [
     <!-- Tabela de Logs -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="fas fa-list me-1"></i> Logs (<?= count($logs) ?>)</span>
+            <span><i class="fas fa-list me-1"></i> <?= __('admin.installment.logs', 'Logs') ?> (<?= count($logs) ?>)</span>
         </div>
         <div class="card-body p-0">
             <?php if (empty($logs)): ?>
                 <div class="text-center text-muted py-5">
                     <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
-                    Nenhum log encontrado.
+                    <?= __('admin.installment.no_logs_found', 'Nenhum log encontrado.') ?>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 150px;">Data</th>
-                                <th style="width: 160px;">Tipo</th>
-                                <th style="width: 80px;">Carnê</th>
-                                <th style="width: 80px;">Pedido</th>
-                                <th style="width: 80px;">Parcela</th>
-                                <th>Mensagem</th>
-                                <th style="width: 200px;">Detalhes</th>
+                                <th style="width: 150px;"><?= __('admin.installment.col_date', 'Data') ?></th>
+                                <th style="width: 160px;"><?= __('admin.installment.type', 'Tipo') ?></th>
+                                <th style="width: 80px;"><?= __('admin.installment.col_plan', 'Carnê') ?></th>
+                                <th style="width: 80px;"><?= __('admin.installment.order', 'Pedido') ?></th>
+                                <th style="width: 80px;"><?= __('admin.installment.col_installment', 'Parcela') ?></th>
+                                <th><?= __('admin.installment.col_message', 'Mensagem') ?></th>
+                                <th style="width: 200px;"><?= __('admin.installment.details', 'Detalhes') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -111,12 +111,12 @@ $tipoBadges = [
                                     <td class="small">
                                         <?php if (!empty($log['detalhes'])): ?>
                                             <?php $detalheTruncado = mb_strlen($log['detalhes']) > 80 ? mb_substr($log['detalhes'], 0, 80) . '...' : $log['detalhes']; ?>
-                                            <span class="log-detalhe-truncado" title="Clique para expandir" style="cursor: pointer;" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                                            <span class="log-detalhe-truncado" title="<?= htmlspecialchars(__('admin.installment.click_to_expand', 'Clique para expandir'), ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer;" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline';">
                                                 <?= htmlspecialchars($detalheTruncado) ?>
                                             </span>
                                             <span class="log-detalhe-completo" style="display: none; word-break: break-all;">
                                                 <?= htmlspecialchars($log['detalhes']) ?>
-                                                <a href="#" class="text-muted small" onclick="event.preventDefault(); this.parentElement.style.display='none'; this.parentElement.previousElementSibling.style.display='inline';">[recolher]</a>
+                                                <a href="#" class="text-muted small" onclick="event.preventDefault(); this.parentElement.style.display='none'; this.parentElement.previousElementSibling.style.display='inline';"><?= __('admin.installment.collapse', '[recolher]') ?></a>
                                             </span>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
