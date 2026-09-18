@@ -374,15 +374,15 @@ class AdminPacotesRecebidosController extends Controller {
      */
     public static function getStatusList(): array {
         return [
-            'pendente' => 'Pendente',
-            'pedido_criado' => 'Pedido Criado',
-            'invoice_liberado' => 'Invoice Liberado',
-            'invoice_confirmado' => 'Invoice Confirmado',
-            'invoice_contestado' => 'Invoice Contestado',
-            'enviado' => 'Enviado',
-            'fatura_pendente' => 'Fatura Pendente',
-            'fatura_paga' => 'Fatura Paga',
-            'descartado' => 'Descartado',
+            'pendente' => __('admin.received_packages.status.pending', 'Pendente'),
+            'pedido_criado' => __('admin.received_packages.status.order_created', 'Pedido Criado'),
+            'invoice_liberado' => __('admin.received_packages.status.invoice_released', 'Invoice Liberado'),
+            'invoice_confirmado' => __('admin.received_packages.status.invoice_confirmed', 'Invoice Confirmado'),
+            'invoice_contestado' => __('admin.received_packages.status.invoice_disputed', 'Invoice Contestado'),
+            'enviado' => __('admin.received_packages.status.shipped', 'Enviado'),
+            'fatura_pendente' => __('admin.received_packages.status.invoice_pending', 'Fatura Pendente'),
+            'fatura_paga' => __('admin.received_packages.status.invoice_paid', 'Fatura Paga'),
+            'descartado' => __('admin.received_packages.status.discarded', 'Descartado'),
         ];
     }
 

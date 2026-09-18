@@ -3671,26 +3671,26 @@ HTML;
                 <div class="d-flex flex-wrap gap-1">
                     ' . (((string) ($pedido['origem_pedido'] ?? '') === 'manual')
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary btn-sm">'
-                            . '<i class="fas fa-pen-to-square me-1"></i><span class="d-none d-lg-inline">Editar Pedido Manual</span></a>')
+                            . '<i class="fas fa-pen-to-square me-1"></i><span class="d-none d-lg-inline">' . htmlspecialchars(__('admin.orders.details.edit_manual_order', 'Editar Pedido Manual'), ENT_QUOTES, 'UTF-8') . '</span></a>')
                         : '') . '
                     <form method="POST" action="/admin/pedidos/' . (int) $id . '/criar-ticket" style="display:inline-block">
                         <button type="submit" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-headset me-1"></i><span class="d-none d-md-inline">Criar ticket</span>
+                            <i class="fas fa-headset me-1"></i><span class="d-none d-md-inline">' . htmlspecialchars(__('admin.orders.details.create_ticket', 'Criar ticket'), ENT_QUOTES, 'UTF-8') . '</span>
                         </button>
                     </form>
-                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" onsubmit="return confirm(' . "'" . 'Sincronizar status de pagamento (Câmbio Real + AppMax + Stripe) agora?' . "'" . ');">
+                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" onsubmit="return confirm(' . "'" . htmlspecialchars(__('admin.orders.details.sync_payments_confirm', 'Sincronizar status de pagamento (Câmbio Real + AppMax + Stripe) agora?'), ENT_QUOTES, 'UTF-8') . "'" . ');">
                         <button type="submit" class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-rotate me-1"></i><span class="d-none d-lg-inline">Sincronizar pagamentos</span>
+                            <i class="fas fa-rotate me-1"></i><span class="d-none d-lg-inline">' . htmlspecialchars(__('admin.orders.details.sync_payments', 'Sincronizar pagamentos'), ENT_QUOTES, 'UTF-8') . '</span>
                         </button>
                     </form>
                     ' . (
                         $printCount > 0
-                        ? '<span id="badge-impressao-pedido" class="badge bg-success align-self-center me-1">Impresso ' . (int) $printCount . 'x' . ($lastPrintedBy !== '' ? ' por ' . htmlspecialchars($lastPrintedBy, ENT_QUOTES, 'UTF-8') : '') . '</span>'
-                        : '<span id="badge-impressao-pedido" class="badge bg-secondary align-self-center me-1">Não impresso</span>'
+                        ? '<span id="badge-impressao-pedido" class="badge bg-success align-self-center me-1">' . htmlspecialchars(__('admin.orders.details.printed', 'Impresso'), ENT_QUOTES, 'UTF-8') . ' ' . (int) $printCount . 'x' . ($lastPrintedBy !== '' ? ' ' . htmlspecialchars(__('admin.orders.details.printed_by', 'por'), ENT_QUOTES, 'UTF-8') . ' ' . htmlspecialchars($lastPrintedBy, ENT_QUOTES, 'UTF-8') : '') . '</span>'
+                        : '<span id="badge-impressao-pedido" class="badge bg-secondary align-self-center me-1">' . htmlspecialchars(__('admin.orders.details.not_printed', 'Não impresso'), ENT_QUOTES, 'UTF-8') . '</span>'
                     ) . '
-                    <span class="form-check form-check-inline align-self-center mb-0 me-1" title="Se marcado, o PDF é gerado sem a linha de Taxa de Serviço">
+                    <span class="form-check form-check-inline align-self-center mb-0 me-1" title="' . htmlspecialchars(__('admin.orders.details.hide_fee_pdf_tooltip', 'Se marcado, o PDF é gerado sem a linha de Taxa de Serviço'), ENT_QUOTES, 'UTF-8') . '">
                         <input class="form-check-input" type="checkbox" id="pdf-ocultar-taxa">
-                        <label class="form-check-label small" for="pdf-ocultar-taxa">Ocultar taxa no PDF</label>
+                        <label class="form-check-label small" for="pdf-ocultar-taxa">' . htmlspecialchars(__('admin.orders.details.hide_fee_pdf', 'Ocultar taxa no PDF'), ENT_QUOTES, 'UTF-8') . '</label>
                     </span>
                     <button type="button" class="btn btn-outline-dark btn-sm" onclick="abrirPdfPedido(' . (int) $id . ')">
                         <i class="fas fa-file-pdf me-1"></i><span class="d-none d-md-inline">PDF</span>
@@ -3717,31 +3717,31 @@ HTML;
                                 keepalive: true
                             }).then(function() {
                                 var b = document.getElementById("badge-impressao-pedido");
-                                if (b) { b.className = "badge bg-success align-self-center me-1"; b.textContent = "\u2713 Impresso agora"; }
+                                if (b) { b.className = "badge bg-success align-self-center me-1"; b.textContent = "\u2713 ' . htmlspecialchars(addslashes(__('admin.orders.details.printed_now', 'Impresso agora')), ENT_QUOTES, 'UTF-8') . '"; }
                             }).catch(function() {});
                         } catch (e) {}
                         return true;
                     }
                     </script>
                     <a href="/admin/pedidos/editar/' . $id . '?returnUrl=' . urlencode($voltarUrl) . '" class="btn btn-warning btn-sm">
-                        <i class="fas fa-edit me-1"></i><span class="d-none d-md-inline">Editar</span>
+                        <i class="fas fa-edit me-1"></i><span class="d-none d-md-inline">' . htmlspecialchars(__('common.edit', 'Editar'), ENT_QUOTES, 'UTF-8') . '</span>
                     </a>
                     <a href="/admin/pedidos/split?id=' . $id . '" class="btn btn-info btn-sm">
-                        <i class="fas fa-cut me-1"></i><span class="d-none d-md-inline">Split</span>
+                        <i class="fas fa-cut me-1"></i><span class="d-none d-md-inline">' . htmlspecialchars(__('admin.orders.details.split', 'Split'), ENT_QUOTES, 'UTF-8') . '</span>
                     </a>
                     <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
-                        <i class="fas fa-trash me-1"></i><span class="d-none d-md-inline">Lixeira</span>
+                        <i class="fas fa-trash me-1"></i><span class="d-none d-md-inline">' . htmlspecialchars(__('admin.orders.details.trash', 'Lixeira'), ENT_QUOTES, 'UTF-8') . '</span>
                     </button>
                     <a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">Voltar</span>
+                        <i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">' . htmlspecialchars(__('common.back', 'Voltar'), ENT_QUOTES, 'UTF-8') . '</span>
                     </a>
                 </div>
             </div>';
 
             if ($syncOk) {
-                echo '<div class="alert alert-success">Sincronização de pagamentos executada com sucesso.</div>';
+                echo '<div class="alert alert-success">' . htmlspecialchars(__('admin.orders.details.sync_success', 'Sincronização de pagamentos executada com sucesso.'), ENT_QUOTES, 'UTF-8') . '</div>';
             } elseif ($syncErr !== '') {
-                echo '<div class="alert alert-warning">Falha ao sincronizar pagamentos: ' . htmlspecialchars($syncErr) . '</div>';
+                echo '<div class="alert alert-warning">' . htmlspecialchars(__('admin.orders.details.sync_failed', 'Falha ao sincronizar pagamentos:'), ENT_QUOTES, 'UTF-8') . ' ' . htmlspecialchars($syncErr) . '</div>';
             }
 
             // Badge: sem comissão (já lançado no vendas.braziliana)
