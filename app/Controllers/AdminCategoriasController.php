@@ -159,7 +159,7 @@ class AdminCategoriasController extends Controller {
             $status = (string) $request->getParam('status', 'ativo');
 
             if ($nome === '') {
-                $_SESSION['message'] = 'Informe o nome da categoria.';
+                $_SESSION['message'] = __('admin.categories.msg_name_required', 'Informe o nome da categoria.');
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/categorias');
                 exit;
@@ -209,13 +209,13 @@ class AdminCategoriasController extends Controller {
                 $stmt->execute();
             }
 
-            $_SESSION['message'] = 'Categoria salva com sucesso.';
+            $_SESSION['message'] = __('admin.categories.msg_saved', 'Categoria salva com sucesso.');
             $_SESSION['message_type'] = 'success';
         } catch (\PDOException $e) {
-            $_SESSION['message'] = 'Erro ao salvar categoria.';
+            $_SESSION['message'] = __('admin.categories.msg_save_error', 'Erro ao salvar categoria.');
             $_SESSION['message_type'] = 'danger';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao salvar categoria.';
+            $_SESSION['message'] = __('admin.categories.msg_save_error', 'Erro ao salvar categoria.');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -254,7 +254,7 @@ class AdminCategoriasController extends Controller {
             }
 
             if ($hasProducts) {
-                $_SESSION['message'] = 'Não é possível excluir: existem produtos vinculados a esta categoria.';
+                $_SESSION['message'] = __('admin.categories.msg_delete_has_products', 'Não é possível excluir: existem produtos vinculados a esta categoria.');
                 $_SESSION['message_type'] = 'warning';
                 header('Location: /admin/categorias');
                 exit;
@@ -264,10 +264,10 @@ class AdminCategoriasController extends Controller {
             $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
             $stmt->execute();
 
-            $_SESSION['message'] = 'Categoria excluída com sucesso.';
+            $_SESSION['message'] = __('admin.categories.msg_deleted', 'Categoria excluída com sucesso.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao excluir categoria.';
+            $_SESSION['message'] = __('admin.categories.msg_delete_error', 'Erro ao excluir categoria.');
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -311,11 +311,11 @@ class AdminCategoriasController extends Controller {
         }
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Categorias - Braziliana Admin</title>
+    <title>' . htmlspecialchars(__('admin.categories.page_title', 'Categorias - Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/assets/css/lojas-categorias-redesign.css" rel="stylesheet">';
@@ -329,8 +329,8 @@ class AdminCategoriasController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Categorias</h1>
-                    <a href="/admin/categorias/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Nova Categoria</a>
+                    <h1 class="page-title">' . __('admin.categories.title', 'Categorias') . '</h1>
+                    <a href="/admin/categorias/novo" class="btn btn-primary"><i class="fas fa-plus"></i> ' . __('admin.categories.new_category', 'Nova Categoria') . '</a>
                 </div>';
 
         if (isset($_SESSION['message'])) {
@@ -346,34 +346,34 @@ class AdminCategoriasController extends Controller {
         if ($categoriaEdit !== null) {
             echo '<div class="card mb-4">
                     <div class="card-header bg-white">
-                        <strong>' . ($editId ? 'Editar Categoria' : 'Nova Categoria') . '</strong>
+                        <strong>' . ($editId ? __('admin.categories.edit_category', 'Editar Categoria') : __('admin.categories.new_category', 'Nova Categoria')) . '</strong>
                     </div>
                     <div class="card-body">
                         <form method="POST" action="/admin/categorias/salvar" class="row g-3">
                             <input type="hidden" name="id" value="' . $editId . '">
                             <div class="col-md-4">
-                                <label class="form-label">Nome *</label>
+                                <label class="form-label">' . __('admin.categories.label_name', 'Nome *') . '</label>
                                 <input type="text" class="form-control" name="nome" value="' . htmlspecialchars($editNome) . '" required>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Slug</label>
-                                <input type="text" class="form-control" name="slug" value="' . htmlspecialchars($editSlug) . '" placeholder="ex: eletronicos">
-                                <small class="text-muted">Se vazio, será gerado automaticamente.</small>
+                                <label class="form-label">' . __('admin.categories.label_slug', 'Slug') . '</label>
+                                <input type="text" class="form-control" name="slug" value="' . htmlspecialchars($editSlug) . '" placeholder="' . htmlspecialchars(__('admin.categories.slug_placeholder', 'ex: eletronicos'), ENT_QUOTES, 'UTF-8') . '">
+                                <small class="text-muted">' . __('admin.categories.slug_help', 'Se vazio, será gerado automaticamente.') . '</small>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Status</label>
+                                <label class="form-label">' . __('admin.categories.label_status', 'Status') . '</label>
                                 <select class="form-select" name="status">
-                                    <option value="ativo" ' . ($editStatus === 'ativo' ? 'selected' : '') . '>Ativa</option>
-                                    <option value="inativo" ' . ($editStatus === 'inativo' ? 'selected' : '') . '>Inativa</option>
+                                    <option value="ativo" ' . ($editStatus === 'ativo' ? 'selected' : '') . '>' . __('admin.categories.status_active', 'Ativa') . '</option>
+                                    <option value="inativo" ' . ($editStatus === 'inativo' ? 'selected' : '') . '>' . __('admin.categories.status_inactive', 'Inativa') . '</option>
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Descrição</label>
+                                <label class="form-label">' . __('admin.categories.label_description', 'Descrição') . '</label>
                                 <textarea class="form-control" name="descricao" rows="3">' . htmlspecialchars($editDescricao) . '</textarea>
                             </div>
                             <div class="col-12 d-flex gap-2">
-                                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
-                                <a href="/admin/categorias" class="btn btn-secondary">Cancelar</a>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> ' . __('admin.categories.btn_save', 'Salvar') . '</button>
+                                <a href="/admin/categorias" class="btn btn-secondary">' . __('admin.categories.btn_cancel', 'Cancelar') . '</a>
                             </div>
                         </form>
                     </div>
@@ -382,24 +382,24 @@ class AdminCategoriasController extends Controller {
 
         echo '<div class="card">
                 <div class="card-header bg-white">
-                    <strong>Lista de Categorias</strong>
+                    <strong>' . __('admin.categories.list_title', 'Lista de Categorias') . '</strong>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Nome</th>
-                                    <th>Slug</th>
-                                    <th>Status</th>
-                                    <th style="width: 140px;">Ações</th>
+                                    <th>' . __('admin.categories.th_id', 'ID') . '</th>
+                                    <th>' . __('admin.categories.th_name', 'Nome') . '</th>
+                                    <th>' . __('admin.categories.th_slug', 'Slug') . '</th>
+                                    <th>' . __('admin.categories.th_status', 'Status') . '</th>
+                                    <th style="width: 140px;">' . __('admin.categories.th_actions', 'Ações') . '</th>
                                 </tr>
                             </thead>
                             <tbody>';
 
         if (empty($categorias)) {
-            echo '<tr><td colspan="5" class="text-center text-muted py-4">Nenhuma categoria cadastrada.</td></tr>';
+            echo '<tr><td colspan="5" class="text-center text-muted py-4">' . __('admin.categories.empty', 'Nenhuma categoria cadastrada.') . '</td></tr>';
         } else {
             foreach ($categorias as $c) {
                 $nome = '';
@@ -412,19 +412,19 @@ class AdminCategoriasController extends Controller {
 
                 $slug = (string) ($c['slug'] ?? '');
 
-                $status = 'Ativa';
+                $status = __('admin.categories.status_active', 'Ativa');
                 $badge = 'success';
                 if (isset($c['status'])) {
                     $isAtivo = ((string) $c['status']) === 'ativo';
-                    $status = $isAtivo ? 'Ativa' : 'Inativa';
+                    $status = $isAtivo ? __('admin.categories.status_active', 'Ativa') : __('admin.categories.status_inactive', 'Inativa');
                     $badge = $isAtivo ? 'success' : 'secondary';
                 } elseif (isset($c['ativo'])) {
                     $isAtivo = ((int) $c['ativo']) === 1;
-                    $status = $isAtivo ? 'Ativa' : 'Inativa';
+                    $status = $isAtivo ? __('admin.categories.status_active', 'Ativa') : __('admin.categories.status_inactive', 'Inativa');
                     $badge = $isAtivo ? 'success' : 'secondary';
                 } elseif (isset($c['active'])) {
                     $isAtivo = ((int) $c['active']) === 1;
-                    $status = $isAtivo ? 'Ativa' : 'Inativa';
+                    $status = $isAtivo ? __('admin.categories.status_active', 'Ativa') : __('admin.categories.status_inactive', 'Inativa');
                     $badge = $isAtivo ? 'success' : 'secondary';
                 }
 
@@ -435,9 +435,9 @@ class AdminCategoriasController extends Controller {
                         <td><span class="badge bg-' . $badge . '">' . $status . '</span></td>
                         <td>
                             <div class="btn-group" role="group">
-                                <a class="btn btn-sm btn-outline-secondary" href="/admin/produtos?categoria=' . (int) $c['id'] . '" title="Ver produtos desta categoria"><i class="fas fa-box-open"></i></a>
+                                <a class="btn btn-sm btn-outline-secondary" href="/admin/produtos?categoria=' . (int) $c['id'] . '" title="' . htmlspecialchars(__('admin.categories.view_products_title', 'Ver produtos desta categoria'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-box-open"></i></a>
                                 <a class="btn btn-sm btn-outline-primary" href="/admin/categorias/editar/' . (int) $c['id'] . '"><i class="fas fa-edit"></i></a>
-                                <form method="POST" action="/admin/categorias/excluir/' . (int) $c['id'] . '" onsubmit="return confirm(\'Excluir esta categoria?\');">
+                                <form method="POST" action="/admin/categorias/excluir/' . (int) $c['id'] . '" onsubmit="return confirm(\'' . htmlspecialchars(__('admin.categories.confirm_delete', 'Excluir esta categoria?'), ENT_QUOTES, 'UTF-8') . '\');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
                                 </form>
                             </div>

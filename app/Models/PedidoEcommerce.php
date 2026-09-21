@@ -897,6 +897,27 @@ class PedidoEcommerce {
                 }
 
                 if ($trk === '') {
+                    if ($this->tableExists('shippo_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, tracking_url, label_url, carrier FROM shippo_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $t = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Shippo' . (!empty($row['carrier']) ? (' (' . trim((string) $row['carrier']) . ')') : '');
+                                // Preferir a URL pública de rastreio; cair para a URL da etiqueta se não houver.
+                                $trkUrl = trim((string) ($row['tracking_url'] ?? ''));
+                                if ($trkUrl === '') {
+                                    $trkUrl = trim((string) ($row['label_url'] ?? ''));
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
                     if ($this->tableExists('shipstation_etiquetas')) {
                         try {
                             $st = $this->connection->prepare('SELECT tracking_number, label_url, carrier_code FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
@@ -1091,6 +1112,19 @@ class PedidoEcommerce {
                                 $pedido['cidade_entrega'] = $rowE['cidade'] ?? ($pedido['cidade_entrega'] ?? null);
                                 $pedido['estado_entrega'] = $rowE['estado'] ?? ($pedido['estado_entrega'] ?? null);
                                 $pedido['cep_entrega'] = $rowE['cep'] ?? ($pedido['cep_entrega'] ?? null);
+
+                                // País do endereço (fallback do usuário).
+                                // IMPORTANTE: só usar como fallback quando o PEDIDO ainda não tem um país
+                                // próprio definido (pais_entrega/pais). Caso contrário, o país editado no
+                                // pedido seria indevidamente sobrescrito pelo endereço principal do usuário.
+                                $paisPedidoAtual = trim((string) ($pedido['pais_entrega'] ?? ($pedido['pais'] ?? '')));
+                                if ($paisPedidoAtual === '') {
+                                    $paisEnd = $rowE['pais'] ?? ($rowE['country'] ?? ($rowE['country_code'] ?? ($rowE['pais_code'] ?? null)));
+                                    if ($paisEnd !== null && trim((string) $paisEnd) !== '') {
+                                        $pedido['pais_entrega'] = trim((string) $paisEnd);
+                                        $pedido['pais'] = trim((string) $paisEnd);
+                                    }
+                                }
 
                                 $pedido['endereco'] = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? null);
                                 $pedido['numero'] = $pedido['numero_entrega'] ?? ($pedido['numero'] ?? null);

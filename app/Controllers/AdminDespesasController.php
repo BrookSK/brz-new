@@ -72,7 +72,7 @@ class AdminDespesasController extends Controller {
         $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
         $data['taxaUsdBrl'] = $taxaUsdBrl;
 
-        $title = 'Despesas';
+        $title = __('admin.expenses.title', 'Despesas');
         $sidebarActive = 'despesas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
@@ -118,7 +118,7 @@ class AdminDespesasController extends Controller {
             ':uid' => $_SESSION['usuario_id'] ?? null,
         ]);
 
-        $_SESSION['message'] = 'Despesa criada com sucesso.';
+        $_SESSION['message'] = __('admin.expenses.created_success', 'Despesa criada com sucesso.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -146,7 +146,7 @@ class AdminDespesasController extends Controller {
             }
         }
 
-        $_SESSION['message'] = 'Despesa marcada como paga.';
+        $_SESSION['message'] = __('admin.expenses.marked_paid', 'Despesa marcada como paga.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -158,7 +158,7 @@ class AdminDespesasController extends Controller {
 
         $this->db->prepare("UPDATE despesas SET status = 'cancelada', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL")->execute([(int)$id]);
 
-        $_SESSION['message'] = 'Despesa cancelada.';
+        $_SESSION['message'] = __('admin.expenses.cancelled', 'Despesa cancelada.');
         $_SESSION['message_type'] = 'warning';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -170,7 +170,7 @@ class AdminDespesasController extends Controller {
 
         $this->db->prepare("UPDATE despesas SET deleted_at = NOW() WHERE id = ?")->execute([(int)$id]);
 
-        $_SESSION['message'] = 'Despesa excluída.';
+        $_SESSION['message'] = __('admin.expenses.deleted', 'Despesa excluída.');
         $_SESSION['message_type'] = 'info';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -195,7 +195,7 @@ class AdminDespesasController extends Controller {
         }
 
         if ($despesaId <= 0) {
-            $_SESSION['message'] = 'ID da despesa não encontrado.';
+            $_SESSION['message'] = __('admin.expenses.id_not_found', 'ID da despesa não encontrado.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -213,7 +213,7 @@ class AdminDespesasController extends Controller {
         $observacoes = !empty($body['observacoes']) ? $body['observacoes'] : null;
 
         if (empty($descricao)) {
-            $_SESSION['message'] = 'Descrição não pode ser vazia.';
+            $_SESSION['message'] = __('admin.expenses.description_empty', 'Descrição não pode ser vazia.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -234,7 +234,7 @@ class AdminDespesasController extends Controller {
             $despesaId,
         ]);
 
-        $_SESSION['message'] = 'Despesa atualizada com sucesso.';
+        $_SESSION['message'] = __('admin.expenses.updated_success', 'Despesa atualizada com sucesso.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -258,7 +258,7 @@ class AdminDespesasController extends Controller {
         }
 
         if ($recId <= 0) {
-            $_SESSION['message'] = 'ID da recorrência não encontrado.';
+            $_SESSION['message'] = __('admin.expenses.recurrence_id_not_found', 'ID da recorrência não encontrado.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -272,7 +272,7 @@ class AdminDespesasController extends Controller {
         $favorecido = !empty($body['favorecido']) ? $body['favorecido'] : null;
 
         if (empty($descricao)) {
-            $_SESSION['message'] = 'Descrição não pode ser vazia.';
+            $_SESSION['message'] = __('admin.expenses.description_empty', 'Descrição não pode ser vazia.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -289,7 +289,7 @@ class AdminDespesasController extends Controller {
             $recId,
         ]);
 
-        $_SESSION['message'] = 'Recorrência atualizada com sucesso.';
+        $_SESSION['message'] = __('admin.expenses.recurrence_updated', 'Recorrência atualizada com sucesso.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -315,7 +315,7 @@ class AdminDespesasController extends Controller {
         $rec = $st->fetch(\PDO::FETCH_ASSOC);
 
         if (!$rec) {
-            $_SESSION['message'] = 'Recorrência não encontrada.';
+            $_SESSION['message'] = __('admin.expenses.recurrence_not_found', 'Recorrência não encontrada.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -362,7 +362,7 @@ class AdminDespesasController extends Controller {
             $this->db->prepare("UPDATE despesa_recorrencias SET proxima_geracao = ?, updated_at = NOW() WHERE id = ?")->execute([$proxima, $recId]);
         }
 
-        $msg = $status === 'paga' ? 'Despesa marcada como paga e próxima geração avançada.' : 'Despesa cancelada para este período.';
+        $msg = $status === 'paga' ? __('admin.expenses.recurrence_paid_advanced', 'Despesa marcada como paga e próxima geração avançada.') : __('admin.expenses.recurrence_cancelled_period', 'Despesa cancelada para este período.');
         $_SESSION['message'] = $msg;
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
@@ -469,7 +469,7 @@ class AdminDespesasController extends Controller {
             ':uid' => $_SESSION['usuario_id'] ?? null,
         ]);
 
-        $_SESSION['message'] = 'Recorrência criada com sucesso.';
+        $_SESSION['message'] = __('admin.expenses.recurrence_created', 'Recorrência criada com sucesso.');
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=recorrentes');
     }
@@ -518,7 +518,7 @@ class AdminDespesasController extends Controller {
             ]);
         }
 
-        $_SESSION['message'] = "Parcelamento criado com {$qtdParcelas} parcelas.";
+        $_SESSION['message'] = __('admin.expenses.installment_created', 'Parcelamento criado com {count} parcelas.', ['count' => $qtdParcelas]);
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=parceladas');
     }
@@ -530,7 +530,7 @@ class AdminDespesasController extends Controller {
         $valorTotal = round($horasTrabalhadas * $valorHora, 2);
 
         if (empty($pessoaNome) || $horasTrabalhadas <= 0 || $valorHora <= 0) {
-            $_SESSION['message'] = 'Preencha o nome da pessoa, horas trabalhadas e valor por hora.';
+            $_SESSION['message'] = __('admin.expenses.fill_hourly_fields', 'Preencha o nome da pessoa, horas trabalhadas e valor por hora.');
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -556,7 +556,7 @@ class AdminDespesasController extends Controller {
             ':uid' => $_SESSION['usuario_id'] ?? null,
         ]);
 
-        $_SESSION['message'] = "Despesa por hora criada: {$pessoaNome} ({$horasTrabalhadas}h × R$ " . number_format($valorHora, 2, ',', '.') . " = R$ " . number_format($valorTotal, 2, ',', '.') . ")";
+        $_SESSION['message'] = __('admin.expenses.hourly_created', 'Despesa por hora criada: ') . "{$pessoaNome} ({$horasTrabalhadas}h × R$ " . number_format($valorHora, 2, ',', '.') . " = R$ " . number_format($valorTotal, 2, ',', '.') . ")";
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -844,7 +844,7 @@ class AdminDespesasController extends Controller {
 
             $vendedores[] = [
                 'uid' => $uid,
-                'nome' => $nomes[$uid]['nome'] ?? 'Vendedor #' . $uid,
+                'nome' => $nomes[$uid]['nome'] ?? __('admin.expenses.seller_label', 'Vendedor #') . $uid,
                 'email' => $nomes[$uid]['email'] ?? '',
                 'pedidos' => $t['qtd'],
                 'faturado' => $t['faturado'],
@@ -912,7 +912,24 @@ class AdminDespesasController extends Controller {
         // BOM UTF-8
         fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
         // Header
-        fputcsv($out, ['ID', 'Descrição', 'Categoria', 'Tipo', 'Competência', 'Vencimento', 'Pagamento', 'Valor', 'Moeda', 'Status', 'Forma Pagamento', 'Favorecido', 'Origem', 'Pessoa (hora)', 'Horas', 'Valor/Hora'], ';');
+        fputcsv($out, [
+            'ID',
+            __('admin.expenses.csv_description', 'Descrição'),
+            __('admin.expenses.csv_category', 'Categoria'),
+            __('admin.expenses.csv_type', 'Tipo'),
+            __('admin.expenses.csv_competence', 'Competência'),
+            __('admin.expenses.csv_due_date', 'Vencimento'),
+            __('admin.expenses.csv_payment', 'Pagamento'),
+            __('admin.expenses.csv_amount', 'Valor'),
+            __('admin.expenses.csv_currency', 'Moeda'),
+            __('common.status', 'Status'),
+            __('admin.expenses.csv_payment_method', 'Forma Pagamento'),
+            __('admin.expenses.csv_payee', 'Favorecido'),
+            __('admin.expenses.csv_origin', 'Origem'),
+            __('admin.expenses.csv_person_hour', 'Pessoa (hora)'),
+            __('admin.expenses.csv_hours', 'Horas'),
+            __('admin.expenses.csv_hourly_rate', 'Valor/Hora'),
+        ], ';');
         foreach ($despesas as $d) {
             fputcsv($out, [
                 $d['id'] ?? '',

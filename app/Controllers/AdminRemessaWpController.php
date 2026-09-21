@@ -86,10 +86,10 @@ class AdminRemessaWpController extends Controller {
             $st->execute();
             $has = (bool) $st->fetchColumn();
             if (!$has) {
-                throw new \RuntimeException('Configurações do WordPress não encontradas.');
+                throw new \RuntimeException(__('admin.shipment_wp.wp_config_not_found', 'Configurações do WordPress não encontradas.'));
             }
         } catch (\Exception $e) {
-            throw new \RuntimeException('Configure o banco WordPress em Admin > Configurações > WordPress');
+            throw new \RuntimeException(__('admin.shipment_wp.configure_wp_db', 'Configure o banco WordPress em Admin > Configurações > WordPress'));
         }
 
         $cols = [];
@@ -159,7 +159,7 @@ class AdminRemessaWpController extends Controller {
         }
 
         if ($host === '' || $dbname === '' || $user === '') {
-            throw new \RuntimeException('Configure o banco WordPress em Admin > Configurações > WordPress');
+            throw new \RuntimeException(__('admin.shipment_wp.configure_wp_db', 'Configure o banco WordPress em Admin > Configurações > WordPress'));
         }
 
         $dsn = 'mysql:host=' . $host . ';' . ($port ? ('port=' . $port . ';') : '') . 'dbname=' . $dbname . ';charset=utf8mb4';
@@ -483,11 +483,11 @@ class AdminRemessaWpController extends Controller {
         $perfilAtual = strtolower(trim($perfilAtual));
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa WP - Braziliana Admin</title>
+    <title>' . __('admin.shipment_wp.page_title_admin', 'Remessa WP - Braziliana Admin') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -502,36 +502,36 @@ class AdminRemessaWpController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Remessa WP</h1>
+                <h1 class="page-title">' . __('admin.shipment_wp.page_title', 'Remessa WP') . '</h1>
                 <div class="d-flex gap-2">
                     <form method="GET" action="/admin/remessa-wp" class="d-flex gap-2">
                         <select class="form-select" name="source" style="max-width: 160px;">
-                            <option value="all"' . ($source === 'all' ? ' selected' : '') . '>Todos</option>
+                            <option value="all"' . ($source === 'all' ? ' selected' : '') . '>' . __('admin.shipment_wp.all', 'Todos') . '</option>
                             <option value="br"' . ($source === 'br' ? ' selected' : '') . '>BR</option>
                             <option value="red"' . ($source === 'red' ? ' selected' : '') . '>RED</option>
                             <option value="us"' . ($source === 'us' ? ' selected' : '') . '>US</option>
                         </select>
-                        <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+                        <button type="submit" class="btn btn-outline-secondary">' . __('admin.shipment_wp.filter', 'Filtrar') . '</button>
                     </form>
-                    <form method="POST" action="/admin/remessa-wp/primeira-remessa/popular?source=' . urlencode($source) . '" class="d-inline" onsubmit="return confirm(' . "\"Adicionar TODOS os pedidos já etiquetados na janela 'Primeira remessa'?\"" . ')">
-                        <button type="submit" class="btn btn-outline-dark"><i class="fas fa-layer-group me-1"></i>Primeira remessa</button>
+                    <form method="POST" action="/admin/remessa-wp/primeira-remessa/popular?source=' . urlencode($source) . '" class="d-inline" onsubmit="return confirm(' . "\"" . htmlspecialchars(__('admin.shipment_wp.confirm_first_shipment', "Adicionar TODOS os pedidos já etiquetados na janela 'Primeira remessa'?"), ENT_QUOTES, 'UTF-8') . "\"" . ')">
+                        <button type="submit" class="btn btn-outline-dark"><i class="fas fa-layer-group me-1"></i>' . __('admin.shipment_wp.first_shipment', 'Primeira remessa') . '</button>
                     </form>
-                    <button type="button" class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>' . __('admin.shipment_wp.refresh', 'Atualizar') . '</button>
                 </div>
             </div>';
 
         if ($errorMsg) {
-            echo '<div class="alert alert-danger"><strong>Erro:</strong> ' . htmlspecialchars((string) $errorMsg) . '</div>';
+            echo '<div class="alert alert-danger"><strong>' . __('admin.shipment_wp.error_label', 'Erro:') . '</strong> ' . htmlspecialchars((string) $errorMsg) . '</div>';
         }
 
         echo '<div class="row mb-4">
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header"><strong>Janelas Abertas (13 dias)</strong></div>
+                    <div class="card-header"><strong>' . __('admin.shipment_wp.open_windows_13d', 'Janelas Abertas (13 dias)') . '</strong></div>
                     <div class="card-body">';
 
         if (!$janelasAbertas) {
-            echo '<div class="text-muted">Nenhuma janela aberta.</div>';
+            echo '<div class="text-muted">' . __('admin.shipment_wp.no_open_window', 'Nenhuma janela aberta.') . '</div>';
         } else {
             echo '<div class="list-group">';
             foreach ($janelasAbertas as $j) {
@@ -542,8 +542,8 @@ class AdminRemessaWpController extends Controller {
                 $srcBadge = ($source === 'all') ? (' <span class="badge bg-light text-dark">' . htmlspecialchars(strtoupper($jSource)) . '</span>') : '';
                 echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($jSource) . '">
                     <div class="d-flex justify-content-between">
-                        <div><strong>Janela #' . (int) $j['id'] . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
-                        <span class="badge bg-success">Aberta</span>
+                        <div><strong>' . __('admin.shipment_wp.window_n', 'Janela #{n}', ['n' => (int) $j['id']]) . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' ' . __('admin.shipment_wp.date_range_to', 'a') . ' ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
+                        <span class="badge bg-success">' . __('admin.shipment_wp.status_open', 'Aberta') . '</span>
                     </div>
                 </a>';
             }
@@ -555,11 +555,11 @@ class AdminRemessaWpController extends Controller {
             </div>
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header"><strong>Janelas Finalizadas</strong></div>
+                    <div class="card-header"><strong>' . __('admin.shipment_wp.finished_windows', 'Janelas Finalizadas') . '</strong></div>
                     <div class="card-body">';
 
         if (!$janelasFinalizadas) {
-            echo '<div class="text-muted">Nenhuma janela finalizada.</div>';
+            echo '<div class="text-muted">' . __('admin.shipment_wp.no_finished_window', 'Nenhuma janela finalizada.') . '</div>';
         } else {
             echo '<div class="list-group">';
             foreach (array_slice($janelasFinalizadas, 0, 10) as $j) {
@@ -570,8 +570,8 @@ class AdminRemessaWpController extends Controller {
                 $srcBadge = ($source === 'all') ? (' <span class="badge bg-light text-dark">' . htmlspecialchars(strtoupper($jSource)) . '</span>') : '';
                 echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($jSource) . '">
                     <div class="d-flex justify-content-between">
-                        <div><strong>Janela #' . (int) $j['id'] . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
-                        <span class="badge bg-secondary">Finalizada</span>
+                        <div><strong>' . __('admin.shipment_wp.window_n', 'Janela #{n}', ['n' => (int) $j['id']]) . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' ' . __('admin.shipment_wp.date_range_to', 'a') . ' ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
+                        <span class="badge bg-secondary">' . __('admin.shipment_wp.status_finished', 'Finalizada') . '</span>
                     </div>
                 </a>';
             }
@@ -586,11 +586,11 @@ class AdminRemessaWpController extends Controller {
         echo '<div class="row mb-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header"><strong>Primeira remessa</strong></div>
+                    <div class="card-header"><strong>' . __('admin.shipment_wp.first_shipment', 'Primeira remessa') . '</strong></div>
                     <div class="card-body">';
 
         if (!$janelasPrimeiraRemessa) {
-            echo '<div class="text-muted">Nenhuma janela encontrada. Use o botão <strong>Primeira remessa</strong> acima para criar/popular.</div>';
+            echo '<div class="text-muted">' . __('admin.shipment_wp.no_window_found_first', 'Nenhuma janela encontrada. Use o botão <strong>Primeira remessa</strong> acima para criar/popular.') . '</div>';
         } else {
             echo '<div class="list-group">';
             foreach ($janelasPrimeiraRemessa as $j) {
@@ -603,8 +603,8 @@ class AdminRemessaWpController extends Controller {
                 $srcBadge = ($source === 'all') ? (' <span class="badge bg-light text-dark">' . htmlspecialchars(strtoupper($jSource)) . '</span>') : '';
                 echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($jSource) . '">
                     <div class="d-flex justify-content-between">
-                        <div><strong>' . htmlspecialchars($title) . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
-                        <span class="badge bg-warning text-dark">Manual</span>
+                        <div><strong>' . htmlspecialchars($title) . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' ' . __('admin.shipment_wp.date_range_to', 'a') . ' ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
+                        <span class="badge bg-warning text-dark">' . __('admin.shipment_wp.status_manual', 'Manual') . '</span>
                     </div>
                 </a>';
             }
@@ -739,16 +739,16 @@ class AdminRemessaWpController extends Controller {
         $perfilAtual = strtolower(trim($perfilAtual));
 
         $tituloJanela = trim((string) ($janela['titulo'] ?? ''));
-        $tituloLabel = $tituloJanela !== '' ? $tituloJanela : ('Janela #' . (int) $janelaId);
-        $badge = ($tipoJanela === 'manual') ? '<span class="badge bg-warning text-dark">Manual</span>' : '<span class="badge bg-success">Automática</span>';
+        $tituloLabel = $tituloJanela !== '' ? $tituloJanela : __('admin.shipment_wp.window_n', 'Janela #{n}', ['n' => (int) $janelaId]);
+        $badge = ($tipoJanela === 'manual') ? '<span class="badge bg-warning text-dark">' . __('admin.shipment_wp.status_manual', 'Manual') . '</span>' : '<span class="badge bg-success">' . __('admin.shipment_wp.status_automatic', 'Automática') . '</span>';
         $totalPedidosJanela = is_array($links) ? count($links) : 0;
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa WP - ' . htmlspecialchars($tituloLabel) . '</title>
+    <title>' . __('admin.shipment_wp.page_title_window', 'Remessa WP - {title}', ['title' => htmlspecialchars($tituloLabel)]) . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -762,13 +762,13 @@ class AdminRemessaWpController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h4 mb-0">' . htmlspecialchars($tituloLabel) . ' ' . $badge . ' <span class="badge bg-light text-dark">Pedidos: ' . (int) $totalPedidosJanela . '</span></h1>
-                    <div class="text-muted small">' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . '</div>
+                    <h1 class="h4 mb-0">' . htmlspecialchars($tituloLabel) . ' ' . $badge . ' <span class="badge bg-light text-dark">' . __('admin.shipment_wp.orders_count', 'Pedidos: {n}', ['n' => (int) $totalPedidosJanela]) . '</span></h1>
+                    <div class="text-muted small">' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' ' . __('admin.shipment_wp.date_range_to', 'a') . ' ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . '</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <a class="btn btn-outline-secondary" href="/admin/remessa-wp?source=' . urlencode($source) . '">Voltar</a>
-                    <button class="btn btn-outline-primary" type="button" onclick="location.reload()">Atualizar</button>
-                    <button class="btn btn-danger" type="button" onclick="regerarEtiquetasMassa()">Regerar etiquetas (já geradas)</button>
+                    <a class="btn btn-outline-secondary" href="/admin/remessa-wp?source=' . urlencode($source) . '">' . __('admin.shipment_wp.back', 'Voltar') . '</a>
+                    <button class="btn btn-outline-primary" type="button" onclick="location.reload()">' . __('admin.shipment_wp.refresh', 'Atualizar') . '</button>
+                    <button class="btn btn-danger" type="button" onclick="regerarEtiquetasMassa()">' . __('admin.shipment_wp.regenerate_labels', 'Regerar etiquetas (já geradas)') . '</button>
                 </div>
             </div>';
 
@@ -776,25 +776,25 @@ class AdminRemessaWpController extends Controller {
         }
 
         echo '<div class="card">
-                <div class="card-header"><strong>Pedidos</strong></div>
+                <div class="card-header"><strong>' . __('admin.shipment_wp.orders', 'Pedidos') . '</strong></div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th>Pedido</th>
-                                    <th>Data</th>
-                                    <th>Cliente</th>
-                                    <th>ZIP/CEP</th>
-                                    <th>Qtd</th>
-                                    <th>Etiqueta</th>
-                                    <th>Ações</th>
+                                    <th>' . __('admin.shipment_wp.th_order', 'Pedido') . '</th>
+                                    <th>' . __('admin.shipment_wp.th_date', 'Data') . '</th>
+                                    <th>' . __('admin.shipment_wp.th_customer', 'Cliente') . '</th>
+                                    <th>' . __('admin.shipment_wp.th_zip', 'ZIP/CEP') . '</th>
+                                    <th>' . __('admin.shipment_wp.th_qty', 'Qtd') . '</th>
+                                    <th>' . __('admin.shipment_wp.th_label', 'Etiqueta') . '</th>
+                                    <th>' . __('admin.shipment_wp.th_actions', 'Ações') . '</th>
                                 </tr>
                             </thead>
                             <tbody>';
 
         if (!$links) {
-            echo '<tr><td colspan="7" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
+            echo '<tr><td colspan="7" class="text-center text-muted">' . __('admin.shipment_wp.no_order_in_window', 'Nenhum pedido nesta janela.') . '</td></tr>';
         } else {
             foreach ($links as $lnk) {
                 $oid = (int) ($lnk['order_id'] ?? 0);
@@ -832,11 +832,11 @@ class AdminRemessaWpController extends Controller {
                     <td>' . htmlspecialchars($nome !== '' ? $nome : '-') . '</td>
                     <td>' . htmlspecialchars($zip !== '' ? $zip : '-') . '</td>
                     <td>' . ($qtd > 0 ? (int) $qtd : '-') . '</td>
-                    <td>' . ($etq ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</td>
+                    <td>' . ($etq ? '<span class="badge bg-success">' . __('admin.shipment_wp.badge_generated', 'Gerada') . '</span>' : '<span class="badge bg-warning text-dark">' . __('admin.shipment_wp.badge_pending', 'Pendente') . '</span>') . '</td>
                     <td class="text-nowrap">'
-                        . ($labelUrl !== '' ? ('<a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($labelUrl) . '">Etiqueta</a> ') : '')
-                        . '<a class="btn btn-sm btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $oid . '?source=' . urlencode($source) . '">Detalhes</a> '
-                        . ($perfilAtual !== 'conferente' ? (' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $oid . '?source=' . urlencode($source) . '">Pedido</a>') : '')
+                        . ($labelUrl !== '' ? ('<a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($labelUrl) . '">' . __('admin.shipment_wp.label', 'Etiqueta') . '</a> ') : '')
+                        . '<a class="btn btn-sm btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $oid . '?source=' . urlencode($source) . '">' . __('admin.shipment_wp.details', 'Detalhes') . '</a> '
+                        . ($perfilAtual !== 'conferente' ? (' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $oid . '?source=' . urlencode($source) . '">' . __('admin.shipment_wp.order', 'Pedido') . '</a>') : '')
                     . '</td>
                 </tr>';
             }
@@ -850,14 +850,14 @@ class AdminRemessaWpController extends Controller {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function regerarEtiquetasMassa() {
-    if (!confirm("Regerar todas as etiquetas já geradas desta janela?")) return;
+    if (!confirm("' . htmlspecialchars(__('admin.shipment_wp.js_confirm_regenerate', 'Regerar todas as etiquetas já geradas desta janela?'), ENT_QUOTES, 'UTF-8') . '")) return;
 
     const rows = ' . json_encode($links, JSON_UNESCAPED_UNICODE) . ';
     const source = ' . json_encode($source, JSON_UNESCAPED_UNICODE) . ';
 
     const targets = rows.filter(r => parseInt(r.etiqueta_gerada || 0) === 1).map(r => parseInt(r.order_id || 0)).filter(id => id > 0);
     if (!targets.length) {
-        alert("Nenhuma etiqueta gerada para regerar nesta janela.");
+        alert("' . htmlspecialchars(__('admin.shipment_wp.js_no_label_to_regenerate', 'Nenhuma etiqueta gerada para regerar nesta janela.'), ENT_QUOTES, 'UTF-8') . '");
         return;
     }
 
@@ -880,17 +880,17 @@ function regerarEtiquetasMassa() {
         box.style.boxShadow = "0 10px 24px rgba(0,0,0,.15)";
         box.style.padding = "12px";
         box.innerHTML = "<div style=\"display:flex;justify-content:space-between;align-items:center;gap:8px;\">" +
-            "<div style=\"font-weight:600;\">Regerando etiquetas</div>" +
-            "<button type=\"button\" id=\"wx-regerar-close\" class=\"btn btn-sm btn-outline-secondary\">Ocultar</button>" +
+            "<div style=\"font-weight:600;\">' . htmlspecialchars(__('admin.shipment_wp.js_regenerating_labels', 'Regerando etiquetas'), ENT_QUOTES, 'UTF-8') . '</div>" +
+            "<button type=\"button\" id=\"wx-regerar-close\" class=\"btn btn-sm btn-outline-secondary\">' . htmlspecialchars(__('admin.shipment_wp.js_hide', 'Ocultar'), ENT_QUOTES, 'UTF-8') . '</button>" +
         "</div>" +
         "<div class=\"mt-2\" style=\"font-size:12px;\">" +
-            "<div><strong>Início:</strong> <span id=\"wx-regerar-start\"></span></div>" +
-            "<div><strong>Última atualização:</strong> <span id=\"wx-regerar-last\">-</span></div>" +
-            "<div><strong>Pedido atual:</strong> <span id=\"wx-regerar-current\">-</span></div>" +
-            "<div><strong>Progresso:</strong> <span id=\"wx-regerar-count\">0/0</span></div>" +
+            "<div><strong>' . htmlspecialchars(__('admin.shipment_wp.js_start', 'Início:'), ENT_QUOTES, 'UTF-8') . '</strong> <span id=\"wx-regerar-start\"></span></div>" +
+            "<div><strong>' . htmlspecialchars(__('admin.shipment_wp.js_last_update', 'Última atualização:'), ENT_QUOTES, 'UTF-8') . '</strong> <span id=\"wx-regerar-last\">-</span></div>" +
+            "<div><strong>' . htmlspecialchars(__('admin.shipment_wp.js_current_order', 'Pedido atual:'), ENT_QUOTES, 'UTF-8') . '</strong> <span id=\"wx-regerar-current\">-</span></div>" +
+            "<div><strong>' . htmlspecialchars(__('admin.shipment_wp.js_progress', 'Progresso:'), ENT_QUOTES, 'UTF-8') . '</strong> <span id=\"wx-regerar-count\">0/0</span></div>" +
         "</div>" +
         "<div class=\"progress mt-2\" style=\"height:10px;\"><div id=\"wx-regerar-bar\" class=\"progress-bar\" role=\"progressbar\" style=\"width:0%\"></div></div>" +
-        "<div class=\"mt-2\" style=\"font-size:12px;color:#6c757d;\">Não feche a página enquanto estiver processando.</div>";
+        "<div class=\"mt-2\" style=\"font-size:12px;color:#6c757d;\">' . htmlspecialchars(__('admin.shipment_wp.js_dont_close', 'Não feche a página enquanto estiver processando.'), ENT_QUOTES, 'UTF-8') . '</div>";
         document.body.appendChild(box);
         document.getElementById("wx-regerar-close").onclick = () => { box.style.display = "none"; };
     } else {
@@ -916,8 +916,8 @@ function regerarEtiquetasMassa() {
     const runNext = () => {
         if (idx >= targets.length) {
             updateUi();
-            if (elCurrent) elCurrent.textContent = "Concluído";
-            alert("Concluído. Recarregando...");
+            if (elCurrent) elCurrent.textContent = "' . htmlspecialchars(__('admin.shipment_wp.js_completed', 'Concluído'), ENT_QUOTES, 'UTF-8') . '";
+            alert("' . htmlspecialchars(__('admin.shipment_wp.js_completed_reloading', 'Concluído. Recarregando...'), ENT_QUOTES, 'UTF-8') . '");
             location.reload();
             return;
         }
@@ -992,7 +992,7 @@ function regerarEtiquetasMassa() {
         $stL->execute([$janelaId, $source, $pedidoId]);
         $link = $stL->fetch(\PDO::FETCH_ASSOC) ?: null;
         if (!$link) {
-            $_SESSION['message'] = 'Pedido não pertence a esta janela.';
+            $_SESSION['message'] = __('admin.shipment_wp.order_not_in_window', 'Pedido não pertence a esta janela.');
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/remessa-wp/janela/' . $janelaId . '?source=' . urlencode($source));
             exit;
@@ -1286,7 +1286,7 @@ function regerarEtiquetasMassa() {
         } catch (\Exception $e) {
             $nomeClientePdf = '';
         }
-        $invoiceTitle = 'Invoice - Pedido #' . (int) $pedidoId;
+        $invoiceTitle = __('admin.shipment_wp.invoice_order_title', 'Invoice - Pedido #{n}', ['n' => (int) $pedidoId]);
         if ($nomeClientePdf !== '') {
             $invoiceTitle .= ' - ' . $nomeClientePdf;
         }
@@ -1349,8 +1349,8 @@ function regerarEtiquetasMassa() {
 
             $aceitaSubstRaw = strtolower(trim((string) ($wpMeta['_accept_product_replacement'] ?? '')));
             $aceitaSubst = $aceitaSubstRaw;
-            if ($aceitaSubstRaw === 'yes') $aceitaSubst = 'Sim';
-            if ($aceitaSubstRaw === 'no') $aceitaSubst = 'Não';
+            if ($aceitaSubstRaw === 'yes') $aceitaSubst = __('admin.shipment_wp.yes', 'Sim');
+            if ($aceitaSubstRaw === 'no') $aceitaSubst = __('admin.shipment_wp.no', 'Não');
 
             $trkWx = trim((string) ($link['courier_tracking_number'] ?? ($link['wexpress_tracking_number'] ?? '')));
             $zona = $this->formatTriageGroup($wpZona);
@@ -1542,83 +1542,89 @@ function regerarEtiquetasMassa() {
             $metaGet = function (string $key) use ($wpMeta) {
                 return array_key_exists($key, $wpMeta) ? $wpMeta[$key] : null;
             };
-            $useful['Chave do Pedido'] = $metaGet('_order_key');
-            $useful['Usuário do Cliente'] = $metaGet('_customer_user');
-            $useful['Método de Pagamento'] = $metaGet('_payment_method');
-            $useful['Título do Método de Pagamento'] = $metaGet('_payment_method_title');
-            $useful['Endereço IP do Cliente'] = $metaGet('_customer_ip_address');
-            $useful['Agente do Usuário do Cliente'] = $metaGet('_customer_user_agent');
-            $useful['Criado Via'] = $metaGet('_created_via');
-            $useful['Hash do Carrinho'] = $metaGet('_cart_hash');
-            $useful['Permissões de Download'] = $metaGet('_download_permissions_granted');
-            $useful['Vendas Registradas'] = $metaGet('_recorded_sales');
-            $useful['Contagens de Uso de Cupons Registradas'] = $metaGet('_recorded_coupon_usage_counts');
-            $useful['Email de Novo Pedido Enviado'] = $metaGet('_new_order_email_sent');
-            $useful['Estoque do Pedido Reduzido'] = $metaGet('_order_stock_reduced');
-            $useful['Moeda do Pedido'] = $metaGet('_order_currency');
-            $useful['Desconto do Carrinho'] = $metaGet('_cart_discount');
-            $useful['Imposto do Desconto do Carrinho'] = $metaGet('_cart_discount_tax');
-            $useful['Frete do Pedido'] = $metaGet('_order_shipping');
-            $useful['Imposto do Frete do Pedido'] = $metaGet('_order_shipping_tax');
-            $useful['Imposto do Pedido'] = $metaGet('_order_tax');
-            $useful['Total do Pedido'] = $metaGet('_order_total');
-            $useful['Versão do Pedido'] = $metaGet('_order_version');
-            $useful['Preços Incluem Imposto'] = $metaGet('_prices_include_tax');
-            $useful['Primeiro Nome de Cobrança'] = $metaGet('_billing_first_name');
-            $useful['Sobrenome de Cobrança'] = $metaGet('_billing_last_name');
-            $useful['Endereço de Cobrança 1'] = $metaGet('_billing_address_1');
+            $useful[__('admin.shipment_wp.uf_order_key', 'Chave do Pedido')] = $metaGet('_order_key');
+            $useful[__('admin.shipment_wp.uf_customer_user', 'Usuário do Cliente')] = $metaGet('_customer_user');
+            $useful[__('admin.shipment_wp.uf_payment_method', 'Método de Pagamento')] = $metaGet('_payment_method');
+            $useful[__('admin.shipment_wp.uf_payment_method_title', 'Título do Método de Pagamento')] = $metaGet('_payment_method_title');
+            $useful[__('admin.shipment_wp.uf_customer_ip', 'Endereço IP do Cliente')] = $metaGet('_customer_ip_address');
+            $useful[__('admin.shipment_wp.uf_customer_user_agent', 'Agente do Usuário do Cliente')] = $metaGet('_customer_user_agent');
+            $useful[__('admin.shipment_wp.uf_created_via', 'Criado Via')] = $metaGet('_created_via');
+            $useful[__('admin.shipment_wp.uf_cart_hash', 'Hash do Carrinho')] = $metaGet('_cart_hash');
+            $useful[__('admin.shipment_wp.uf_download_permissions', 'Permissões de Download')] = $metaGet('_download_permissions_granted');
+            $useful[__('admin.shipment_wp.uf_recorded_sales', 'Vendas Registradas')] = $metaGet('_recorded_sales');
+            $useful[__('admin.shipment_wp.uf_recorded_coupon_usage', 'Contagens de Uso de Cupons Registradas')] = $metaGet('_recorded_coupon_usage_counts');
+            $useful[__('admin.shipment_wp.uf_new_order_email_sent', 'Email de Novo Pedido Enviado')] = $metaGet('_new_order_email_sent');
+            $useful[__('admin.shipment_wp.uf_order_stock_reduced', 'Estoque do Pedido Reduzido')] = $metaGet('_order_stock_reduced');
+            $useful[__('admin.shipment_wp.uf_order_currency', 'Moeda do Pedido')] = $metaGet('_order_currency');
+            $useful[__('admin.shipment_wp.uf_cart_discount', 'Desconto do Carrinho')] = $metaGet('_cart_discount');
+            $useful[__('admin.shipment_wp.uf_cart_discount_tax', 'Imposto do Desconto do Carrinho')] = $metaGet('_cart_discount_tax');
+            $useful[__('admin.shipment_wp.uf_order_shipping', 'Frete do Pedido')] = $metaGet('_order_shipping');
+            $useful[__('admin.shipment_wp.uf_order_shipping_tax', 'Imposto do Frete do Pedido')] = $metaGet('_order_shipping_tax');
+            $useful[__('admin.shipment_wp.uf_order_tax', 'Imposto do Pedido')] = $metaGet('_order_tax');
+            $useful[__('admin.shipment_wp.uf_order_total', 'Total do Pedido')] = $metaGet('_order_total');
+            $useful[__('admin.shipment_wp.uf_order_version', 'Versão do Pedido')] = $metaGet('_order_version');
+            $useful[__('admin.shipment_wp.uf_prices_include_tax', 'Preços Incluem Imposto')] = $metaGet('_prices_include_tax');
+            $useful[__('admin.shipment_wp.uf_billing_first_name', 'Primeiro Nome de Cobrança')] = $metaGet('_billing_first_name');
+            $useful[__('admin.shipment_wp.uf_billing_last_name', 'Sobrenome de Cobrança')] = $metaGet('_billing_last_name');
+            $useful[__('admin.shipment_wp.uf_billing_address_1', 'Endereço de Cobrança 1')] = $metaGet('_billing_address_1');
             $useful['Billing Address 2'] = $metaGet('_billing_address_2');
-            $useful['Cidade de Cobrança'] = $metaGet('_billing_city');
-            $useful['Estado de Cobrança'] = $metaGet('_billing_state');
-            $useful['CEP de Cobrança'] = $metaGet('_billing_postcode');
-            $useful['País de Cobrança'] = $metaGet('_billing_country');
-            $useful['Email de Cobrança'] = $metaGet('_billing_email');
-            $useful['Telefone de Cobrança'] = $metaGet('_billing_phone');
-            $useful['CPF de Cobrança'] = $metaGet('_billing_cpf');
-            $useful['Data de Nascimento de Cobrança'] = $metaGet('_billing_birthdate');
-            $useful['Número de Cobrança'] = $metaGet('_billing_number');
-            $useful['Bairro de Cobrança'] = $metaGet('_billing_neighborhood');
-            $useful['Endereço de Entrega 1'] = $metaGet('_shipping_address_1');
+            $useful[__('admin.shipment_wp.uf_billing_city', 'Cidade de Cobrança')] = $metaGet('_billing_city');
+            $useful[__('admin.shipment_wp.uf_billing_state', 'Estado de Cobrança')] = $metaGet('_billing_state');
+            $useful[__('admin.shipment_wp.uf_billing_postcode', 'CEP de Cobrança')] = $metaGet('_billing_postcode');
+            $useful[__('admin.shipment_wp.uf_billing_country', 'País de Cobrança')] = $metaGet('_billing_country');
+            $useful[__('admin.shipment_wp.uf_billing_email', 'Email de Cobrança')] = $metaGet('_billing_email');
+            $useful[__('admin.shipment_wp.uf_billing_phone', 'Telefone de Cobrança')] = $metaGet('_billing_phone');
+            $useful[__('admin.shipment_wp.uf_billing_cpf', 'CPF de Cobrança')] = $metaGet('_billing_cpf');
+            $useful[__('admin.shipment_wp.uf_billing_birthdate', 'Data de Nascimento de Cobrança')] = $metaGet('_billing_birthdate');
+            $useful[__('admin.shipment_wp.uf_billing_number', 'Número de Cobrança')] = $metaGet('_billing_number');
+            $useful[__('admin.shipment_wp.uf_billing_neighborhood', 'Bairro de Cobrança')] = $metaGet('_billing_neighborhood');
+            $useful[__('admin.shipment_wp.uf_shipping_address_1', 'Endereço de Entrega 1')] = $metaGet('_shipping_address_1');
             $useful['Shipping Address 2'] = $metaGet('_shipping_address_2');
-            $useful['Cidade de Entrega'] = $metaGet('_shipping_city');
-            $useful['Estado de Entrega'] = $metaGet('_shipping_state');
-            $useful['CEP de Entrega'] = $metaGet('_shipping_postcode');
-            $useful['Bairro de Entrega'] = $metaGet('_shipping_neighborhood');
-            $useful['Número de Entrega'] = $metaGet('_shipping_number');
+            $useful[__('admin.shipment_wp.uf_shipping_city', 'Cidade de Entrega')] = $metaGet('_shipping_city');
+            $useful[__('admin.shipment_wp.uf_shipping_state', 'Estado de Entrega')] = $metaGet('_shipping_state');
+            $useful[__('admin.shipment_wp.uf_shipping_postcode', 'CEP de Entrega')] = $metaGet('_shipping_postcode');
+            $useful[__('admin.shipment_wp.uf_shipping_neighborhood', 'Bairro de Entrega')] = $metaGet('_shipping_neighborhood');
+            $useful[__('admin.shipment_wp.uf_shipping_number', 'Número de Entrega')] = $metaGet('_shipping_number');
 
+            $catPixMp = __('admin.shipment_wp.cat_pix_mp', 'Metas adicionais (Pix/Mercado Pago)');
+            $catUtm = __('admin.shipment_wp.cat_utm', 'Metas adicionais (Atribuição / UTM / Sessão)');
+            $catWccs = __('admin.shipment_wp.cat_wccs', 'Metas adicionais (WCCS / Câmbio)');
+            $catTrp = __('admin.shipment_wp.cat_trp', 'Metas adicionais (TRP / Idioma)');
+            $catTpul = __('admin.shipment_wp.cat_tpul', 'Metas adicionais (TPUL / Visitor)');
+            $catCheckout = __('admin.shipment_wp.cat_checkout', 'Metas adicionais (Checkout / Gateway)');
             $cats = [
-                'Metas adicionais (Pix/Mercado Pago)' => [],
-                'Metas adicionais (Atribuição / UTM / Sessão)' => [],
-                'Metas adicionais (WCCS / Câmbio)' => [],
-                'Metas adicionais (TRP / Idioma)' => [],
-                'Metas adicionais (TPUL / Visitor)' => [],
-                'Metas adicionais (Checkout / Gateway)' => [],
+                $catPixMp => [],
+                $catUtm => [],
+                $catWccs => [],
+                $catTrp => [],
+                $catTpul => [],
+                $catCheckout => [],
             ];
             foreach ($wpMeta as $k => $v) {
                 $ks = strtolower((string) $k);
                 if ($ks === '') continue;
                 if (strpos($ks, 'mp ') === 0 || strpos($ks, 'mp_') === 0 || strpos($ks, 'mercado') !== false || strpos($ks, 'pix') !== false) {
-                    $cats['Metas adicionais (Pix/Mercado Pago)'][$k] = $v;
+                    $cats[$catPixMp][$k] = $v;
                     continue;
                 }
                 if (strpos($ks, 'utm_') !== false || strpos($ks, 'attribution') !== false || strpos($ks, 'referrer') !== false || strpos($ks, 'landing') !== false || strpos($ks, 'session') !== false) {
-                    $cats['Metas adicionais (Atribuição / UTM / Sessão)'][$k] = $v;
+                    $cats[$catUtm][$k] = $v;
                     continue;
                 }
                 if (strpos($ks, 'wccs') !== false || strpos($ks, 'currency_ratio') !== false || strpos($ks, 'base_currency') !== false) {
-                    $cats['Metas adicionais (WCCS / Câmbio)'][$k] = $v;
+                    $cats[$catWccs][$k] = $v;
                     continue;
                 }
                 if (strpos($ks, 'trp') !== false || strpos($ks, 'language') !== false || strpos($ks, 'idioma') !== false) {
-                    $cats['Metas adicionais (TRP / Idioma)'][$k] = $v;
+                    $cats[$catTrp][$k] = $v;
                     continue;
                 }
                 if (strpos($ks, 'tpul') !== false || strpos($ks, 'visitor') !== false) {
-                    $cats['Metas adicionais (TPUL / Visitor)'][$k] = $v;
+                    $cats[$catTpul][$k] = $v;
                     continue;
                 }
                 if (strpos($ks, 'checkout') !== false || strpos($ks, 'gateway') !== false || strpos($ks, 'used gateway') !== false || strpos($ks, 'blocks payment') !== false) {
-                    $cats['Metas adicionais (Checkout / Gateway)'][$k] = $v;
+                    $cats[$catCheckout][$k] = $v;
                     continue;
                 }
             }
@@ -1734,10 +1740,10 @@ function regerarEtiquetasMassa() {
                 $idx++;
             }
             if ($rowsItems === '') {
-                $rowsItems = '<tr><td colspan="7" style="text-align:center;padding:12px;">Nenhum item</td></tr>';
+                $rowsItems = '<tr><td colspan="7" style="text-align:center;padding:12px;">' . __('admin.shipment_wp.no_item', 'Nenhum item') . '</td></tr>';
             }
 
-            $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+            $html = '<!DOCTYPE html><html lang="' . \App\Core\I18n::getLocaleHtml() . '"><head><meta charset="UTF-8">'
                 . '<style>'
                 . '@page { margin: 22px 26px; }'
                 . 'body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; }'
@@ -1761,87 +1767,87 @@ function regerarEtiquetasMassa() {
                 . '.muted { color:#6b7280; }'
                 . '</style></head><body>'
                 . '<div class="title">' . $safeText($invoiceTitle) . '</div>'
-                . '<div class="sub">Data de emissão: <strong>' . $safeText($emitDate) . '</strong></div>'
+                . '<div class="sub">' . __('admin.shipment_wp.issue_date', 'Data de emissão:') . ' <strong>' . $safeText($emitDate) . '</strong></div>'
 
                 . '<table class="grid" style="margin-top:10px;"><tr>'
                 . '<td style="width:50%;padding-right:8px;">'
-                . '<div class="section"><div class="section-h">Dados do Cliente</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.customer_data', 'Dados do Cliente') . '</div>'
                 . '<table class="kv">'
-                . '<tr><td>Nome:</td><td><strong>' . $safeText($nomeClientePdf) . '</strong></td></tr>'
-                . '<tr><td>Suíte:</td><td>' . $safeText($wpSuite) . '</td></tr>'
-                . '<tr><td>E-mail:</td><td>' . $safeText($email) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.name', 'Nome:') . '</td><td><strong>' . $safeText($nomeClientePdf) . '</strong></td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.suite', 'Suíte:') . '</td><td>' . $safeText($wpSuite) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.email', 'E-mail:') . '</td><td>' . $safeText($email) . '</td></tr>'
                 . '<tr><td>CPF:</td><td>' . $safeText($cpf) . '</td></tr>'
                 . '<tr><td>CNPJ:</td><td>' . $safeText($cnpj) . '</td></tr>'
-                . '<tr><td>Celular:</td><td>' . $safeText($cel) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.mobile', 'Celular:') . '</td><td>' . $safeText($cel) . '</td></tr>'
                 . '<tr><td>IP:</td><td>' . $safeText($ipCliente) . '</td></tr>'
-                . '<tr><td>Zona:</td><td>' . $safeText($zona) . '</td></tr>'
-                . '<tr><td>Status WP:</td><td>' . $safeText($statusWp !== '' ? $statusWp : '-') . '</td></tr>'
-                . '<tr><td>Aceita substituição:</td><td>' . $safeText($aceitaSubst) . '</td></tr>'
-                . '<tr><td>Cód. rastreio:</td><td>' . $safeText($trkWx) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.zone', 'Zona:') . '</td><td>' . $safeText($zona) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.wp_status', 'Status WP:') . '</td><td>' . $safeText($statusWp !== '' ? $statusWp : '-') . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.accepts_substitution', 'Aceita substituição:') . '</td><td>' . $safeText($aceitaSubst) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.tracking_code_short', 'Cód. rastreio:') . '</td><td>' . $safeText($trkWx) . '</td></tr>'
                 . '</table></div>'
                 . '</td>'
                 . '<td style="width:50%;">'
-                . '<div class="section"><div class="section-h">Endereço de Cobrança</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.billing_address', 'Endereço de Cobrança') . '</div>'
                 . '<table class="kv">'
-                . '<tr><td>Nome:</td><td><strong>' . $safeText($b['name']) . '</strong></td></tr>'
-                . '<tr><td>Empresa:</td><td>' . $safeText($b['company']) . '</td></tr>'
-                . '<tr><td>Rua:</td><td>' . $safeText($b['address1']) . '</td></tr>'
-                . '<tr><td>Complemento:</td><td>' . $safeText($b['address2']) . '</td></tr>'
-                . '<tr><td>Número:</td><td>' . $safeText($b['number']) . '</td></tr>'
-                . '<tr><td>Bairro:</td><td>' . $safeText($b['neighborhood']) . '</td></tr>'
-                . '<tr><td>Cidade:</td><td>' . $safeText($b['city']) . '</td></tr>'
-                . '<tr><td>Estado:</td><td>' . $safeText($b['state']) . '</td></tr>'
-                . '<tr><td>CEP:</td><td>' . $safeText($b['postcode']) . '</td></tr>'
-                . '<tr><td>País:</td><td>' . $safeText($b['country']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.name', 'Nome:') . '</td><td><strong>' . $safeText($b['name']) . '</strong></td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.company', 'Empresa:') . '</td><td>' . $safeText($b['company']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.street', 'Rua:') . '</td><td>' . $safeText($b['address1']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.complement', 'Complemento:') . '</td><td>' . $safeText($b['address2']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.number', 'Número:') . '</td><td>' . $safeText($b['number']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.district', 'Bairro:') . '</td><td>' . $safeText($b['neighborhood']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.city', 'Cidade:') . '</td><td>' . $safeText($b['city']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.state', 'Estado:') . '</td><td>' . $safeText($b['state']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.zip', 'CEP:') . '</td><td>' . $safeText($b['postcode']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.country', 'País:') . '</td><td>' . $safeText($b['country']) . '</td></tr>'
                 . '</table></div>'
                 . '</td>'
                 . '</tr></table>'
 
-                . '<div class="section"><div class="section-h">Endereço de Entrega</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.delivery_address', 'Endereço de Entrega') . '</div>'
                 . '<table class="kv">'
-                . '<tr><td>Nome:</td><td><strong>' . $safeText($s['name']) . '</strong></td></tr>'
-                . '<tr><td>Empresa:</td><td>' . $safeText($s['company']) . '</td></tr>'
-                . '<tr><td>Rua:</td><td>' . $safeText($s['address1']) . '</td></tr>'
-                . '<tr><td>Complemento:</td><td>' . $safeText($s['address2']) . '</td></tr>'
-                . '<tr><td>Número:</td><td>' . $safeText($s['number']) . '</td></tr>'
-                . '<tr><td>Suíte:</td><td>' . $safeText($s['suite']) . '</td></tr>'
-                . '<tr><td>Bairro:</td><td>' . $safeText($s['neighborhood']) . '</td></tr>'
-                . '<tr><td>Cidade:</td><td>' . $safeText($s['city']) . '</td></tr>'
-                . '<tr><td>Estado:</td><td>' . $safeText($s['state']) . '</td></tr>'
-                . '<tr><td>CEP:</td><td>' . $safeText($s['postcode']) . '</td></tr>'
-                . '<tr><td>País:</td><td>' . $safeText($s['country']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.name', 'Nome:') . '</td><td><strong>' . $safeText($s['name']) . '</strong></td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.company', 'Empresa:') . '</td><td>' . $safeText($s['company']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.street', 'Rua:') . '</td><td>' . $safeText($s['address1']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.complement', 'Complemento:') . '</td><td>' . $safeText($s['address2']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.number', 'Número:') . '</td><td>' . $safeText($s['number']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.suite', 'Suíte:') . '</td><td>' . $safeText($s['suite']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.district', 'Bairro:') . '</td><td>' . $safeText($s['neighborhood']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.city', 'Cidade:') . '</td><td>' . $safeText($s['city']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.state', 'Estado:') . '</td><td>' . $safeText($s['state']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.zip', 'CEP:') . '</td><td>' . $safeText($s['postcode']) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.country', 'País:') . '</td><td>' . $safeText($s['country']) . '</td></tr>'
                 . '</table></div>'
 
-                . '<div class="section"><div class="section-h">Itens do Pedido</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.order_items', 'Itens do Pedido') . '</div>'
                 . '<table class="items">'
                 . '<thead><tr>'
                 . '<th style="width:32px;text-align:center;">#</th>'
-                . '<th style="width:66px;text-align:center;">Imagem</th>'
-                . '<th>Declaração</th>'
-                . '<th style="width:70px;text-align:right;">Peso (kg)</th>'
-                . '<th style="width:52px;text-align:center;">Qtd</th>'
-                . '<th style="width:110px;text-align:right;">Preço unit.</th>'
-                . '<th style="width:110px;text-align:right;">Total</th>'
+                . '<th style="width:66px;text-align:center;">' . __('admin.shipment_wp.th_image', 'Imagem') . '</th>'
+                . '<th>' . __('admin.shipment_wp.th_declaration', 'Declaração') . '</th>'
+                . '<th style="width:70px;text-align:right;">' . __('admin.shipment_wp.th_weight_kg', 'Peso (kg)') . '</th>'
+                . '<th style="width:52px;text-align:center;">' . __('admin.shipment_wp.th_qty', 'Qtd') . '</th>'
+                . '<th style="width:110px;text-align:right;">' . __('admin.shipment_wp.th_unit_price', 'Preço unit.') . '</th>'
+                . '<th style="width:110px;text-align:right;">' . __('admin.shipment_wp.th_total', 'Total') . '</th>'
                 . '</tr></thead><tbody>' . $rowsItems . '</tbody></table>'
                 . '</div>'
 
                 . (($medicamentoFlag || $source === 'red')
-                    ? ('<div class="section"><div class="section-h">Documentos / Uploads</div>'
+                    ? ('<div class="section"><div class="section-h">' . __('admin.shipment_wp.documents_uploads', 'Documentos / Uploads') . '</div>'
                         . '<table class="kv">'
                         . ($medicamentoFlag
-                            ? ('<tr><td>Medicamento?</td><td><strong>Sim</strong></td></tr>'
-                                . '<tr><td>Doc. medicamento:</td><td>'
+                            ? ('<tr><td>' . __('admin.shipment_wp.is_medication_q', 'Medicamento?') . '</td><td><strong>' . __('admin.shipment_wp.yes', 'Sim') . '</strong></td></tr>'
+                                . '<tr><td>' . __('admin.shipment_wp.medication_doc_label', 'Doc. medicamento:') . '</td><td>'
                                     . (!empty($docsByTipo['medicamento']['file_path'])
-                                        ? ('Enviado - ' . $safeText((string) ($docsByTipo['medicamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['medicamento']['file_path'] ?? '')) . '</span>')
-                                        : '<span class="muted">Pendente</span>')
+                                        ? (__('admin.shipment_wp.sent_dash', 'Enviado - ') . $safeText((string) ($docsByTipo['medicamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['medicamento']['file_path'] ?? '')) . '</span>')
+                                        : '<span class="muted">' . __('admin.shipment_wp.badge_pending', 'Pendente') . '</span>')
                                 . '</td></tr>')
                             : '')
                         . (($source === 'red')
-                            ? ('<tr><td>Redirecionamento?</td><td><strong>Sim</strong></td></tr>'
-                                . '<tr><td>Comp. pagamento:</td><td>'
+                            ? ('<tr><td>' . __('admin.shipment_wp.is_redirect_q', 'Redirecionamento?') . '</td><td><strong>' . __('admin.shipment_wp.yes', 'Sim') . '</strong></td></tr>'
+                                . '<tr><td>' . __('admin.shipment_wp.payment_receipt_label', 'Comp. pagamento:') . '</td><td>'
                                     . (!empty($docsByTipo['pagamento']['file_path'])
-                                        ? ('Enviado - ' . $safeText((string) ($docsByTipo['pagamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['pagamento']['file_path'] ?? '')) . '</span>')
-                                        : '<span class="muted">Pendente</span>')
+                                        ? (__('admin.shipment_wp.sent_dash', 'Enviado - ') . $safeText((string) ($docsByTipo['pagamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['pagamento']['file_path'] ?? '')) . '</span>')
+                                        : '<span class="muted">' . __('admin.shipment_wp.badge_pending', 'Pendente') . '</span>')
                                 . '</td></tr>')
                             : '')
                         . '</table></div>')
@@ -1849,27 +1855,27 @@ function regerarEtiquetasMassa() {
 
                 . '<table class="grid" style="margin-top:10px;"><tr>'
                 . '<td style="width:50%;padding-right:8px;">'
-                . '<div class="section"><div class="section-h">Pagamento</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.payment', 'Pagamento') . '</div>'
                 . '<table class="kv">'
-                . '<tr><td>Valor pago:</td><td><strong>' . $safeText($fmtMoney($total)) . '</strong></td></tr>'
-                . '<tr><td>Data de crédito:</td><td>' . $safeText($paidDate) . '</td></tr>'
-                . '<tr><td>Método:</td><td>' . $safeText($paymentMethodTitle) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.amount_paid', 'Valor pago:') . '</td><td><strong>' . $safeText($fmtMoney($total)) . '</strong></td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.credit_date', 'Data de crédito:') . '</td><td>' . $safeText($paidDate) . '</td></tr>'
+                . '<tr><td>' . __('admin.shipment_wp.method', 'Método:') . '</td><td>' . $safeText($paymentMethodTitle) . '</td></tr>'
                 . '</table></div>'
                 . '</td>'
                 . '<td style="width:50%;">'
-                . '<div class="section"><div class="section-h">Totais</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.totals', 'Totais') . '</div>'
                 . '<table class="totals">'
-                . '<tr><td class="label">Subtotal:</td><td class="value">' . $safeText($fmtMoney($subTotal)) . '</td></tr>'
-                . '<tr><td class="label">Taxa de serviço:</td><td class="value">' . $safeText($fmtMoney(isset($wpTotals['service_fee']) ? (float) $wpTotals['service_fee'] : null)) . '</td></tr>'
-                . '<tr><td class="label">Frete (WExpress - USD):</td><td class="value">' . $safeText($fmtUsd($wxFreteUsd)) . '</td></tr>'
-                . '<tr><td class="label">Peso total (kg):</td><td class="value">' . $safeText($wpPesoTotalKg > 0 ? number_format($wpPesoTotalKg, 3, ',', '.') : '-') . '</td></tr>'
-                . '<tr><td class="label">Descontos/Subsídios:</td><td class="value">' . $safeText($fmtMoney($discount)) . '</td></tr>'
-                . '<tr><td class="label grand">Total do pedido:</td><td class="value grand">' . $safeText($fmtMoney($total)) . '</td></tr>'
+                . '<tr><td class="label">' . __('admin.shipment_wp.subtotal', 'Subtotal:') . '</td><td class="value">' . $safeText($fmtMoney($subTotal)) . '</td></tr>'
+                . '<tr><td class="label">' . __('admin.shipment_wp.service_fee', 'Taxa de serviço:') . '</td><td class="value">' . $safeText($fmtMoney(isset($wpTotals['service_fee']) ? (float) $wpTotals['service_fee'] : null)) . '</td></tr>'
+                . '<tr><td class="label">' . __('admin.shipment_wp.freight_wexpress_usd', 'Frete (WExpress - USD):') . '</td><td class="value">' . $safeText($fmtUsd($wxFreteUsd)) . '</td></tr>'
+                . '<tr><td class="label">' . __('admin.shipment_wp.total_weight_kg', 'Peso total (kg):') . '</td><td class="value">' . $safeText($wpPesoTotalKg > 0 ? number_format($wpPesoTotalKg, 3, ',', '.') : '-') . '</td></tr>'
+                . '<tr><td class="label">' . __('admin.shipment_wp.discounts_subsidies', 'Descontos/Subsídios:') . '</td><td class="value">' . $safeText($fmtMoney($discount)) . '</td></tr>'
+                . '<tr><td class="label grand">' . __('admin.shipment_wp.order_total', 'Total do pedido:') . '</td><td class="value grand">' . $safeText($fmtMoney($total)) . '</td></tr>'
                 . '</table></div>'
                 . '</td>'
                 . '</tr></table>'
 
-                . '<div class="section"><div class="section-h">Informações Úteis</div>'
+                . '<div class="section"><div class="section-h">' . __('admin.shipment_wp.useful_info', 'Informações Úteis') . '</div>'
                 . '<table class="kv">';
 
             foreach ($useful as $k => $v) {
@@ -1903,14 +1909,14 @@ function regerarEtiquetasMassa() {
 
             header('Content-Type: text/html; charset=utf-8');
             echo '<div style="padding:12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;margin:12px;font-family:Arial;">'
-                . '<strong>PDF indisponível:</strong> a biblioteca <code>dompdf/dompdf</code> não está instalada no servidor ainda. Rode <code>composer install</code>.'
+                . '<strong>' . __('admin.shipment_wp.pdf_unavailable_label', 'PDF indisponível:') . '</strong> ' . __('admin.shipment_wp.dompdf_not_installed', 'a biblioteca <code>dompdf/dompdf</code> não está instalada no servidor ainda. Rode <code>composer install</code>.')
                 . '</div>';
             echo $html;
             exit;
         }
 
         echo '<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="' . \App\Core\I18n::getLocaleHtml() . '">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1955,19 +1961,19 @@ function regerarEtiquetasMassa() {
         }
 
         $mainColClass = ($printMode || $pdfMode) ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
-        $topTitle = ($printMode || $pdfMode) ? $invoiceTitle : ('Pedido #' . (int) $pedidoId);
+        $topTitle = ($printMode || $pdfMode) ? $invoiceTitle : __('admin.shipment_wp.order_n', 'Pedido #{n}', ['n' => (int) $pedidoId]);
         echo '<main class="' . $mainColClass . '">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
                     <h1 class="h4 mb-0">' . htmlspecialchars($topTitle, ENT_QUOTES, 'UTF-8') . '</h1>
-                    <div class="text-muted small">Janela #' . (int) $janelaId . ' (' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . ')</div>
+                    <div class="text-muted small">' . __('admin.shipment_wp.window_n', 'Janela #{n}', ['n' => (int) $janelaId]) . ' (' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' ' . __('admin.shipment_wp.date_range_to', 'a') . ' ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . ')</div>
                 </div>
                 <div class="d-flex gap-2 no-print">
-                    <a class="btn btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '?source=' . urlencode($source) . '">Voltar</a>
-                    <a class="btn btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $pedidoId . '?source=' . urlencode($source) . '">Abrir pedido</a>
-                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&download=1">Baixar Invoice (PDF)</a>
-                    ' . ($recebido ? '' : ('<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/confirmar-recebimento?source=' . urlencode($source) . '" style="display:inline;" onsubmit="return confirm(\"Confirmar recebimento deste pedido?\")">'
-                        . '<button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>Confirmar recebimento</button>'
+                    <a class="btn btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '?source=' . urlencode($source) . '">' . __('admin.shipment_wp.back', 'Voltar') . '</a>
+                    <a class="btn btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $pedidoId . '?source=' . urlencode($source) . '">' . __('admin.shipment_wp.open_order', 'Abrir pedido') . '</a>
+                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&download=1">' . __('admin.shipment_wp.download_invoice_pdf', 'Baixar Invoice (PDF)') . '</a>
+                    ' . ($recebido ? '' : ('<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/confirmar-recebimento?source=' . urlencode($source) . '" style="display:inline;" onsubmit="return confirm(\"' . htmlspecialchars(__('admin.shipment_wp.js_confirm_receipt', 'Confirmar recebimento deste pedido?'), ENT_QUOTES, 'UTF-8') . '\")">'
+                        . '<button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>' . __('admin.shipment_wp.confirm_receipt', 'Confirmar recebimento') . '</button>'
                     . '</form>')) . '
                 </div>
             </div>';
@@ -1975,20 +1981,20 @@ function regerarEtiquetasMassa() {
         echo '<div class="row g-3">
                 <div class="col-md-6">
                     <div class="card">
-                        <div class="card-header"><strong>Informações</strong></div>
+                        <div class="card-header"><strong>' . __('admin.shipment_wp.information', 'Informações') . '</strong></div>
                         <div class="card-body">';
 
         $statusWp = (string) ($wpOrder['post_status'] ?? '');
         $dateWp = (string) ($wpOrder['post_date'] ?? '');
-        echo '<div><strong>Status WP:</strong> ' . htmlspecialchars($statusWp !== '' ? $statusWp : '-') . '</div>';
-        echo '<div><strong>Data:</strong> ' . ($dateWp !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($dateWp))) : '-') . '</div>';
+        echo '<div><strong>' . __('admin.shipment_wp.wp_status', 'Status WP:') . '</strong> ' . htmlspecialchars($statusWp !== '' ? $statusWp : '-') . '</div>';
+        echo '<div><strong>' . __('admin.shipment_wp.date', 'Data:') . '</strong> ' . ($dateWp !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($dateWp))) : '-') . '</div>';
 
         $trkWx = trim((string) ($link['courier_tracking_number'] ?? ($link['wexpress_tracking_number'] ?? '')));
         if ($trkWx !== '') {
-            echo '<div class="mt-2"><strong>Tracking W-Express:</strong> ' . htmlspecialchars($trkWx) . '</div>';
+            echo '<div class="mt-2"><strong>' . __('admin.shipment_wp.tracking_wexpress', 'Tracking W-Express:') . '</strong> ' . htmlspecialchars($trkWx) . '</div>';
         }
 
-        echo '<div class="mt-2"><strong>Etiqueta:</strong> ' . ($etq ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</div>';
+        echo '<div class="mt-2"><strong>' . __('admin.shipment_wp.label', 'Etiqueta:') . '</strong> ' . ($etq ? '<span class="badge bg-success">' . __('admin.shipment_wp.badge_generated', 'Gerada') . '</span>' : '<span class="badge bg-warning text-dark">' . __('admin.shipment_wp.badge_pending', 'Pendente') . '</span>') . '</div>';
 
         $labelUrl = trim((string) ($link['wexpress_label_url'] ?? ''));
 
@@ -2037,23 +2043,23 @@ function regerarEtiquetasMassa() {
             }
         }
         if ($finalLabelUrl !== '') {
-            echo '<div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($finalLabelUrl) . '">Abrir etiqueta</a></div>';
+            echo '<div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($finalLabelUrl) . '">' . __('admin.shipment_wp.open_label', 'Abrir etiqueta') . '</a></div>';
         }
 
         if ($this->tableExists('remessa_wp_pedido_documentos')) {
             echo '<hr>';
             echo '<div class="d-flex align-items-center justify-content-between">'
-                . '<div><strong>Medicamento?</strong></div>'
+                . '<div><strong>' . __('admin.shipment_wp.is_medication_q', 'Medicamento?') . '</strong></div>'
                 . '</div>';
 
             if (!$etq) {
-                echo '<div class="text-muted small mt-1">A etiqueta precisa estar gerada para habilitar os uploads obrigatórios.</div>';
+                echo '<div class="text-muted small mt-1">' . __('admin.shipment_wp.label_needed_for_uploads', 'A etiqueta precisa estar gerada para habilitar os uploads obrigatórios.') . '</div>';
             }
 
             echo '<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/medicamento?source=' . urlencode($source) . '" class="mt-2">'
                 . '<input type="hidden" name="medicamento" value="' . ($medicamento ? '0' : '1') . '">' 
                 . '<button type="submit" class="btn btn-sm ' . ($medicamento ? 'btn-warning' : 'btn-outline-warning') . '">' 
-                . ($medicamento ? 'Marcar como não medicamento' : 'Marcar como medicamento')
+                . ($medicamento ? __('admin.shipment_wp.mark_not_medication', 'Marcar como não medicamento') : __('admin.shipment_wp.mark_medication', 'Marcar como medicamento'))
                 . '</button>'
                 . '</form>';
         }
@@ -2063,28 +2069,28 @@ function regerarEtiquetasMassa() {
                 </div>
                 <div class="col-md-6">
                     <div class="card">
-                        <div class="card-header"><strong>Documentos</strong></div>
+                        <div class="card-header"><strong>' . __('admin.shipment_wp.documents', 'Documentos') . '</strong></div>
                         <div class="card-body">';
 
         if (!$this->tableExists('remessa_wp_pedido_documentos')) {
-            echo '<div class="alert alert-warning mb-0">Tabela de documentos não encontrada. Rode a migration: database/migrations/048_add_docs_to_remessa_wp.sql</div>';
+            echo '<div class="alert alert-warning mb-0">' . __('admin.shipment_wp.docs_table_missing_migration', 'Tabela de documentos não encontrada. Rode a migration: database/migrations/048_add_docs_to_remessa_wp.sql') . '</div>';
         } else {
             $requirements = [];
             if ($source === 'red') {
-                $requirements['pagamento'] = ['label' => 'Comprovante de pagamento', 'required' => true];
+                $requirements['pagamento'] = ['label' => __('admin.shipment_wp.payment_receipt', 'Comprovante de pagamento'), 'required' => true];
             } else {
-                echo '<div class="alert alert-info">Para pedidos ' . htmlspecialchars(strtoupper($source)) . ', o comprovante de pagamento é exibido nas informações do pedido (WordPress) e não exige upload.</div>';
+                echo '<div class="alert alert-info">' . __('admin.shipment_wp.payment_receipt_wp_note', 'Para pedidos {src}, o comprovante de pagamento é exibido nas informações do pedido (WordPress) e não exige upload.', ['src' => htmlspecialchars(strtoupper($source))]) . '</div>';
             }
             if ($medicamento) {
-                $requirements['medicamento'] = ['label' => 'Documento de medicamento', 'required' => true];
+                $requirements['medicamento'] = ['label' => __('admin.shipment_wp.medication_document_req', 'Documento de medicamento'), 'required' => true];
             }
 
             if (!$etq) {
-                echo '<div class="alert alert-secondary">Uploads bloqueados até gerar etiqueta.</div>';
+                echo '<div class="alert alert-secondary">' . __('admin.shipment_wp.uploads_blocked_until_label', 'Uploads bloqueados até gerar etiqueta.') . '</div>';
             }
 
             if (!$requirements) {
-                echo '<div class="text-muted">Nenhum documento obrigatório para este pedido.</div>';
+                echo '<div class="text-muted">' . __('admin.shipment_wp.no_required_document', 'Nenhum documento obrigatório para este pedido.') . '</div>';
             }
 
             foreach ($requirements as $tipo => $cfg) {
@@ -2096,17 +2102,17 @@ function regerarEtiquetasMassa() {
                         . '<div><strong>' . htmlspecialchars($cfg['label']) . '</strong> ' 
                             . ($cfg['required'] ? '<span class="text-danger">*</span>' : '')
                         . '</div>'
-                        . '<div>' . ($has ? '<span class="badge bg-success">Enviado</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</div>'
+                        . '<div>' . ($has ? '<span class="badge bg-success">' . __('admin.shipment_wp.sent', 'Enviado') . '</span>' : '<span class="badge bg-warning text-dark">' . __('admin.shipment_wp.badge_pending', 'Pendente') . '</span>') . '</div>'
                     . '</div>';
 
                 if ($has) {
-                    echo '<div class="small text-muted">Arquivo: ' . htmlspecialchars((string) ($doc['original_name'] ?? '')) . '</div>';
-                    echo '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string) $doc['file_path']) . '" target="_blank" rel="noopener">Abrir</a></div>';
+                    echo '<div class="small text-muted">' . __('admin.shipment_wp.file_label', 'Arquivo:') . ' ' . htmlspecialchars((string) ($doc['original_name'] ?? '')) . '</div>';
+                    echo '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string) $doc['file_path']) . '" target="_blank" rel="noopener">' . __('admin.shipment_wp.open', 'Abrir') . '</a></div>';
                 }
 
                 echo '<form method="POST" enctype="multipart/form-data" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/documento/' . urlencode($tipo) . '?source=' . urlencode($source) . '" class="mt-2">'
                     . '<input class="form-control form-control-sm" type="file" name="arquivo" ' . ($etq ? '' : 'disabled') . ' required>'
-                    . '<button class="btn btn-sm btn-primary mt-2" type="submit" ' . ($etq ? '' : 'disabled') . '>Enviar</button>'
+                    . '<button class="btn btn-sm btn-primary mt-2" type="submit" ' . ($etq ? '' : 'disabled') . '>' . __('admin.shipment_wp.send', 'Enviar') . '</button>'
                     . '</form>';
 
                 echo '</div>';
@@ -2118,7 +2124,7 @@ function regerarEtiquetasMassa() {
                 </div>
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-header"><strong>Pedido (WordPress)</strong></div>
+                        <div class="card-header"><strong>' . __('admin.shipment_wp.order_wordpress', 'Pedido (WordPress)') . '</strong></div>
                         <div class="card-body">';
 
         $nomeCliente = trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? '')));
@@ -2135,8 +2141,8 @@ function regerarEtiquetasMassa() {
         $zona = $this->formatTriageGroup($wpZona);
         $aceitaSubstRaw = strtolower(trim((string) ($wpMeta['_accept_product_replacement'] ?? '')));
         $aceitaSubst = $aceitaSubstRaw;
-        if ($aceitaSubstRaw === 'yes') $aceitaSubst = 'Sim';
-        if ($aceitaSubstRaw === 'no') $aceitaSubst = 'Não';
+        if ($aceitaSubstRaw === 'yes') $aceitaSubst = __('admin.shipment_wp.yes', 'Sim');
+        if ($aceitaSubstRaw === 'no') $aceitaSubst = __('admin.shipment_wp.no', 'Não');
         $codigoRastreio = $trkWx;
 
         $debugZona = ((string) ($_GET['debug_zona'] ?? '')) === '1';
@@ -2287,53 +2293,53 @@ function regerarEtiquetasMassa() {
         echo '<div class="row g-3">'
             . '<div class="col-lg-4">'
                 . '<div class="border rounded p-3 h-100">'
-                    . '<div class="mb-2"><strong>Informações do Cliente</strong></div>'
+                    . '<div class="mb-2"><strong>' . __('admin.shipment_wp.customer_information', 'Informações do Cliente') . '</strong></div>'
                     . '<div class="small">'
-                        . '<div><strong>Nome:</strong> ' . htmlspecialchars($nomeCliente !== '' ? $nomeCliente : '-') . '</div>'
-                        . '<div><strong>Suite:</strong> ' . htmlspecialchars($suite !== '' ? $suite : '-') . '</div>'
-                        . '<div><strong>E-mail:</strong> ' . htmlspecialchars($email !== '' ? $email : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.name', 'Nome:') . '</strong> ' . htmlspecialchars($nomeCliente !== '' ? $nomeCliente : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.suite_en', 'Suite:') . '</strong> ' . htmlspecialchars($suite !== '' ? $suite : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.email', 'E-mail:') . '</strong> ' . htmlspecialchars($email !== '' ? $email : '-') . '</div>'
                         . '<div><strong>CPF/CNPJ:</strong> ' . htmlspecialchars($cpf !== '' ? $cpf : '-') . '</div>'
-                        . '<div><strong>Celular:</strong> ' . htmlspecialchars($cel !== '' ? $cel : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.mobile', 'Celular:') . '</strong> ' . htmlspecialchars($cel !== '' ? $cel : '-') . '</div>'
                         . '<div><strong>IP:</strong> ' . htmlspecialchars($ipCliente !== '' ? $ipCliente : '-') . '</div>'
-                        . '<div><strong>Zona:</strong> ' . htmlspecialchars($zona !== '' ? $zona : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.zone', 'Zona:') . '</strong> ' . htmlspecialchars($zona !== '' ? $zona : '-') . '</div>'
                         . ($debugZona ? ('<div class="text-muted" style="font-size:12px;">debug_zona: package_id=' . (int) ($wpZonaDebug['package_id'] ?? 0) . ' package_meta_key=' . htmlspecialchars((string) ($wpZonaDebug['package_meta_key'] ?? '')) . ' container_id=' . (int) ($wpZonaDebug['container_id'] ?? 0) . ' zona_raw=' . htmlspecialchars((string) ($wpZonaDebug['zona_raw'] ?? '')) . '</div>') : '')
-                        . '<div><strong>Aceitar substituição:</strong> ' . htmlspecialchars($aceitaSubst !== '' ? $aceitaSubst : '-') . '</div>'
-                        . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($codigoRastreio !== '' ? $codigoRastreio : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.accept_substitution', 'Aceitar substituição:') . '</strong> ' . htmlspecialchars($aceitaSubst !== '' ? $aceitaSubst : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.tracking_code', 'Código de rastreio:') . '</strong> ' . htmlspecialchars($codigoRastreio !== '' ? $codigoRastreio : '-') . '</div>'
                     . '</div>'
                 . '</div>'
             . '</div>'
             . '<div class="col-lg-4">'
                 . '<div class="border rounded p-3 h-100">'
-                    . '<div class="mb-2"><strong>Endereço de Cobrança</strong></div>'
+                    . '<div class="mb-2"><strong>' . __('admin.shipment_wp.billing_address', 'Endereço de Cobrança') . '</strong></div>'
                     . '<div class="small">'
-                        . '<div><strong>Nome:</strong> ' . htmlspecialchars(trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? ''))) ?: '-') . '</div>'
-                        . '<div><strong>Empresa:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_company'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Rua:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_address_1'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Complemento:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_address_2'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Número:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_number'] ?? ($wpMeta['billing_number'] ?? ''))) ?: '-') . '</div>'
-                        . '<div><strong>Bairro:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_neighborhood'] ?? ($wpMeta['_billing_bairro'] ?? ($wpMeta['billing_bairro'] ?? '')))) ?: '-') . '</div>'
-                        . '<div><strong>Cidade:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_city'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Estado:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_state'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>CEP:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_postcode'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>País:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_country'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.name', 'Nome:') . '</strong> ' . htmlspecialchars(trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.company', 'Empresa:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_company'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.street', 'Rua:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_address_1'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.complement', 'Complemento:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_address_2'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.number', 'Número:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_number'] ?? ($wpMeta['billing_number'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.district', 'Bairro:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_neighborhood'] ?? ($wpMeta['_billing_bairro'] ?? ($wpMeta['billing_bairro'] ?? '')))) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.city', 'Cidade:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_city'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.state', 'Estado:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_state'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.zip', 'CEP:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_postcode'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.country', 'País:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_country'] ?? '')) ?: '-') . '</div>'
                     . '</div>'
                 . '</div>'
             . '</div>'
             . '<div class="col-lg-4">'
                 . '<div class="border rounded p-3 h-100">'
-                    . '<div class="mb-2"><strong>Endereço de Entrega</strong></div>'
+                    . '<div class="mb-2"><strong>' . __('admin.shipment_wp.delivery_address', 'Endereço de Entrega') . '</strong></div>'
                     . '<div class="small">'
-                        . '<div><strong>Nome:</strong> ' . htmlspecialchars(trim((string) (($wpMeta['_shipping_first_name'] ?? '') . ' ' . ($wpMeta['_shipping_last_name'] ?? ''))) ?: '-') . '</div>'
-                        . '<div><strong>Empresa:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_company'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Rua:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_address_1'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Complemento:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_address_2'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Número:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_number'] ?? ($wpMeta['shipping_number'] ?? ''))) ?: '-') . '</div>'
-                        . '<div><strong>Suite:</strong> ' . htmlspecialchars($suite !== '' ? $suite : '-') . '</div>'
-                        . '<div><strong>Bairro:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_neighborhood'] ?? ($wpMeta['_shipping_bairro'] ?? ($wpMeta['shipping_bairro'] ?? '')))) ?: '-') . '</div>'
-                        . '<div><strong>Cidade:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_city'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>Estado:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_state'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>CEP:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_postcode'] ?? '')) ?: '-') . '</div>'
-                        . '<div><strong>País:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_country'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.name', 'Nome:') . '</strong> ' . htmlspecialchars(trim((string) (($wpMeta['_shipping_first_name'] ?? '') . ' ' . ($wpMeta['_shipping_last_name'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.company', 'Empresa:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_company'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.street', 'Rua:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_address_1'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.complement', 'Complemento:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_address_2'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.number', 'Número:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_number'] ?? ($wpMeta['shipping_number'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.suite_en', 'Suite:') . '</strong> ' . htmlspecialchars($suite !== '' ? $suite : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.district', 'Bairro:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_neighborhood'] ?? ($wpMeta['_shipping_bairro'] ?? ($wpMeta['shipping_bairro'] ?? '')))) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.city', 'Cidade:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_city'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.state', 'Estado:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_state'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.zip', 'CEP:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_postcode'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.country', 'País:') . '</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_country'] ?? '')) ?: '-') . '</div>'
                     . '</div>'
                 . '</div>'
             . '</div>'
@@ -2346,15 +2352,15 @@ function regerarEtiquetasMassa() {
                 . '<div class="table-responsive">'
                     . '<table class="table table-sm align-middle">'
                         . '<thead><tr>'
-                            . '<th style="width:60px;">Imagem</th>'
-                            . '<th>Declaração</th>'
-                            . '<th class="text-end">Qtd</th>'
-                            . '<th class="text-end">Preço Unit.</th>'
-                            . '<th class="text-end">Total</th>'
+                            . '<th style="width:60px;">' . __('admin.shipment_wp.th_image', 'Imagem') . '</th>'
+                            . '<th>' . __('admin.shipment_wp.th_declaration', 'Declaração') . '</th>'
+                            . '<th class="text-end">' . __('admin.shipment_wp.th_qty', 'Qtd') . '</th>'
+                            . '<th class="text-end">' . __('admin.shipment_wp.th_unit_price', 'Preço Unit.') . '</th>'
+                            . '<th class="text-end">' . __('admin.shipment_wp.th_total', 'Total') . '</th>'
                         . '</tr></thead><tbody>';
 
         if (!$wpItems) {
-            echo '<tr><td colspan="5" class="text-muted">Itens não encontrados no WordPress.</td></tr>';
+            echo '<tr><td colspan="5" class="text-muted">' . __('admin.shipment_wp.items_not_found_wp', 'Itens não encontrados no WordPress.') . '</td></tr>';
         } else {
             foreach ($wpItems as $it) {
                 $img = trim((string) ($it['image_url'] ?? ''));
@@ -2393,24 +2399,24 @@ function regerarEtiquetasMassa() {
         echo '<div class="row g-3">'
             . '<div class="col-lg-6">'
                 . '<div class="border rounded p-3 h-100">'
-                    . '<div class="mb-2"><strong>Pagamento</strong></div>'
+                    . '<div class="mb-2"><strong>' . __('admin.shipment_wp.payment', 'Pagamento') . '</strong></div>'
                     . '<div class="small">'
-                        . '<div><strong>Valor pago:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Data de crédito:</strong> ' . htmlspecialchars($paidDate !== '' ? $paidDate : '-') . htmlspecialchars($creditAmountLabel) . '</div>'
-                        . '<div><strong>Método:</strong> ' . htmlspecialchars($paymentMethod !== '' ? $paymentMethod : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.amount_paid', 'Valor pago:') . '</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.credit_date', 'Data de crédito:') . '</strong> ' . htmlspecialchars($paidDate !== '' ? $paidDate : '-') . htmlspecialchars($creditAmountLabel) . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.method', 'Método:') . '</strong> ' . htmlspecialchars($paymentMethod !== '' ? $paymentMethod : '-') . '</div>'
                     . '</div>'
                 . '</div>'
             . '</div>'
             . '<div class="col-lg-6">'
                 . '<div class="border rounded p-3 h-100">'
-                    . '<div class="mb-2"><strong>Totais</strong></div>'
+                    . '<div class="mb-2"><strong>' . __('admin.shipment_wp.totals', 'Totais') . '</strong></div>'
                     . '<div class="small">'
-                        . '<div><strong>Subda pauta:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Taxa de serviço:</strong> ' . htmlspecialchars(isset($wpTotals['service_fee']) && (float) $wpTotals['service_fee'] != 0.0 ? number_format((float) $wpTotals['service_fee'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Frete (WExpress - USD):</strong> ' . htmlspecialchars($wxFreteUsdUi !== null ? ('USD ' . number_format((float) $wxFreteUsdUi, 2, '.', ',')) : '-') . '</div>'
-                        . '<div><strong>Frete (WooCommerce):</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Descontos/Subsídios:</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Total do pedido:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.subtotal', 'Subtotal:') . '</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.service_fee', 'Taxa de serviço:') . '</strong> ' . htmlspecialchars(isset($wpTotals['service_fee']) && (float) $wpTotals['service_fee'] != 0.0 ? number_format((float) $wpTotals['service_fee'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.freight_wexpress_usd', 'Frete (WExpress - USD):') . '</strong> ' . htmlspecialchars($wxFreteUsdUi !== null ? ('USD ' . number_format((float) $wxFreteUsdUi, 2, '.', ',')) : '-') . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.freight_woocommerce', 'Frete (WooCommerce):') . '</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.discounts_subsidies', 'Descontos/Subsídios:') . '</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>' . __('admin.shipment_wp.order_total', 'Total do pedido:') . '</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
                     . '</div>'
                 . '</div>'
             . '</div>'
@@ -2449,51 +2455,51 @@ function regerarEtiquetasMassa() {
         };
 
         $useful = [];
-        $useful['Chave do Pedido'] = $metaGet('_order_key');
-        $useful['Usuário do Cliente'] = $metaGet('_customer_user');
-        $useful['Método de Pagamento'] = $metaGet('_payment_method');
-        $useful['Título do Método de Pagamento'] = $metaGet('_payment_method_title');
-        $useful['Endereço IP do Cliente'] = $metaGet('_customer_ip_address');
-        $useful['Agente do Usuário do Cliente'] = $metaGet('_customer_user_agent');
-        $useful['Criado Via'] = $metaGet('_created_via');
-        $useful['Hash do Carrinho'] = $metaGet('_cart_hash');
-        $useful['Permissões de Download'] = $metaGet('_download_permissions_granted');
-        $useful['Vendas Registradas'] = $metaGet('_recorded_sales');
-        $useful['Contagens de Uso de Cupons Registradas'] = $metaGet('_recorded_coupon_usage_counts');
-        $useful['Email de Novo Pedido Enviado'] = $metaGet('_new_order_email_sent');
-        $useful['Estoque do Pedido Reduzido'] = $metaGet('_order_stock_reduced');
-        $useful['Moeda do Pedido'] = $metaGet('_order_currency');
-        $useful['Desconto do Carrinho'] = $metaGet('_cart_discount');
-        $useful['Imposto do Desconto do Carrinho'] = $metaGet('_cart_discount_tax');
-        $useful['Frete do Pedido'] = $metaGet('_order_shipping');
-        $useful['Imposto do Frete do Pedido'] = $metaGet('_order_shipping_tax');
-        $useful['Imposto do Pedido'] = $metaGet('_order_tax');
-        $useful['Total do Pedido'] = $metaGet('_order_total');
-        $useful['Versão do Pedido'] = $metaGet('_order_version');
-        $useful['Preços Incluem Imposto'] = $metaGet('_prices_include_tax');
+        $useful[__('admin.shipment_wp.uf_order_key', 'Chave do Pedido')] = $metaGet('_order_key');
+        $useful[__('admin.shipment_wp.uf_customer_user', 'Usuário do Cliente')] = $metaGet('_customer_user');
+        $useful[__('admin.shipment_wp.uf_payment_method', 'Método de Pagamento')] = $metaGet('_payment_method');
+        $useful[__('admin.shipment_wp.uf_payment_method_title', 'Título do Método de Pagamento')] = $metaGet('_payment_method_title');
+        $useful[__('admin.shipment_wp.uf_customer_ip', 'Endereço IP do Cliente')] = $metaGet('_customer_ip_address');
+        $useful[__('admin.shipment_wp.uf_customer_user_agent', 'Agente do Usuário do Cliente')] = $metaGet('_customer_user_agent');
+        $useful[__('admin.shipment_wp.uf_created_via', 'Criado Via')] = $metaGet('_created_via');
+        $useful[__('admin.shipment_wp.uf_cart_hash', 'Hash do Carrinho')] = $metaGet('_cart_hash');
+        $useful[__('admin.shipment_wp.uf_download_permissions', 'Permissões de Download')] = $metaGet('_download_permissions_granted');
+        $useful[__('admin.shipment_wp.uf_recorded_sales', 'Vendas Registradas')] = $metaGet('_recorded_sales');
+        $useful[__('admin.shipment_wp.uf_recorded_coupon_usage', 'Contagens de Uso de Cupons Registradas')] = $metaGet('_recorded_coupon_usage_counts');
+        $useful[__('admin.shipment_wp.uf_new_order_email_sent', 'Email de Novo Pedido Enviado')] = $metaGet('_new_order_email_sent');
+        $useful[__('admin.shipment_wp.uf_order_stock_reduced', 'Estoque do Pedido Reduzido')] = $metaGet('_order_stock_reduced');
+        $useful[__('admin.shipment_wp.uf_order_currency', 'Moeda do Pedido')] = $metaGet('_order_currency');
+        $useful[__('admin.shipment_wp.uf_cart_discount', 'Desconto do Carrinho')] = $metaGet('_cart_discount');
+        $useful[__('admin.shipment_wp.uf_cart_discount_tax', 'Imposto do Desconto do Carrinho')] = $metaGet('_cart_discount_tax');
+        $useful[__('admin.shipment_wp.uf_order_shipping', 'Frete do Pedido')] = $metaGet('_order_shipping');
+        $useful[__('admin.shipment_wp.uf_order_shipping_tax', 'Imposto do Frete do Pedido')] = $metaGet('_order_shipping_tax');
+        $useful[__('admin.shipment_wp.uf_order_tax', 'Imposto do Pedido')] = $metaGet('_order_tax');
+        $useful[__('admin.shipment_wp.uf_order_total', 'Total do Pedido')] = $metaGet('_order_total');
+        $useful[__('admin.shipment_wp.uf_order_version', 'Versão do Pedido')] = $metaGet('_order_version');
+        $useful[__('admin.shipment_wp.uf_prices_include_tax', 'Preços Incluem Imposto')] = $metaGet('_prices_include_tax');
 
-        $useful['Primeiro Nome de Cobrança'] = $metaGet('_billing_first_name');
-        $useful['Sobrenome de Cobrança'] = $metaGet('_billing_last_name');
-        $useful['Endereço de Cobrança 1'] = $metaGet('_billing_address_1');
+        $useful[__('admin.shipment_wp.uf_billing_first_name', 'Primeiro Nome de Cobrança')] = $metaGet('_billing_first_name');
+        $useful[__('admin.shipment_wp.uf_billing_last_name', 'Sobrenome de Cobrança')] = $metaGet('_billing_last_name');
+        $useful[__('admin.shipment_wp.uf_billing_address_1', 'Endereço de Cobrança 1')] = $metaGet('_billing_address_1');
         $useful['Billing Address 2'] = $metaGet('_billing_address_2');
-        $useful['Cidade de Cobrança'] = $metaGet('_billing_city');
-        $useful['Estado de Cobrança'] = $metaGet('_billing_state');
-        $useful['CEP de Cobrança'] = $metaGet('_billing_postcode');
-        $useful['País de Cobrança'] = $metaGet('_billing_country');
-        $useful['Email de Cobrança'] = $metaGet('_billing_email');
-        $useful['Telefone de Cobrança'] = $metaGet('_billing_phone');
-        $useful['CPF de Cobrança'] = $metaGet('_billing_cpf');
-        $useful['Data de Nascimento de Cobrança'] = $metaGet('_billing_birthdate');
-        $useful['Número de Cobrança'] = $metaGet('_billing_number');
-        $useful['Bairro de Cobrança'] = $metaGet('_billing_neighborhood');
+        $useful[__('admin.shipment_wp.uf_billing_city', 'Cidade de Cobrança')] = $metaGet('_billing_city');
+        $useful[__('admin.shipment_wp.uf_billing_state', 'Estado de Cobrança')] = $metaGet('_billing_state');
+        $useful[__('admin.shipment_wp.uf_billing_postcode', 'CEP de Cobrança')] = $metaGet('_billing_postcode');
+        $useful[__('admin.shipment_wp.uf_billing_country', 'País de Cobrança')] = $metaGet('_billing_country');
+        $useful[__('admin.shipment_wp.uf_billing_email', 'Email de Cobrança')] = $metaGet('_billing_email');
+        $useful[__('admin.shipment_wp.uf_billing_phone', 'Telefone de Cobrança')] = $metaGet('_billing_phone');
+        $useful[__('admin.shipment_wp.uf_billing_cpf', 'CPF de Cobrança')] = $metaGet('_billing_cpf');
+        $useful[__('admin.shipment_wp.uf_billing_birthdate', 'Data de Nascimento de Cobrança')] = $metaGet('_billing_birthdate');
+        $useful[__('admin.shipment_wp.uf_billing_number', 'Número de Cobrança')] = $metaGet('_billing_number');
+        $useful[__('admin.shipment_wp.uf_billing_neighborhood', 'Bairro de Cobrança')] = $metaGet('_billing_neighborhood');
 
-        $useful['Endereço de Entrega 1'] = $metaGet('_shipping_address_1');
+        $useful[__('admin.shipment_wp.uf_shipping_address_1', 'Endereço de Entrega 1')] = $metaGet('_shipping_address_1');
         $useful['Shipping Address 2'] = $metaGet('_shipping_address_2');
-        $useful['Cidade de Entrega'] = $metaGet('_shipping_city');
-        $useful['Estado de Entrega'] = $metaGet('_shipping_state');
-        $useful['CEP de Entrega'] = $metaGet('_shipping_postcode');
-        $useful['Bairro de Entrega'] = $metaGet('_shipping_neighborhood');
-        $useful['Número de Entrega'] = $metaGet('_shipping_number');
+        $useful[__('admin.shipment_wp.uf_shipping_city', 'Cidade de Entrega')] = $metaGet('_shipping_city');
+        $useful[__('admin.shipment_wp.uf_shipping_state', 'Estado de Entrega')] = $metaGet('_shipping_state');
+        $useful[__('admin.shipment_wp.uf_shipping_postcode', 'CEP de Entrega')] = $metaGet('_shipping_postcode');
+        $useful[__('admin.shipment_wp.uf_shipping_neighborhood', 'Bairro de Entrega')] = $metaGet('_shipping_neighborhood');
+        $useful[__('admin.shipment_wp.uf_shipping_number', 'Número de Entrega')] = $metaGet('_shipping_number');
 
         // Mercado Pago / Pix (quando existir)
         $useful['Used Gateway'] = $metaGet('used_gateway');
@@ -2501,11 +2507,11 @@ function regerarEtiquetasMassa() {
         $useful['Mp Transaction Amount'] = $metaGet('mp_transaction_amount');
         $useful['Mp Pix Qr Code'] = $metaGet('mp_pix_qr_code');
         $useful['Checkout Pix Date Expiration'] = $metaGet('checkout_pix_date_expiration');
-        $useful['Data Paga'] = $metaGet('data_paga');
-        $useful['Data Concluída'] = $metaGet('data_concluida');
+        $useful[__('admin.shipment_wp.uf_data_paga', 'Data Paga')] = $metaGet('data_paga');
+        $useful[__('admin.shipment_wp.uf_data_concluida', 'Data Concluída')] = $metaGet('data_concluida');
 
         // Complementos úteis também aparecem em paidDate / date paid, então deixamos explícito
-        $useful['Data de crédito (calculada)'] = $paidDate;
+        $useful[__('admin.shipment_wp.uf_credit_date_calc', 'Data de crédito (calculada)')] = $paidDate;
 
         $mpExtras = [];
         $attributionExtras = [];
@@ -2556,11 +2562,11 @@ function regerarEtiquetasMassa() {
 
         echo '<hr>';
         echo '<div class="card">'
-            . '<div class="card-header"><strong>Informações Úteis</strong></div>'
+            . '<div class="card-header"><strong>' . __('admin.shipment_wp.useful_info', 'Informações Úteis') . '</strong></div>'
             . '<div class="card-body">'
                 . '<div class="table-responsive">'
                     . '<table class="table table-sm align-middle">'
-                        . '<thead><tr><th style="width: 320px;">Campo</th><th>Valor</th></tr></thead>'
+                        . '<thead><tr><th style="width: 320px;">' . __('admin.shipment_wp.th_field', 'Campo') . '</th><th>' . __('admin.shipment_wp.th_value', 'Valor') . '</th></tr></thead>'
                         . '<tbody>';
 
         foreach ($useful as $label => $val) {
@@ -2583,12 +2589,12 @@ function regerarEtiquetasMassa() {
             }
         };
 
-        $renderExtras('Metas adicionais (Pix/Mercado Pago)', $mpExtras);
-        $renderExtras('Metas adicionais (Atribuição / UTM / Sessão)', $attributionExtras);
-        $renderExtras('Metas adicionais (WCCS / Câmbio)', $wccsExtras);
-        $renderExtras('Metas adicionais (TRP / Idioma)', $trpExtras);
-        $renderExtras('Metas adicionais (TPUL / Visitor)', $tpulExtras);
-        $renderExtras('Metas adicionais (Checkout / Gateway)', $checkoutExtras);
+        $renderExtras(__('admin.shipment_wp.cat_pix_mp', 'Metas adicionais (Pix/Mercado Pago)'), $mpExtras);
+        $renderExtras(__('admin.shipment_wp.cat_utm', 'Metas adicionais (Atribuição / UTM / Sessão)'), $attributionExtras);
+        $renderExtras(__('admin.shipment_wp.cat_wccs', 'Metas adicionais (WCCS / Câmbio)'), $wccsExtras);
+        $renderExtras(__('admin.shipment_wp.cat_trp', 'Metas adicionais (TRP / Idioma)'), $trpExtras);
+        $renderExtras(__('admin.shipment_wp.cat_tpul', 'Metas adicionais (TPUL / Visitor)'), $tpulExtras);
+        $renderExtras(__('admin.shipment_wp.cat_checkout', 'Metas adicionais (Checkout / Gateway)'), $checkoutExtras);
 
         echo '           </tbody></table>'
                 . '</div>'
@@ -2598,16 +2604,16 @@ function regerarEtiquetasMassa() {
         echo '           </div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><strong>Recebimento</strong></div>
+                        <div class="card-header"><strong>' . __('admin.shipment_wp.receipt', 'Recebimento') . '</strong></div>
                         <div class="card-body">';
 
         if ($recebido) {
             echo '<div class="alert alert-success mb-0">
-                    <div><strong>Recebimento confirmado.</strong></div>'
-                    . ($recebidoEm !== '' ? ('<div class="small">Em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($recebidoEm))) . '</strong></div>') : '')
+                    <div><strong>' . __('admin.shipment_wp.receipt_confirmed', 'Recebimento confirmado.') . '</strong></div>'
+                    . ($recebidoEm !== '' ? ('<div class="small">' . __('admin.shipment_wp.on_label', 'Em:') . ' <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($recebidoEm))) . '</strong></div>') : '')
                 . '</div>';
         } else {
-            echo '<div class="text-muted">Use o botão <strong>Confirmar recebimento</strong> no topo desta tela.</div>';
+            echo '<div class="text-muted">' . __('admin.shipment_wp.use_confirm_receipt_button', 'Use o botão <strong>Confirmar recebimento</strong> no topo desta tela.') . '</div>';
         }
 
         echo '           </div>
@@ -2648,10 +2654,10 @@ function regerarEtiquetasMassa() {
                  WHERE janela_id = ? AND source = ? AND order_id = ?'
             );
             $st->execute([$janelaId, $source, $pedidoId]);
-            $_SESSION['message'] = 'Recebimento confirmado.';
+            $_SESSION['message'] = __('admin.shipment_wp.receipt_confirmed', 'Recebimento confirmado.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao confirmar recebimento: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.shipment_wp.confirm_receipt_error', 'Erro ao confirmar recebimento: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -2676,14 +2682,14 @@ function regerarEtiquetasMassa() {
 
         try {
             if (!$this->tableExists('remessa_wp_janela_pedidos')) {
-                throw new \RuntimeException('Tabela remessa_wp_janela_pedidos não encontrada.');
+                throw new \RuntimeException(__('admin.shipment_wp.table_window_orders_not_found', 'Tabela remessa_wp_janela_pedidos não encontrada.'));
             }
             $st = $this->connection->prepare('UPDATE remessa_wp_janela_pedidos SET medicamento = ? WHERE janela_id = ? AND source = ? AND order_id = ?');
             $st->execute([$val, $janelaId, $source, $pedidoId]);
-            $_SESSION['message'] = 'Atualizado.';
+            $_SESSION['message'] = __('admin.shipment_wp.updated', 'Atualizado.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.shipment_wp.error_prefix', 'Erro: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -2711,58 +2717,58 @@ function regerarEtiquetasMassa() {
 
         try {
             if (!$this->tableExists('remessa_wp_pedido_documentos')) {
-                throw new \RuntimeException('Tabela de documentos não encontrada. Rode a migration 048_add_docs_to_remessa_wp.sql');
+                throw new \RuntimeException(__('admin.shipment_wp.table_docs_not_found', 'Tabela de documentos não encontrada. Rode a migration 048_add_docs_to_remessa_wp.sql'));
             }
 
             $stL = $this->connection->prepare('SELECT etiqueta_gerada, medicamento FROM remessa_wp_janela_pedidos WHERE janela_id = ? AND source = ? AND order_id = ? LIMIT 1');
             $stL->execute([$janelaId, $source, $pedidoId]);
             $lnk = $stL->fetch(\PDO::FETCH_ASSOC) ?: null;
             if (!$lnk) {
-                throw new \RuntimeException('Pedido não encontrado na janela.');
+                throw new \RuntimeException(__('admin.shipment_wp.order_not_found_in_window', 'Pedido não encontrado na janela.'));
             }
             if (((int) ($lnk['etiqueta_gerada'] ?? 0)) !== 1) {
-                throw new \RuntimeException('Uploads bloqueados até gerar etiqueta.');
+                throw new \RuntimeException(__('admin.shipment_wp.uploads_blocked_until_label', 'Uploads bloqueados até gerar etiqueta.'));
             }
 
             if ($tipoNorm === 'pagamento' && $source !== 'red') {
-                throw new \RuntimeException('Comprovante de pagamento só é exigido para pedidos do redirecionamento (RED).');
+                throw new \RuntimeException(__('admin.shipment_wp.payment_receipt_only_red', 'Comprovante de pagamento só é exigido para pedidos do redirecionamento (RED).'));
             }
 
             $isMed = ((int) ($lnk['medicamento'] ?? 0)) === 1;
             if ($tipoNorm === 'medicamento' && !$isMed) {
-                throw new \RuntimeException('Documento de medicamento só é exigido quando o pedido está marcado como medicamento.');
+                throw new \RuntimeException(__('admin.shipment_wp.medication_doc_only_when_marked', 'Documento de medicamento só é exigido quando o pedido está marcado como medicamento.'));
             }
 
             if (!isset($_FILES['arquivo']) || !is_array($_FILES['arquivo'])) {
-                throw new \RuntimeException('Arquivo não enviado.');
+                throw new \RuntimeException(__('admin.shipment_wp.file_not_sent', 'Arquivo não enviado.'));
             }
             if (($_FILES['arquivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-                throw new \RuntimeException('Falha no upload.');
+                throw new \RuntimeException(__('admin.shipment_wp.upload_failed', 'Falha no upload.'));
             }
 
             $tmp = (string) ($_FILES['arquivo']['tmp_name'] ?? '');
             $origName = (string) ($_FILES['arquivo']['name'] ?? '');
             $size = (int) ($_FILES['arquivo']['size'] ?? 0);
             if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0) {
-                throw new \RuntimeException('Arquivo inválido.');
+                throw new \RuntimeException(__('admin.shipment_wp.invalid_file', 'Arquivo inválido.'));
             }
 
             $max = 20 * 1024 * 1024;
             if ($size > $max) {
-                throw new \RuntimeException('Arquivo acima do limite de 20MB.');
+                throw new \RuntimeException(__('admin.shipment_wp.file_over_limit', 'Arquivo acima do limite de 20MB.'));
             }
 
             $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
             $allowedExt = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
             if (!in_array($ext, $allowedExt, true)) {
-                throw new \RuntimeException('Extensão inválida. Permitidos: ' . implode(', ', $allowedExt));
+                throw new \RuntimeException(__('admin.shipment_wp.invalid_extension', 'Extensão inválida. Permitidos: {list}', ['list' => implode(', ', $allowedExt)]));
             }
 
             $dirs = $this->getUploadsDirRemessaWp();
             $absDir = (string) ($dirs['abs'] ?? '');
             $webDir = (string) ($dirs['web'] ?? '/uploads/remessa-wp');
             if ($absDir === '') {
-                throw new \RuntimeException('Diretório de upload não disponível.');
+                throw new \RuntimeException(__('admin.shipment_wp.upload_dir_unavailable', 'Diretório de upload não disponível.'));
             }
 
             $fname = 'wp_' . $source . '_j' . (int) $janelaId . '_o' . (int) $pedidoId . '_' . $tipoNorm . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
@@ -2770,7 +2776,7 @@ function regerarEtiquetasMassa() {
             $rel = rtrim($webDir, '/') . '/' . $fname;
 
             if (!@move_uploaded_file($tmp, $abs)) {
-                throw new \RuntimeException('Não foi possível salvar o arquivo.');
+                throw new \RuntimeException(__('admin.shipment_wp.could_not_save_file', 'Não foi possível salvar o arquivo.'));
             }
 
             $auth = new AuthService();
@@ -2803,10 +2809,10 @@ function regerarEtiquetasMassa() {
                 $uid,
             ]);
 
-            $_SESSION['message'] = 'Documento enviado.';
+            $_SESSION['message'] = __('admin.shipment_wp.document_sent', 'Documento enviado.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.shipment_wp.error_prefix', 'Erro: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -2826,7 +2832,7 @@ function regerarEtiquetasMassa() {
 
         try {
             if (!$this->tableExists('remessa_wp_janelas')) {
-                throw new \RuntimeException('Tabelas de Remessa WP não encontradas. Rode a migration 047_create_remessa_wp_janelas.sql');
+                throw new \RuntimeException(__('admin.shipment_wp.tables_not_found', 'Tabelas de Remessa WP não encontradas. Rode a migration 047_create_remessa_wp_janelas.sql'));
             }
 
             $titulo = 'Janela de testes';
@@ -2846,12 +2852,12 @@ function regerarEtiquetasMassa() {
                 $id = (int) $this->connection->lastInsertId();
             }
 
-            $_SESSION['message'] = 'Janela de testes pronta.';
+            $_SESSION['message'] = __('admin.shipment_wp.test_window_ready', 'Janela de testes pronta.');
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/remessa-wp/janela/' . $id . '?source=' . urlencode($source));
             exit;
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao criar janela de testes: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.shipment_wp.create_test_window_error', 'Erro ao criar janela de testes: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/remessa-wp?source=' . urlencode($source));
             exit;
@@ -2880,7 +2886,7 @@ function regerarEtiquetasMassa() {
             $stJ->execute([$janelaId, $source]);
             $tipo = strtolower(trim((string) ($stJ->fetchColumn() ?: '')));
             if ($tipo !== 'manual') {
-                throw new \RuntimeException('Só é permitido adicionar pedido manualmente em janelas manuais.');
+                throw new \RuntimeException(__('admin.shipment_wp.only_manual_window_add', 'Só é permitido adicionar pedido manualmente em janelas manuais.'));
             }
 
             $stIns = $this->connection->prepare('INSERT IGNORE INTO remessa_wp_janela_pedidos (janela_id, source, order_id, created_at) VALUES (?, ?, ?, NOW())');
@@ -2933,10 +2939,10 @@ function regerarEtiquetasMassa() {
                 $orderId,
             ]);
 
-            $_SESSION['message'] = 'Pedido adicionado na janela de testes.';
+            $_SESSION['message'] = __('admin.shipment_wp.order_added_test_window', 'Pedido adicionado na janela de testes.');
             $_SESSION['message_type'] = 'success';
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao adicionar pedido: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.shipment_wp.add_order_error', 'Erro ao adicionar pedido: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -2961,7 +2967,7 @@ function regerarEtiquetasMassa() {
 
         try {
             if (!$this->tableExists('remessa_wp_janelas') || !$this->tableExists('remessa_wp_janela_pedidos')) {
-                throw new \RuntimeException('Tabelas de Remessa WP não encontradas. Rode a migration 047_create_remessa_wp_janelas.sql');
+                throw new \RuntimeException(__('admin.shipment_wp.tables_not_found', 'Tabelas de Remessa WP não encontradas. Rode a migration 047_create_remessa_wp_janelas.sql'));
             }
 
             $totalAdded = 0;
@@ -3097,7 +3103,7 @@ function regerarEtiquetasMassa() {
                 }
             }
 
-            $_SESSION['message'] = 'Primeira remessa populada. Pedidos adicionados/atualizados: ' . (int) $totalAdded;
+            $_SESSION['message'] = __('admin.shipment_wp.first_shipment_populated', 'Primeira remessa populada. Pedidos adicionados/atualizados: {n}', ['n' => (int) $totalAdded]);
             $_SESSION['message_type'] = 'success';
 
             if (count($sources) === 1 && $lastJanelaId > 0) {
@@ -3105,7 +3111,7 @@ function regerarEtiquetasMassa() {
                 exit;
             }
         } catch (\Exception $e) {
-            $_SESSION['message'] = 'Erro ao popular primeira remessa: ' . $e->getMessage();
+            $_SESSION['message'] = __('admin.shipment_wp.populate_first_shipment_error', 'Erro ao popular primeira remessa: ') . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 

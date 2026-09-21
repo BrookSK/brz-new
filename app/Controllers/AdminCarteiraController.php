@@ -61,7 +61,7 @@ class AdminCarteiraController extends Controller {
         $valor = $data['valor'] ?? 0;
         $descricao = trim((string) ($data['descricao'] ?? ''));
         if ($descricao === '') {
-            $descricao = 'Crédito adicionado pelo admin';
+            $descricao = __('admin.wallet.credit_added_by_admin', 'Crédito adicionado pelo admin');
         }
         
         try {
@@ -72,7 +72,7 @@ class AdminCarteiraController extends Controller {
             $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
             $stmt->execute([$usuarioId]);
             if (!$stmt->fetch()) {
-                throw new \Exception('Usuário não encontrado');
+                throw new \Exception(__('admin.wallet.user_not_found', 'Usuário não encontrado'));
             }
             
             // Garantir carteira existe
@@ -101,7 +101,7 @@ class AdminCarteiraController extends Controller {
             
             $pdo->commit();
             
-            echo json_encode(['success' => true, 'message' => 'Crédito adicionado com sucesso']);
+            echo json_encode(['success' => true, 'message' => __('admin.wallet.credit_added_success', 'Crédito adicionado com sucesso')]);
             
         } catch (\Exception $e) {
             $pdo->rollBack();
@@ -118,11 +118,11 @@ class AdminCarteiraController extends Controller {
         $valor = (float) ($data['valor'] ?? 0);
         $descricao = trim((string) ($data['descricao'] ?? ''));
         if ($descricao === '') {
-            $descricao = 'Débito realizado pelo admin';
+            $descricao = __('admin.wallet.debit_by_admin', 'Débito realizado pelo admin');
         }
 
         if ($usuarioId <= 0 || $valor <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Dados inválidos']);
+            echo json_encode(['success' => false, 'message' => __('admin.wallet.invalid_data', 'Dados inválidos')]);
             exit;
         }
 
@@ -134,7 +134,7 @@ class AdminCarteiraController extends Controller {
             $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
             $stmt->execute([$usuarioId]);
             if (!$stmt->fetch()) {
-                throw new \Exception('Usuário não encontrado');
+                throw new \Exception(__('admin.wallet.user_not_found', 'Usuário não encontrado'));
             }
 
             // Garantir carteira existe
@@ -146,7 +146,7 @@ class AdminCarteiraController extends Controller {
             $saldoAtual = (float) ($stmt->fetchColumn() ?: 0);
 
             if ($valor > $saldoAtual) {
-                throw new \Exception('Saldo insuficiente. Saldo atual: $' . number_format($saldoAtual, 2) . ' USD');
+                throw new \Exception(__('admin.wallet.insufficient_balance_current', 'Saldo insuficiente. Saldo atual: ') . '$' . number_format($saldoAtual, 2) . ' USD');
             }
 
             // Ensure modalidade column exists
@@ -173,7 +173,7 @@ class AdminCarteiraController extends Controller {
             $pdo->commit();
 
             $novoSaldo = $saldoAtual - $valor;
-            echo json_encode(['success' => true, 'message' => 'Débito realizado com sucesso', 'novo_saldo' => $novoSaldo]);
+            echo json_encode(['success' => true, 'message' => __('admin.wallet.debit_success', 'Débito realizado com sucesso'), 'novo_saldo' => $novoSaldo]);
 
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
@@ -202,7 +202,7 @@ class AdminCarteiraController extends Controller {
             $carteira = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$carteira || $carteira['saldo_usd'] < $valorUSD) {
-                throw new \Exception('Saldo insuficiente');
+                throw new \Exception(__('admin.wallet.insufficient_balance', 'Saldo insuficiente'));
             }
             
             $valorBRL = $valorUSD * $taxaConversao;
@@ -221,15 +221,15 @@ class AdminCarteiraController extends Controller {
             $stmt = $pdo->prepare("
                 INSERT INTO transacoes_carteira 
                 (usuario_id, tipo, valor_usd, valor_brl, taxa_conversao, descricao, created_at) 
-                VALUES (?, 'conversao', ?, ?, ?, 'Conversão USD para BRL', NOW())
+                VALUES (?, 'conversao', ?, ?, ?, ?, NOW())
             ");
-            $stmt->execute([$usuarioId, $valorUSD, $valorBRL, $taxaConversao]);
+            $stmt->execute([$usuarioId, $valorUSD, $valorBRL, $taxaConversao, __('admin.wallet.conversion_usd_brl', 'Conversão USD para BRL')]);
             
             $pdo->commit();
             
             echo json_encode([
                 'success' => true, 
-                'message' => 'Conversão realizada com sucesso',
+                'message' => __('admin.wallet.conversion_success', 'Conversão realizada com sucesso'),
                 'valor_brl' => $valorBRL
             ]);
             
@@ -356,7 +356,7 @@ class AdminCarteiraController extends Controller {
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarios = $data['usuarios'] ?? [];
         $valor = $data['valor'] ?? 0;
-        $descricao = $data['descricao'] ?? 'Crédito em lote adicionado pelo admin';
+        $descricao = $data['descricao'] ?? __('admin.wallet.batch_credit_by_admin', 'Crédito em lote adicionado pelo admin');
         
         try {
             $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -371,7 +371,7 @@ class AdminCarteiraController extends Controller {
                     $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
                     $stmt->execute([$usuarioId]);
                     if (!$stmt->fetch()) {
-                        $erros[] = "Usuário ID {$usuarioId} não encontrado";
+                        $erros[] = __('admin.wallet.batch_user_not_found', 'Usuário ID {id} não encontrado', ['id' => $usuarioId]);
                         continue;
                     }
                     
@@ -393,7 +393,7 @@ class AdminCarteiraController extends Controller {
                     $sucessos++;
                     
                 } catch (\Exception $e) {
-                    $erros[] = "Erro no usuário ID {$usuarioId}: " . $e->getMessage();
+                    $erros[] = __('admin.wallet.batch_user_error', 'Erro no usuário ID {id}: ', ['id' => $usuarioId]) . $e->getMessage();
                 }
             }
             
@@ -401,7 +401,7 @@ class AdminCarteiraController extends Controller {
             
             echo json_encode([
                 'success' => true,
-                'message' => "Processado: {$sucessos} sucessos, " . count($erros) . " erros",
+                'message' => __('admin.wallet.batch_processed', 'Processado: {ok} sucessos, {err} erros', ['ok' => $sucessos, 'err' => count($erros)]),
                 'sucessos' => $sucessos,
                 'erros' => $erros
             ]);

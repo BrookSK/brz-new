@@ -185,8 +185,8 @@ class AdminClubeRecargasController extends Controller {
             session_start();
         }
         $_SESSION['flash_' . ($ok ? 'success' : 'error')] = $ok
-            ? ($novoValor === '1' ? 'Clube ativado. Novas recargas liberadas.' : 'Clube desativado. Novas recargas bloqueadas.')
-            : 'Não foi possível atualizar o status do Clube.';
+            ? ($novoValor === '1' ? __('admin.club_recharges.enabled_success', 'Clube ativado. Novas recargas liberadas.') : __('admin.club_recharges.disabled_success', 'Clube desativado. Novas recargas bloqueadas.'))
+            : __('admin.club_recharges.toggle_error', 'Não foi possível atualizar o status do Clube.');
 
         $this->redirect('/admin/clube/recargas');
     }

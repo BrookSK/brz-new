@@ -47,23 +47,23 @@ $simbolo = $simboloEncaminhamento ?? 'sedex';
   <div class="hd">
     <div class="lg"><img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="width:25mm;height:auto;"></div>
     <div class="dm"><canvas id="dm-<?= $uid ?>"></canvas></div>
-    <div class="sm"><img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="Símbolo" style="width:20mm;height:auto;"></div>
+    <div class="sm"><img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="<?= htmlspecialchars(__('admin.shipment_correios.symbol','Símbolo'), ENT_QUOTES, 'UTF-8') ?>" style="width:20mm;height:auto;"></div>
   </div>
   <div class="inf">
-    <div>NF:<br>Pedido: <strong><?= $pedidoId > 0 ? $pedidoId : '0' ?></strong></div>
-    <div class="cc">Contrato: <strong><?= $h($contrato) ?></strong><br><strong><?= $h($servicoLabel) ?></strong></div>
-    <div class="cr">Volume: 1/1<br>Peso (g): <strong><?= $h($pesoGramas) ?></strong></div>
+    <div><?= __('admin.shipment_correios.nf','NF:') ?><br><?= __('admin.shipment_correios.order','Pedido:') ?> <strong><?= $pedidoId > 0 ? $pedidoId : '0' ?></strong></div>
+    <div class="cc"><?= __('admin.shipment_correios.contract','Contrato:') ?> <strong><?= $h($contrato) ?></strong><br><strong><?= $h($servicoLabel) ?></strong></div>
+    <div class="cr"><?= __('admin.shipment_correios.volume','Volume:') ?> 1/1<br><?= __('admin.shipment_correios.weight_g','Peso (g):') ?> <strong><?= $h($pesoGramas) ?></strong></div>
   </div>
   <div class="trk">
     <div class="ct"><?= $h($codigoFormatado) ?></div>
     <div class="br"><svg id="bc-<?= $uid ?>"></svg><div class="sa"><?php foreach($servicosAdicionais as $sa): ?><?= $h($sa) ?><br><?php endforeach; ?></div></div>
   </div>
   <div class="rcv">
-    <div class="f"><span class="l">Recebedor:</span><span class="v"></span></div>
-    <div class="fr"><div class="f"><span class="l">Assinatura:</span><span class="v"></span></div><div class="f"><span class="l">Documento:</span><span class="v"></span></div></div>
+    <div class="f"><span class="l"><?= __('admin.shipment_correios.receiver','Recebedor:') ?></span><span class="v"></span></div>
+    <div class="fr"><div class="f"><span class="l"><?= __('admin.shipment_correios.signature','Assinatura:') ?></span><span class="v"></span></div><div class="f"><span class="l"><?= __('admin.shipment_correios.document','Documento:') ?></span><span class="v"></span></div></div>
   </div>
   <div class="dst">
-    <div class="dh"><span>DESTINATÁRIO</span><img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="height:4mm;width:auto;"></div>
+    <div class="dh"><span><?= __('admin.shipment_correios.recipient','DESTINATÁRIO') ?></span><img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="height:4mm;width:auto;"></div>
     <div class="dd">
       <div class="dt">
         <div class="dn"><?= $h($destNome) ?></div>
@@ -75,10 +75,10 @@ $simbolo = $simboloEncaminhamento ?? 'sedex';
     </div>
   </div>
   <div class="rem">
-    <div class="rt">Remetente: <?= $h($remNome) ?></div>
+    <div class="rt"><?= __('admin.shipment_correios.sender','Remetente:') ?> <?= $h($remNome) ?></div>
     <div><?= $h($remEndereco) ?></div>
     <div class="rc"><?= $h($remCep) ?> <?= $h($remCidade . '/' . $remUf) ?></div>
-    <?php if (!empty($remCnpj)): ?><div>CNPJ: <?= $h($remCnpj) ?></div><?php endif; ?>
+    <?php if (!empty($remCnpj)): ?><div><?= __('admin.shipment_correios.cnpj','CNPJ:') ?> <?= $h($remCnpj) ?></div><?php endif; ?>
   </div>
 </div>
 <script>

@@ -172,7 +172,7 @@ class AdminRemessaStampsController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa Stamps (UPS) - Braziliana Admin</title>
+    <title>' . __('admin.stamps.page_title', 'Remessa Stamps (UPS)') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -184,26 +184,26 @@ class AdminRemessaStampsController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="page-title">Remessa Stamps (UPS)</h1>
+                <h1 class="page-title">' . __('admin.stamps.heading', 'Remessa Stamps (UPS)') . '</h1>
                 <div>
-                    <button type="button" class="btn btn-outline-secondary" onclick="location.reload()"><i class="fas fa-sync"></i> Atualizar</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="location.reload()"><i class="fas fa-sync"></i> ' . __('common.refresh', 'Atualizar') . '</button>
                 </div>
             </div>';
 
         if (!$enabled) {
-            echo '<div class="alert alert-warning">Stamps está desabilitado ou não configurado. Vá em <strong>/admin/configuracoes</strong> &gt; <strong>Entrega</strong> e ative/configure.</div>';
+            echo '<div class="alert alert-warning">' . __('admin.stamps.disabled_warning', 'Stamps está desabilitado ou não configurado. Vá em') . ' <strong>/admin/configuracoes</strong> &gt; <strong>' . __('admin.stamps.delivery_menu', 'Entrega') . '</strong> ' . __('admin.stamps.enable_configure', 'e ative/configure.') . '</div>';
         }
 
         echo '<div class="card mb-4">
-            <div class="card-header"><strong>Pedidos pagos (exterior) - prontos para etiqueta</strong></div>
+            <div class="card-header"><strong>' . __('admin.stamps.orders_ready_label', 'Pedidos pagos (exterior) - prontos para etiqueta') . '</strong></div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>País</th><th>Data</th><th>Ação</th></tr></thead>
+                        <thead><tr><th>' . __('admin.stamps.th_order', 'Pedido') . '</th><th>' . __('common.customer', 'Cliente') . '</th><th>' . __('admin.stamps.th_country', 'País') . '</th><th>' . __('admin.stamps.th_date', 'Data') . '</th><th>' . __('common.actions', 'Ação') . '</th></tr></thead>
                         <tbody>';
 
         if (empty($pedidos)) {
-            echo '<tr><td colspan="5" class="text-center text-muted">Nenhum pedido exterior aguardando etiqueta.</td></tr>';
+            echo '<tr><td colspan="5" class="text-center text-muted">' . __('admin.stamps.no_orders_waiting', 'Nenhum pedido exterior aguardando etiqueta.') . '</td></tr>';
         } else {
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['pedido_id'] ?? 0);
@@ -213,8 +213,8 @@ class AdminRemessaStampsController extends Controller {
                     . '<td>' . htmlspecialchars((string) ($p['pais'] ?? '')) . '</td>'
                     . '<td>' . (!empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-') . '</td>'
                     . '<td>'
-                    . '<button class="btn btn-sm btn-primary" onclick="gerarEtiqueta(' . $pid . ')"><i class="fas fa-tag"></i> Gerar etiqueta</button>'
-                    . ' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i> Pedido</a>'
+                    . '<button class="btn btn-sm btn-primary" onclick="gerarEtiqueta(' . $pid . ')"><i class="fas fa-tag"></i> ' . __('admin.stamps.generate_label', 'Gerar etiqueta') . '</button>'
+                    . ' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i> ' . __('admin.stamps.order', 'Pedido') . '</a>'
                     . '</td>'
                     . '</tr>';
             }
@@ -223,15 +223,15 @@ class AdminRemessaStampsController extends Controller {
         echo '</tbody></table></div></div></div>';
 
         echo '<div class="card">
-            <div class="card-header"><strong>Etiquetas geradas</strong></div>
+            <div class="card-header"><strong>' . __('admin.stamps.generated_labels', 'Etiquetas geradas') . '</strong></div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>Tracking</th><th>Carrier</th><th>Label</th><th>Data</th></tr></thead>
+                        <thead><tr><th>' . __('admin.stamps.th_order', 'Pedido') . '</th><th>' . __('common.customer', 'Cliente') . '</th><th>' . __('admin.stamps.th_tracking', 'Tracking') . '</th><th>' . __('admin.stamps.th_carrier', 'Carrier') . '</th><th>' . __('admin.stamps.th_label', 'Label') . '</th><th>' . __('admin.stamps.th_date', 'Data') . '</th></tr></thead>
                         <tbody>';
 
         if (empty($etiquetas)) {
-            echo '<tr><td colspan="6" class="text-center text-muted">Nenhuma etiqueta gerada.</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted">' . __('admin.stamps.no_labels', 'Nenhuma etiqueta gerada.') . '</td></tr>';
         } else {
             foreach ($etiquetas as $e) {
                 $pid = (int) ($e['pedido_id'] ?? 0);
@@ -242,7 +242,7 @@ class AdminRemessaStampsController extends Controller {
                     . '<td>' . htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) . '</td>'
                     . '<td>' . htmlspecialchars($trk) . '</td>'
                     . '<td>' . htmlspecialchars((string) ($e['carrier'] ?? '')) . '</td>'
-                    . '<td>' . ($url !== '' ? ('<a href="' . htmlspecialchars($url) . '" target="_blank">Abrir</a>') : '-') . '</td>'
+                    . '<td>' . ($url !== '' ? ('<a href="' . htmlspecialchars($url) . '" target="_blank">' . __('admin.stamps.open', 'Abrir') . '</a>') : '-') . '</td>'
                     . '<td>' . (!empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-') . '</td>'
                     . '</tr>';
             }
@@ -254,7 +254,7 @@ class AdminRemessaStampsController extends Controller {
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function gerarEtiqueta(pedidoId) {
-    if (!confirm("Gerar etiqueta Stamps para o pedido #" + pedidoId + "?")) return;
+    if (!confirm("' . __('admin.stamps.confirm_generate', 'Gerar etiqueta Stamps para o pedido') . ' #" + pedidoId + "?")) return;
     fetch("/admin/remessa-stamps/gerar-etiqueta", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -266,9 +266,9 @@ function gerarEtiqueta(pedidoId) {
             location.reload();
             return;
         }
-        alert("Erro: " + (data.message || data.error || JSON.stringify(data)));
+        alert("' . __('common.error', 'Erro') . ': " + (data.message || data.error || JSON.stringify(data)));
     })
-    .catch(err => alert("Erro: " + err.message));
+    .catch(err => alert("' . __('common.error', 'Erro') . ': " + err.message));
 }
 </script>
 </body>
@@ -327,12 +327,12 @@ function gerarEtiqueta(pedidoId) {
         $fromJson = trim((string) $this->getConfigEntregaValue('stamps_from_address_json', ''));
         $from = $fromJson !== '' ? json_decode($fromJson, true) : null;
         if (!is_array($from)) {
-            throw new \Exception('Stamps: configure stamps_from_address_json (JSON) em /admin/configuracoes > Entrega');
+            throw new \Exception(__('admin.stamps.err_from_address', 'Stamps: configure stamps_from_address_json (JSON) em /admin/configuracoes > Entrega'));
         }
 
         $serviceType = (string) $this->getConfigEntregaValue('stamps_service_type', '');
         if (trim($serviceType) === '') {
-            throw new \Exception('Stamps: configure stamps_service_type em /admin/configuracoes > Entrega');
+            throw new \Exception(__('admin.stamps.err_service_type', 'Stamps: configure stamps_service_type em /admin/configuracoes > Entrega'));
         }
 
         $packagingType = (string) $this->getConfigEntregaValue('stamps_packaging_type', 'package');
@@ -365,7 +365,7 @@ function gerarEtiqueta(pedidoId) {
             $to['name'] = 'Cliente';
         }
         if (trim((string) ($to['address_line1'] ?? '')) === '') {
-            throw new \Exception('Stamps: endereço de entrega incompleto no pedido (address_line1).');
+            throw new \Exception(__('admin.stamps.err_incomplete_address', 'Stamps: endereço de entrega incompleto no pedido (address_line1).'));
         }
         if (trim((string) ($to['city'] ?? '')) === '') {
             $to['city'] = 'City';
@@ -479,13 +479,13 @@ function gerarEtiqueta(pedidoId) {
             }
             $pedidoId = (int) $raw;
             if ($pedidoId <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Pedido inválido']);
+                echo json_encode(['success' => false, 'message' => __('admin.stamps.invalid_order', 'Pedido inválido')]);
                 return;
             }
 
             $this->ensureStampsEtiquetasTable();
             if (!$this->tableExists('stamps_etiquetas')) {
-                echo json_encode(['success' => false, 'message' => 'Tabela stamps_etiquetas não encontrada. Rode a migration database/migrations/070_create_stamps_etiquetas.sql']);
+                echo json_encode(['success' => false, 'message' => __('admin.stamps.table_missing', 'Tabela stamps_etiquetas não encontrada. Rode a migration database/migrations/070_create_stamps_etiquetas.sql')]);
                 return;
             }
 
@@ -493,14 +493,14 @@ function gerarEtiqueta(pedidoId) {
             $stCheck->execute([$pedidoId]);
             $exists = (int) ($stCheck->fetchColumn() ?: 0);
             if ($exists > 0) {
-                echo json_encode(['success' => false, 'message' => 'Já existe etiqueta Stamps para este pedido']);
+                echo json_encode(['success' => false, 'message' => __('admin.stamps.label_exists', 'Já existe etiqueta Stamps para este pedido')]);
                 return;
             }
 
             $pedidoModel = new PedidoEcommerce();
             $pedido = $pedidoModel->getComDetalhes($pedidoId);
             if (!is_array($pedido) || empty($pedido['id'])) {
-                echo json_encode(['success' => false, 'message' => 'Pedido não encontrado']);
+                echo json_encode(['success' => false, 'message' => __('admin.stamps.order_not_found', 'Pedido não encontrado')]);
                 return;
             }
 

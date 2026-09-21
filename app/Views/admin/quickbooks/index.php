@@ -1,8 +1,8 @@
 ﻿<?php require_once __DIR__.'/../../partials/admin_sidebar.php'; renderAdminSidebarStyles(); ?>
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="<?= \App\Core\I18n::getLocaleHtml() ?>">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickBooks - Braziliana Admin</title>
+<title><?= __('admin.quickbooks.title_online','QuickBooks - Braziliana Admin') ?></title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -13,8 +13,8 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h1 class="page-title">QuickBooks Online</h1>
-        <p class="page-subtitle">Integração contábil</p>
+        <h1 class="page-title"><?= __('admin.quickbooks.page_title','QuickBooks Online') ?></h1>
+        <p class="page-subtitle"><?= __('admin.quickbooks.page_subtitle','Integração contábil') ?></p>
     </div>
 </div>
 
@@ -30,29 +30,29 @@
     <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-plug me-2"></i>Status da Conexão</h5>
+                <h5 class="card-title"><i class="fas fa-plug me-2"></i><?= __('admin.quickbooks.connection_status','Status da Conexão') ?></h5>
                 <?php if ($conectado): ?>
-                    <span class="badge bg-success fs-6">Conectado</span>
+                    <span class="badge bg-success fs-6"><?= __('admin.quickbooks.connected','Conectado') ?></span>
                     <?php if ($companyInfo): ?>
-                        <p class="mt-2 mb-1"><strong>Empresa:</strong> <?= htmlspecialchars($companyInfo['CompanyInfo']['CompanyName'] ?? 'N/A') ?></p>
+                        <p class="mt-2 mb-1"><strong><?= __('admin.quickbooks.company','Empresa:') ?></strong> <?= htmlspecialchars($companyInfo['CompanyInfo']['CompanyName'] ?? 'N/A') ?></p>
                         <p class="mb-1 text-muted small">Realm ID: <?= htmlspecialchars($token['realm_id'] ?? '') ?></p>
-                        <p class="mb-2 text-muted small">Ambiente: <?= htmlspecialchars($token['ambiente'] ?? '') ?></p>
+                        <p class="mb-2 text-muted small"><?= __('admin.quickbooks.environment','Ambiente:') ?> <?= htmlspecialchars($token['ambiente'] ?? '') ?></p>
                     <?php endif; ?>
                     <form method="POST" action="/admin/quickbooks/desconectar" class="mt-2">
-                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Desconectar do QuickBooks?')">
-                            <i class="fas fa-unlink me-1"></i>Desconectar
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('<?= htmlspecialchars(__('admin.quickbooks.disconnect_confirm','Desconectar do QuickBooks?'), ENT_QUOTES, 'UTF-8') ?>')">
+                            <i class="fas fa-unlink me-1"></i><?= __('admin.quickbooks.disconnect','Desconectar') ?>
                         </button>
                     </form>
                 <?php else: ?>
-                    <span class="badge bg-secondary fs-6">Desconectado</span>
+                    <span class="badge bg-secondary fs-6"><?= __('admin.quickbooks.disconnected','Desconectado') ?></span>
                     <?php if ($configurado): ?>
                         <div class="mt-3">
                             <a href="/admin/quickbooks/conectar" class="btn btn-primary">
-                                <i class="fas fa-link me-1"></i>Conectar ao QuickBooks
+                                <i class="fas fa-link me-1"></i><?= __('admin.quickbooks.connect_to','Conectar ao QuickBooks') ?>
                             </a>
                         </div>
                     <?php else: ?>
-                        <p class="text-muted mt-2">Configure as credenciais abaixo para conectar.</p>
+                        <p class="text-muted mt-2"><?= __('admin.quickbooks.configure_credentials','Configure as credenciais abaixo para conectar.') ?></p>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
@@ -64,13 +64,13 @@
     <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-bolt me-2"></i>Ações Rápidas</h5>
+                <h5 class="card-title"><i class="fas fa-bolt me-2"></i><?= __('admin.quickbooks.quick_actions','Ações Rápidas') ?></h5>
                 <div class="d-grid gap-2">
                     <a href="/admin/quickbooks/invoices" class="btn btn-outline-primary">
-                        <i class="fas fa-file-invoice-dollar me-1"></i>Ver Invoices
+                        <i class="fas fa-file-invoice-dollar me-1"></i><?= __('admin.quickbooks.view_invoices','Ver Invoices') ?>
                     </a>
                     <button type="button" class="btn btn-outline-warning" onclick="document.getElementById('syncLoteCard').style.display=document.getElementById('syncLoteCard').style.display==='none'?'':'none'">
-                        <i class="fas fa-sync me-1"></i>Sincronizar em Lote
+                        <i class="fas fa-sync me-1"></i><?= __('admin.quickbooks.batch_sync','Sincronizar em Lote') ?>
                     </button>
                 </div>
             </div>
@@ -81,7 +81,7 @@
 
 <!-- Configurações -->
 <div class="card mb-4">
-    <div class="card-header"><i class="fas fa-cog me-2"></i>Configurações QuickBooks</div>
+    <div class="card-header"><i class="fas fa-cog me-2"></i><?= __('admin.quickbooks.settings','Configurações QuickBooks') ?></div>
     <div class="card-body">
         <form method="POST" action="/admin/quickbooks/config">
             <div class="row">
@@ -89,49 +89,49 @@
                     <label class="form-label">Client ID <span class="text-danger">*</span></label>
                     <input type="text" name="qb_client_id" class="form-control"
                            value="<?= htmlspecialchars($config['qb_client_id'] ?? '') ?>"
-                           placeholder="Client ID do app QuickBooks">
-                    <div class="form-text">Obtido em <a href="https://developer.intuit.com" target="_blank">developer.intuit.com</a></div>
+                           placeholder="<?= htmlspecialchars(__('admin.quickbooks.ph_client_id','Client ID do app QuickBooks'), ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="form-text"><?= __('admin.quickbooks.obtained_at','Obtido em') ?> <a href="https://developer.intuit.com" target="_blank">developer.intuit.com</a></div>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Client Secret <span class="text-danger">*</span></label>
                     <input type="password" name="qb_client_secret" class="form-control"
-                           placeholder="<?= !empty($config['qb_client_secret']) ? '(salvo)' : 'Client Secret' ?>">
+                           placeholder="<?= !empty($config['qb_client_secret']) ? htmlspecialchars(__('admin.quickbooks.ph_saved','(salvo)'), ENT_QUOTES, 'UTF-8') : 'Client Secret' ?>">
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Redirect URI <span class="text-danger">*</span></label>
                     <input type="text" name="qb_redirect_uri" class="form-control"
                            value="<?= htmlspecialchars($config['qb_redirect_uri'] ?? '') ?>"
                            placeholder="https://seusite.com/admin/quickbooks/callback">
-                    <div class="form-text">Deve ser cadastrado no app QuickBooks exatamente igual.</div>
+                    <div class="form-text"><?= __('admin.quickbooks.redirect_help','Deve ser cadastrado no app QuickBooks exatamente igual.') ?></div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label class="form-label">Ambiente</label>
+                    <label class="form-label"><?= __('admin.quickbooks.environment_label','Ambiente') ?></label>
                     <select name="qb_ambiente" class="form-select">
-                        <option value="sandbox" <?= ($config['qb_ambiente'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>>Sandbox (Testes)</option>
-                        <option value="production" <?= ($config['qb_ambiente'] ?? 'sandbox') === 'production' ? 'selected' : '' ?>>Produção</option>
+                        <option value="sandbox" <?= ($config['qb_ambiente'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>><?= __('admin.quickbooks.sandbox_tests','Sandbox (Testes)') ?></option>
+                        <option value="production" <?= ($config['qb_ambiente'] ?? 'sandbox') === 'production' ? 'selected' : '' ?>><?= __('admin.quickbooks.production','Produção') ?></option>
                     </select>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label class="form-label">Ativo</label>
+                    <label class="form-label"><?= __('admin.quickbooks.active','Ativo') ?></label>
                     <select name="qb_ativo" class="form-select">
-                        <option value="1" <?= ($config['qb_ativo'] ?? '0') === '1' ? 'selected' : '' ?>>Sim</option>
-                        <option value="0" <?= ($config['qb_ativo'] ?? '0') === '0' ? 'selected' : '' ?>>Não</option>
+                        <option value="1" <?= ($config['qb_ativo'] ?? '0') === '1' ? 'selected' : '' ?>><?= __('admin.quickbooks.yes','Sim') ?></option>
+                        <option value="0" <?= ($config['qb_ativo'] ?? '0') === '0' ? 'selected' : '' ?>><?= __('admin.quickbooks.no','Não') ?></option>
                     </select>
                 </div>
                 <div class="col-12 mb-3">
-                    <label class="form-label">Verifier Token (Webhook)</label>
+                    <label class="form-label"><?= __('admin.quickbooks.verifier_token','Verifier Token (Webhook)') ?></label>
                     <input type="text" name="qb_verifier_token" class="form-control font-monospace"
                            value="<?= htmlspecialchars($config['qb_verifier_token'] ?? '') ?>"
-                           placeholder="Token gerado no painel QuickBooks → Webhooks">
+                           placeholder="<?= htmlspecialchars(__('admin.quickbooks.ph_verifier_token','Token gerado no painel QuickBooks → Webhooks'), ENT_QUOTES, 'UTF-8') ?>">
                     <div class="form-text">
-                        Obtido em <strong>developer.intuit.com → seu app → Webhooks</strong>.
-                        URL do webhook a cadastrar:
+                        <?= __('admin.quickbooks.obtained_at','Obtido em') ?> <strong>developer.intuit.com → seu app → Webhooks</strong>.
+                        <?= __('admin.quickbooks.webhook_url_register','URL do webhook a cadastrar:') ?>
                         <code><?= htmlspecialchars(($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'seusite.com') . '/webhook/quickbooks') ?></code>
                     </div>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save me-1"></i>Salvar Configurações
+                <i class="fas fa-save me-1"></i><?= __('admin.quickbooks.save_settings','Salvar Configurações') ?>
             </button>
         </form>
     </div>
@@ -140,24 +140,24 @@
 <!-- Sincronização em Lote (oculto - admin only) -->
 <?php if ($conectado): ?>
 <div class="card mb-4" id="syncLoteCard" style="display:none;">
-    <div class="card-header bg-warning text-dark"><i class="fas fa-sync me-2"></i>Sincronização em Lote</div>
+    <div class="card-header bg-warning text-dark"><i class="fas fa-sync me-2"></i><?= __('admin.quickbooks.batch_sync_title','Sincronização em Lote') ?></div>
     <div class="card-body">
-        <p class="small text-muted">Sincroniza todos os pedidos no período que ainda não foram enviados ao QuickBooks. Pedidos já sincronizados são ignorados automaticamente.</p>
+        <p class="small text-muted"><?= __('admin.quickbooks.batch_sync_desc','Sincroniza todos os pedidos no período que ainda não foram enviados ao QuickBooks. Pedidos já sincronizados são ignorados automaticamente.') ?></p>
         <div class="row g-2 align-items-end">
             <div class="col-md-3">
-                <label class="form-label small">Data Início</label>
+                <label class="form-label small"><?= __('admin.quickbooks.date_start','Data Início') ?></label>
                 <input type="date" class="form-control form-control-sm" id="syncLoteInicio" value="2026-04-29">
             </div>
             <div class="col-md-3">
-                <label class="form-label small">Data Fim</label>
+                <label class="form-label small"><?= __('admin.quickbooks.date_end','Data Fim') ?></label>
                 <input type="date" class="form-control form-control-sm" id="syncLoteFim" value="<?= date('Y-m-d') ?>">
             </div>
             <div class="col-md-3">
                 <button type="button" class="btn btn-warning btn-sm" id="btnSyncLote" onclick="executarSyncLote()">
-                    <i class="fas fa-play me-1"></i>Executar Sincronização
+                    <i class="fas fa-play me-1"></i><?= __('admin.quickbooks.run_sync','Executar Sincronização') ?>
                 </button>
                 <button type="button" class="btn btn-danger btn-sm" id="btnSyncLoteStop" style="display:none;" onclick="pararSyncLote()">
-                    <i class="fas fa-stop me-1"></i>Parar
+                    <i class="fas fa-stop me-1"></i><?= __('admin.quickbooks.stop','Parar') ?>
                 </button>
             </div>
         </div>
@@ -181,14 +181,14 @@ function executarSyncLote() {
     var res = document.getElementById('syncLoteResultado');
     var inicio = document.getElementById('syncLoteInicio').value;
     var fim = document.getElementById('syncLoteFim').value;
-    if (!inicio) { alert('Informe a data de início'); return; }
+    if (!inicio) { alert('<?= htmlspecialchars(__('admin.quickbooks.js_inform_start_date','Informe a data de início'), ENT_QUOTES, 'UTF-8') ?>'); return; }
 
     _syncAborted = false;
     btn.disabled = true;
     btn.style.display = 'none';
     btnStop.style.display = '';
     res.style.display = '';
-    res.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Iniciando sincronização...</div>';
+    res.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i><?= htmlspecialchars(__('admin.quickbooks.js_starting_sync','Iniciando sincronização...'), ENT_QUOTES, 'UTF-8') ?></div>';
 
     var totalSucesso = 0;
     var totalErros = [];
@@ -197,16 +197,16 @@ function executarSyncLote() {
 
     function rodarLote() {
         if (_syncAborted) {
-            finalizar('Sincronização interrompida pelo usuário.');
+            finalizar('<?= htmlspecialchars(__('admin.quickbooks.js_sync_interrupted','Sincronização interrompida pelo usuário.'), ENT_QUOTES, 'UTF-8') ?>');
             return;
         }
 
         rodada++;
         res.innerHTML = '<div class="alert alert-info">'
             + '<i class="fas fa-spinner fa-spin me-2"></i>'
-            + '<strong>Processando...</strong> Rodada ' + rodada + ' | '
-            + totalSucesso + ' sincronizados até agora'
-            + (totalErros.length > 0 ? ' | ' + totalErros.length + ' erros' : '')
+            + '<strong><?= htmlspecialchars(__('admin.quickbooks.js_processing','Processando...'), ENT_QUOTES, 'UTF-8') ?></strong> <?= htmlspecialchars(__('admin.quickbooks.js_round','Rodada'), ENT_QUOTES, 'UTF-8') ?> ' + rodada + ' | '
+            + totalSucesso + ' <?= htmlspecialchars(__('admin.quickbooks.js_synced_so_far','sincronizados até agora'), ENT_QUOTES, 'UTF-8') ?>'
+            + (totalErros.length > 0 ? ' | ' + totalErros.length + ' <?= htmlspecialchars(__('admin.quickbooks.js_errors','erros'), ENT_QUOTES, 'UTF-8') ?>' : '')
             + '<div class="progress mt-2" style="height:4px;"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div></div>'
             + '</div>';
 
@@ -218,7 +218,7 @@ function executarSyncLote() {
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (!data.ok) {
-                    finalizar('Erro: ' + (data.erro || 'Falha desconhecida'));
+                    finalizar('<?= htmlspecialchars(__('admin.quickbooks.js_error_prefix','Erro: '), ENT_QUOTES, 'UTF-8') ?>' + (data.erro || '<?= htmlspecialchars(__('admin.quickbooks.js_unknown_failure','Falha desconhecida'), ENT_QUOTES, 'UTF-8') ?>'));
                     return;
                 }
 
@@ -232,13 +232,13 @@ function executarSyncLote() {
                 // Se processou 0 pedidos com sucesso e não tem mais pendentes, acabou
                 var pendente = r.total_pendente || 0;
                 if (r.sucesso === 0 && r.total === 0) {
-                    finalizar('Todos os pedidos já estão sincronizados!');
+                    finalizar('<?= htmlspecialchars(__('admin.quickbooks.js_all_synced','Todos os pedidos já estão sincronizados!'), ENT_QUOTES, 'UTF-8') ?>');
                     return;
                 }
 
                 // Se todos deram erro nesta rodada, parar para não ficar em loop infinito
                 if (r.sucesso === 0 && r.erros && r.erros.length > 0) {
-                    finalizar('Parado: todos os pedidos desta rodada deram erro.');
+                    finalizar('<?= htmlspecialchars(__('admin.quickbooks.js_stopped_all_errors','Parado: todos os pedidos desta rodada deram erro.'), ENT_QUOTES, 'UTF-8') ?>');
                     return;
                 }
 
@@ -247,16 +247,16 @@ function executarSyncLote() {
                     // Pequena pausa entre rodadas
                     setTimeout(rodarLote, 1500);
                 } else {
-                    finalizar('Sincronização concluída!');
+                    finalizar('<?= htmlspecialchars(__('admin.quickbooks.js_sync_complete','Sincronização concluída!'), ENT_QUOTES, 'UTF-8') ?>');
                 }
             })
             .catch(function(e) {
                 // Se deu erro de conexão, tentar mais uma vez após pausa
                 if (rodada < 3 || totalSucesso > 0) {
-                    totalErros.push('Rodada ' + rodada + ': erro de conexão (' + e.message + ') - tentando novamente...');
+                    totalErros.push('<?= htmlspecialchars(__('admin.quickbooks.js_round','Rodada'), ENT_QUOTES, 'UTF-8') ?> ' + rodada + ': <?= htmlspecialchars(__('admin.quickbooks.js_connection_error_retry','erro de conexão ('), ENT_QUOTES, 'UTF-8') ?>' + e.message + '<?= htmlspecialchars(__('admin.quickbooks.js_retrying_suffix',') - tentando novamente...'), ENT_QUOTES, 'UTF-8') ?>');
                     setTimeout(rodarLote, 3000);
                 } else {
-                    finalizar('Erro de conexão persistente: ' + e.message);
+                    finalizar('<?= htmlspecialchars(__('admin.quickbooks.js_persistent_connection_error','Erro de conexão persistente: '), ENT_QUOTES, 'UTF-8') ?>' + e.message);
                 }
             });
     }
@@ -268,13 +268,13 @@ function executarSyncLote() {
 
         var html = '<div class="alert alert-success">'
             + '<strong>' + msg + '</strong><br>'
-            + '<span class="small">' + totalSucesso + ' pedidos sincronizados'
-            + (totalVoided > 0 ? ' | ' + totalVoided + ' invoices canceladas' : '')
-            + ' | ' + rodada + ' rodadas</span>'
+            + '<span class="small">' + totalSucesso + ' <?= htmlspecialchars(__('admin.quickbooks.js_orders_synced','pedidos sincronizados'), ENT_QUOTES, 'UTF-8') ?>'
+            + (totalVoided > 0 ? ' | ' + totalVoided + ' <?= htmlspecialchars(__('admin.quickbooks.js_invoices_voided','invoices canceladas'), ENT_QUOTES, 'UTF-8') ?>' : '')
+            + ' | ' + rodada + ' <?= htmlspecialchars(__('admin.quickbooks.js_rounds','rodadas'), ENT_QUOTES, 'UTF-8') ?></span>'
             + '</div>';
 
         if (totalErros.length > 0) {
-            html += '<div class="alert alert-warning"><strong>Erros (' + totalErros.length + '):</strong>'
+            html += '<div class="alert alert-warning"><strong><?= htmlspecialchars(__('admin.quickbooks.js_errors_label','Erros ('), ENT_QUOTES, 'UTF-8') ?>' + totalErros.length + '):</strong>'
                 + '<ul class="mb-0 small" style="max-height:200px;overflow-y:auto;">';
             totalErros.forEach(function(e) { html += '<li>' + e + '</li>'; });
             html += '</ul></div>';
@@ -296,14 +296,14 @@ function pararSyncLote() {
 <?php if ($conectado && !empty($logs)): ?>
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fas fa-history me-2"></i>Logs de Sincronização Recentes</span>
-        <a href="/admin/quickbooks/invoices" class="btn btn-sm btn-outline-primary">Ver Invoices</a>
+        <span><i class="fas fa-history me-2"></i><?= __('admin.quickbooks.recent_sync_logs','Logs de Sincronização Recentes') ?></span>
+        <a href="/admin/quickbooks/invoices" class="btn btn-sm btn-outline-primary"><?= __('admin.quickbooks.view_invoices','Ver Invoices') ?></a>
     </div>
     <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>Data</th><th>Entidade</th><th>ID Local</th><th>QB ID</th><th>Ação</th><th>Status</th>
+                    <th><?= __('admin.quickbooks.th_date','Data') ?></th><th><?= __('admin.quickbooks.th_entity','Entidade') ?></th><th><?= __('admin.quickbooks.th_local_id','ID Local') ?></th><th>QB ID</th><th><?= __('admin.quickbooks.th_action','Ação') ?></th><th><?= __('admin.quickbooks.th_status','Status') ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -318,7 +318,7 @@ function pararSyncLote() {
                         <?php if ($log['status'] === 'success'): ?>
                             <span class="badge bg-success">OK</span>
                         <?php else: ?>
-                            <span class="badge bg-danger" title="<?= htmlspecialchars($log['erro'] ?? '') ?>">Erro</span>
+                            <span class="badge bg-danger" title="<?= htmlspecialchars($log['erro'] ?? '') ?>"><?= __('admin.quickbooks.error','Erro') ?></span>
                         <?php endif; ?>
                     </td>
                 </tr>

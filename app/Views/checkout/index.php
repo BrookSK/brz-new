@@ -10,6 +10,17 @@
     <?php endif; ?>
     <script>
         window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
+        // Categoria de envio calculada no servidor (US / BR / OTHER) + flag de atendimento manual.
+        window.CHECKOUT_CATEGORIA_ENVIO = <?= json_encode((string) ($categoria_envio ?? 'BR'), JSON_UNESCAPED_UNICODE) ?>;
+        window.CHECKOUT_ATENDIMENTO_MANUAL = <?= !empty($atendimento_manual) ? 'true' : 'false' ?>;
+        // Classifica um país (ISO-2/nome) na mesma regra do backend.
+        window.classificarCategoriaEnvio = function(pais) {
+            var p = (pais || 'BR').toString().trim().toUpperCase();
+            if (p === '') p = 'BR';
+            if (['BR', 'BRA', 'BRAZIL', 'BRASIL'].indexOf(p) >= 0) return 'BR';
+            if (['US', 'USA', 'EUA', 'UNITED STATES'].indexOf(p) >= 0) return 'US';
+            return 'OTHER';
+        };
         window.IS_PAYMENT_LINK = <?= !empty($is_payment_link) ? 'true' : 'false' ?>;
         window.PAYMENT_LINK_CURRENCY = window.IS_PAYMENT_LINK ? <?= json_encode((string) ($moeda ?? ''), JSON_UNESCAPED_UNICODE) ?> : '';
         window.CAMBIOREAL_RATE_BRL = <?= json_encode((float) ($cambioreal_rate_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
@@ -60,6 +71,8 @@
             ddi_example: <?= json_encode(__('auth.ddi_example', 'Ex: 81'), JSON_UNESCAPED_UNICODE) ?>,
             select: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
             free_shipping: <?= json_encode(__('cart.free_shipping', 'Frete grátis'), JSON_UNESCAPED_UNICODE) ?>,
+            shipping_on_request: <?= json_encode(__('checkout.shipping_on_request', 'Sob consulta'), JSON_UNESCAPED_UNICODE) ?>,
+            confirm_delete_address: <?= json_encode(__('checkout.confirm_delete_address', 'Deseja realmente excluir este endereço?'), JSON_UNESCAPED_UNICODE) ?>,
             processing_order: <?= json_encode(__('checkout.processing_order', 'Processando seu pedido...'), JSON_UNESCAPED_UNICODE) ?>,
             stripe_not_configured: <?= json_encode(__('checkout.stripe_not_configured', 'Stripe não configurado. Verifique as configurações de pagamento.'), JSON_UNESCAPED_UNICODE) ?>,
             stripe_card_form_error: <?= json_encode(__('checkout.stripe_card_form_error', 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.'), JSON_UNESCAPED_UNICODE) ?>,
@@ -220,11 +233,18 @@
                                     </select>
                                 </div>
                                 
-                                <!-- Botão para adicionar novo endereço -->
-                                <div class="mb-3">
+                                <!-- Botões de gestão do endereço -->
+                                <div class="mb-3 d-flex align-items-center gap-2">
                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btn-novo-endereco">
                                         <i class="fas fa-plus me-2"></i> <?= __('checkout.add_new_address', 'Adicionar Novo Endereço') ?>
                                     </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-editar-endereco" title="<?= htmlspecialchars(__('checkout.edit_address', 'Editar endereço'), ENT_QUOTES, 'UTF-8') ?>" style="display:none;">
+                                        <i class="fas fa-pencil-alt"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" id="btn-excluir-endereco" title="<?= htmlspecialchars(__('checkout.delete_address', 'Excluir endereço'), ENT_QUOTES, 'UTF-8') ?>" style="display:none;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    <span class="small" id="endereco-acao-msg" style="display:none;"></span>
                                 </div>
                             <?php endif; ?>
                             
@@ -285,6 +305,14 @@
                                         <input type="text" class="form-control" id="estado_text" name="estado_text" style="display:none;" value="<?= htmlspecialchars((string) ($endereco_prefill['estado'] ?? '')) ?>">
                                     </div>
                                 </div>
+                                <?php if (!empty($usuario)): ?>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-success btn-sm" id="btn-salvar-endereco">
+                                        <i class="fas fa-save me-2"></i> <?= __('checkout.save_and_use_address', 'Salvar e usar este endereço') ?>
+                                    </button>
+                                    <span class="ms-2 small" id="salvar-endereco-msg" style="display:none;"></span>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -707,6 +735,14 @@
                         var cur = moedaHidden ? moedaHidden.value : 'BRL';
                         if (typeof updatePaymentMethodsForCurrency === 'function') {
                             updatePaymentMethodsForCurrency(cur);
+                        }
+
+                        // Regras de envio por país: recalcular método de frete,
+                        // estimativa (Shippo + markup) e o bloqueio de pagamento /
+                        // atendimento manual SEM recarregar a página (para não perder
+                        // o preenchimento de um novo endereço).
+                        if (typeof atualizarEnvioPorPais === 'function') {
+                            atualizarEnvioPorPais(pais);
                         }
                     });
                 }
@@ -1181,10 +1217,26 @@
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
-                                    <span><?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?></span>
-                                    <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
-                                        <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
+                                    <span>
+                                        <?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?>
+                                        <small class="text-muted d-block" id="metodo-envio-label"><?= htmlspecialchars((string) ($metodo_envio ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
                                     </span>
+                                    <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
+                                        <?php if (!empty($atendimento_manual)): ?>
+                                            <?php if (is_array($estimativa_frete ?? null) && !empty($estimativa_frete['success'])): ?>
+                                                <?= htmlspecialchars((string) ($estimativa_frete['moeda'] ?? 'USD'), ENT_QUOTES, 'UTF-8') ?> <?= number_format((float) $estimativa_frete['valor_final'], 2, '.', ',') ?>
+                                            <?php else: ?>
+                                                <?= __('checkout.shipping_on_request', 'Sob consulta') ?>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                                <?php $__showEstDet = (!empty($atendimento_manual) && is_array($estimativa_frete ?? null) && !empty($estimativa_frete['success'])); ?>
+                                <div class="small text-muted mt-1" id="frete-estimativa-detalhe" style="<?= $__showEstDet ? '' : 'display:none;' ?>">
+                                    <i class="fas fa-info-circle"></i>
+                                    <?= __('checkout.shipping_estimate_note', 'Estimativa de frete internacional (referência). Valor final confirmado pelo atendimento.') ?>
                                 </div>
                             </div>
 
@@ -1273,8 +1325,20 @@
                             </div>
                             <?php endif; ?>
 
+                            <?php $__isManual = !empty($atendimento_manual); ?>
+                            <!-- Demais países: atendimento manual via WhatsApp (pagamento bloqueado).
+                                 Estes elementos são alternados dinamicamente por JS (atualizarEnvioPorPais). -->
+                            <div class="alert alert-info small <?= $__isManual ? '' : 'd-none' ?>" id="atendimento-manual-alert">
+                                <i class="fas fa-headset"></i>
+                                <?= __('checkout.manual_service_note', 'Para envios fora dos Estados Unidos e do Brasil, a compra é concluída manualmente pela nossa equipe após verificarmos se os produtos podem ser enviados para o seu país. Fale com o atendimento para finalizar.') ?>
+                            </div>
+                            <a href="<?= htmlspecialchars((string) ($whatsapp_atendimento_url ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
+                               target="_blank" rel="noopener"
+                               class="btn btn-success btn-lg w-100 <?= $__isManual ? '' : 'd-none' ?>" id="btn-atendimento-whatsapp">
+                                <i class="fab fa-whatsapp"></i> <?= __('checkout.talk_to_support', 'Falar com o atendimento (WhatsApp)') ?>
+                            </a>
                             <!-- Botão Finalizar -->
-                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= $abaixoMinimo ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
+                            <button type="button" class="btn btn-primary btn-lg w-100 <?= $__isManual ? 'd-none' : '' ?>" id="btn-finalizar" <?= ($__isManual || $abaixoMinimo) ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
                                     onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
                                 <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
                             </button>
@@ -1593,6 +1657,84 @@ function updatePixBrlInfo() {
     box.classList.remove('d-none');
 }
 
+// Recalcula a regra de envio no servidor (US / BR / demais países) e atualiza
+// a UI de frete, método de envio e o botão finalizar/WhatsApp, sem recarregar.
+let __envioPaisReqSeq = 0;
+function atualizarEnvioPorPais(pais) {
+    pais = (pais || (document.getElementById('pais')?.value) || 'BR').toString().toUpperCase();
+
+    var freteEl = document.getElementById('frete');
+    var metodoEl = document.getElementById('metodo-envio-label');
+    var btnFinalizar = document.getElementById('btn-finalizar');
+    var btnWhats = document.getElementById('btn-atendimento-whatsapp');
+    var alertManual = document.getElementById('atendimento-manual-alert');
+    var detalheEstimativa = document.getElementById('frete-estimativa-detalhe');
+
+    // Coletar dados de endereço (ajudam a cotação Shippo para os demais países).
+    var body = new URLSearchParams();
+    body.set('pais', pais);
+    body.set('cep', (document.getElementById('cep')?.value || ''));
+    body.set('endereco', (document.getElementById('endereco')?.value || ''));
+    body.set('cidade', (document.getElementById('cidade')?.value || ''));
+    var estadoEl = document.getElementById('estado');
+    body.set('estado', (estadoEl ? estadoEl.value : ''));
+
+    var seq = ++__envioPaisReqSeq;
+    if (freteEl) { freteEl.textContent = '...'; }
+
+    fetch('/checkout/envio-pais', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body.toString(),
+        credentials: 'same-origin'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (seq !== __envioPaisReqSeq) return; // resposta obsoleta
+        if (!data || !data.success) { return; }
+
+        window.CHECKOUT_CATEGORIA_ENVIO = data.categoria || 'BR';
+        window.CHECKOUT_ATENDIMENTO_MANUAL = !!data.atendimento_manual;
+
+        if (metodoEl) { metodoEl.textContent = data.metodo_envio || ''; }
+
+        // Atualizar valor de frete exibido.
+        if (freteEl) {
+            if (data.atendimento_manual) {
+                if (data.estimativa && data.estimativa.success) {
+                    freteEl.textContent = (data.estimativa.moeda || 'USD') + ' ' + Number(data.estimativa.valor_final).toFixed(2);
+                } else {
+                    freteEl.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.shipping_on_request) ? window.CHECKOUT_I18N.shipping_on_request : 'Sob consulta';
+                }
+                freteEl.setAttribute('data-original-value', (data.estimativa && data.estimativa.success) ? Number(data.estimativa.valor_final) : 0);
+            } else {
+                var f = Number(data.frete || 0);
+                freteEl.textContent = (f <= 0) ? ((window.CHECKOUT_I18N && window.CHECKOUT_I18N.free_shipping) ? window.CHECKOUT_I18N.free_shipping : 'Frete grátis') : ('$' + f.toFixed(2));
+                freteEl.setAttribute('data-original-value', f);
+            }
+        }
+
+        if (detalheEstimativa) {
+            detalheEstimativa.style.display = (data.atendimento_manual && data.estimativa && data.estimativa.success) ? '' : 'none';
+        }
+
+        // Alternar botão Finalizar x botão de atendimento (WhatsApp).
+        if (data.atendimento_manual) {
+            if (btnFinalizar) { btnFinalizar.classList.add('d-none'); btnFinalizar.disabled = true; }
+            if (alertManual) { alertManual.classList.remove('d-none'); }
+            if (btnWhats) {
+                btnWhats.classList.remove('d-none');
+                if (data.whatsapp_url) { btnWhats.setAttribute('href', data.whatsapp_url); }
+            }
+        } else {
+            if (btnFinalizar) { btnFinalizar.classList.remove('d-none'); btnFinalizar.disabled = false; }
+            if (alertManual) { alertManual.classList.add('d-none'); }
+            if (btnWhats) { btnWhats.classList.add('d-none'); }
+        }
+    })
+    .catch(function() { /* silencioso: mantém o estado atual */ });
+}
+
 function atualizarEnderecoPorPais() {
     const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
     const cep = document.getElementById('cep');
@@ -1891,7 +2033,21 @@ function debugBotaoFinalizar() {
 // Função para processar pedido diretamente
 async function processarPedidoDireto() {
     console.log('🔍 [DIRETO] Processando pedido diretamente...');
-    
+
+    // Bloqueio para "demais países": pagamento indisponível no checkout.
+    // O cliente deve concluir a compra manualmente pelo atendimento (WhatsApp).
+    var paisSelDireto = document.getElementById('pais');
+    var paisDireto = paisSelDireto ? paisSelDireto.value : 'BR';
+    var categoriaDireto = (typeof classificarCategoriaEnvio === 'function')
+        ? classificarCategoriaEnvio(paisDireto)
+        : 'BR';
+    if (categoriaDireto === 'OTHER' || window.CHECKOUT_ATENDIMENTO_MANUAL === true) {
+        var whatsBtn = document.getElementById('btn-atendimento-whatsapp');
+        alert('Para envios fora dos Estados Unidos e do Brasil, a compra é concluída pelo atendimento. Clique em "Falar com o atendimento (WhatsApp)".');
+        if (whatsBtn) { try { whatsBtn.focus(); } catch (e) {} }
+        return;
+    }
+
     const form = document.getElementById('checkout-form');
     const botao = document.getElementById('btn-finalizar');
     const checkbox = document.getElementById('consentimento_legal');
@@ -3469,6 +3625,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('cidade').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.cidade || '') : '';
             document.getElementById('estado').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.estado || '') : '';
             try { atualizarEnderecoPorPais(); } catch (e) {}
+            try { if (typeof atualizarEnvioPorPais === 'function') atualizarEnvioPorPais(document.getElementById('pais') ? document.getElementById('pais').value : 'BR'); } catch (e) {}
         }
 
         function clearEnderecoForm() {
@@ -3505,7 +3662,21 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
 
+        var btnEditarEndereco = document.getElementById('btn-editar-endereco');
+        var btnExcluirEndereco = document.getElementById('btn-excluir-endereco');
+
+        // Mostra/esconde os botões de editar/excluir conforme houver um endereço salvo selecionado.
+        function toggleEnderecoActionButtons() {
+            var temSelecionado = enderecoSelect.value !== '';
+            if (btnEditarEndereco) btnEditarEndereco.style.display = temSelecionado ? '' : 'none';
+            if (btnExcluirEndereco) btnExcluirEndereco.style.display = temSelecionado ? '' : 'none';
+        }
+
         function handleEnderecoChange() {
+            // Ao trocar de endereço, sair do modo de edição.
+            window.__editandoEnderecoId = null;
+            toggleEnderecoActionButtons();
+
             const selectedOption = enderecoSelect.options[enderecoSelect.selectedIndex];
             if (enderecoSelect.value === '') {
                 clearEnderecoForm();
@@ -3524,10 +3695,77 @@ document.addEventListener('DOMContentLoaded', function() {
                     paisEl.value = selectedOption.dataset.pais || 'BR';
                 }
                 try { atualizarEnderecoPorPais(); } catch (e) {}
+                // Recalcular regra de envio (a mudança de país via JS não dispara 'change').
+                try { if (typeof atualizarEnvioPorPais === 'function') atualizarEnvioPorPais(paisEl ? paisEl.value : 'BR'); } catch (e) {}
             }
         }
 
         enderecoSelect.addEventListener('change', handleEnderecoChange);
+
+        // Editar: abre o formulário preenchido com o endereço selecionado (modo edição).
+        if (btnEditarEndereco) {
+            btnEditarEndereco.addEventListener('click', function() {
+                if (enderecoSelect.value === '') return;
+                var opt = enderecoSelect.options[enderecoSelect.selectedIndex];
+                window.__editandoEnderecoId = enderecoSelect.value;
+                fillEnderecoFormFromSelectedOption(opt);
+                var msgEl = document.getElementById('salvar-endereco-msg');
+                if (msgEl) {
+                    msgEl.textContent = 'Editando endereço — altere os campos e clique em salvar.';
+                    msgEl.className = 'ms-2 small text-muted';
+                    msgEl.style.display = '';
+                }
+            });
+        }
+
+        // Excluir: remove o endereço selecionado (com confirmação).
+        if (btnExcluirEndereco) {
+            btnExcluirEndereco.addEventListener('click', function() {
+                if (enderecoSelect.value === '') return;
+                var confirmMsg = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.confirm_delete_address) ? window.CHECKOUT_I18N.confirm_delete_address : 'Deseja realmente excluir este endereço?';
+                if (!window.confirm(confirmMsg)) return;
+
+                var id = enderecoSelect.value;
+                var acaoMsg = document.getElementById('endereco-acao-msg');
+                function setAcao(txt, ok) {
+                    if (!acaoMsg) return;
+                    acaoMsg.textContent = txt;
+                    acaoMsg.style.display = txt ? '' : 'none';
+                    acaoMsg.className = 'small ' + (ok ? 'text-success' : 'text-danger');
+                }
+
+                var payload = new URLSearchParams();
+                payload.set('id', id);
+                btnExcluirEndereco.disabled = true;
+                setAcao('Excluindo...', true);
+
+                fetch('/checkout/excluir-endereco', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: payload.toString(),
+                    credentials: 'same-origin'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    btnExcluirEndereco.disabled = false;
+                    if (!data || !data.success) {
+                        setAcao((data && data.error) ? data.error : 'Não foi possível excluir.', false);
+                        return;
+                    }
+                    // Remover a option e voltar para "Novo endereço...".
+                    var optToRemove = Array.prototype.filter.call(enderecoSelect.options, function(o){ return o.value === String(id); })[0];
+                    if (optToRemove) optToRemove.remove();
+                    enderecoSelect.value = '';
+                    window.__editandoEnderecoId = null;
+                    setAcao('Endereço excluído.', true);
+                    try { enderecoSelect.dispatchEvent(new Event('change')); } catch (ev) {}
+                })
+                .catch(function() {
+                    btnExcluirEndereco.disabled = false;
+                    setAcao('Erro de conexão ao excluir.', false);
+                });
+            });
+        }
 
         // Quando existe um endereço principal já selecionado, o evento change não dispara.
         // Se ele estiver incompleto, abrimos o formulário automaticamente para permitir preencher numero/bairro.
@@ -3538,6 +3776,106 @@ document.addEventListener('DOMContentLoaded', function() {
         btnNovoEndereco.addEventListener('click', function() {
             enderecoSelect.value = '';
             clearEnderecoForm();
+        });
+    }
+
+    // Salvar e usar este endereço: grava via AJAX (sem finalizar o pedido),
+    // insere no seletor e marca como endereço de entrega selecionado.
+    var btnSalvarEndereco = document.getElementById('btn-salvar-endereco');
+    if (btnSalvarEndereco) {
+        btnSalvarEndereco.addEventListener('click', function() {
+            var msgEl = document.getElementById('salvar-endereco-msg');
+            function setMsg(txt, ok) {
+                if (!msgEl) return;
+                msgEl.textContent = txt;
+                msgEl.style.display = txt ? '' : 'none';
+                msgEl.className = 'ms-2 small ' + (ok ? 'text-success' : 'text-danger');
+            }
+
+            var pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+            var estadoEl = document.getElementById('estado');
+            var estadoTextEl = document.getElementById('estado_text');
+            var estadoVal = '';
+            if (estadoEl && estadoEl.offsetParent !== null && estadoEl.value) {
+                estadoVal = estadoEl.value;
+            } else if (estadoTextEl && estadoTextEl.value) {
+                estadoVal = estadoTextEl.value;
+            } else if (estadoEl) {
+                estadoVal = estadoEl.value || '';
+            }
+
+            var payload = new URLSearchParams();
+            payload.set('pais', pais);
+            payload.set('cep', (document.getElementById('cep')?.value || ''));
+            payload.set('endereco', (document.getElementById('endereco')?.value || ''));
+            payload.set('numero', (document.querySelector('input[name="numero"]')?.value || ''));
+            payload.set('complemento', (document.querySelector('input[name="complemento"]')?.value || ''));
+            payload.set('bairro', (document.getElementById('bairro')?.value || ''));
+            payload.set('cidade', (document.getElementById('cidade')?.value || ''));
+            payload.set('estado', estadoVal);
+
+            // Modo edição x criação.
+            var editandoId = window.__editandoEnderecoId || null;
+            var url = editandoId ? '/checkout/atualizar-endereco' : '/checkout/salvar-endereco';
+            if (editandoId) {
+                payload.set('id', editandoId);
+            }
+
+            btnSalvarEndereco.disabled = true;
+            setMsg('Salvando...', true);
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                body: payload.toString(),
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json().then(function(j){ return { status: r.status, body: j }; }); })
+            .then(function(res) {
+                btnSalvarEndereco.disabled = false;
+                var data = res.body || {};
+                if (!data.success || !data.endereco) {
+                    setMsg(data.error || 'Não foi possível salvar o endereço.', false);
+                    return;
+                }
+
+                var e = data.endereco;
+                window.__editandoEnderecoId = null;
+
+                if (!enderecoSelect) {
+                    // Usuário não tinha endereços: recarrega para o seletor aparecer
+                    // já com o endereço salvo disponível.
+                    setMsg('Endereço salvo.', true);
+                    window.location.reload();
+                    return;
+                }
+
+                // Encontrar option existente (edição) ou criar nova (criação).
+                var optExistente = Array.prototype.filter.call(enderecoSelect.options, function(o){ return o.value === String(e.id); })[0];
+                var opt = optExistente || document.createElement('option');
+                opt.value = String(e.id);
+                opt.setAttribute('data-pais', e.pais || 'BR');
+                opt.setAttribute('data-cep', e.cep || '');
+                opt.setAttribute('data-endereco', e.endereco || '');
+                opt.setAttribute('data-numero', e.numero || '');
+                opt.setAttribute('data-complemento', e.complemento || '');
+                opt.setAttribute('data-bairro', e.bairro || '');
+                opt.setAttribute('data-cidade', e.cidade || '');
+                opt.setAttribute('data-estado', e.estado || '');
+                opt.textContent = (e.endereco || '') + ', ' + (e.numero || '') + ' - ' + (e.bairro || '') + ', ' + (e.cidade || '') + '/' + (e.estado || '');
+                if (!optExistente) {
+                    enderecoSelect.appendChild(opt);
+                }
+                enderecoSelect.value = String(e.id);
+                // Disparar o fluxo de seleção (preenche campos, país e recalcula envio).
+                try { enderecoSelect.dispatchEvent(new Event('change')); } catch (ev) {}
+
+                setMsg(editandoId ? 'Endereço atualizado e selecionado.' : 'Endereço salvo e selecionado.', true);
+            })
+            .catch(function() {
+                btnSalvarEndereco.disabled = false;
+                setMsg('Erro de conexão ao salvar o endereço.', false);
+            });
         });
     }
 });

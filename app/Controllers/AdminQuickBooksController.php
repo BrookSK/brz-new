@@ -68,7 +68,7 @@ class AdminQuickBooksController extends Controller {
         (new AuthService())->requerPerfil('admin');
         header('Content-Type: application/json');
         $pedidoId=(int)($req->getParam('pedido_id')??0);
-        if($pedidoId<=0){echo json_encode(['ok'=>false,'erro'=>'ID invalido']); return;}
+        if($pedidoId<=0){echo json_encode(['ok'=>false,'erro'=>__('admin.quickbooks.invalid_id', 'ID invalido')]); return;}
         try{
             $pdo = Database::getConnection();
 
@@ -77,7 +77,7 @@ class AdminQuickBooksController extends Controller {
             $ped->execute([$pedidoId]);
             $pedido = $ped->fetch(\PDO::FETCH_ASSOC);
             if (!$pedido) {
-                echo json_encode(['ok' => false, 'erro' => 'Pedido não encontrado']);
+                echo json_encode(['ok' => false, 'erro' => __('admin.quickbooks.order_not_found', 'Pedido não encontrado')]);
                 return;
             }
 
@@ -164,7 +164,7 @@ class AdminQuickBooksController extends Controller {
             $qb = $this->qb();
 
             if (!$qb->isConectado()) {
-                echo json_encode(['ok' => false, 'erro' => 'QuickBooks não está conectado']);
+                echo json_encode(['ok' => false, 'erro' => __('admin.quickbooks.not_connected', 'QuickBooks não está conectado')]);
                 return;
             }
 

@@ -143,7 +143,7 @@ class AdminGruposComprasController extends Controller {
         } catch (\Throwable $e) {}
 
         $sidebarActive = 'grupos-compras';
-        $title = 'Grupos de Compras';
+        $title = __('admin.purchase_groups.title', 'Grupos de Compras');
         ob_start();
         include __DIR__ . '/../Views/admin/grupos-compras/index.php';
         $content = ob_get_clean();
@@ -166,7 +166,7 @@ class AdminGruposComprasController extends Controller {
         $clubeOnly = $request->getParam('clube_only') ? 1 : 0;
 
         if ($nome === '') {
-            echo json_encode(['ok' => false, 'msg' => 'Nome obrigatório.']);
+            echo json_encode(['ok' => false, 'msg' => __('admin.purchase_groups.msg_name_required', 'Nome obrigatório.')]);
             return;
         }
 
@@ -433,7 +433,7 @@ class AdminGruposComprasController extends Controller {
             $grupos = [];
         }
 
-        $title = 'Grupos de Compras';
+        $title = __('admin.purchase_groups.title', 'Grupos de Compras');
         ob_start();
         include __DIR__ . '/../Views/grupo-compras/todos.php';
         $content = ob_get_clean();
@@ -465,9 +465,9 @@ class AdminGruposComprasController extends Controller {
             $grupo = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$grupo) {
                 http_response_code(404);
-                $title = 'Grupo não encontrado';
+                $title = __('admin.purchase_groups.group_not_found', 'Grupo não encontrado');
                 ob_start();
-                echo '<div class="container py-5 text-center"><h2>Grupo não encontrado ou inativo.</h2><a href="/produtos" class="btn btn-primary mt-3">Ver produtos</a></div>';
+                echo '<div class="container py-5 text-center"><h2>' . __('admin.purchase_groups.group_not_found_or_inactive', 'Grupo não encontrado ou inativo.') . '</h2><a href="/produtos" class="btn btn-primary mt-3">' . __('admin.purchase_groups.view_products', 'Ver produtos') . '</a></div>';
                 $content = ob_get_clean();
                 include __DIR__ . '/../Views/layouts/main.php';
                 return;
@@ -573,10 +573,10 @@ class AdminGruposComprasController extends Controller {
 
         } catch (\Throwable $e) {
             http_response_code(500);
-            $title = 'Erro';
+            $title = __('admin.purchase_groups.error', 'Erro');
             $errMsg = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
             ob_start();
-            echo '<div class="container py-5 text-center"><h2>Erro ao carregar grupo.</h2><p class="text-muted small">' . $errMsg . '</p></div>';
+            echo '<div class="container py-5 text-center"><h2>' . __('admin.purchase_groups.error_loading_group', 'Erro ao carregar grupo.') . '</h2><p class="text-muted small">' . $errMsg . '</p></div>';
             $content = ob_get_clean();
             include __DIR__ . '/../Views/layouts/main.php';
             return;
@@ -671,9 +671,9 @@ class AdminGruposComprasController extends Controller {
 
             if (!$grupo) {
                 http_response_code(404);
-                $title = 'Grupo não encontrado';
+                $title = __('admin.purchase_groups.group_not_found', 'Grupo não encontrado');
                 ob_start();
-                echo '<div class="container py-5 text-center"><h2>Grupo não encontrado.</h2></div>';
+                echo '<div class="container py-5 text-center"><h2>' . __('admin.purchase_groups.group_not_found_period', 'Grupo não encontrado.') . '</h2></div>';
                 $content = ob_get_clean();
                 include __DIR__ . '/../Views/layouts/main.php';
                 return;
@@ -687,14 +687,14 @@ class AdminGruposComprasController extends Controller {
                 $stSnaps->execute([$grupoId]);
                 $snapshots = $stSnaps->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-                $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — Histórico (Receita Federal)';
+                $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — ' . __('admin.purchase_groups.history_receita_federal', 'Histórico (Receita Federal)');
                 ob_start();
                 echo '<div class="container py-4">';
                 echo '<h1 class="page-title">' . htmlspecialchars($grupo['nome'] ?? '') . '</h1>';
-                echo '<p class="text-muted mb-4">Histórico de períodos — Receita Federal</p>';
+                echo '<p class="text-muted mb-4">' . __('admin.purchase_groups.periods_history_receita_federal', 'Histórico de períodos — Receita Federal') . '</p>';
 
                 if (empty($snapshots)) {
-                    echo '<div class="alert alert-info">Nenhum histórico disponível para este grupo.</div>';
+                    echo '<div class="alert alert-info">' . __('admin.purchase_groups.no_history', 'Nenhum histórico disponível para este grupo.') . '</div>';
                 } else {
                     echo '<div class="list-group">';
                     foreach ($snapshots as $snap) {
@@ -705,8 +705,8 @@ class AdminGruposComprasController extends Controller {
                         echo '<a href="' . $link . '" class="list-group-item list-group-item-action">'
                             . '<div class="d-flex justify-content-between align-items-center">'
                             . '<div>'
-                            . '<strong>Período: ' . $inicio . ' — ' . $fim . '</strong>'
-                            . '<div class="small text-muted">' . $qtd . ' produto(s)</div>'
+                            . '<strong>' . __('admin.purchase_groups.period_label', 'Período:') . ' ' . $inicio . ' — ' . $fim . '</strong>'
+                            . '<div class="small text-muted">' . __('admin.purchase_groups.products_count', '{n} produto(s)', ['n' => $qtd]) . '</div>'
                             . '</div>'
                             . '<i class="fas fa-chevron-right text-muted"></i>'
                             . '</div>'
@@ -715,7 +715,7 @@ class AdminGruposComprasController extends Controller {
                     echo '</div>';
                 }
 
-                echo '<div class="mt-4"><a href="/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
+                echo '<div class="mt-4"><a href="/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('admin.purchase_groups.back', 'Voltar') . '</a></div>';
                 echo '</div>';
                 $content = ob_get_clean();
                 include __DIR__ . '/../Views/layouts/main.php';
@@ -729,9 +729,9 @@ class AdminGruposComprasController extends Controller {
 
             if (!$snapshot) {
                 http_response_code(404);
-                $title = 'Histórico não encontrado';
+                $title = __('admin.purchase_groups.history_not_found', 'Histórico não encontrado');
                 ob_start();
-                echo '<div class="container py-5 text-center"><h2>Histórico não encontrado.</h2></div>';
+                echo '<div class="container py-5 text-center"><h2>' . __('admin.purchase_groups.history_not_found_period', 'Histórico não encontrado.') . '</h2></div>';
                 $content = ob_get_clean();
                 include __DIR__ . '/../Views/layouts/main.php';
                 return;
@@ -748,12 +748,12 @@ class AdminGruposComprasController extends Controller {
             $periodoFim = date('d/m/Y H:i', strtotime($snapshot['periodo_fim']));
             $snapshotInfo = ['inicio' => $periodoInicio, 'fim' => $periodoFim, 'id' => $snapshotId];
 
-            $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — ' . $periodoInicio . ' a ' . $periodoFim;
+            $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — ' . $periodoInicio . ' ' . __('admin.purchase_groups.to', 'a') . ' ' . $periodoFim;
 
         } catch (\Throwable $e) {
-            $title = 'Erro';
+            $title = __('admin.purchase_groups.error', 'Erro');
             ob_start();
-            echo '<div class="container py-5 text-center"><h2>Erro ao carregar histórico.</h2></div>';
+            echo '<div class="container py-5 text-center"><h2>' . __('admin.purchase_groups.error_loading_history', 'Erro ao carregar histórico.') . '</h2></div>';
             $content = ob_get_clean();
             include __DIR__ . '/../Views/layouts/main.php';
             return;
