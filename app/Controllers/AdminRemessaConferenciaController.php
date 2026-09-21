@@ -1100,9 +1100,9 @@ function baixarDocumentosMassa(janelaId) {
             $crTaxasValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $cambioRealTaxasPagamentos));
             echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-warning text-dark"><strong><i class="fas fa-receipt me-1"></i>Câmbio Real Taxas</strong></div><div class="card-body">';
             if (empty($cambioRealTaxasPagamentos)) {
-                echo '<div class="text-muted">Nenhum pagamento Câmbio Real Taxas encontrado.</div>';
+                echo '<div class="text-muted">' . htmlspecialchars(__('admin.shipment_check.detail.no_cr_taxas_payment', 'Nenhum pagamento Câmbio Real Taxas encontrado.'), ENT_QUOTES, 'UTF-8') . '</div>';
             } else {
-                echo '<div class="mb-2"><strong>Valor CR Taxas (BRL):</strong> ' . $fmtBrl($crTaxasValorTotal > 0 ? $crTaxasValorTotal : null) . '</div>';
+                echo '<div class="mb-2"><strong>' . htmlspecialchars(__('admin.shipment_check.detail.cr_taxas_value', 'Valor CR Taxas (BRL):'), ENT_QUOTES, 'UTF-8') . '</strong> ' . $fmtBrl($crTaxasValorTotal > 0 ? $crTaxasValorTotal : null) . '</div>';
                 foreach ($cambioRealTaxasPagamentos as $pg) {
                     echo '<hr class="my-2"><table class="table table-sm mb-0">';
                     $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
@@ -1128,12 +1128,12 @@ function baixarDocumentosMassa(janelaId) {
         echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-success text-white"><strong><i class="fas fa-exchange-alt me-1"></i>Câmbio Real</strong></div><div class="card-body">';
         if (empty($cambioRealPagamentos)) {
             if ($pedidoPago && empty($appmaxPagamentos) && !$isPagdev) {
-                echo '<div class="alert alert-warning py-2 small mb-0"><i class="fas fa-exclamation-triangle me-1"></i><strong>Pagamento confirmado</strong> mas dados da transação Câmbio Real não foram sincronizados.<br><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="mt-1 d-inline-block">Abrir pedido → Sincronizar pagamentos</a></div>';
+                echo '<div class="alert alert-warning py-2 small mb-0"><i class="fas fa-exclamation-triangle me-1"></i><strong>' . htmlspecialchars(__('admin.shipment_check.detail.payment_confirmed', 'Pagamento confirmado'), ENT_QUOTES, 'UTF-8') . '</strong> ' . htmlspecialchars(__('admin.shipment_check.detail.cr_not_synced', 'mas dados da transação Câmbio Real não foram sincronizados.'), ENT_QUOTES, 'UTF-8') . '<br><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="mt-1 d-inline-block">' . htmlspecialchars(__('admin.shipment_check.detail.open_order_sync', 'Abrir pedido → Sincronizar pagamentos'), ENT_QUOTES, 'UTF-8') . '</a></div>';
             } else {
-                echo '<div class="text-muted">Nenhum pagamento Câmbio Real encontrado.</div>';
+                echo '<div class="text-muted">' . htmlspecialchars(__('admin.shipment_check.detail.no_cr_payment', 'Nenhum pagamento Câmbio Real encontrado.'), ENT_QUOTES, 'UTF-8') . '</div>';
             }
         } else {
-            echo '<div class="mb-2"><strong>Valor Câmbio Real (BRL):</strong> ' . $fmtBrl($cambioRealValorTotal > 0 ? $cambioRealValorTotal : null) . '</div>';
+            echo '<div class="mb-2"><strong>' . htmlspecialchars(__('admin.shipment_check.detail.cr_value', 'Valor Câmbio Real (BRL):'), ENT_QUOTES, 'UTF-8') . '</strong> ' . $fmtBrl($cambioRealValorTotal > 0 ? $cambioRealValorTotal : null) . '</div>';
             foreach ($cambioRealPagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
                 $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];

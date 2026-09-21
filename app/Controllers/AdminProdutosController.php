@@ -4170,21 +4170,21 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="page-title">Produtos (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">' . htmlspecialchars(__('admin.products.list_title', 'Produtos'), ENT_QUOTES, 'UTF-8') . ' (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> Arquivados</a>'
-            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
-            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> ' . htmlspecialchars(__('admin.products.archived', 'Arquivados'), ENT_QUOTES, 'UTF-8') . '</a>'
+            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> ' . htmlspecialchars(__('admin.products.quick_add', 'Cadastro rápido'), ENT_QUOTES, 'UTF-8') . '</a>'
+            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> ' . htmlspecialchars(__('admin.products.new_short', 'Novo'), ENT_QUOTES, 'UTF-8') . '</a>'
             . '</div>'
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
             . '<div class="col-md-4">'
-            . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '<input type="text" class="form-control" name="busca" placeholder="' . htmlspecialchars(__('admin.products.list_search_placeholder', 'Buscar produto...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="loja_filtro">'
-            . '<option value="">Todas as lojas</option>';
+            . '<option value="">' . htmlspecialchars(__('admin.products.all_stores', 'Todas as lojas'), ENT_QUOTES, 'UTF-8') . '</option>';
         foreach ($lojaMap as $_lid => $_lnome) {
             $selLoja = ((string) $lojaFiltro === (string) $_lid) ? ' selected' : '';
             echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
@@ -4193,19 +4193,19 @@ HTML;
             . '</div>'
             . '<div class="col-md-1">'
             . '<select class="form-select" name="outlet_filtro">'
-            . '<option value="">Outlet</option>'
-            . '<option value="1"' . ((isset($outletFiltro) && $outletFiltro === '1') ? ' selected' : '') . '>Sim</option>'
+            . '<option value="">' . htmlspecialchars(__('admin.products.outlet', 'Outlet'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="1"' . ((isset($outletFiltro) && $outletFiltro === '1') ? ' selected' : '') . '>' . htmlspecialchars(__('common.yes', 'Sim'), ENT_QUOTES, 'UTF-8') . '</option>'
             . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
-            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
-            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
+            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.name', 'Nome'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.created', 'Cadastro'), ENT_QUOTES, 'UTF-8') . '</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
-            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
-            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>Loja</option>'
-            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
-            . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
+            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.weight', 'Peso'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.store', 'Loja'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.price', 'Preço'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.status', 'Status'), ENT_QUOTES, 'UTF-8') . '</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
             . '</select>'
             . '</div>'
@@ -4223,20 +4223,20 @@ HTML;
         echo '<div class="table-responsive">'
             . '<form id="formMassa" method="POST" action="/admin/produtos/acoes-massa">'
             . '<div id="barraMassa" class="d-none mb-3 p-3 rounded-3 d-flex align-items-center gap-3 flex-wrap" style="background:rgba(11,31,58,0.06);border:1px solid rgba(11,31,58,0.14);">'
-            . '<span class="fw-semibold text-primary"><span id="qtdSelecionados">0</span> produto(s) selecionado(s)</span>'
-            . '<button type="button" class="btn btn-sm btn-primary" onclick="abrirModalMassa()"><i class="fas fa-edit me-1"></i>Editar em massa</button>'
-            . '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()"><i class="fas fa-times me-1"></i>Desmarcar todos</button>'
+            . '<span class="fw-semibold text-primary"><span id="qtdSelecionados">0</span> ' . htmlspecialchars(__('admin.products.selected_count', 'produto(s) selecionado(s)'), ENT_QUOTES, 'UTF-8') . '</span>'
+            . '<button type="button" class="btn btn-sm btn-primary" onclick="abrirModalMassa()"><i class="fas fa-edit me-1"></i>' . htmlspecialchars(__('admin.products.bulk_edit', 'Editar em massa'), ENT_QUOTES, 'UTF-8') . '</button>'
+            . '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()"><i class="fas fa-times me-1"></i>' . htmlspecialchars(__('admin.products.deselect_all', 'Desmarcar todos'), ENT_QUOTES, 'UTF-8') . '</button>'
             . '</div>'
             . '<table class="table table-hover align-middle">'
             . '<thead><tr>'
-            . '<th style="width:40px"><input type="checkbox" id="checkTodos" class="form-check-input" title="Selecionar todos"></th>'
-            . '<th style="width:72px">Imagem</th>'
-            . '<th>Nome</th>'
-            . '<th style="width:130px">Loja</th>'
-            . '<th style="width:120px">Peso (kg)</th>'
-            . '<th style="width:140px">Preço</th>'
-            . '<th style="width:110px">Status</th>'
-            . '<th style="width:150px">Ações</th>'
+            . '<th style="width:40px"><input type="checkbox" id="checkTodos" class="form-check-input" title="' . htmlspecialchars(__('admin.products.select_all', 'Selecionar todos'), ENT_QUOTES, 'UTF-8') . '"></th>'
+            . '<th style="width:72px">' . htmlspecialchars(__('admin.products.col_image', 'Imagem'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th>' . htmlspecialchars(__('admin.products.col_name', 'Nome'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:130px">' . htmlspecialchars(__('admin.products.col_store', 'Loja'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:120px">' . htmlspecialchars(__('admin.products.col_weight', 'Peso (kg)'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:140px">' . htmlspecialchars(__('admin.products.col_price', 'Preço'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:110px">' . htmlspecialchars(__('admin.products.col_status', 'Status'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:150px">' . htmlspecialchars(__('admin.products.col_actions', 'Ações'), ENT_QUOTES, 'UTF-8') . '</th>'
             . '</tr></thead><tbody>';
 
         foreach ($produtos as $produto) {
@@ -4249,7 +4249,7 @@ HTML;
             $peso = number_format((float) $pesoRaw, 3, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
-            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+            $label = ((int) $produto['active'] ? __('admin.products.status_active', 'Ativo') : __('admin.products.status_inactive', 'Inativo'));
 
             echo '<tr>'
                 . '<td><input type="checkbox" name="ids[]" value="' . (int) $produto['id'] . '" class="form-check-input check-produto"></td>'
@@ -4801,21 +4801,21 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="page-title">Arquivados (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">' . htmlspecialchars(__('admin.products.archived', 'Arquivados'), ENT_QUOTES, 'UTF-8') . ' (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>'
-            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
-            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> ' . htmlspecialchars(__('common.back', 'Voltar'), ENT_QUOTES, 'UTF-8') . '</a>'
+            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> ' . htmlspecialchars(__('admin.products.quick_add', 'Cadastro rápido'), ENT_QUOTES, 'UTF-8') . '</a>'
+            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> ' . htmlspecialchars(__('admin.products.new_short', 'Novo'), ENT_QUOTES, 'UTF-8') . '</a>'
             . '</div>'
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
             . '<div class="col-md-5">'
-            . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '<input type="text" class="form-control" name="busca" placeholder="' . htmlspecialchars(__('admin.products.list_search_placeholder', 'Buscar produto...'), ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="loja_filtro">'
-            . '<option value="">Todas as lojas</option>';
+            . '<option value="">' . htmlspecialchars(__('admin.products.all_stores', 'Todas as lojas'), ENT_QUOTES, 'UTF-8') . '</option>';
         foreach ($lojaMap as $_lid => $_lnome) {
             $selLoja = ((string) $lojaFiltro === (string) $_lid) ? ' selected' : '';
             echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
@@ -4824,13 +4824,13 @@ HTML;
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
-            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
-            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
+            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.name', 'Nome'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.created', 'Cadastro'), ENT_QUOTES, 'UTF-8') . '</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
-            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
-            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>Loja</option>'
-            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
-            . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
+            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.weight', 'Peso'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.store', 'Loja'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.price', 'Preço'), ENT_QUOTES, 'UTF-8') . '</option>'
+            . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>' . htmlspecialchars(__('admin.products.sort.status', 'Status'), ENT_QUOTES, 'UTF-8') . '</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
             . '</select>'
             . '</div>'
@@ -4848,13 +4848,13 @@ HTML;
         echo '<div class="table-responsive">'
             . '<table class="table table-hover align-middle">'
             . '<thead><tr>'
-            . '<th style="width:72px">Imagem</th>'
-            . '<th>Nome</th>'
-            . '<th style="width:130px">Loja</th>'
-            . '<th style="width:120px">Peso (kg)</th>'
-            . '<th style="width:140px">Preço</th>'
-            . '<th style="width:110px">Status</th>'
-            . '<th style="width:90px">Ações</th>'
+            . '<th style="width:72px">' . htmlspecialchars(__('admin.products.col_image', 'Imagem'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th>' . htmlspecialchars(__('admin.products.col_name', 'Nome'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:130px">' . htmlspecialchars(__('admin.products.col_store', 'Loja'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:120px">' . htmlspecialchars(__('admin.products.col_weight', 'Peso (kg)'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:140px">' . htmlspecialchars(__('admin.products.col_price', 'Preço'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:110px">' . htmlspecialchars(__('admin.products.col_status', 'Status'), ENT_QUOTES, 'UTF-8') . '</th>'
+            . '<th style="width:90px">' . htmlspecialchars(__('admin.products.col_actions', 'Ações'), ENT_QUOTES, 'UTF-8') . '</th>'
             . '</tr></thead><tbody>';
 
         foreach ($produtos as $produto) {
@@ -4867,7 +4867,7 @@ HTML;
             $peso = number_format((float) $pesoRaw, 3, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
-            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+            $label = ((int) $produto['active'] ? __('admin.products.status_active', 'Ativo') : __('admin.products.status_inactive', 'Inativo'));
 
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'

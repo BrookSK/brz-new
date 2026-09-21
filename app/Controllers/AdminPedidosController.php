@@ -6393,7 +6393,12 @@ LINKSCRIPT;
      * Retorna os status na ordem do fluxo logístico.
      * Usado para gerar <option> em todos os selects de status.
      */
-    public static function getStatusList(): array {
+    /**
+     * Lista canônica de status SEMPRE em português (não traduzida).
+     * Use para gravar rótulos denormalizados no banco (ex.: pedidos.pagamento_status),
+     * garantindo que o dado armazenado não dependa do idioma do admin logado.
+     */
+    public static function getStatusListCanonical(): array {
         return [
             'pendente'                       => 'Pendente',
             'processando'                    => 'Processando',
@@ -6414,6 +6419,30 @@ LINKSCRIPT;
             'enviado_ao_destinatario'        => 'Enviado ao Destinatário',
             'entregue'                       => 'Entregue',
             'cancelado'                      => 'Cancelado',
+        ];
+    }
+
+    public static function getStatusList(): array {
+        return [
+            'pendente'                       => __('admin.order_status_list.pendente', 'Pendente'),
+            'processando'                    => __('admin.order_status_list.processando', 'Processando'),
+            'pago'                           => __('admin.order_status_list.pago', 'Pago'),
+            'itens_parcialmente_comprados'   => __('admin.order_status_list.itens_parcialmente_comprados', 'Parcialmente Comprado'),
+            'itens_comprados'                => __('admin.order_status_list.itens_comprados', 'Produto Comprado'),
+            'invoice_liberado'               => __('admin.order_status_list.invoice_liberado', 'Invoice Liberado'),
+            'invoice_confirmado'             => __('admin.order_status_list.invoice_confirmado', 'Invoice Confirmado'),
+            'invoice_contestado'             => __('admin.order_status_list.invoice_contestado', 'Invoice Contestado'),
+            'fatura_pendente'                => __('admin.order_status_list.fatura_pendente', 'Fatura Pendente'),
+            'fatura_paga'                    => __('admin.order_status_list.fatura_paga', 'Fatura Paga'),
+            'carne_pagando'                  => __('admin.order_status_list.carne_pagando', 'Carnê em Pagamento'),
+            'carne_aguardando'               => __('admin.order_status_list.carne_aguardando', 'Carnê Aguardando'),
+            'produto_consolidado'            => __('admin.order_status_list.produto_consolidado', 'Caixa Fechada'),
+            'etiqueta_gerada'                => __('admin.order_status_list.etiqueta_gerada', 'Etiqueta Gerada'),
+            'em_transporte'                  => __('admin.order_status_list.em_transporte', 'Em Transporte'),
+            'aguardando_liberacao_aduaneira' => __('admin.order_status_list.aguardando_liberacao_aduaneira', 'Aguardando Liberação Aduaneira'),
+            'enviado_ao_destinatario'        => __('admin.order_status_list.enviado_ao_destinatario', 'Enviado ao Destinatário'),
+            'entregue'                       => __('admin.order_status_list.entregue', 'Entregue'),
+            'cancelado'                      => __('admin.order_status_list.cancelado', 'Cancelado'),
         ];
     }
 
@@ -7182,7 +7211,7 @@ HTML;
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
             $isPaid = in_array(strtolower(trim((string) $novoStatus)), $paidValues, true);
 
-            $statusLabelMap = array_merge(self::getStatusList(), [
+            $statusLabelMap = array_merge(self::getStatusListCanonical(), [
                 'enviado' => 'Etiqueta Gerada', // alias legado
             ]);
             $pagamentoStatusTexto = $statusLabelMap[$novoStatusKey] ?? ucfirst(str_replace('_', ' ', $novoStatusKey));
@@ -8153,9 +8182,9 @@ HTML;
                 $set[] = 'updated_at = NOW()';
             }
 
-            // Atualizar pagamento_status para exibição
+            // Atualizar pagamento_status para exibição (rótulo canônico em PT, independente do idioma)
             if (in_array('pagamento_status', $cols, true)) {
-                $statusLabelMap = self::getStatusList();
+                $statusLabelMap = self::getStatusListCanonical();
                 $label = $statusLabelMap[strtolower($novoStatus)] ?? ucfirst(str_replace('_', ' ', $novoStatus));
                 $set[] = 'pagamento_status = ?';
                 $baseParams[] = $label;

@@ -25,9 +25,9 @@ $busca = $busca ?? '';
 <?php if (!empty($grupoInativo)): ?>
 <div class="alert alert-warning mb-4">
     <i class="fas fa-archive me-2"></i>
-    <strong>Grupo arquivado.</strong> Este grupo de compras foi encerrado. Os produtos e valores exibidos são históricos.
+    <strong><?= htmlspecialchars(__('group_page.archived_title', 'Grupo arquivado.'), ENT_QUOTES, 'UTF-8') ?></strong> <?= htmlspecialchars(__('group_page.archived_text', 'Este grupo de compras foi encerrado. Os produtos e valores exibidos são históricos.'), ENT_QUOTES, 'UTF-8') ?>
     <?php if (!empty($snapshotInfo)): ?>
-    <div class="mt-1 small">Período: <?= htmlspecialchars($snapshotInfo['inicio']) ?> — <?= htmlspecialchars($snapshotInfo['fim']) ?></div>
+    <div class="mt-1 small"><?= htmlspecialchars(__('group_page.period', 'Período'), ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars($snapshotInfo['inicio']) ?> — <?= htmlspecialchars($snapshotInfo['fim']) ?></div>
     <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -38,7 +38,7 @@ $busca = $busca ?? '';
             <?= htmlspecialchars($grupo['nome'] ?? '', ENT_QUOTES, 'UTF-8') ?>
             <?php if (!empty($clubeOnly)): ?>
             <span class="badge align-middle ms-2" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.55em;vertical-align:middle;">
-                <i class="fas fa-crown me-1"></i>Clube Braziliana
+                <i class="fas fa-crown me-1"></i><?= htmlspecialchars(__('group_page.club_badge', 'Clube Braziliana'), ENT_QUOTES, 'UTF-8') ?>
             </span>
             <?php endif; ?>
         </h1>
@@ -46,12 +46,12 @@ $busca = $busca ?? '';
         <p class="text-muted mb-2"><?= htmlspecialchars($grupo['descricao'], ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
         <div class="d-flex align-items-center gap-3 flex-wrap">
-            <span class="text-muted small"><i class="fas fa-box me-1"></i><?= $total ?> produto(s)</span>
+            <span class="text-muted small"><i class="fas fa-box me-1"></i><?= $total ?> <?= htmlspecialchars(__('group_page.products_count', 'produto(s)'), ENT_QUOTES, 'UTF-8') ?></span>
             <?php
             $impostoLocalPercent = (float)($grupo['imposto_local_percent'] ?? 0);
             if ($impostoLocalPercent > 0): ?>
             <span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">
-                Inclui imposto local (<?= number_format($impostoLocalPercent, 0) ?>%)
+                <?= htmlspecialchars(__('group_page.includes_local_tax', 'Inclui imposto local'), ENT_QUOTES, 'UTF-8') ?> (<?= number_format($impostoLocalPercent, 0) ?>%)
             </span>
             <?php endif; ?>
         </div>
@@ -62,22 +62,22 @@ $busca = $busca ?? '';
         <form method="GET" action="/grupo/<?= $slug ?>" id="formBuscaGrupo" class="d-flex gap-2 flex-wrap" style="max-width:700px">
             <div class="input-group" style="flex:1;min-width:200px;">
                 <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" name="q" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome..." value="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
+                <input type="text" name="q" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="<?= htmlspecialchars(__('group_page.search_placeholder', 'Buscar produto pelo nome...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
             </div>
             <?php if (!empty($categoriasDoGrupo)): ?>
             <select name="categoria" class="form-select" style="max-width:220px;" onchange="this.form.submit()">
-                <option value="">Todas as categorias</option>
+                <option value=""><?= htmlspecialchars(__('group_page.all_categories', 'Todas as categorias'), ENT_QUOTES, 'UTF-8') ?></option>
                 <?php foreach ($categoriasDoGrupo as $cat): ?>
-                <option value="<?= (int) $cat['cat_id'] ?>" <?= $categoriaFiltro === (int) $cat['cat_id'] ? 'selected' : '' ?>><?= htmlspecialchars($cat['cat_nome'] ?? 'Sem nome', ENT_QUOTES, 'UTF-8') ?></option>
+                <option value="<?= (int) $cat['cat_id'] ?>" <?= $categoriaFiltro === (int) $cat['cat_id'] ? 'selected' : '' ?>><?= htmlspecialchars($cat['cat_nome'] ?? __('group_page.no_name', 'Sem nome'), ENT_QUOTES, 'UTF-8') ?></option>
                 <?php endforeach; ?>
             </select>
             <?php endif; ?>
             <?php if ($busca !== '' || $categoriaFiltro > 0): ?>
-            <a href="/grupo/<?= $slug ?>" class="btn btn-outline-secondary" title="Limpar filtros"><i class="fas fa-times"></i></a>
+            <a href="/grupo/<?= $slug ?>" class="btn btn-outline-secondary" title="<?= htmlspecialchars(__('group_page.clear_filters', 'Limpar filtros'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-times"></i></a>
             <?php endif; ?>
         </form>
         <?php if ($busca !== '' && empty($produtos)): ?>
-        <div class="text-muted small mt-2">Nenhum produto encontrado para "<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>".</div>
+        <div class="text-muted small mt-2"><?= htmlspecialchars(__('group_page.no_results_for', 'Nenhum produto encontrado para'), ENT_QUOTES, 'UTF-8') ?> "<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>".</div>
         <?php endif; ?>
     </div>
 
@@ -86,27 +86,26 @@ $busca = $busca ?? '';
     <div class="card border-0 shadow-sm mb-4" style="border-radius:16px;overflow:hidden;">
         <div class="card-body text-center py-5" style="background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);">
             <i class="fas fa-crown fa-3x mb-3" style="color:#d97706;"></i>
-            <h3 class="fw-bold mb-2" style="color:#92400e;">Grupo exclusivo do Clube Braziliana</h3>
+            <h3 class="fw-bold mb-2" style="color:#92400e;"><?= htmlspecialchars(__('group_page.club_exclusive_title', 'Grupo exclusivo do Clube Braziliana'), ENT_QUOTES, 'UTF-8') ?></h3>
             <p class="text-muted mb-3">
-                Para acessar os produtos deste grupo, você precisa ser membro do Clube Braziliana
-                com saldo mínimo de <strong>US$ <?= number_format($clubeMinimo, 2, ',', '.') ?></strong> na carteira.
+                <?= htmlspecialchars(__('group_page.club_exclusive_text', 'Para acessar os produtos deste grupo, você precisa ser membro do Clube Braziliana com saldo mínimo de'), ENT_QUOTES, 'UTF-8') ?> <strong>US$ <?= number_format($clubeMinimo, 2, ',', '.') ?></strong> <?= htmlspecialchars(__('group_page.in_wallet', 'na carteira.'), ENT_QUOTES, 'UTF-8') ?>
             </p>
             <?php if (empty($clubeLogado)): ?>
                 <div class="d-flex gap-2 justify-content-center flex-wrap">
-                    <a href="/login" class="btn btn-primary"><i class="fas fa-sign-in-alt me-1"></i>Fazer login</a>
-                    <a href="/registro" class="btn btn-outline-primary"><i class="fas fa-user-plus me-1"></i>Criar conta</a>
-                    <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i>Saiba mais</a>
+                    <a href="/login" class="btn btn-primary"><i class="fas fa-sign-in-alt me-1"></i><?= htmlspecialchars(__('group_page.login', 'Fazer login'), ENT_QUOTES, 'UTF-8') ?></a>
+                    <a href="/registro" class="btn btn-outline-primary"><i class="fas fa-user-plus me-1"></i><?= htmlspecialchars(__('group_page.create_account', 'Criar conta'), ENT_QUOTES, 'UTF-8') ?></a>
+                    <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i><?= htmlspecialchars(__('group_page.learn_more', 'Saiba mais'), ENT_QUOTES, 'UTF-8') ?></a>
                 </div>
             <?php else: ?>
-                <p class="small text-muted mb-2">Seu saldo atual: <strong>US$ <?= number_format($clubeSaldoUsd, 2, ',', '.') ?></strong></p>
+                <p class="small text-muted mb-2"><?= htmlspecialchars(__('group_page.current_balance', 'Seu saldo atual:'), ENT_QUOTES, 'UTF-8') ?> <strong>US$ <?= number_format($clubeSaldoUsd, 2, ',', '.') ?></strong></p>
                 <?php $__clubeEnabledGrupo = \App\Controllers\ClubeController::isClubeEnabled(); ?>
                 <div class="d-flex gap-2 justify-content-center flex-wrap">
                     <?php if ($__clubeEnabledGrupo): ?>
-                        <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i>Recarregar carteira</a>
+                        <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i><?= htmlspecialchars(__('group_page.recharge_wallet', 'Recarregar carteira'), ENT_QUOTES, 'UTF-8') ?></a>
                     <?php else: ?>
-                        <a href="https://wa.me/<?= htmlspecialchars(\App\Controllers\ClubeController::CLUBE_WHATSAPP) ?>?text=<?= rawurlencode('Olá, gostaria de saber mais sobre o meu Clube Braziliana.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success"><i class="fab fa-whatsapp me-1"></i>Falar no WhatsApp</a>
+                        <a href="https://wa.me/<?= htmlspecialchars(\App\Controllers\ClubeController::CLUBE_WHATSAPP) ?>?text=<?= rawurlencode('Olá, gostaria de saber mais sobre o meu Clube Braziliana.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success"><i class="fab fa-whatsapp me-1"></i><?= htmlspecialchars(__('group_page.talk_whatsapp', 'Falar no WhatsApp'), ENT_QUOTES, 'UTF-8') ?></a>
                     <?php endif; ?>
-                    <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i>Saiba mais</a>
+                    <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i><?= htmlspecialchars(__('group_page.learn_more', 'Saiba mais'), ENT_QUOTES, 'UTF-8') ?></a>
                 </div>
             <?php endif; ?>
         </div>
@@ -123,9 +122,9 @@ $busca = $busca ?? '';
         <div class="col-12">
             <div class="text-center py-5">
                 <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
-                <h3 class="text-muted">Nenhum produto disponível</h3>
-                <p class="text-muted">Este grupo ainda não possui produtos publicados.</p>
-                <a href="/produtos" class="btn btn-primary mt-2">Ver todos os produtos</a>
+                <h3 class="text-muted"><?= htmlspecialchars(__('group_page.empty_title', 'Nenhum produto disponível'), ENT_QUOTES, 'UTF-8') ?></h3>
+                <p class="text-muted"><?= htmlspecialchars(__('group_page.empty_text', 'Este grupo ainda não possui produtos publicados.'), ENT_QUOTES, 'UTF-8') ?></p>
+                <a href="/produtos" class="btn btn-primary mt-2"><?= htmlspecialchars(__('group_page.see_all_products', 'Ver todos os produtos'), ENT_QUOTES, 'UTF-8') ?></a>
             </div>
         </div>
         <?php else: ?>
@@ -146,7 +145,7 @@ $busca = $busca ?? '';
                              class="card-img-top product-image-modern">
                         <?php if (!empty($produto['featured'])): ?>
                         <span class="position-absolute top-0 start-0 m-2 badge bg-danger">
-                            <i class="fas fa-star me-1"></i>Destaque
+                            <i class="fas fa-star me-1"></i><?= htmlspecialchars(__('group_page.featured', 'Destaque'), ENT_QUOTES, 'UTF-8') ?>
                         </span>
                         <?php endif; ?>
                     <?php else: ?>
@@ -178,7 +177,7 @@ $busca = $busca ?? '';
                             </small>
                             <?php endif; ?>
                             <?php if ($impostoLocalGrupo > 0): ?>
-                            <div class="small text-warning mt-1">+ imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
+                            <div class="small text-warning mt-1">+ <?= htmlspecialchars(__('group_page.local_tax', 'imposto local'), ENT_QUOTES, 'UTF-8') ?> <?= number_format($impostoLocalGrupo, 0) ?>%</div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -188,7 +187,7 @@ $busca = $busca ?? '';
                     <div class="d-grid gap-2">
                         <a href="/produto/detalhes/<?= (int)$produto['id'] ?>"
                            class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-eye me-2"></i>Ver Detalhes
+                            <i class="fas fa-eye me-2"></i><?= htmlspecialchars(__('group_page.view_details', 'Ver Detalhes'), ENT_QUOTES, 'UTF-8') ?>
                         </a>
                         <button class="btn btn-primary btn-sm btn-adicionar-modern"
                                 data-produto-id="<?= (int)$produto['id'] ?>"
@@ -197,7 +196,7 @@ $busca = $busca ?? '';
                                 data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
                                 <?= (int)($produto['stock'] ?? 0) > 0 ? '' : 'disabled' ?>>
                             <i class="fas fa-cart-plus me-2"></i>
-                            <?= (int)($produto['stock'] ?? 0) > 0 ? 'Adicionar ao Carrinho' : 'Indisponível' ?>
+                            <?= (int)($produto['stock'] ?? 0) > 0 ? htmlspecialchars(__('group_page.add_to_cart', 'Adicionar ao Carrinho'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('group_page.unavailable', 'Indisponível'), ENT_QUOTES, 'UTF-8') ?>
                         </button>
                     </div>
                 </div>
@@ -219,12 +218,12 @@ $busca = $busca ?? '';
             <?php if (!empty($verTodos)): ?>
                 <li class="page-item">
                     <a class="page-link" href="<?= htmlspecialchars($buildUrl(1), ENT_QUOTES, 'UTF-8') ?>">
-                        <i class="fas fa-list me-1"></i>Paginado
+                        <i class="fas fa-list me-1"></i><?= htmlspecialchars(__('group_page.paginated', 'Paginado'), ENT_QUOTES, 'UTF-8') ?>
                     </a>
                 </li>
             <?php else: ?>
             <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                <a class="page-link" href="<?= htmlspecialchars($buildUrl(max(1, $page - 1)), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
+                <a class="page-link" href="<?= htmlspecialchars($buildUrl(max(1, $page - 1)), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(__('common.previous', 'Anterior'), ENT_QUOTES, 'UTF-8') ?></a>
             </li>
             <?php
             $start = max(1, $page - 2);
@@ -243,7 +242,7 @@ $busca = $busca ?? '';
             }
             ?>
             <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
-                <a class="page-link" href="<?= htmlspecialchars($buildUrl(min($totalPages, $page + 1)), ENT_QUOTES, 'UTF-8') ?>">Próxima</a>
+                <a class="page-link" href="<?= htmlspecialchars($buildUrl(min($totalPages, $page + 1)), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(__('common.next', 'Próxima'), ENT_QUOTES, 'UTF-8') ?></a>
             </li>
             <?php
             $verTodosUrl = '/grupo/' . $slug . '?ver_todos=1';
@@ -251,7 +250,7 @@ $busca = $busca ?? '';
             ?>
             <li class="page-item ms-2">
                 <a class="page-link text-primary fw-semibold" href="<?= htmlspecialchars($verTodosUrl, ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="fas fa-th me-1"></i>Ver Todos (<?= $total ?>)
+                    <i class="fas fa-th me-1"></i><?= htmlspecialchars(__('group_page.see_all', 'Ver Todos'), ENT_QUOTES, 'UTF-8') ?> (<?= $total ?>)
                 </a>
             </li>
             <?php endif; ?>
@@ -268,9 +267,9 @@ $busca = $busca ?? '';
 
 <script>
 window.PRODUCTS_MODERNO_I18N = {
-    add_to_cart: 'Adicionar ao Carrinho',
-    adding: 'Adicionando...',
-    error_add: 'Erro ao adicionar produto'
+    add_to_cart: <?= json_encode(__('group_page.add_to_cart', 'Adicionar ao Carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    adding: <?= json_encode(__('group_page.adding', 'Adicionando...'), JSON_UNESCAPED_UNICODE) ?>,
+    error_add: <?= json_encode(__('group_page.error_add', 'Erro ao adicionar produto'), JSON_UNESCAPED_UNICODE) ?>
 };
 
 function adicionarAoCarrinhoModerno(botao) {
@@ -282,7 +281,7 @@ function adicionarAoCarrinhoModerno(botao) {
     }
     if (botao.disabled) return;
     botao.disabled = true;
-    botao.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adicionando...';
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + (window.PRODUCTS_MODERNO_I18N ? window.PRODUCTS_MODERNO_I18N.adding : 'Adicionando...');
     fetch('/carrinho/adicionar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
@@ -291,7 +290,7 @@ function adicionarAoCarrinhoModerno(botao) {
     .then(r => r.json())
     .then(data => {
         botao.disabled = false;
-        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>Adicionar ao Carrinho';
+        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>' + (window.PRODUCTS_MODERNO_I18N ? window.PRODUCTS_MODERNO_I18N.add_to_cart : 'Adicionar ao Carrinho');
         if (data.success) {
             if (window.updateCartBadge) window.updateCartBadge(data.total_itens);
             const a = document.createElement('div');
@@ -304,7 +303,7 @@ function adicionarAoCarrinhoModerno(botao) {
     })
     .catch(() => {
         botao.disabled = false;
-        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>Adicionar ao Carrinho';
+        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>' + (window.PRODUCTS_MODERNO_I18N ? window.PRODUCTS_MODERNO_I18N.add_to_cart : 'Adicionar ao Carrinho');
     });
 }
 

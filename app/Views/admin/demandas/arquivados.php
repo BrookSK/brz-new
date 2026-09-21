@@ -1,12 +1,12 @@
 <?php
 $demandas = $demandas ?? [];
-$statusLabels = $statusLabels ?? ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+$statusLabels = $statusLabels ?? ['pendente'=>__('admin.demands.status.pending','Pendente'),'em_analise'=>__('admin.demands.status.in_analysis','Em Análise'),'em_execucao'=>__('admin.demands.status.in_progress','Em Execução'),'em_teste'=>__('admin.demands.status.in_testing','Em Teste'),'recusado'=>__('admin.demands.status.rejected','Recusado'),'concluido'=>__('admin.demands.status.completed','Concluído')];
 $statusCores = $statusCores ?? ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 ?>
 <div class="container-fluid py-3">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
-        <h1 class="page-title"><i class="fas fa-archive me-2 text-muted"></i>Demandas Arquivadas</h1>
-        <a href="/admin/demandas/painel" class="btn btn-outline-dark btn-sm rounded-pill px-3"><i class="fas fa-arrow-left me-1"></i>Voltar ao Painel</a>
+        <h1 class="page-title"><i class="fas fa-archive me-2 text-muted"></i><?= htmlspecialchars(__('admin.demands.archived_title', 'Demandas Arquivadas'), ENT_QUOTES, 'UTF-8') ?></h1>
+        <a href="/admin/demandas/painel" class="btn btn-outline-dark btn-sm rounded-pill px-3"><i class="fas fa-arrow-left me-1"></i><?= htmlspecialchars(__('admin.demands.back_to_board', 'Voltar ao Painel'), ENT_QUOTES, 'UTF-8') ?></a>
     </div>
 
     <?php if (!empty($_SESSION['message'])): ?>
@@ -20,7 +20,7 @@ $statusCores = $statusCores ?? ['pendente'=>'secondary','em_analise'=>'primary',
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center text-muted py-5">
             <i class="fas fa-archive fs-2 d-block mb-2 opacity-50"></i>
-            Nenhuma demanda arquivada.
+            <?= htmlspecialchars(__('admin.demands.empty_archived', 'Nenhuma demanda arquivada.'), ENT_QUOTES, 'UTF-8') ?>
         </div>
     </div>
     <?php else: ?>
@@ -31,11 +31,11 @@ $statusCores = $statusCores ?? ['pendente'=>'secondary','em_analise'=>'primary',
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
-                            <th>Título</th>
-                            <th>Solicitante</th>
-                            <th>Status</th>
-                            <th>Criada em</th>
-                            <th>Ações</th>
+                            <th><?= htmlspecialchars(__('admin.demands.col.title', 'Título'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th><?= htmlspecialchars(__('admin.demands.col.requester', 'Solicitante'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th><?= htmlspecialchars(__('admin.demands.col.status', 'Status'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th><?= htmlspecialchars(__('admin.demands.col.created_at', 'Criada em'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th><?= htmlspecialchars(__('admin.demands.col.actions', 'Ações'), ENT_QUOTES, 'UTF-8') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -50,7 +50,7 @@ $statusCores = $statusCores ?? ['pendente'=>'secondary','em_analise'=>'primary',
                                 <a href="/admin/demandas/detalhe/<?= $d['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
                                 <form method="POST" action="/admin/demandas/arquivar/<?= $d['id'] ?>">
                                     <input type="hidden" name="arquivar" value="0">
-                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Desarquivar"><i class="fas fa-undo"></i></button>
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="<?= htmlspecialchars(__('admin.demands.unarchive', 'Desarquivar'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-undo"></i></button>
                                 </form>
                             </td>
                         </tr>

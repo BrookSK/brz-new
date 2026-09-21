@@ -9,6 +9,65 @@ $comissoes = $comissoes ?? [];
 $filtros = $filtros ?? [];
 function fmtD($v) { return 'R$ ' . number_format((float)($v ?? 0), 2, ',', '.'); }
 
+// Mapas de tradução para rótulos derivados de dados (status, tipo, origem, frequência, grupo)
+$__despStatusLabels = [
+    'prevista'           => __('admin.expenses.status.forecast', 'Prevista'),
+    'a_vencer'           => __('admin.expenses.status.due', 'A vencer'),
+    'vencida'            => __('admin.expenses.status.overdue', 'Vencida'),
+    'paga'               => __('admin.expenses.status.paid', 'Paga'),
+    'parcialmente_paga'  => __('admin.expenses.status.partially_paid', 'Parcialmente paga'),
+    'cancelada'          => __('admin.expenses.status.cancelled', 'Cancelada'),
+];
+$__despTipoLabels = [
+    'avulsa'     => __('admin.expenses.type.one_off', 'Avulsa'),
+    'fixa'       => __('admin.expenses.type.fixed', 'Fixa'),
+    'recorrente' => __('admin.expenses.type.recurring', 'Recorrente'),
+    'parcelada'  => __('admin.expenses.type.installment', 'Parcelada'),
+    'comissao'   => __('admin.expenses.type.commission', 'Comissão'),
+    'por_hora'   => __('admin.expenses.type.hourly', 'Por Hora'),
+];
+$__despOrigemLabels = [
+    'manual'        => __('admin.expenses.origin.manual', 'Manual'),
+    'recorrencia'   => __('admin.expenses.origin.recurrence', 'Recorrência'),
+    'parcelamento'  => __('admin.expenses.origin.installment', 'Parcelamento'),
+    'sistema'       => __('admin.expenses.origin.system', 'Sistema'),
+];
+$__despFreqLabels = [
+    'semanal'   => __('admin.expenses.freq.weekly', 'Semanal'),
+    'quinzenal' => __('admin.expenses.freq.biweekly', 'Quinzenal'),
+    'mensal'    => __('admin.expenses.freq.monthly', 'Mensal'),
+    'anual'     => __('admin.expenses.freq.yearly', 'Anual'),
+];
+$__despGrupoLabels = [
+    'despesa_operacional'    => __('admin.expenses.group.operational', 'Despesa operacional'),
+    'despesa_administrativa' => __('admin.expenses.group.administrative', 'Despesa administrativa'),
+    'despesa_financeira'     => __('admin.expenses.group.financial', 'Despesa financeira'),
+    'custo_produto'          => __('admin.expenses.group.product_cost', 'Custo produto'),
+    'tributos'               => __('admin.expenses.group.taxes', 'Tributos'),
+    'outros'                 => __('admin.expenses.group.others', 'Outros'),
+];
+$__despLabelStatus = static function (?string $s) use ($__despStatusLabels): string {
+    $s = (string) $s;
+    return $__despStatusLabels[$s] ?? ucfirst(str_replace('_', ' ', $s));
+};
+$__despLabelTipo = static function (?string $t) use ($__despTipoLabels): string {
+    $t = (string) $t;
+    return $__despTipoLabels[$t] ?? ucfirst(str_replace('_', ' ', $t));
+};
+$__despLabelOrigem = static function (?string $o) use ($__despOrigemLabels): string {
+    $o = (string) ($o !== '' && $o !== null ? $o : 'manual');
+    return $__despOrigemLabels[$o] ?? ucfirst(str_replace('_', ' ', $o));
+};
+$__despLabelFreq = static function (?string $f) use ($__despFreqLabels): string {
+    $f = (string) $f;
+    return $__despFreqLabels[$f] ?? ucfirst(str_replace('_', ' ', $f));
+};
+$__despLabelGrupo = static function (?string $g) use ($__despGrupoLabels): string {
+    $g = (string) $g;
+    if ($g === '') return '';
+    return $__despGrupoLabels[$g] ?? ucfirst(str_replace('_', ' ', $g));
+};
+
 $countAll = count($despesas);
 $countVencidas = count(array_filter($despesas, fn($d) => ($d['status'] ?? '') === 'vencida'));
 $countHoje = count(array_filter($despesas, fn($d) => ($d['vencimento'] ?? '') === date('Y-m-d') && ($d['status'] ?? '') !== 'paga'));
@@ -80,7 +139,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <div class="list-group list-group-flush">
                         <?php foreach (array_slice($recorrencias, 0, 5) as $r): ?>
                         <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= ucfirst($r['frequencia']) ?> · dia <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· até ' . date('m/Y', strtotime($r['data_fim'])) : '· sem fim' ?></div></div>
+                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($__despLabelFreq($r['frequencia'] ?? '')) ?> · <?= htmlspecialchars(__('admin.expenses.day', 'dia')) ?> <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· ' . htmlspecialchars(__('admin.expenses.until', 'até')) . ' ' . date('m/Y', strtotime($r['data_fim'])) : '· ' . htmlspecialchars(__('admin.expenses.no_end', 'sem fim')) ?></div></div>
                             <span class="fw-bold small"><?= fmtD($r['valor']) ?></span>
                         </div>
                         <?php endforeach; ?>
@@ -200,10 +259,10 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
                 <div class="col-md-2"><label class="form-label small text-muted">Competência de</label><input type="month" name="competencia_de" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_de'] ?? '', 0, 7)) ?>"></div>
                 <div class="col-md-2"><label class="form-label small text-muted">Até</label><input type="month" name="competencia_ate" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_ate'] ?? '', 0, 7)) ?>"></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Categoria</label><select name="categoria" class="form-select form-select-sm"><option value="">Todas</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>" <?= ($filtros['categoria']??'')==$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Status</label><select name="status" class="form-select form-select-sm"><option value="">Todos</option><option value="prevista" <?= ($filtros['status']??'')==='prevista'?'selected':'' ?>>Prevista</option><option value="a_vencer" <?= ($filtros['status']??'')==='a_vencer'?'selected':'' ?>>A vencer</option><option value="vencida" <?= ($filtros['status']??'')==='vencida'?'selected':'' ?>>Vencida</option><option value="paga" <?= ($filtros['status']??'')==='paga'?'selected':'' ?>>Paga</option><option value="cancelada" <?= ($filtros['status']??'')==='cancelada'?'selected':'' ?>>Cancelada</option></select></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Tipo</label><select name="tipo" class="form-select form-select-sm"><option value="">Todos</option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>>Avulsa</option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>>Fixa</option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>>Recorrente</option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>>Parcelada</option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>>Comissão</option><option value="por_hora" <?= ($filtros['tipo']??'')==='por_hora'?'selected':'' ?>>Por Hora</option></select></div>
-                <div class="col-md-2"><button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= htmlspecialchars(__('admin.expenses.filter.category', 'Categoria')) ?></label><select name="categoria" class="form-select form-select-sm"><option value=""><?= htmlspecialchars(__('common.all_f', 'Todas')) ?></option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>" <?= ($filtros['categoria']??'')==$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= htmlspecialchars(__('admin.expenses.filter.status', 'Status')) ?></label><select name="status" class="form-select form-select-sm"><option value=""><?= htmlspecialchars(__('common.all', 'Todos')) ?></option><option value="prevista" <?= ($filtros['status']??'')==='prevista'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.status.forecast', 'Prevista')) ?></option><option value="a_vencer" <?= ($filtros['status']??'')==='a_vencer'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.status.due', 'A vencer')) ?></option><option value="vencida" <?= ($filtros['status']??'')==='vencida'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.status.overdue', 'Vencida')) ?></option><option value="paga" <?= ($filtros['status']??'')==='paga'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.status.paid', 'Paga')) ?></option><option value="cancelada" <?= ($filtros['status']??'')==='cancelada'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.status.cancelled', 'Cancelada')) ?></option></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= htmlspecialchars(__('admin.expenses.filter.type', 'Tipo')) ?></label><select name="tipo" class="form-select form-select-sm"><option value=""><?= htmlspecialchars(__('common.all', 'Todos')) ?></option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.type.one_off', 'Avulsa')) ?></option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.type.fixed', 'Fixa')) ?></option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.type.recurring', 'Recorrente')) ?></option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.type.installment', 'Parcelada')) ?></option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.type.commission', 'Comissão')) ?></option><option value="por_hora" <?= ($filtros['tipo']??'')==='por_hora'?'selected':'' ?>><?= htmlspecialchars(__('admin.expenses.type.hourly', 'Por Hora')) ?></option></select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-filter me-1"></i><?= htmlspecialchars(__('admin.expenses.filter.apply', 'Filtrar')) ?></button></div>
             </form>
         </div>
     </div>
@@ -226,7 +285,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <div class="fw-semibold text-truncate" style="font-size:12px;"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
                             <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                 <span class="fw-bold" style="font-size:11px;"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></span>
-                                <span class="badge <?= $stClassMobile ?>" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span>
+                                <span class="badge <?= $stClassMobile ?>" style="font-size:9px;"><?= htmlspecialchars($__despLabelStatus($d['status'] ?? '')) ?></span>
                             </div>
                             <div class="text-muted" style="font-size:10px;">Venc: <?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></div>
                         </div>
@@ -263,12 +322,12 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <?php if ($d['favorecido']): ?><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($d['favorecido']) ?></div><?php endif; ?>
                         </td>
                         <td><?php if ($d['categoria_nome']): ?><span class="badge" style="background:<?= $d['categoria_cor'] ?? '#6b7280' ?>;font-size:10px;"><?= htmlspecialchars($d['categoria_nome']) ?></span><?php else: ?>-<?php endif; ?></td>
-                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= $tipoBadge[$d['tipo'] ?? ''] ?? $d['tipo'] ?></span></td>
+                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= htmlspecialchars($__despLabelTipo($d['tipo'] ?? '')) ?></span></td>
                         <td><?= $d['competencia'] ? date('m/Y', strtotime($d['competencia'])) : '-' ?></td>
                         <td><?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></td>
                         <td class="text-end fw-bold"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></td>
-                        <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
-                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
+                        <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= htmlspecialchars($__despLabelStatus($d['status'] ?? '')) ?></span></td>
+                        <td><span class="text-muted" style="font-size:10px;"><?= htmlspecialchars($__despLabelOrigem($d['origem'] ?? 'manual')) ?></span></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-editar-despesa" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>" data-virtual="0"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
@@ -309,7 +368,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($r['descricao']) ?></td>
                         <td><?= !empty($r['categoria_nome']) ? '<span class="badge" style="background:'.($r['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($r['categoria_nome']).'</span>' : '-' ?></td>
-                        <td><?= ucfirst($r['frequencia'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($__despLabelFreq($r['frequencia'] ?? '')) ?></td>
                         <td><?= $r['dia_vencimento'] ?? '-' ?></td>
                         <td class="text-end fw-bold"><?= fmtD($r['valor']) ?></td>
                         <td><?= $r['proxima_geracao'] ? date('d/m/Y', strtotime($r['proxima_geracao'])) : '-' ?></td>
@@ -369,8 +428,8 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <tr>
                         <td><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:<?= $cat['cor'] ?? '#6b7280' ?>;"></span></td>
                         <td class="fw-semibold"><?= htmlspecialchars($cat['nome']) ?></td>
-                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $cat['grupo'] ?? '')) ?></span></td>
-                        <td><?= $cat['ativa'] ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>' ?></td>
+                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= htmlspecialchars($__despLabelGrupo($cat['grupo'] ?? '')) ?></span></td>
+                        <td><?= $cat['ativa'] ? '<span class="badge bg-success">' . htmlspecialchars(__('admin.expenses.active', 'Ativa')) . '</span>' : '<span class="badge bg-secondary">' . htmlspecialchars(__('admin.expenses.inactive', 'Inativa')) . '</span>' ?></td>
                     </tr>
                     <?php endforeach; ?>
                     </tbody>

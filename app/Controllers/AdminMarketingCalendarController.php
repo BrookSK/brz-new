@@ -93,7 +93,7 @@ class AdminMarketingCalendarController extends Controller {
         ob_start();
         require __DIR__ . '/../Views/admin/marketing/calendario.php';
         $content = ob_get_clean();
-        $title = 'Calendário de Marketing';
+        $title = __('admin.mkt_calendar.title', 'Calendário de Marketing');
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 

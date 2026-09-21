@@ -6,9 +6,9 @@ $isEdit = !empty($live);
 ?>
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3"><?= $isEdit ? 'Editar Live' : 'Nova Live' ?></h1>
+        <h1 class="h3"><?= $isEdit ? htmlspecialchars(__('admin.lives.edit_live', 'Editar Live'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('admin.lives.new_live', 'Nova Live'), ENT_QUOTES, 'UTF-8') ?></h1>
         <a href="/admin/lives" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Voltar
+            <i class="fas fa-arrow-left me-1"></i> <?= htmlspecialchars(__('common.back', 'Voltar'), ENT_QUOTES, 'UTF-8') ?>
         </a>
     </div>
 
@@ -16,28 +16,28 @@ $isEdit = !empty($live);
         <div class="row">
             <div class="col-lg-8">
                 <div class="card mb-4">
-                    <div class="card-header">Informações da Live</div>
+                    <div class="card-header"><?= htmlspecialchars(__('admin.lives.form.info', 'Informações da Live'), ENT_QUOTES, 'UTF-8') ?></div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label">Título *</label>
+                            <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.title', 'Título *'), ENT_QUOTES, 'UTF-8') ?></label>
                             <input type="text" name="title" class="form-control" required
                                    value="<?= htmlspecialchars($live['title'] ?? '') ?>">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Descrição</label>
+                            <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.description', 'Descrição'), ENT_QUOTES, 'UTF-8') ?></label>
                             <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($live['description'] ?? '') ?></textarea>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Data/Hora prevista</label>
+                                <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.scheduled_at', 'Data/Hora prevista'), ENT_QUOTES, 'UTF-8') ?></label>
                                 <input type="datetime-local" name="scheduled_at" class="form-control"
                                        value="<?= !empty($live['scheduled_at']) ? date('Y-m-d\TH:i', strtotime($live['scheduled_at'])) : '' ?>">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Método de transmissão</label>
+                                <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.ingest_method', 'Método de transmissão'), ENT_QUOTES, 'UTF-8') ?></label>
                                 <select name="ingest_method" class="form-select">
                                     <option value="webrtc" <?= ($live['ingest_method'] ?? 'webrtc') === 'webrtc' ? 'selected' : '' ?>>
-                                        WebRTC (Navegador/Celular)
+                                        <?= htmlspecialchars(__('admin.lives.form.webrtc', 'WebRTC (Navegador/Celular)'), ENT_QUOTES, 'UTF-8') ?>
                                     </option>
                                     <option value="obs" <?= ($live['ingest_method'] ?? '') === 'obs' ? 'selected' : '' ?>>
                                         OBS (RTMPS)
@@ -46,7 +46,7 @@ $isEdit = !empty($live);
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Capa</label>
+                            <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.cover', 'Capa'), ENT_QUOTES, 'UTF-8') ?></label>
                             <input type="file" name="cover" class="form-control" accept="image/*">
                             <?php if (!empty($live['cover_url'])): ?>
                                 <img src="<?= htmlspecialchars($live['cover_url']) ?>" class="mt-2" style="max-height:100px;border-radius:8px" alt="">
@@ -58,9 +58,9 @@ $isEdit = !empty($live);
                 <!-- Produtos da Live -->
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Produtos da Live</span>
+                        <span><?= htmlspecialchars(__('admin.lives.form.products', 'Produtos da Live'), ENT_QUOTES, 'UTF-8') ?></span>
                         <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                            <i class="fas fa-plus"></i> Adicionar
+                            <i class="fas fa-plus"></i> <?= htmlspecialchars(__('admin.lives.form.add', 'Adicionar'), ENT_QUOTES, 'UTF-8') ?>
                         </button>
                     </div>
                     <div class="card-body p-0">
@@ -81,7 +81,7 @@ $isEdit = !empty($live);
                         </div>
                         <?php if (empty($products)): ?>
                             <p class="text-center text-muted py-3 mb-0" id="noProductsMsg">
-                                Nenhum produto adicionado. Selecione os produtos que serão vendidos nesta live.
+                                <?= htmlspecialchars(__('admin.lives.form.no_products', 'Nenhum produto adicionado. Selecione os produtos que serão vendidos nesta live.'), ENT_QUOTES, 'UTF-8') ?>
                             </p>
                         <?php endif; ?>
                     </div>
@@ -96,26 +96,26 @@ $isEdit = !empty($live);
                             <input class="form-check-input" type="checkbox" id="freemiumToggle"
                                    <?= (($live['free_seconds'] ?? 0) > 0) ? 'checked' : '' ?>
                                    onchange="document.getElementById('freemiumFields').classList.toggle('d-none')">
-                            <label class="form-check-label" for="freemiumToggle">Freemium (paywall)</label>
+                            <label class="form-check-label" for="freemiumToggle"><?= htmlspecialchars(__('admin.lives.form.freemium', 'Freemium (paywall)'), ENT_QUOTES, 'UTF-8') ?></label>
                         </div>
                     </div>
                     <div class="card-body <?= (($live['free_seconds'] ?? 0) > 0) ? '' : 'd-none' ?>" id="freemiumFields">
                         <div class="mb-3">
-                            <label class="form-label">Segundos grátis</label>
+                            <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.free_seconds', 'Segundos grátis'), ENT_QUOTES, 'UTF-8') ?></label>
                             <input type="number" name="free_seconds" class="form-control" min="0"
                                    value="<?= (int)($live['free_seconds'] ?? 0) ?>">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Preço para desbloquear (R$)</label>
+                            <label class="form-label"><?= htmlspecialchars(__('admin.lives.form.unlock_price', 'Preço para desbloquear (R$)'), ENT_QUOTES, 'UTF-8') ?></label>
                             <input type="number" name="unlock_price" class="form-control" min="0" step="0.01"
                                    value="<?= number_format((float)($live['unlock_price'] ?? 0), 2, '.', '') ?>">
                         </div>
-                        <small class="text-muted">Se ativado, o cliente assiste X segundos grátis e depois precisa pagar para continuar.</small>
+                        <small class="text-muted"><?= htmlspecialchars(__('admin.lives.form.freemium_hint', 'Se ativado, o cliente assiste X segundos grátis e depois precisa pagar para continuar.'), ENT_QUOTES, 'UTF-8') ?></small>
                     </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-lg w-100">
-                    <i class="fas fa-save me-2"></i> <?= $isEdit ? 'Salvar Alterações' : 'Criar Live' ?>
+                    <i class="fas fa-save me-2"></i> <?= $isEdit ? htmlspecialchars(__('admin.lives.form.save_changes', 'Salvar Alterações'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('admin.lives.form.create', 'Criar Live'), ENT_QUOTES, 'UTF-8') ?>
                 </button>
             </div>
         </div>
@@ -127,13 +127,13 @@ $isEdit = !empty($live);
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Produtos da Live</h5>
+                <h5 class="modal-title"><?= htmlspecialchars(__('admin.lives.form.products', 'Produtos da Live'), ENT_QUOTES, 'UTF-8') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="text" class="form-control mb-3" placeholder="Digite o nome do produto..." id="searchProduct" autocomplete="off">
+                <input type="text" class="form-control mb-3" placeholder="<?= htmlspecialchars(__('admin.lives.form.search_product_ph', 'Digite o nome do produto...'), ENT_QUOTES, 'UTF-8') ?>" id="searchProduct" autocomplete="off">
                 <div id="eligibleList" style="max-height:300px;overflow-y:auto">
-                    <p class="text-center text-muted py-3" id="searchHint">Digite para buscar produtos</p>
+                    <p class="text-center text-muted py-3" id="searchHint"><?= htmlspecialchars(__('admin.lives.form.search_hint', 'Digite para buscar produtos'), ENT_QUOTES, 'UTF-8') ?></p>
                 </div>
             </div>
         </div>
@@ -141,6 +141,15 @@ $isEdit = !empty($live);
 </div>
 
 <script>
+window.LIVES_FORM_I18N = {
+    type_min_2: <?= json_encode(__('admin.lives.form.type_min_2', 'Digite pelo menos 2 caracteres'), JSON_UNESCAPED_UNICODE) ?>,
+    type_to_search: <?= json_encode(__('admin.lives.form.search_hint', 'Digite para buscar produtos'), JSON_UNESCAPED_UNICODE) ?>,
+    searching: <?= json_encode(__('admin.lives.form.searching', 'Buscando...'), JSON_UNESCAPED_UNICODE) ?>,
+    no_products: <?= json_encode(__('admin.lives.form.no_results', 'Nenhum produto encontrado'), JSON_UNESCAPED_UNICODE) ?>,
+    search_error: <?= json_encode(__('admin.lives.form.search_error', 'Erro na busca'), JSON_UNESCAPED_UNICODE) ?>,
+    already_added: <?= json_encode(__('admin.lives.form.already_added', 'Produto já adicionado'), JSON_UNESCAPED_UNICODE) ?>,
+    product_fallback: <?= json_encode(__('admin.lives.form.product_fallback', 'Produto #'), JSON_UNESCAPED_UNICODE) ?>
+};
 var searchTimer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -150,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var term = this.value.trim();
             clearTimeout(searchTimer);
             if (term.length < 2) {
-                document.getElementById('eligibleList').innerHTML = '<p class="text-center text-muted py-3">Digite pelo menos 2 caracteres</p>';
+                document.getElementById('eligibleList').innerHTML = '<p class="text-center text-muted py-3">' + window.LIVES_FORM_I18N.type_min_2 + '</p>';
                 return;
             }
             searchTimer = setTimeout(function() { searchProducts(term); }, 300);
@@ -162,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.addEventListener('shown.bs.modal', function() {
                 searchInput.value = '';
                 searchInput.focus();
-                document.getElementById('eligibleList').innerHTML = '<p class="text-center text-muted py-3">Digite para buscar produtos</p>';
+                document.getElementById('eligibleList').innerHTML = '<p class="text-center text-muted py-3">' + window.LIVES_FORM_I18N.type_to_search + '</p>';
             });
         }
     }
@@ -170,13 +179,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function searchProducts(term) {
     var list = document.getElementById('eligibleList');
-    list.innerHTML = '<p class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> Buscando...</p>';
+    list.innerHTML = '<p class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> ' + window.LIVES_FORM_I18N.searching + '</p>';
 
     fetch('/admin/lives/buscar-produtos?q=' + encodeURIComponent(term))
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (!data.products || data.products.length === 0) {
-                list.innerHTML = '<p class="text-center text-muted py-3">Nenhum produto encontrado</p>';
+                list.innerHTML = '<p class="text-center text-muted py-3">' + window.LIVES_FORM_I18N.no_products + '</p>';
                 return;
             }
             var html = '';
@@ -190,14 +199,14 @@ function searchProducts(term) {
 
                 html += '<div class="eligible-item d-flex align-items-center p-2 border-bottom" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" data-price="' + p.price + '" data-img="' + (p.image || '') + '">'
                     + '<div style="width:45px;height:45px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center">' + imgHtml + '</div>'
-                    + '<div class="flex-grow-1"><strong>' + (p.name || 'Produto #' + p.id) + '</strong><br><small>R$ ' + parseFloat(p.price).toFixed(2).replace('.', ',') + '</small></div>'
+                    + '<div class="flex-grow-1"><strong>' + (p.name || window.LIVES_FORM_I18N.product_fallback + p.id) + '</strong><br><small>R$ ' + parseFloat(p.price).toFixed(2).replace('.', ',') + '</small></div>'
                     + '<button type="button" class="btn btn-sm btn-success" onclick="addProductToLive(this)"><i class="fas fa-plus"></i></button>'
                     + '</div>';
             });
-            list.innerHTML = html || '<p class="text-center text-muted py-3">Nenhum produto encontrado</p>';
+            list.innerHTML = html || '<p class="text-center text-muted py-3">' + window.LIVES_FORM_I18N.no_products + '</p>';
         })
         .catch(function() {
-            list.innerHTML = '<p class="text-center text-muted py-3">Erro na busca</p>';
+            list.innerHTML = '<p class="text-center text-muted py-3">' + window.LIVES_FORM_I18N.search_error + '</p>';
         });
 }
 
@@ -209,7 +218,7 @@ function addProductToLive(btn) {
     const img = item.dataset.img || '';
 
     if (document.querySelector(`#productsList [data-product-id="${id}"]`)) {
-        alert('Produto já adicionado');
+        alert(window.LIVES_FORM_I18N.already_added);
         return;
     }
 

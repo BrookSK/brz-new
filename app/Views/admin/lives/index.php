@@ -4,9 +4,9 @@
 ?>
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="page-title">Lives</h1>
+        <h1 class="page-title"><?= htmlspecialchars(__('admin.lives.title', 'Lives'), ENT_QUOTES, 'UTF-8') ?></h1>
         <a href="/admin/lives/nova" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i> Nova Live
+            <i class="fas fa-plus me-1"></i> <?= htmlspecialchars(__('admin.lives.new_live', 'Nova Live'), ENT_QUOTES, 'UTF-8') ?>
         </a>
     </div>
 
@@ -15,10 +15,10 @@
         <div class="card-body py-2">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <small class="text-muted">
-                    Cota mensal: <?= $quota['minutes_used'] ?> / <?= $quota['minutes_included'] ?> min
+                    <?= htmlspecialchars(__('admin.lives.monthly_quota', 'Cota mensal:'), ENT_QUOTES, 'UTF-8') ?> <?= $quota['minutes_used'] ?> / <?= $quota['minutes_included'] ?> <?= htmlspecialchars(__('admin.lives.min', 'min'), ENT_QUOTES, 'UTF-8') ?>
                 </small>
                 <a href="/admin/configuracoes/lives" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-cog"></i> Config
+                    <i class="fas fa-cog"></i> <?= htmlspecialchars(__('admin.lives.config', 'Config'), ENT_QUOTES, 'UTF-8') ?>
                 </a>
             </div>
             <?php $pct = $quota['minutes_included'] > 0 ? min(100, ($quota['minutes_used'] / $quota['minutes_included']) * 100) : 0; ?>
@@ -32,18 +32,18 @@
     <!-- Tabs de status -->
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
-            <a class="nav-link <?= empty($_GET['status'] ?? '') ? 'active' : '' ?>" href="/admin/lives">Todas</a>
+            <a class="nav-link <?= empty($_GET['status'] ?? '') ? 'active' : '' ?>" href="/admin/lives"><?= htmlspecialchars(__('admin.lives.tab_all', 'Todas'), ENT_QUOTES, 'UTF-8') ?></a>
         </li>
         <li class="nav-item">
             <a class="nav-link <?= ($_GET['status'] ?? '') === 'live' ? 'active' : '' ?>" href="/admin/lives?status=live">
-                <span class="badge bg-danger me-1" style="animation:pulse 2s infinite">●</span> Ao Vivo
+                <span class="badge bg-danger me-1" style="animation:pulse 2s infinite">●</span> <?= htmlspecialchars(__('admin.lives.tab_live', 'Ao Vivo'), ENT_QUOTES, 'UTF-8') ?>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?= ($_GET['status'] ?? '') === 'scheduled' ? 'active' : '' ?>" href="/admin/lives?status=scheduled">Agendadas</a>
+            <a class="nav-link <?= ($_GET['status'] ?? '') === 'scheduled' ? 'active' : '' ?>" href="/admin/lives?status=scheduled"><?= htmlspecialchars(__('admin.lives.tab_scheduled', 'Agendadas'), ENT_QUOTES, 'UTF-8') ?></a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?= ($_GET['status'] ?? '') === 'ended' ? 'active' : '' ?>" href="/admin/lives?status=ended">Encerradas</a>
+            <a class="nav-link <?= ($_GET['status'] ?? '') === 'ended' ? 'active' : '' ?>" href="/admin/lives?status=ended"><?= htmlspecialchars(__('admin.lives.tab_ended', 'Encerradas'), ENT_QUOTES, 'UTF-8') ?></a>
         </li>
     </ul>
 
@@ -51,8 +51,8 @@
     <?php if (empty($lives)): ?>
         <div class="text-center py-5 text-muted">
             <i class="fas fa-video fa-3x mb-3"></i>
-            <p>Nenhuma live encontrada</p>
-            <a href="/admin/lives/nova" class="btn btn-primary">Criar primeira live</a>
+            <p><?= htmlspecialchars(__('admin.lives.empty', 'Nenhuma live encontrada'), ENT_QUOTES, 'UTF-8') ?></p>
+            <a href="/admin/lives/nova" class="btn btn-primary"><?= htmlspecialchars(__('admin.lives.create_first', 'Criar primeira live'), ENT_QUOTES, 'UTF-8') ?></a>
         </div>
     <?php else: ?>
         <div class="row g-3">
@@ -66,17 +66,17 @@
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h6 class="card-title mb-0"><?= htmlspecialchars($live['title']) ?></h6>
                                 <?php if ($live['status'] === 'live'): ?>
-                                    <span class="badge bg-danger">AO VIVO</span>
+                                    <span class="badge bg-danger"><?= htmlspecialchars(__('admin.lives.badge_live', 'AO VIVO'), ENT_QUOTES, 'UTF-8') ?></span>
                                 <?php elseif ($live['status'] === 'scheduled'): ?>
-                                    <span class="badge bg-info">Agendada</span>
+                                    <span class="badge bg-info"><?= htmlspecialchars(__('admin.lives.badge_scheduled', 'Agendada'), ENT_QUOTES, 'UTF-8') ?></span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">Encerrada</span>
+                                    <span class="badge bg-secondary"><?= htmlspecialchars(__('admin.lives.badge_ended', 'Encerrada'), ENT_QUOTES, 'UTF-8') ?></span>
                                 <?php endif; ?>
                             </div>
                             
                             <?php if ($live['status'] === 'live'): ?>
                                 <small class="text-muted">
-                                    <i class="fas fa-eye"></i> <?= $live['viewers_current'] ?> viewers
+                                    <i class="fas fa-eye"></i> <?= $live['viewers_current'] ?> <?= htmlspecialchars(__('admin.lives.viewers', 'viewers'), ENT_QUOTES, 'UTF-8') ?>
                                     · <i class="fas fa-heart"></i> <?= $live['likes_count'] ?>
                                 </small>
                             <?php elseif ($live['scheduled_at']): ?>
@@ -89,11 +89,11 @@
                             <div class="btn-group btn-group-sm w-100">
                                 <?php if ($live['status'] === 'live'): ?>
                                     <a href="/admin/lives/<?= $live['id'] ?>/studio" class="btn btn-danger">
-                                        <i class="fas fa-broadcast-tower"></i> Estúdio
+                                        <i class="fas fa-broadcast-tower"></i> <?= htmlspecialchars(__('admin.lives.studio', 'Estúdio'), ENT_QUOTES, 'UTF-8') ?>
                                     </a>
                                 <?php elseif ($live['status'] === 'scheduled'): ?>
                                     <a href="/admin/lives/<?= $live['id'] ?>/studio" class="btn btn-success">
-                                        <i class="fas fa-play"></i> Iniciar
+                                        <i class="fas fa-play"></i> <?= htmlspecialchars(__('admin.lives.start', 'Iniciar'), ENT_QUOTES, 'UTF-8') ?>
                                     </a>
                                 <?php endif; ?>
                                 <a href="/admin/lives/<?= $live['id'] ?>/editar" class="btn btn-outline-primary">
@@ -124,11 +124,11 @@
 <script>
 document.querySelectorAll('.btn-delete-live').forEach(btn => {
     btn.addEventListener('click', async function() {
-        if (!confirm('Excluir esta live?')) return;
+        if (!confirm(<?= json_encode(__('admin.lives.confirm_delete', 'Excluir esta live?'), JSON_UNESCAPED_UNICODE) ?>)) return;
         const id = this.dataset.id;
         const res = await fetch('/admin/lives/' + id, { method: 'DELETE' });
         if (res.ok) location.reload();
-        else alert('Erro ao excluir');
+        else alert(<?= json_encode(__('admin.lives.delete_error', 'Erro ao excluir'), JSON_UNESCAPED_UNICODE) ?>);
     });
 });
 </script>

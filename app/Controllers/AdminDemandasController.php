@@ -12,6 +12,20 @@ class AdminDemandasController extends Controller {
         $this->ensureTables();
     }
 
+    /**
+     * Rótulos de status traduzidos (código do banco → label exibido).
+     */
+    private static function statusLabels(): array {
+        return [
+            'pendente'    => __('admin.demands.status.pending', 'Pendente'),
+            'em_analise'  => __('admin.demands.status.in_analysis', 'Em Análise'),
+            'em_execucao' => __('admin.demands.status.in_progress', 'Em Execução'),
+            'em_teste'    => __('admin.demands.status.in_testing', 'Em Teste'),
+            'recusado'    => __('admin.demands.status.rejected', 'Recusado'),
+            'concluido'   => __('admin.demands.status.completed', 'Concluído'),
+        ];
+    }
+
     public function painel(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
 
@@ -21,7 +35,7 @@ class AdminDemandasController extends Controller {
         // Verificar testes expirados ao carregar o painel
         $this->verificarTestesExpirados();
         $demandas = $this->listar();
-        $title = 'Painel de Demandas'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.board_title', 'Painel de Demandas'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/painel.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -35,7 +49,7 @@ class AdminDemandasController extends Controller {
             $uid = $_SESSION['usuario_id'] ?? 0;
             if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: ''); }
         } catch (\Exception $e) {}
-        $title = 'Nova Solicitação'; $sidebarActive = 'demandas-nova';
+        $title = __('admin.demands.new_request', 'Nova Solicitação'); $sidebarActive = 'demandas-nova';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/nova.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -44,7 +58,7 @@ class AdminDemandasController extends Controller {
     public function concluidos(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
         $demandas = $this->listar('concluido');
-        $title = 'Demandas Concluídas'; $sidebarActive = 'demandas-concluidos';
+        $title = __('admin.demands.completed_title', 'Demandas Concluídas'); $sidebarActive = 'demandas-concluidos';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/concluidos.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -64,20 +78,20 @@ class AdminDemandasController extends Controller {
             $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusLabels = self::statusLabels();
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Minhas Solicitações'; $sidebarActive = 'demandas-minhas';
+        $title = __('admin.demands.my_requests', 'Minhas Solicitações'); $sidebarActive = 'demandas-minhas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3">';
         echo '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">';
-        echo '<h1 class="page-title">Minhas Solicitações</h1>';
-        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>';
+        echo '<h1 class="page-title">' . htmlspecialchars(__('admin.demands.my_requests', 'Minhas Solicitações'), ENT_QUOTES, 'UTF-8') . '</h1>';
+        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>' . htmlspecialchars(__('admin.demands.new_request', 'Nova Solicitação'), ENT_QUOTES, 'UTF-8') . '</a>';
         echo '</div>';
 
         if (empty($demandas)) {
-            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">Nenhuma solicitação ainda</h5><p class="text-muted small">Clique em "Nova Solicitação" para registrar uma demanda.</p></div></div>';
+            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">' . htmlspecialchars(__('admin.demands.empty_requests', 'Nenhuma solicitação ainda'), ENT_QUOTES, 'UTF-8') . '</h5><p class="text-muted small">' . htmlspecialchars(__('admin.demands.empty_requests_hint', 'Clique em "Nova Solicitação" para registrar uma demanda.'), ENT_QUOTES, 'UTF-8') . '</p></div></div>';
         } else {
             foreach ($demandas as $d) {
                 $st = $statusLabels[$d['status']] ?? $d['status'];
@@ -126,10 +140,10 @@ class AdminDemandasController extends Controller {
         $arquivosBug = $this->getArquivosDemanda($id);
         $historico = $this->getHistorico($id);
 
-        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusLabels = self::statusLabels();
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Solicitação #' . $id; $sidebarActive = 'demandas-minhas';
+        $title = __('admin.demands.request_number', 'Solicitação #{id}', ['id' => $id]); $sidebarActive = 'demandas-minhas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3">';
@@ -1165,10 +1179,10 @@ class AdminDemandasController extends Controller {
         $st = $this->db->query("SELECT * FROM demandas WHERE arquivado = 1 ORDER BY updated_at DESC");
         $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusLabels = self::statusLabels();
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Demandas Arquivadas'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.archived_title', 'Demandas Arquivadas'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/arquivados.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
