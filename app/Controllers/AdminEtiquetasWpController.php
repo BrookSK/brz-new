@@ -21,6 +21,8 @@ class AdminEtiquetasWpController extends Controller
     private \PDO $connection;
     private ?string $ultimoErroSalvarEtiqueta = null;
     private ?string $ultimoSqlSalvarEtiqueta = null;
+    private ?int $ultimoRowCountSalvar = null;
+    private ?string $ultimoLastInsertId = null;
 
     public function __construct()
     {
@@ -1017,6 +1019,25 @@ class AdminEtiquetasWpController extends Controller
             $out['sincronizar_resultado'] = $rSync;
             $out['salvar_erro'] = $this->ultimoErroSalvarEtiqueta;
             $out['salvar_sql'] = $this->ultimoSqlSalvarEtiqueta;
+            $out['salvar_rowcount'] = $this->ultimoRowCountSalvar;
+            $out['salvar_last_insert_id'] = $this->ultimoLastInsertId;
+
+            // Diagnóstico de infra: banco atual, se a tabela é VIEW e se há triggers.
+            try {
+                $out['db_atual'] = (string) $this->connection->query('SELECT DATABASE()')->fetchColumn();
+            } catch (\Throwable $e) {}
+            try {
+                $stT = $this->connection->query("SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'correios_packet_etiquetas'");
+                $out['tabela_tipo'] = $stT ? (string) $stT->fetchColumn() : null;
+            } catch (\Throwable $e) {}
+            try {
+                $stTr = $this->connection->query("SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND EVENT_OBJECT_TABLE = 'correios_packet_etiquetas'");
+                $out['tabela_triggers'] = $stTr ? ($stTr->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            } catch (\Throwable $e) {}
+            try {
+                $out['total_linhas_tabela'] = (int) $this->connection->query('SELECT COUNT(*) FROM correios_packet_etiquetas')->fetchColumn();
+            } catch (\Throwable $e) {}
+
             // Reler a tabela local após a tentativa
             $st = $this->connection->prepare('SELECT id, pedido_id, tracking_number, wp_post_id FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
             $st->execute([$pedidoId]);
@@ -2244,6 +2265,8 @@ class AdminEtiquetasWpController extends Controller
             $this->ultimoSqlSalvarEtiqueta = $sqlIns;
             $stIns = $this->connection->prepare($sqlIns);
             $stIns->execute($valores);
+            $this->ultimoRowCountSalvar = $stIns->rowCount();
+            $this->ultimoLastInsertId = (string) $this->connection->lastInsertId();
             $this->ultimoErroSalvarEtiqueta = null;
             return true;
         } catch (\Exception $e) {
