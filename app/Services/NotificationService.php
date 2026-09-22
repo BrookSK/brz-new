@@ -210,6 +210,15 @@ class NotificationService {
             'data' => date('Y-m-d H:i:s'),
             'data_pedido' => $dataPedido,
 
+            // Rastreio: o getComDetalhes já resolve tracking_code (correios_packet_etiquetas,
+            // shippo, etc.). Preencher os placeholders comuns para que os templates funcionem
+            // mesmo quando o tracking não é passado no $extra (ex.: reenvio manual).
+            'tracking_number' => (string) ($pedido['tracking_code'] ?? ''),
+            'tracking_code' => (string) ($pedido['tracking_code'] ?? ''),
+            'codigo_rastreio' => (string) ($pedido['tracking_code'] ?? ''),
+            'tracking_url' => (string) ($pedido['tracking_label_url'] ?? ''),
+            'customer_control_code' => (string) ($pedido['customer_control_code'] ?? ($pedido['codigo_pedido'] ?? '')),
+
             'itens' => $itensHtml,
             'endereco_entrega' => $enderecoEntrega,
 
