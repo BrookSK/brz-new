@@ -179,6 +179,8 @@ $router->post('/admin/etiquetas-wp/deletar-fatura', 'AdminEtiquetasWpController'
 $router->post('/admin/etiquetas-wp/deletar-embarque', 'AdminEtiquetasWpController', 'deletarEmbarque');
 $router->post('/admin/etiquetas-wp/regerar-etiqueta', 'AdminEtiquetasWpController', 'regerarEtiqueta');
 $router->post('/admin/etiquetas-wp/notificar-selecionados', 'AdminEtiquetasWpController', 'notificarSelecionados');
+$router->post('/admin/etiquetas-wp/notificar-embarque', 'AdminEtiquetasWpController', 'notificarEmbarque');
+$router->post('/admin/etiquetas-wp/notificar-fatura', 'AdminEtiquetasWpController', 'notificarFatura');
 $router->get('/admin/etiquetas-wp/diagnostico-rastreio', 'AdminEtiquetasWpController', 'diagnosticoRastreio');
 $router->get('/admin/etiquetas-wp/reparar-tabela-etiquetas', 'AdminEtiquetasWpController', 'repararTabelaEtiquetas');
 $router->get('/admin/etiquetas-wp/testar-email-direto', 'AdminEtiquetasWpController', 'testarEmailDireto');

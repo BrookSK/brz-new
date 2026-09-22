@@ -1516,6 +1516,92 @@ class AdminEtiquetasWpController extends Controller
     }
 
     /**
+     * Notifica TODOS os clientes dos pedidos de uma FATURA (bill) de uma vez.
+     * Usado na aba Documentação (cada fatura tem um botão "Notificar clientes").
+     * POST /admin/etiquetas-wp/notificar-fatura  Body JSON: { bill_wp_post_id: int }
+     */
+    public function notificarFatura(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) { $body = []; }
+        $billId = (int) ($body['bill_wp_post_id'] ?? 0);
+        if ($billId <= 0) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
+            return;
+        }
+
+        // Reusar a resolução fatura -> containers -> trackings -> pedidos, e notificar cada pedido.
+        $pares = $this->resolverPedidosTrackingDoEmbarque([$billId]);
+        $resumo = $this->notificarPedidosEmbarque($pares, ['origem' => 'notificacao_fatura_manual']);
+
+        $this->json([
+            'success' => (int) ($resumo['enviadas'] ?? 0) > 0,
+            'enviadas' => (int) ($resumo['enviadas'] ?? 0),
+            'falhas' => (int) ($resumo['falhas'] ?? 0),
+            'pedidos' => $resumo['pedidos'] ?? [],
+            'aviso' => $resumo['aviso'] ?? null,
+        ]);
+    }
+
+    /**
+     * Notifica TODOS os clientes dos pedidos de um embarque (departure) de uma vez.
+     * POST /admin/etiquetas-wp/notificar-embarque  Body JSON: { wp_post_id: int }
+     * Resolve: embarque -> faturas vinculadas (departure_id) -> trackings -> pedidos.
+     */
+    public function notificarEmbarque(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) { $body = []; }
+        $embarqueWpId = (int) ($body['wp_post_id'] ?? 0);
+        if ($embarqueWpId <= 0) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
+            return;
+        }
+
+        // Achar as faturas vinculadas a este embarque (fatura.departure_id == embarque wp_post_id).
+        $billIds = [];
+        try {
+            $resp = $this->wp->listBills(['per_page' => 500]);
+            $bills = $this->extrairLista($resp);
+            foreach ($bills as $bill) {
+                if ((int) ($bill['departure_id'] ?? 0) === $embarqueWpId) {
+                    $bwid = (int) ($bill['wp_post_id'] ?? ($bill['id'] ?? 0));
+                    if ($bwid > 0) $billIds[] = $bwid;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[EMBARQUE][NOTIF] Erro ao listar faturas do embarque: ' . $e->getMessage());
+        }
+
+        if (empty($billIds)) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.no_bills_in_shipment', 'Nenhuma fatura encontrada para este embarque.'), 'enviadas' => 0, 'falhas' => 0], 200);
+            return;
+        }
+
+        // Reusar a resolução por faturas -> trackings -> pedidos, e notificar cada pedido.
+        $pares = $this->resolverPedidosTrackingDoEmbarque($billIds);
+        $resumo = $this->notificarPedidosEmbarque($pares, [
+            'origem' => 'notificacao_embarque_manual',
+        ]);
+
+        $this->json([
+            'success' => (int) ($resumo['enviadas'] ?? 0) > 0,
+            'enviadas' => (int) ($resumo['enviadas'] ?? 0),
+            'falhas' => (int) ($resumo['falhas'] ?? 0),
+            'pedidos' => $resumo['pedidos'] ?? [],
+            'aviso' => $resumo['aviso'] ?? null,
+        ]);
+    }
+
+    /**
      * Notifica os clientes dos pacotes selecionados na tela de etiquetas (e-mail + WhatsApp)
      * com o código de rastreio da etiqueta gerada. Não depende de container/fatura/embarque.
      * POST /admin/etiquetas-wp/notificar-selecionados
