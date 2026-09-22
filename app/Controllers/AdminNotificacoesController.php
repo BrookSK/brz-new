@@ -220,14 +220,24 @@ class AdminNotificacoesController extends Controller
 
         try {
             $notif = new NotificationService();
-            $notif->notificarEventoPedido($evento, $pedidoId, []);
+            $r = $notif->notificarEventoPedido($evento, $pedidoId, []);
         } catch (\Throwable $e) {
             $this->json(['success' => false, 'error' => __('admin.notifications.resend_failed', 'Falha ao reenviar: ') . $e->getMessage()], 500);
             return;
         }
 
+        $okEmail = !empty($r['email_enviado']);
+        $okWhats = !empty($r['whatsapp_enviado']);
+        if (!$okEmail && !$okWhats) {
+            $motivo = (string) ($r['email_erro'] ?? $r['whatsapp_erro'] ?? 'Nenhum canal enviou');
+            $this->json(['success' => false, 'error' => __('admin.notifications.resend_nothing_sent', 'Nada foi enviado: ') . $motivo], 200);
+            return;
+        }
+
         $this->json([
             'success' => true,
+            'email_enviado' => $okEmail,
+            'whatsapp_enviado' => $okWhats,
             'message' => __('admin.notifications.resend_ok', 'Notificação reenviada (e-mail e WhatsApp, conforme configurado).'),
         ]);
     }

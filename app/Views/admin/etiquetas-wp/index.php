@@ -50,6 +50,7 @@
         <button class="ewp-tab-btn" onclick="switchTab('faturas')">🧾 <?= __('admin.labels_wp.tab_invoices','Faturas') ?></button>
         <button class="ewp-tab-btn" onclick="switchTab('embarques')">✈️ <?= __('admin.labels_wp.tab_shipments','Embarques') ?></button>
         <button class="ewp-tab-btn" onclick="switchTab('documentacao')">📄 <?= __('admin.labels_wp.tab_documentation','Documentação') ?></button>
+        <button class="ewp-tab-btn" onclick="switchTab('notificacoes')">🔔 <?= __('admin.labels_wp.tab_notifications','Notificações') ?></button>
     </div>
     <!-- ETIQUETAS -->
     <div class="ewp-panel" id="panel-etiquetas">
@@ -216,6 +217,77 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
                 <div id="doc-tab-loading" class="text-center py-3" style="display:none;"><i class="fas fa-spinner fa-spin me-1"></i> <?= __('admin.labels_wp.loading','Carregando...') ?></div>
                 <div id="doc-tab-lista"></div>
                 <div id="doc-tab-pagination"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICAÇÕES -->
+    <div class="ewp-panel" id="panel-notificacoes" style="display:none;">
+        <div class="card ewp-card">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
+                <strong class="small"><?= __('admin.labels_wp.notify_tracking_title','Notificar rastreio ao cliente') ?></strong>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm" id="notif-busca" style="width:auto;min-width:180px;" placeholder="<?= htmlspecialchars(__('admin.labels_wp.search_placeholder','Buscar por pedido, cliente, tracking...'), ENT_QUOTES, 'UTF-8') ?>" oninput="filtrarNotif(this.value)">
+                    <button class="btn btn-sm btn-success" id="btnNotificarLista" style="display:none;" onclick="notificarDaLista()"><i class="fas fa-paper-plane me-1"></i><span id="btnNotificarListaText"><?= __('admin.labels_wp.notify_customers','Notificar clientes') ?></span></button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <p class="text-muted small px-3 pt-2 mb-2"><?= __('admin.labels_wp.notify_tracking_help','Todos os pedidos com etiqueta gerada (independente de container/fatura/embarque). Selecione e clique em notificar para enviar o rastreio por e-mail e WhatsApp.') ?></p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light"><tr>
+                            <th style="width:30px"><input type="checkbox" id="checkAllNotif" onclick="toggleAllNotif()"></th>
+                            <th><?= __('admin.labels_wp.col_order','Pedido') ?></th>
+                            <th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.labels_wp.col_tracking','Tracking') ?></th>
+                            <th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_email','E-mail') ?></th>
+                            <th><?= __('admin.labels_wp.col_generated_at','Gerada em') ?></th>
+                        </tr></thead>
+                        <tbody id="notif-body">
+<?php
+$pedidosNotif = [];
+try {
+    $conn = \Config\Database::getConnection();
+    // Detectar coluna de nome/email do cliente na tabela pedidos (preferir dados do pedido).
+    $colsPed = [];
+    try { $stc = $conn->query('DESCRIBE pedidos'); $colsPed = $stc ? $stc->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+    $selNome = in_array('cliente_nome', $colsPed, true) ? 'p.cliente_nome' : 'NULL';
+    $selEmail = in_array('cliente_email', $colsPed, true) ? 'p.cliente_email' : 'NULL';
+    $selCodigo = in_array('codigo_pedido', $colsPed, true) ? 'p.codigo_pedido' : (in_array('numero_pedido', $colsPed, true) ? 'p.numero_pedido' : 'NULL');
+    $st = $conn->prepare("SELECT cpe.pedido_id, cpe.tracking_number, cpe.created_at,
+                {$selNome} AS cliente_nome, {$selEmail} AS cliente_email, {$selCodigo} AS codigo_pedido,
+                u.nome AS usu_nome, u.email AS usu_email
+            FROM correios_packet_etiquetas cpe
+            LEFT JOIN pedidos p ON p.id = cpe.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            WHERE cpe.tracking_number IS NOT NULL AND cpe.tracking_number <> ''
+              AND (cpe.status IS NULL OR LOWER(cpe.status) NOT IN ('cancelado','cancelada','cancelled'))
+            ORDER BY cpe.id DESC LIMIT 500");
+    $st->execute();
+    $pedidosNotif = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+} catch (\Exception $e) { $pedidosNotif = []; }
+if (empty($pedidosNotif)): ?>
+                            <tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i><?= __('admin.labels_wp.no_labels_generated','Nenhuma etiqueta gerada ainda') ?></td></tr>
+<?php else: foreach ($pedidosNotif as $pn):
+    $pid = (int) ($pn['pedido_id'] ?? 0);
+    $nome = trim((string) ($pn['cliente_nome'] ?? '')) !== '' ? (string) $pn['cliente_nome'] : (string) ($pn['usu_nome'] ?? '-');
+    $email = trim((string) ($pn['cliente_email'] ?? '')) !== '' ? (string) $pn['cliente_email'] : (string) ($pn['usu_email'] ?? '');
+    $trk = (string) ($pn['tracking_number'] ?? '');
+    $cod = trim((string) ($pn['codigo_pedido'] ?? '')) !== '' ? (string) $pn['codigo_pedido'] : ('#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT));
+    $ger = !empty($pn['created_at']) ? date('d/m/Y H:i', strtotime((string) $pn['created_at'])) : '-';
+?>
+                            <tr class="notif-row">
+                                <td><input type="checkbox" class="chk-notif" value="<?= $pid ?>" data-email="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>" onchange="updateNotificarLista()"></td>
+                                <td><strong><?= htmlspecialchars($cod, ENT_QUOTES, 'UTF-8') ?></strong><?= $pid > 0 ? (' <a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="small">#' . $pid . '</a>') : '' ?></td>
+                                <td class="d-none d-md-table-cell"><?= htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><code class="small"><?= htmlspecialchars($trk, ENT_QUOTES, 'UTF-8') ?></code></td>
+                                <td class="d-none d-md-table-cell small"><?= $email !== '' ? htmlspecialchars($email, ENT_QUOTES, 'UTF-8') : '<span class="text-danger">—</span>' ?></td>
+                                <td class="small text-nowrap"><?= $ger ?></td>
+                            </tr>
+<?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -437,6 +509,45 @@ async function notificarSelecionados(){
         }
     }catch(e){alert(e.message);}
     finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane me-1"></i><span id="btnNotificarSelecionadosText">'+(<?= json_encode(__('admin.labels_wp.notify_customers','Notificar clientes')) ?>)+'</span>';updateNotificarSelecionados();}}
+}
+
+// ABA NOTIFICAÇÕES (lista server-side de pedidos com etiqueta gerada, independente de estágio)
+function filtrarNotif(termo){
+    const t=(termo||'').toLowerCase();
+    document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>{
+        tr.style.display=(!t||tr.textContent.toLowerCase().includes(t))?'':'none';
+    });
+}
+function toggleAllNotif(){
+    const c=document.getElementById('checkAllNotif').checked;
+    document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>{
+        if(tr.style.display==='none')return; // só marca os visíveis (respeita filtro)
+        const cb=tr.querySelector('.chk-notif');if(cb)cb.checked=c;
+    });
+    updateNotificarLista();
+}
+function updateNotificarLista(){
+    const n=document.querySelectorAll('.chk-notif:checked').length;
+    const btn=document.getElementById('btnNotificarLista');
+    const txt=document.getElementById('btnNotificarListaText');
+    if(!btn)return;
+    if(n>0){btn.style.display='';if(txt)txt.textContent=(<?= json_encode(__('admin.labels_wp.notify_n_customers','Notificar {n} cliente(s)')) ?>).replace('{n}', n);}
+    else{btn.style.display='none';}
+}
+async function notificarDaLista(){
+    const ids=[...document.querySelectorAll('.chk-notif:checked')].map(cb=>parseInt(cb.value)).filter(v=>v>0);
+    if(!ids.length){alert(<?= json_encode(__('admin.labels_wp.select_at_least_one_label','Selecione pelo menos 1 etiqueta.')) ?>);return;}
+    if(!confirm((<?= json_encode(__('admin.labels_wp.confirm_notify_n','Enviar notificação de rastreio (e-mail e WhatsApp) para {n} cliente(s)?')) ?>).replace('{n}', ids.length)))return;
+    const btn=document.getElementById('btnNotificarLista');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>';}
+    try{
+        const r=await fetch(BASE+'/notificar-selecionados',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedido_ids:ids})});
+        const d=await r.json();
+        if(d.success){alert((<?= json_encode(__('admin.labels_wp.notify_result','Notificações enviadas: {ok}. Falhas: {fail}.')) ?>).replace('{ok}', d.enviadas||0).replace('{fail}', d.falhas||0));}
+        else{alert((<?= json_encode(__('admin.labels_wp.error_prefix','Erro:')) ?>)+' '+(d.error||(<?= json_encode(__('admin.labels_wp.notify_failed','Falha ao enviar notificações.')) ?>)));}
+    }catch(e){alert(e.message);}
+    finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane me-1"></i><span id="btnNotificarListaText">'+(<?= json_encode(__('admin.labels_wp.notify_customers','Notificar clientes')) ?>)+'</span>';updateNotificarLista();}}
 }
 
 // MOVER ETIQUETAS PARA MALA

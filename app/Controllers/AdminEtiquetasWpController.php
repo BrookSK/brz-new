@@ -867,6 +867,67 @@ class AdminEtiquetasWpController extends Controller
     }
 
     /**
+     * Diagnóstico temporário: mostra o que está gravado para um pedido em relação ao rastreio.
+     * GET /admin/etiquetas-wp/diagnostico-rastreio?pedido_id=758
+     * Remover após depuração.
+     */
+    public function diagnosticoRastreio(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $pedidoId = (int) $request->getParam('pedido_id', 0);
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Informe ?pedido_id=']);
+            return;
+        }
+
+        $out = ['pedido_id' => $pedidoId];
+
+        // Linha em correios_packet_etiquetas
+        try {
+            $st = $this->connection->prepare('SELECT id, pedido_id, customer_control_code, tracking_number, status, wp_post_id, created_at FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
+            $st->execute([$pedidoId]);
+            $out['correios_packet_etiquetas'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            $out['correios_packet_etiquetas_erro'] = $e->getMessage();
+        }
+
+        // shippo_etiquetas
+        try {
+            if ($this->tableExists('shippo_etiquetas')) {
+                $st = $this->connection->prepare('SELECT id, pedido_id, tracking_number, status FROM shippo_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
+                $st->execute([$pedidoId]);
+                $out['shippo_etiquetas'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Throwable $e) {
+            $out['shippo_etiquetas_erro'] = $e->getMessage();
+        }
+
+        // O que o getComDetalhes resolve como tracking
+        try {
+            $pm = new PedidoEcommerce();
+            $ped = $pm->getComDetalhes($pedidoId);
+            $out['getComDetalhes_tracking'] = [
+                'tracking_code' => $ped['tracking_code'] ?? null,
+                'tracking_source' => $ped['tracking_source'] ?? null,
+                'tracking_label_url' => $ped['tracking_label_url'] ?? null,
+                'status' => $ped['status'] ?? null,
+                'codigo_pedido' => $ped['codigo_pedido'] ?? null,
+                'numero_pedido' => $ped['numero_pedido'] ?? null,
+                'cliente_email' => $ped['cliente_email'] ?? ($ped['email'] ?? null),
+                'cliente_telefone' => $ped['cliente_telefone'] ?? ($ped['telefone'] ?? null),
+            ];
+        } catch (\Throwable $e) {
+            $out['getComDetalhes_erro'] = $e->getMessage();
+        }
+
+        $this->json(['success' => true, 'diagnostico' => $out]);
+    }
+
+    /**
      * Notifica os clientes dos pacotes selecionados na tela de etiquetas (e-mail + WhatsApp)
      * com o código de rastreio da etiqueta gerada. Não depende de container/fatura/embarque.
      * POST /admin/etiquetas-wp/notificar-selecionados
@@ -911,11 +972,29 @@ class AdminEtiquetasWpController extends Controller
             }
 
             try {
-                $notif->notificarEventoPedido('correios_packet_label_created', $pid, [
+                $r = $notif->notificarEventoPedido('correios_packet_label_created', $pid, [
                     'tracking_number' => $tracking,
                 ]);
-                $enviadas++;
-                $detalhes[] = ['pedido_id' => $pid, 'success' => true, 'tracking_number' => $tracking];
+                $okEmail = !empty($r['email_enviado']);
+                $okWhats = !empty($r['whatsapp_enviado']);
+                if ($okEmail || $okWhats) {
+                    $enviadas++;
+                    $detalhes[] = [
+                        'pedido_id' => $pid,
+                        'success' => true,
+                        'tracking_number' => $tracking,
+                        'email' => $okEmail,
+                        'whatsapp' => $okWhats,
+                    ];
+                } else {
+                    // Nenhum canal enviou de fato — reportar como falha real (não sucesso silencioso).
+                    $falhas++;
+                    $detalhes[] = [
+                        'pedido_id' => $pid,
+                        'success' => false,
+                        'error' => (string) ($r['email_erro'] ?? $r['whatsapp_erro'] ?? 'Nenhum canal enviou'),
+                    ];
+                }
             } catch (\Throwable $e) {
                 $falhas++;
                 $detalhes[] = ['pedido_id' => $pid, 'success' => false, 'error' => $e->getMessage()];
@@ -1737,6 +1816,27 @@ class AdminEtiquetasWpController extends Controller
 
     private function salvarEtiquetaLocal(int $pedidoId, string $controlCode, string $tracking, array $resp): void
     {
+        // Fallback robusto: se o tracking veio vazio, tentar extrair de formatos alternativos
+        // que o WordPress/Correios possam retornar (aninhado, camelCase, etc.).
+        $tracking = trim((string) $tracking);
+        if ($tracking === '') {
+            $candidatos = [
+                $resp['tracking_number'] ?? null,
+                $resp['trackingNumber'] ?? null,
+                $resp['tracking_code'] ?? null,
+                $resp['data']['tracking_number'] ?? null,
+                $resp['data']['trackingNumber'] ?? null,
+                $resp['raw'][0]['trackingNumber'] ?? null,
+            ];
+            foreach ($candidatos as $c) {
+                $c = trim((string) $c);
+                if ($c !== '') { $tracking = $c; break; }
+            }
+        }
+        if ($tracking === '') {
+            error_log('[ETIQUETAS_WP] ATENÇÃO: etiqueta do pedido #' . $pedidoId . ' salva SEM tracking_number. Resp: ' . json_encode($resp));
+        }
+
         try {
             // Garantir que tabela existe
             if (!$this->tableExists('correios_packet_etiquetas')) {

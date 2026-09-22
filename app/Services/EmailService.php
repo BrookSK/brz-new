@@ -405,27 +405,50 @@ class EmailService {
         $meta['to_email'] = $to;
         $meta['subject'] = $subject;
 
+        $reserved = false;
         if ($dedupeKey !== '') {
             $ok = $this->reserveDedupeKey($pdo, $dedupeKey, $meta);
             if (!$ok) {
                 return;
             }
+            $reserved = true;
         }
 
-        if ($driver === 'smtp') {
-            $this->sendSmtpEmail($cfg, $to, $subject, $html, $fromEmail, $fromName);
+        // Envolver o envio para que, em caso de falha, a chave de deduplicação seja LIBERADA.
+        // Sem isso, um envio que falhou (ex.: SMTP indisponível) deixaria a chave reservada,
+        // fazendo o log parecer "enviado" e bloqueando futuros reenvios do mesmo evento/pedido.
+        try {
+            if ($driver === 'smtp') {
+                $this->sendSmtpEmail($cfg, $to, $subject, $html, $fromEmail, $fromName);
+                return;
+            }
+
+            $headers = [];
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
+            $headers[] = 'Reply-To: ' . $fromEmail;
+
+            $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
+            if (!$ok) {
+                throw new \Exception('Falha ao enviar e-mail (mail())');
+            }
+        } catch (\Throwable $e) {
+            if ($reserved) {
+                $this->releaseDedupeKey($pdo, $dedupeKey);
+            }
+            throw $e;
+        }
+    }
+
+    private function releaseDedupeKey(\PDO $pdo, string $dedupeKey): void {
+        if ($dedupeKey === '') {
             return;
         }
-
-        $headers = [];
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
-        $headers[] = 'Reply-To: ' . $fromEmail;
-
-        $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
-        if (!$ok) {
-            throw new \Exception('Falha ao enviar e-mail (mail())');
+        try {
+            $st = $pdo->prepare('DELETE FROM email_event_log WHERE dedupe_key = ?');
+            $st->execute([$dedupeKey]);
+        } catch (\Exception $e) {
         }
     }
 
