@@ -117,7 +117,7 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-key me-2"></i>API Claude (Anthropic)</h5>
+                        <h5 class="mb-0"><i class="fas fa-key me-2"></i><?= __('admin.copilot.api_claude_anthropic','API Claude (Anthropic)') ?></h5>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
@@ -194,10 +194,10 @@ Pode mandar sua dúvida ou o que você procura! 💚';
             ?>
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code — Divulgação do Co-Piloto</h5>
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i><?= __('admin.copilot.qr_title','QR Code — Divulgação do Co-Piloto') ?></h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted mb-3">Compartilhe este QR Code em redes sociais, panfletos e criativos. Quando escaneado, abre o site com a Bri já conversando!</p>
+                    <p class="text-muted mb-3"><?= __('admin.copilot.qr_hint','Compartilhe este QR Code em redes sociais, panfletos e criativos. Quando escaneado, abre o site com a Bri já conversando!') ?></p>
                     
                     <div class="row">
                         <div class="col-md-4 text-center">
@@ -207,7 +207,7 @@ Pode mandar sua dúvida ou o que você procura! 💚';
                                     <i class="fas fa-download me-1"></i><?= __('admin.copilot.download_png', 'Baixar PNG') ?>
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyQRUrl()">
-                                    <i class="fas fa-link me-1"></i>Copiar Link
+                                    <i class="fas fa-link me-1"></i><?= __('admin.copilot.copy_link','Copiar Link') ?>
                                 </button>
                             </div>
                             <div class="mt-2">
@@ -253,7 +253,7 @@ Pode mandar sua dúvida ou o que você procura! 💚';
                     if (apiIndex >= apis.length) {
                         // Fallback: show URL as text
                         var el = document.getElementById('qrcode-container');
-                        if (el) el.innerHTML = '<div class="alert alert-warning p-2 small">QR Code não pôde ser gerado. Use o link: <br><code>' + text + '</code></div>';
+                        if (el) el.innerHTML = '<div class="alert alert-warning p-2 small"><?= addslashes(__('admin.copilot.qr_fallback','QR Code não pôde ser gerado. Use o link:')) ?> <br><code>' + text + '</code></div>';
                         return;
                     }
                     img.src = apis[apiIndex];
@@ -297,7 +297,7 @@ Pode mandar sua dúvida ou o que você procura! 💚';
             function downloadQRCode(format) {
                 var canvas = document.getElementById('qrcode-canvas');
                 if (!canvas) {
-                    alert('QR Code ainda carregando, tente novamente.');
+                    alert(<?= json_encode(__('admin.copilot.qr_loading','QR Code ainda carregando, tente novamente.'), JSON_UNESCAPED_UNICODE) ?>);
                     return;
                 }
                 var a = document.createElement('a');
@@ -309,7 +309,7 @@ Pode mandar sua dúvida ou o que você procura! 💚';
                 navigator.clipboard.writeText(window._qrUrl || '<?= addslashes($qrUrl) ?>');
                 var btn = event.target.closest('button');
                 var orig = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copiado!';
+                btn.innerHTML = '<i class="fas fa-check me-1"></i><?= addslashes(__('admin.copilot.copied','Copiado!')) ?>';
                 setTimeout(function() { btn.innerHTML = orig; }, 2000);
             }
             </script>
@@ -324,15 +324,15 @@ Pode mandar sua dúvida ou o que você procura! 💚';
             ?>
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Cron (Tarefas Automáticas)</h5>
+                    <h5 class="mb-0"><i class="fas fa-clock me-2"></i><?= __('admin.copilot.cron_title','Cron (Tarefas Automáticas)') ?></h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted mb-2">Configure no AAPanel um cron para acessar esta URL a cada 5 minutos. Ela processa conteúdo pendente e faz limpeza automática.</p>
+                    <p class="text-muted mb-2"><?= __('admin.copilot.cron_hint','Configure no AAPanel um cron para acessar esta URL a cada 5 minutos. Ela processa conteúdo pendente e faz limpeza automática.') ?></p>
                     <div class="input-group">
                         <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($cronUrl) ?>" readonly id="cronUrl">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('cronUrl').value);this.textContent='Copiado!';setTimeout(()=>this.textContent='Copiar',2000)">Copiar</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('cronUrl').value);this.textContent=<?= json_encode(__('admin.copilot.copied','Copiado!'), JSON_UNESCAPED_UNICODE) ?>;setTimeout(()=>this.textContent=<?= json_encode(__('admin.copilot.copy','Copiar'), JSON_UNESCAPED_UNICODE) ?>,2000)"><?= __('admin.copilot.copy','Copiar') ?></button>
                     </div>
-                    <small class="text-muted mt-1 d-block">No AAPanel: Cron Jobs → Add → Shell Script → <code>curl -s "<?= htmlspecialchars($cronUrl) ?>" > /dev/null</code> → A cada 5 minutos</small>
+                    <small class="text-muted mt-1 d-block"><?= __('admin.copilot.cron_aapanel_hint','No AAPanel: Cron Jobs → Add → Shell Script → {cmd} → A cada 5 minutos', ['cmd' => '<code>curl -s "' . htmlspecialchars($cronUrl) . '" > /dev/null</code>']) ?></small>
                 </div>
             </div>
 

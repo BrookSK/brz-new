@@ -1,4 +1,20 @@
 <?php $title = __('admin.email_logs.page_title', 'Log de Emails - Admin'); ?>
+<?php
+// Mapa de tradução dos tipos de e-mail (código do banco → rótulo). Fallback embeleza o código.
+$__emailTypeLabels = [
+    'carne_criado'                     => __('admin.email_logs.type.installment_created', 'Carnê criado'),
+    'carne_pagamento_confirmado'       => __('admin.email_logs.type.payment_confirmed', 'Carnê pagamento confirmado'),
+    'carne_parcela_proxima_vencimento' => __('admin.email_logs.type.installment_due_soon', 'Carnê parcela próxima do vencimento'),
+    'carne_parcela_em_atraso_juros'    => __('admin.email_logs.type.installment_overdue', 'Carnê parcela em atraso com juros'),
+    'carne_quitado'                    => __('admin.email_logs.type.installment_paid_off', 'Carnê quitado'),
+    'carne_cancelado'                  => __('admin.email_logs.type.installment_cancelled', 'Carnê cancelado'),
+    'carne_aviso_cancelamento'         => __('admin.email_logs.type.cancellation_warning', 'Carnê aviso de cancelamento'),
+];
+$__emailTypeLabel = static function (?string $t) use ($__emailTypeLabels): string {
+    $t = (string) $t;
+    return $__emailTypeLabels[$t] ?? ucfirst(str_replace('_', ' ', $t));
+};
+?>
 <?php ob_start(); ?>
 
 <div class="container-fluid">
@@ -20,7 +36,7 @@
                     <select name="tipo" class="form-select form-select-sm">
                         <option value=""><?= __('admin.email_logs.all', 'Todos') ?></option>
                         <?php foreach ($tipos as $t): ?>
-                        <option value="<?= htmlspecialchars($t) ?>" <?= $filtros['filtroTipo'] === $t ? 'selected' : '' ?>><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $t))) ?></option>
+                        <option value="<?= htmlspecialchars($t) ?>" <?= $filtros['filtroTipo'] === $t ? 'selected' : '' ?>><?= htmlspecialchars($__emailTypeLabel($t)) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -74,7 +90,7 @@
                         <?php foreach ($logs as $log): ?>
                         <tr>
                             <td class="text-nowrap small"><?= date('d/m/Y H:i', strtotime($log['created_at'])) ?></td>
-                            <td><span class="badge bg-info"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $log['tipo']))) ?></span></td>
+                            <td><span class="badge bg-info"><?= htmlspecialchars($__emailTypeLabel($log['tipo'])) ?></span></td>
                             <td class="small">
                                 <?= htmlspecialchars($log['destinatario_email']) ?>
                                 <?php if (!empty($log['destinatario_nome'])): ?>

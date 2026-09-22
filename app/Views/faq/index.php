@@ -3,14 +3,14 @@
     <div class="row">
         <div class="col-lg-8 mx-auto">
             <div class="text-center mb-5">
-                <h1 class="display-4 mb-3">TERMOS E CONDIÇÕES DE USO - BRAZILIANA</h1>
-                <p class="lead text-muted">Última Atualização: 01 de fevereiro de 2026</p>
+                <h1 class="display-4 mb-3"><?= __('faq_page.title', 'TERMOS E CONDIÇÕES DE USO - BRAZILIANA') ?></h1>
+                <p class="lead text-muted"><?= __('faq_page.last_updated', 'Última Atualização:') ?> <?= __('faq_page.last_updated_date', '01 de fevereiro de 2026') ?></p>
             </div>
             
             <!-- Busca de FAQ -->
             <div class="mb-5">
                 <div class="input-group">
-                    <input type="text" class="form-control" id="faq-search" placeholder="Buscar perguntas...">
+                    <input type="text" class="form-control" id="faq-search" placeholder="<?= htmlspecialchars(__('faq_page.search_ph', 'Buscar perguntas...'), ENT_QUOTES, 'UTF-8') ?>">
                     <span class="input-group-text"><i class="fas fa-search"></i></span>
                 </div>
             </div>

@@ -4,9 +4,9 @@
     <!-- Header -->
     <div class="text-center mb-5">
         <h1 class="fw-bold" style="color: var(--primary-color);">
-            <i class="fas fa-tags me-2"></i>Braziliana Outlet
+            <i class="fas fa-tags me-2"></i><?= __('outlet.title', 'Braziliana Outlet') ?>
         </h1>
-        <p class="text-muted fs-5">Produtos selecionados com preços especiais</p>
+        <p class="text-muted fs-5"><?= __('outlet.subtitle', 'Produtos selecionados com preços especiais') ?></p>
     </div>
 
     <!-- Products Grid -->
@@ -15,10 +15,10 @@
             <div class="col-lg-12">
                 <div class="text-center py-5">
                     <i class="fas fa-tag fa-4x text-muted mb-3"></i>
-                    <h3 class="text-muted">Nenhum produto no Outlet no momento</h3>
-                    <p class="text-muted">Fique de olho, novos produtos podem aparecer a qualquer momento!</p>
+                    <h3 class="text-muted"><?= __('outlet.empty', 'Nenhum produto no Outlet no momento') ?></h3>
+                    <p class="text-muted"><?= __('outlet.empty_hint', 'Fique de olho, novos produtos podem aparecer a qualquer momento!') ?></p>
                     <a href="/produtos" class="btn btn-primary mt-3">
-                        <i class="fas fa-arrow-left me-2"></i>Ver todos os produtos
+                        <i class="fas fa-arrow-left me-2"></i><?= __('outlet.see_all', 'Ver todos os produtos') ?>
                     </a>
                 </div>
             </div>
@@ -37,7 +37,7 @@
                             </div>
                         <?php endif; ?>
                         <span class="position-absolute top-0 start-0 m-2 badge" style="background: #e53e3e; font-size: 0.8rem;">
-                            <i class="fas fa-tag me-1"></i>Outlet
+                            <i class="fas fa-tag me-1"></i><?= __('outlet.badge', 'Outlet') ?>
                         </span>
                         <?php if (!empty($produto['sale_price']) && (float) $produto['sale_price'] > 0 && (float) $produto['sale_price'] < (float) $produto['price']): ?>
                             <?php 
@@ -67,7 +67,7 @@
                             <?php endif; ?>
                         </div>
                         <a href="/produto/detalhes/<?= (int) $produto['id'] ?>" class="btn btn-primary btn-sm w-100 mt-3" style="border-radius: 10px;">
-                            <i class="fas fa-eye me-1"></i>Ver detalhes
+                            <i class="fas fa-eye me-1"></i><?= __('outlet.view_details', 'Ver detalhes') ?>
                         </a>
                     </div>
                 </div>
@@ -79,6 +79,6 @@
 
 <?php
 $content = ob_get_clean();
-$title = 'Braziliana Outlet';
+$title = __('outlet.title', 'Braziliana Outlet');
 require __DIR__ . '/../layouts/main.php';
 ?>

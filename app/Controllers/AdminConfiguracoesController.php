@@ -3652,7 +3652,7 @@ JS;
         }
 
         if (empty($reps)) {
-            return '<div class="alert alert-info">Nenhum usuário com perfil Representante encontrado.</div>';
+            return '<div class="alert alert-info">' . __('admin.settings.commissions.no_reps', 'Nenhum usuário com perfil Representante encontrado.') . '</div>';
         }
 
         $map = [];
@@ -6901,9 +6901,9 @@ HTML;
                         data.logs.forEach(log => {
                             const tr = document.createElement('tr');
                             tr.innerHTML = `
-                                <td>${new Date(log.data_envio).toLocaleString('pt-BR')}</td>
-                                <td><span class="badge bg-${log.status == 'sucesso' ? 'success' : 'danger'}">${log.status}</span></td>
-                                <td><small>${log.resposta || 'Sem resposta'}</small></td>
+                                <td>${new Date(log.data_envio).toLocaleString(<?= json_encode(\App\Core\I18n::getLocale() === 'en' ? 'en-US' : 'pt-BR') ?>)}</td>
+                                <td><span class="badge bg-${log.status == 'sucesso' ? 'success' : 'danger'}">${log.status == 'sucesso' ? <?= json_encode(__('admin.settings.webhook_status_success', 'Sucesso'), JSON_UNESCAPED_UNICODE) ?> : <?= json_encode(__('admin.settings.webhook_status_error', 'Erro'), JSON_UNESCAPED_UNICODE) ?>}</span></td>
+                                <td><small>${log.resposta || <?= json_encode(__('admin.settings.webhook_no_response', 'Sem resposta'), JSON_UNESCAPED_UNICODE) ?>}</small></td>
                                 <td>
                                     <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhesLogNotificacoes(${log.id})">
                                         <i class="fas fa-eye"></i>
@@ -7293,8 +7293,8 @@ HTML;
                     html += "<p class=\"card-text\"><small>" + (tpl.assunto || '') + "</small></p>";
                     html += "<p class=\"card-text\"><small class=\"text-muted\">" + (tpl.updated_at || '') + "</small></p>";
                     html += "<div class=\"d-flex gap-2\">";
-                    html += "<button type=\"button\" class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\">Carregar</button>";
-                    html += "<button type=\"button\" class=\"btn btn-sm btn-outline-success\" onclick=\"testarTemplateEmail('" + evento + "')\">Testar</button>";
+                    html += "<button type=\"button\" class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\"><?= __('admin.settings.template_load', 'Carregar') ?></button>";
+                    html += "<button type=\"button\" class=\"btn btn-sm btn-outline-success\" onclick=\"testarTemplateEmail('" + evento + "')\"><?= __('admin.settings.template_test', 'Testar') ?></button>";
                     html += "</div>";
                     html += "</div>";
                     html += "</div>";

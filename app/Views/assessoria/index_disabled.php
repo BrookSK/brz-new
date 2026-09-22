@@ -7,13 +7,13 @@ ob_start();
         <div class="col-lg-6 col-md-8">
             <div class="card shadow-sm border-0 text-center p-5">
                 <p class="text-muted mb-4">
-                    Para solicitar redirecionamento, entre em contato com nosso atendimento pelo WhatsApp.
+                    <?= __('forwarding_page.request_hint', 'Para solicitar redirecionamento, entre em contato com nosso atendimento pelo WhatsApp.') ?>
                 </p>
-                <a href="https://wa.me/13053638204?text=Ol%C3%A1%2C%20gostaria%20de%20solicitar%20um%20redirecionamento" 
+                <a href="https://wa.me/13053638204?text=<?= rawurlencode(__('forwarding_page.whatsapp_text', 'Olá, gostaria de solicitar um redirecionamento')) ?>" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    class="btn btn-success btn-lg px-4">
-                    <i class="fab fa-whatsapp me-2"></i>Falar no WhatsApp
+                    <i class="fab fa-whatsapp me-2"></i><?= __('forwarding_page.talk_whatsapp', 'Falar no WhatsApp') ?>
                 </a>
                 <p class="text-muted small mt-3 mb-0">
                     <i class="fas fa-phone-alt me-1"></i>+55 17 99620-3062

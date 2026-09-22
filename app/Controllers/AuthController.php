@@ -1377,7 +1377,7 @@ class AuthController extends Controller {
             }
         }
 
-        $_SESSION['message'] = 'Você voltou para seu perfil.';
+        $_SESSION['message'] = __('auth.returned_to_profile', 'Você voltou para seu perfil.');
         $_SESSION['message_type'] = 'success';
 
         $this->redirect('/admin/dashboard');

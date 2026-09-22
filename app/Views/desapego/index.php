@@ -4,17 +4,17 @@
     <!-- Header -->
     <div class="text-center mb-4">
         <h1 class="fw-bold" style="color: var(--primary-color);">
-            <i class="fas fa-hand-holding-heart me-2"></i>Desapego Braziliana
+            <i class="fas fa-hand-holding-heart me-2"></i><?= __('desapego_page.title', 'Desapego Braziliana') ?>
         </h1>
-        <p class="text-muted fs-5">Produtos disponíveis para venda direta nos Estados Unidos</p>
+        <p class="text-muted fs-5"><?= __('desapego_page.subtitle', 'Produtos disponíveis para venda direta nos Estados Unidos') ?></p>
     </div>
 
     <!-- Aviso: somente para EUA -->
     <div class="alert alert-info d-flex align-items-center mb-4" style="border-radius: 14px; border-left: 4px solid #0dcaf0;">
         <i class="fas fa-flag-usa fa-2x me-3 text-info"></i>
         <div>
-            <strong>Atenção:</strong> Os produtos desta seção estão disponíveis <strong>exclusivamente para entrega nos Estados Unidos</strong>. 
-            Para finalizar a compra com itens de desapego, o endereço de entrega deve ser nos EUA.
+            <strong><?= __('desapego_page.notice_label', 'Atenção:') ?></strong> <?= __('desapego_page.notice_1', 'Os produtos desta seção estão disponíveis') ?> <strong><?= __('desapego_page.notice_strong', 'exclusivamente para entrega nos Estados Unidos') ?></strong>. 
+            <?= __('desapego_page.notice_2', 'Para finalizar a compra com itens de desapego, o endereço de entrega deve ser nos EUA.') ?>
         </div>
     </div>
 
@@ -24,10 +24,10 @@
             <div class="col-lg-12">
                 <div class="text-center py-5">
                     <i class="fas fa-hand-holding-heart fa-4x text-muted mb-3"></i>
-                    <h3 class="text-muted">Nenhum produto de desapego disponível no momento</h3>
-                    <p class="text-muted">Fique de olho, novos produtos podem aparecer a qualquer momento!</p>
+                    <h3 class="text-muted"><?= __('desapego_page.empty', 'Nenhum produto de desapego disponível no momento') ?></h3>
+                    <p class="text-muted"><?= __('desapego_page.empty_hint', 'Fique de olho, novos produtos podem aparecer a qualquer momento!') ?></p>
                     <a href="/produtos" class="btn btn-primary mt-3">
-                        <i class="fas fa-arrow-left me-2"></i>Ver todos os produtos
+                        <i class="fas fa-arrow-left me-2"></i><?= __('desapego_page.see_all', 'Ver todos os produtos') ?>
                     </a>
                 </div>
             </div>
@@ -46,7 +46,7 @@
                             </div>
                         <?php endif; ?>
                         <span class="position-absolute top-0 start-0 m-2 badge" style="background: #0891b2; font-size: 0.8rem;">
-                            <i class="fas fa-hand-holding-heart me-1"></i>Desapego
+                            <i class="fas fa-hand-holding-heart me-1"></i><?= __('desapego_page.badge', 'Desapego') ?>
                         </span>
                         <?php if (!empty($produto['sale_price']) && (float) $produto['sale_price'] > 0 && (float) $produto['sale_price'] < (float) $produto['price']): ?>
                             <?php 
@@ -57,7 +57,7 @@
                             </span>
                         <?php endif; ?>
                         <span class="position-absolute bottom-0 end-0 m-2 badge bg-dark bg-opacity-75" style="font-size: 0.7rem;">
-                            <i class="fas fa-flag-usa me-1"></i>Somente EUA
+                            <i class="fas fa-flag-usa me-1"></i><?= __('desapego_page.usa_only', 'Somente EUA') ?>
                         </span>
                     </div>
                     <div class="card-body d-flex flex-column p-3">
@@ -79,7 +79,7 @@
                             <?php endif; ?>
                         </div>
                         <a href="/produto/detalhes/<?= (int) $produto['id'] ?>" class="btn btn-primary btn-sm w-100 mt-3" style="border-radius: 10px;">
-                            <i class="fas fa-eye me-1"></i>Ver detalhes
+                            <i class="fas fa-eye me-1"></i><?= __('desapego_page.view_details', 'Ver detalhes') ?>
                         </a>
                     </div>
                 </div>
@@ -91,6 +91,6 @@
 
 <?php
 $content = ob_get_clean();
-$title = 'Desapego Braziliana';
+$title = __('desapego_page.title', 'Desapego Braziliana');
 require __DIR__ . '/../layouts/main.php';
 ?>

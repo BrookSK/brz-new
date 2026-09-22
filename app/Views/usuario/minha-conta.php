@@ -7,9 +7,9 @@
         <!-- Main Content -->
         <div class="col-lg-9">
             <div class="d-flex justify-content-between align-items-center mb-4 user-page-header">
-                <h2><i class="fas fa-tachometer-alt"></i> Minha Conta</h2>
+                <h2><i class="fas fa-tachometer-alt"></i> <?= __('user.my_account', 'Minha Conta') ?></h2>
                 <span class="text-muted">
-                    Bem-vindo, <strong><?= htmlspecialchars($usuario['nome']) ?></strong>!
+                    <?= __('user.welcome', 'Bem-vindo,') ?> <strong><?= htmlspecialchars($usuario['nome']) ?></strong>!
                 </span>
             </div>
 
@@ -21,10 +21,10 @@
                     <div class="card-body">
                         <div class="d-flex flex-wrap gap-2">
                             <a class="btn btn-outline-primary" href="/admin/representante/produtos">
-                                <i class="fas fa-box me-1"></i> Produtos
+                                <i class="fas fa-box me-1"></i> <?= __('user.rep_products', 'Produtos') ?>
                             </a>
                             <a class="btn btn-primary" href="/admin/representante/comissoes">
-                                <i class="fas fa-percentage me-1"></i> Comissões
+                                <i class="fas fa-percentage me-1"></i> <?= __('user.rep_commissions', 'Comissões') ?>
                             </a>
                         </div>
                     </div>
@@ -45,7 +45,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <small class="text-muted d-block mb-1">Total de Pedidos</small>
+                                    <small class="text-muted d-block mb-1"><?= __('user.total_orders', 'Total de Pedidos') ?></small>
                                     <h4 class="mb-0 text-dark"><?= $total_pedidos ?></h4>
                                 </div>
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: #0b1f3a;">
@@ -61,7 +61,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <small class="text-muted d-block mb-1">Pedidos Ativos</small>
+                                    <small class="text-muted d-block mb-1"><?= __('user.active_orders', 'Pedidos Ativos') ?></small>
                                     <h4 class="mb-0 text-dark">
                                         <?php 
                                         echo (int) ($pedidos_ativos ?? 0);
@@ -81,7 +81,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <small class="text-muted d-block mb-1">Total Gasto</small>
+                                    <small class="text-muted d-block mb-1"><?= __('user.total_spent', 'Total Gasto') ?></small>
                                     <h6 class="mb-0 text-dark" style="line-height: 1.2;">
                                         <?php 
                                         $tgBRL = floatval($total_gasto_brl ?? 0);
@@ -109,7 +109,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <small class="text-muted d-block mb-1">Endereços</small>
+                                    <small class="text-muted d-block mb-1"><?= __('user.addresses', 'Endereços') ?></small>
                                     <h4 class="mb-0 text-dark"><?= count($enderecos) ?></h4>
                                 </div>
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.18); color: rgba(11, 31, 58, 1);">
@@ -125,7 +125,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <small class="text-muted d-block mb-1">Carteira</small>
+                                    <small class="text-muted d-block mb-1"><?= __('user.wallet', 'Carteira') ?></small>
                                     <h6 class="mb-0 text-dark" style="line-height: 1.2;">
                                         <?php
                                         $cu = floatval($carteira_saldo_usd ?? 0);
@@ -133,7 +133,7 @@
                                         ?>
                                     </h6>
                                     <?php if (!isset($clube_enabled) || $clube_enabled === true): ?>
-                                    <a href="/clube/recarga" class="btn btn-sm btn-outline-primary mt-2">Adicionar saldo</a>
+                                    <a href="/clube/recarga" class="btn btn-sm btn-outline-primary mt-2"><?= __('user.add_balance', 'Adicionar saldo') ?></a>
                                     <?php endif; ?>
                                 </div>
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.18); color: rgba(49, 46, 129, 1);">
@@ -191,37 +191,37 @@
             <!-- Endereço de Redirecionamento -->
             <div class="card shadow-sm mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#collapseEnderecoRed" aria-expanded="false" aria-controls="collapseEnderecoRed">
-                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Endereço de Entrega (Redirecionamento)</h5>
+                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i><?= __('user.delivery_address_fwd', 'Endereço de Entrega (Redirecionamento)') ?></h5>
                     <i class="fas fa-chevron-down small"></i>
                 </div>
                 <div class="collapse show" id="collapseEnderecoRed">
                     <div class="card-body">
-                        <p class="text-muted mb-3 small">Use este endereço ao comprar em lojas americanas. Seus produtos serão recebidos no nosso armazém e enviados para o Brasil.</p>
+                        <p class="text-muted mb-3 small"><?= __('user.delivery_address_hint', 'Use este endereço ao comprar em lojas americanas. Seus produtos serão recebidos no nosso armazém e enviados para o Brasil.') ?></p>
                         <table class="table table-sm table-borderless mb-0">
                             <tbody>
                                 <tr>
-                                    <td class="text-muted" style="width:130px;">Endereço 1</td>
+                                    <td class="text-muted" style="width:130px;"><?= __('user.address_1', 'Endereço 1') ?></td>
                                     <td class="fw-bold">1227 W Broad St</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted">Endereço 2</td>
+                                    <td class="text-muted"><?= __('user.address_2', 'Endereço 2') ?></td>
                                     <td class="fw-bold">Suite: <?= htmlspecialchars((string) ($usuario['suite'] ?? '-')) ?></td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted">Cidade</td>
+                                    <td class="text-muted"><?= __('user.city', 'Cidade') ?></td>
                                     <td class="fw-bold">Saint Pauls</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted">Estado</td>
+                                    <td class="text-muted"><?= __('user.state', 'Estado') ?></td>
                                     <td class="fw-bold">NC</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted">CEP</td>
+                                    <td class="text-muted"><?= __('user.zip', 'CEP') ?></td>
                                     <td class="fw-bold">28384</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted">País</td>
-                                    <td class="fw-bold">Estados Unidos da América (EUA)</td>
+                                    <td class="text-muted"><?= __('user.country', 'País') ?></td>
+                                    <td class="fw-bold"><?= __('user.country_usa', 'Estados Unidos da América (EUA)') ?></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -237,27 +237,27 @@
             ?>
             <div class="card shadow-sm mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-wallet"></i> Saldos da Carteira</h5>
+                    <h5 class="mb-0"><i class="fas fa-wallet"></i> <?= __('user.wallet_balances', 'Saldos da Carteira') ?></h5>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-4">
                             <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
-                                <div class="small text-muted">Saldo disponível para uso</div>
+                                <div class="small text-muted"><?= __('user.balance_available', 'Saldo disponível para uso') ?></div>
                                 <div class="h5 mb-0 fw-bold">US$ <?= number_format($normalDisp, 2, ',', '.') ?></div>
-                                <div class="small text-muted mt-1">Clube Normal + Turbo liberado</div>
+                                <div class="small text-muted mt-1"><?= __('user.balance_available_hint', 'Clube Normal + Turbo liberado') ?></div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3" style="background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.18) !important;">
-                                <div class="small text-muted">Saldo Turbo bloqueado</div>
+                                <div class="small text-muted"><?= __('user.balance_turbo_locked', 'Saldo Turbo bloqueado') ?></div>
                                 <div class="h5 mb-0 fw-bold" style="color:#b45309;">US$ <?= number_format($bloqueado, 2, ',', '.') ?></div>
-                                <div class="small text-muted mt-1">Em permanência mínima</div>
+                                <div class="small text-muted mt-1"><?= __('user.balance_turbo_locked_hint', 'Em permanência mínima') ?></div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3" style="background: rgba(99, 102, 241, 0.06); border-color: rgba(99, 102, 241, 0.18) !important;">
-                                <div class="small text-muted">Saldo total da carteira</div>
+                                <div class="small text-muted"><?= __('user.balance_total', 'Saldo total da carteira') ?></div>
                                 <div class="h5 mb-0 fw-bold">US$ <?= number_format(floatval($carteira_saldo_usd ?? 0), 2, ',', '.') ?></div>
                             </div>
                         </div>

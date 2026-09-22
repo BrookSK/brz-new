@@ -3,17 +3,17 @@
     <div class="row">
         <div class="col-lg-8 mx-auto">
             <div class="text-center mb-5">
-                <h1 class="display-4 mb-3">Entre em Contato</h1>
-                <p class="lead text-muted">Estamos aqui para ajudar. Fale conosco!</p>
+                <h1 class="display-4 mb-3"><?= __('contact.title', 'Entre em Contato') ?></h1>
+                <p class="lead text-muted"><?= __('contact.subtitle', 'Estamos aqui para ajudar. Fale conosco!') ?></p>
             </div>
             
             <div class="row g-3 mb-4 contact-info-cards">
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-map-marker-alt text-primary"></i> Endereço</h5>
+                            <h5 class="card-title"><i class="fas fa-map-marker-alt text-primary"></i> <?= __('contact.address', 'Endereço') ?></h5>
                             <p class="text-muted mb-0">
-                                Estados Unidos - Carolina do Norte
+                                <?= __('contact.address_value', 'Estados Unidos - Carolina do Norte') ?>
                             </p>
                         </div>
                     </div>
@@ -24,11 +24,11 @@
                             <h5 class="card-title"><i class="fab fa-whatsapp text-success"></i> WhatsApp</h5>
                             <div class="text-muted contact-lines">
                                 <div class="d-flex align-items-center justify-content-between gap-2">
-                                    <strong class="contact-label">Suporte:</strong>
+                                    <strong class="contact-label"><?= __('contact.support', 'Suporte:') ?></strong>
                                     <a class="contact-wa-link" href="https://wa.me/13053638204" target="_blank" rel="noopener">+1 305-363-8204</a>
                                 </div>
                                 <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
-                                    <strong class="contact-label">Vendas:</strong>
+                                    <strong class="contact-label"><?= __('contact.sales', 'Vendas:') ?></strong>
                                     <a class="contact-wa-link" href="https://wa.me/13053638204" target="_blank" rel="noopener">+1 305-363-8204</a>
                                 </div>
                             </div>
@@ -38,7 +38,7 @@
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-envelope text-warning"></i> E-mail comercial</h5>
+                            <h5 class="card-title"><i class="fas fa-envelope text-warning"></i> <?= __('contact.business_email', 'E-mail comercial') ?></h5>
                             <p class="text-muted mb-0">
                                 <a class="contact-email-link" href="mailto:contato@brazilianashop.com.br">contato@brazilianashop.com.br</a>
                             </p>
@@ -53,41 +53,41 @@
                         <input type="hidden" name="contact_token" value="<?= htmlspecialchars((string)($contactToken ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="nome" class="form-label">Nome Completo</label>
+                                <label for="nome" class="form-label"><?= __('contact.full_name', 'Nome Completo') ?></label>
                                 <input type="text" class="form-control" id="nome" name="nome" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="email" class="form-label">E-mail</label>
+                                <label for="email" class="form-label"><?= __('contact.email', 'E-mail') ?></label>
                                 <input type="email" class="form-control" id="email" name="email" required>
                             </div>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="telefone" class="form-label">Telefone</label>
+                                <label for="telefone" class="form-label"><?= __('contact.phone', 'Telefone') ?></label>
                                 <input type="tel" class="form-control" id="telefone" name="telefone" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="assunto" class="form-label">Assunto</label>
+                                <label for="assunto" class="form-label"><?= __('contact.subject', 'Assunto') ?></label>
                                 <select class="form-select" id="assunto" name="assunto" required>
-                                    <option value="">Selecione...</option>
-                                    <option value="duvida">Dúvida</option>
-                                    <option value="suporte">Suporte Técnico</option>
-                                    <option value="pedido">Sobre Pedido</option>
-                                    <option value="parceria">Parceria</option>
-                                    <option value="outro">Outro</option>
+                                    <option value=""><?= __('contact.subject_select', 'Selecione...') ?></option>
+                                    <option value="duvida"><?= __('contact.subject_question', 'Dúvida') ?></option>
+                                    <option value="suporte"><?= __('contact.subject_support', 'Suporte Técnico') ?></option>
+                                    <option value="pedido"><?= __('contact.subject_order', 'Sobre Pedido') ?></option>
+                                    <option value="parceria"><?= __('contact.subject_partnership', 'Parceria') ?></option>
+                                    <option value="outro"><?= __('contact.subject_other', 'Outro') ?></option>
                                 </select>
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="mensagem" class="form-label">Mensagem</label>
+                            <label for="mensagem" class="form-label"><?= __('contact.message', 'Mensagem') ?></label>
                             <textarea class="form-control" id="mensagem" name="mensagem" rows="5" required></textarea>
                         </div>
                         
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary btn-lg" id="contactBtn">
-                                <i class="fas fa-paper-plane me-2"></i> Enviar Mensagem
+                                <i class="fas fa-paper-plane me-2"></i> <?= __('contact.send_message', 'Enviar Mensagem') ?>
                             </button>
                         </div>
                     </form>
@@ -96,7 +96,7 @@
             
             <!-- Redes Sociais -->
             <div class="text-center mt-5">
-                <h4 class="mb-3">Siga-nos nas Redes Sociais</h4>
+                <h4 class="mb-3"><?= __('contact.follow_us', 'Siga-nos nas Redes Sociais') ?></h4>
                 <div class="d-flex justify-content-center gap-3">
                     <a href="#" class="btn btn-outline-primary btn-lg">
                         <i class="fab fa-facebook-f"></i>
@@ -120,6 +120,13 @@
 </div>
 
 <script>
+window.CONTACT_I18N = {
+    sending: <?= json_encode(__('contact.js.sending', 'Enviando...'), JSON_UNESCAPED_UNICODE) ?>,
+    duplicate: <?= json_encode(__('contact.js.duplicate', 'Mensagem já foi enviada. Se precisar, envie uma nova mensagem atualizando o texto.'), JSON_UNESCAPED_UNICODE) ?>,
+    success: <?= json_encode(__('contact.js.success', 'Mensagem enviada com sucesso! Entraremos em contato em breve.'), JSON_UNESCAPED_UNICODE) ?>,
+    error: <?= json_encode(__('contact.js.error', 'Erro ao enviar mensagem'), JSON_UNESCAPED_UNICODE) ?>,
+    connection_error: <?= json_encode(__('contact.js.connection_error', 'Erro de conexão. Tente novamente.'), JSON_UNESCAPED_UNICODE) ?>
+};
 $(document).ready(function() {
     $('#contactForm').on('submit', function(e) {
         if (!this.checkValidity()) {
@@ -134,7 +141,7 @@ $(document).ready(function() {
         const btn = $('#contactBtn');
         const originalText = btn.html();
         
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Enviando...');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> ' + window.CONTACT_I18N.sending);
         
         $.ajax({
             url: '/contato',
@@ -152,13 +159,13 @@ $(document).ready(function() {
 
                 if (data && data.success) {
                     if (data.duplicate) {
-                        showAlert('success', 'Mensagem já foi enviada. Se precisar, envie uma nova mensagem atualizando o texto.');
+                        showAlert('success', window.CONTACT_I18N.duplicate);
                     } else {
-                        showAlert('success', 'Mensagem enviada com sucesso! Entraremos em contato em breve.');
+                        showAlert('success', window.CONTACT_I18N.success);
                         $('#contactForm')[0].reset();
                     }
                 } else {
-                    showAlert('danger', (data && data.error) ? data.error : 'Erro ao enviar mensagem');
+                    showAlert('danger', (data && data.error) ? data.error : window.CONTACT_I18N.error);
                 }
             },
             error: function(xhr) {
@@ -170,9 +177,9 @@ $(document).ready(function() {
                         const parsed = JSON.parse(txt);
                         if (parsed && parsed.success) {
                             if (parsed.duplicate) {
-                                showAlert('success', 'Mensagem já foi enviada. Se precisar, envie uma nova mensagem atualizando o texto.');
+                                showAlert('success', window.CONTACT_I18N.duplicate);
                             } else {
-                                showAlert('success', 'Mensagem enviada com sucesso! Entraremos em contato em breve.');
+                                showAlert('success', window.CONTACT_I18N.success);
                                 $('#contactForm')[0].reset();
                             }
                             return;
@@ -185,7 +192,7 @@ $(document).ready(function() {
                 } catch (e) {
                 }
 
-                showAlert('danger', 'Erro de conexão. Tente novamente.');
+                showAlert('danger', window.CONTACT_I18N.connection_error);
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);

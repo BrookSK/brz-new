@@ -7,8 +7,8 @@
         <div class="col-lg-9">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-1"><i class="fas fa-file-invoice-dollar me-2"></i>Meus Carnês</h2>
-                    <p class="text-muted mb-0">Acompanhe seus parcelamentos via Carnê Braziliana</p>
+                    <h2 class="mb-1"><i class="fas fa-file-invoice-dollar me-2"></i><?= __('user.installments.title', 'Meus Carnês') ?></h2>
+                    <p class="text-muted mb-0"><?= __('user.installments.subtitle', 'Acompanhe seus parcelamentos via Carnê Braziliana') ?></p>
                 </div>
             </div>
 
@@ -24,13 +24,23 @@
                 <div class="card border-0 shadow-sm">
                     <div class="card-body text-center py-5">
                         <i class="fas fa-file-invoice-dollar text-muted" style="font-size: 3rem;"></i>
-                        <h5 class="mt-3 text-muted">Nenhum carnê encontrado</h5>
-                        <p class="text-muted">Você ainda não possui parcelamentos via Carnê Braziliana.</p>
-                        <a href="/produtos" class="btn btn-primary"><i class="fas fa-shopping-bag me-1"></i> Ver Produtos</a>
+                        <h5 class="mt-3 text-muted"><?= __('user.installments.empty', 'Nenhum carnê encontrado') ?></h5>
+                        <p class="text-muted"><?= __('user.installments.empty_hint', 'Você ainda não possui parcelamentos via Carnê Braziliana.') ?></p>
+                        <a href="/produtos" class="btn btn-primary"><i class="fas fa-shopping-bag me-1"></i> <?= __('user.installments.see_products', 'Ver Produtos') ?></a>
                     </div>
                 </div>
             <?php else: ?>
-                <?php foreach ($carnes as $c):
+                <?php
+                $statusLabelMap = [
+                    'aguardando_primeira_parcela' => __('user.installments.status.awaiting_first', 'Aguardando 1ª parcela'),
+                    'ativo' => __('user.installments.status.active', 'Ativo'),
+                    'em_andamento' => __('user.installments.status.in_progress', 'Em andamento'),
+                    'com_atraso' => __('user.installments.status.overdue', 'Com atraso'),
+                    'quitado' => __('user.installments.status.paid_off', 'Quitado'),
+                    'liberado_envio' => __('user.installments.status.released', 'Liberado p/ envio'),
+                    'encerrado' => __('user.installments.status.closed', 'Encerrado'),
+                ];
+                foreach ($carnes as $c):
                     $statusMap = [
                         'aguardando_primeira_parcela' => ['cor' => 'info', 'icon' => 'clock'],
                         'ativo' => ['cor' => 'primary', 'icon' => 'play-circle'],
@@ -51,8 +61,8 @@
                         <?php if ($pedidoCancelado): ?>
                             <div class="alert alert-danger py-2 px-3 mb-3 d-flex align-items-center gap-2" style="border-radius: 10px;">
                                 <i class="fas fa-ban"></i>
-                                <strong>Pedido cancelado</strong>
-                                <span class="text-muted small">— Este carnê não aceita mais pagamentos.</span>
+                                <strong><?= __('user.installments.order_cancelled', 'Pedido cancelado') ?></strong>
+                                <span class="text-muted small">— <?= __('user.installments.order_cancelled_hint', 'Este carnê não aceita mais pagamentos.') ?></span>
                             </div>
                         <?php endif; ?>
                         <div class="row align-items-center">
@@ -60,39 +70,39 @@
                                 <div class="d-flex align-items-center mb-2">
                                     <?php if ($pedidoCancelado): ?>
                                         <span class="badge bg-danger me-2">
-                                            <i class="fas fa-ban me-1"></i>Cancelado
+                                            <i class="fas fa-ban me-1"></i><?= __('user.installments.status.cancelled', 'Cancelado') ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="badge bg-<?= $st['cor'] ?> me-2">
-                                            <i class="fas fa-<?= $st['icon'] ?> me-1"></i><?= ucfirst(str_replace('_', ' ', $c['status'])) ?>
+                                            <i class="fas fa-<?= $st['icon'] ?> me-1"></i><?= htmlspecialchars($statusLabelMap[$c['status']] ?? ucfirst(str_replace('_', ' ', $c['status']))) ?>
                                         </span>
                                     <?php endif; ?>
-                                    <span class="text-muted small">Pedido #<?= $c['pedido_id'] ?> — <?= date('d/m/Y', strtotime($c['created_at'])) ?></span>
+                                    <span class="text-muted small"><?= __('user.installments.order', 'Pedido') ?> #<?= $c['pedido_id'] ?> — <?= date('d/m/Y', strtotime($c['created_at'])) ?></span>
                                 </div>
                                 <h5 class="mb-1<?= $pedidoCancelado ? ' text-decoration-line-through text-muted' : '' ?>">R$ <?= number_format($c['total_geral'], 2, ',', '.') ?></h5>
-                                <p class="text-muted small mb-2"><?= $total ?>x de R$ <?= number_format($c['total_geral'] / max($total, 1), 2, ',', '.') ?></p>
+                                <p class="text-muted small mb-2"><?= $total ?>x <?= __('user.installments.of', 'de') ?> R$ <?= number_format($c['total_geral'] / max($total, 1), 2, ',', '.') ?></p>
                                 <?php if (!$pedidoCancelado): ?>
                                     <div class="progress" style="height: 6px;">
                                         <div class="progress-bar bg-<?= $progresso >= 100 ? 'success' : 'primary' ?>" style="width: <?= $progresso ?>%"></div>
                                     </div>
-                                    <small class="text-muted"><?= $pagas ?> de <?= $total ?> parcelas pagas</small>
+                                    <small class="text-muted"><?= htmlspecialchars(__('user.installments.paid_of', '{paid} de {total} parcelas pagas', ['paid' => $pagas, 'total' => $total])) ?></small>
                                 <?php else: ?>
-                                    <small class="text-danger"><i class="fas fa-times-circle me-1"></i><?= $pagas ?> de <?= $total ?> parcelas foram pagas antes do cancelamento</small>
+                                    <small class="text-danger"><i class="fas fa-times-circle me-1"></i><?= htmlspecialchars(__('user.installments.paid_before_cancel', '{paid} de {total} parcelas foram pagas antes do cancelamento', ['paid' => $pagas, 'total' => $total])) ?></small>
                                 <?php endif; ?>
                             </div>
                             <div class="col-md-3 text-center">
                                 <?php if ($pedidoCancelado): ?>
-                                    <span class="text-danger fw-bold"><i class="fas fa-ban"></i> Cancelado</span>
+                                    <span class="text-danger fw-bold"><i class="fas fa-ban"></i> <?= __('user.installments.status.cancelled', 'Cancelado') ?></span>
                                 <?php elseif (!empty($c['proximo_vencimento'])): ?>
-                                    <small class="text-muted d-block">Próximo vencimento</small>
+                                    <small class="text-muted d-block"><?= __('user.installments.next_due', 'Próximo vencimento') ?></small>
                                     <span class="fw-bold"><?= date('d/m/Y', strtotime($c['proximo_vencimento'])) ?></span>
                                 <?php elseif ($c['status'] === 'quitado' || $c['status'] === 'liberado_envio'): ?>
-                                    <span class="text-success fw-bold"><i class="fas fa-check-circle"></i> Quitado</span>
+                                    <span class="text-success fw-bold"><i class="fas fa-check-circle"></i> <?= __('user.installments.status.paid_off', 'Quitado') ?></span>
                                 <?php endif; ?>
                             </div>
                             <div class="col-md-2 text-end">
                                 <a href="/meu-carne/<?= $c['id'] ?>" class="btn btn-outline-<?= $pedidoCancelado ? 'secondary' : 'primary' ?> btn-sm">
-                                    <i class="fas fa-eye me-1"></i>Detalhes
+                                    <i class="fas fa-eye me-1"></i><?= __('user.installments.details', 'Detalhes') ?>
                                 </a>
                             </div>
                         </div>

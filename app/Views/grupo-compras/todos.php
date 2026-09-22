@@ -4,8 +4,8 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
 
 <div class="container py-5">
     <div class="mb-5 text-center">
-        <h1 class="h2 fw-bold mb-2">Grupos de Compras</h1>
-        <p class="text-muted">Escolha um grupo para ver os produtos disponíveis</p>
+        <h1 class="h2 fw-bold mb-2"><?= __('purchase_groups_page.title', 'Grupos de Compras') ?></h1>
+        <p class="text-muted"><?= __('purchase_groups_page.subtitle', 'Escolha um grupo para ver os produtos disponíveis') ?></p>
     </div>
 
     <!-- Busca de produtos nos grupos -->
@@ -13,7 +13,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         <div class="col-lg-6 col-md-8">
             <div class="input-group shadow-sm" style="border-radius:50px;overflow:hidden;">
                 <span class="input-group-text bg-white border-0 ps-4"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" id="buscaGruposInput" class="form-control border-0 py-2" placeholder="Buscar produtos nos grupos de compras..." autocomplete="off" style="box-shadow:none;">
+                <input type="text" id="buscaGruposInput" class="form-control border-0 py-2" placeholder="<?= htmlspecialchars(__('purchase_groups_page.search_ph', 'Buscar produtos nos grupos de compras...'), ENT_QUOTES, 'UTF-8') ?>" autocomplete="off" style="box-shadow:none;">
                 <span class="input-group-text bg-white border-0 pe-4 d-none" id="buscaGruposClear" style="cursor:pointer"><i class="fas fa-times text-muted"></i></span>
             </div>
         </div>
@@ -24,8 +24,8 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         <?php if (empty($grupos)): ?>
         <div class="text-center py-5">
             <i class="fas fa-store fa-4x text-muted mb-3 d-block opacity-50"></i>
-            <h3 class="text-muted">Nenhum grupo disponível no momento</h3>
-            <a href="/produtos" class="btn btn-primary mt-3">Ver todos os produtos</a>
+            <h3 class="text-muted"><?= __('purchase_groups_page.empty', 'Nenhum grupo disponível no momento') ?></h3>
+            <a href="/produtos" class="btn btn-primary mt-3"><?= __('purchase_groups_page.see_all', 'Ver todos os produtos') ?></a>
         </div>
         <?php else: ?>
         <div class="row g-4 justify-content-center">
@@ -59,23 +59,23 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             <?php endif; ?>
                             <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
                                 <span class="badge bg-light text-secondary border">
-                                    <i class="fas fa-box me-1"></i><?= $qtd ?> produto<?= $qtd !== 1 ? 's' : '' ?>
+                                    <i class="fas fa-box me-1"></i><?= $qtd ?> <?= $qtd !== 1 ? __('purchase_groups_page.products', 'produtos') : __('purchase_groups_page.product', 'produto') ?>
                                 </span>
                                 <?php if ($impostoLocal > 0): ?>
                                 <span class="badge bg-warning text-dark">
-                                    Imposto local <?= number_format($impostoLocal, 0) ?>%
+                                    <?= __('purchase_groups_page.local_tax', 'Imposto local') ?> <?= number_format($impostoLocal, 0) ?>%
                                 </span>
                                 <?php endif; ?>
                                 <?php if ($clubeOnly): ?>
                                 <span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">
-                                    <i class="fas fa-crown me-1"></i>Clube
+                                    <i class="fas fa-crown me-1"></i><?= __('purchase_groups_page.club', 'Clube') ?>
                                 </span>
                                 <?php endif; ?>
                             </div>
                         </div>
                         <div class="card-footer bg-transparent border-top text-center py-3">
                             <span class="btn btn-primary btn-sm w-100">
-                                <i class="fas fa-eye me-2"></i>Ver produtos
+                                <i class="fas fa-eye me-2"></i><?= __('purchase_groups_page.see_products', 'Ver produtos') ?>
                             </span>
                         </div>
                     </div>
@@ -93,7 +93,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         </div>
         <div class="row g-4" id="gruposBuscaGrid"></div>
         <div class="text-center mt-4" id="gruposBuscaLoadMore" style="display:none;">
-            <button class="btn btn-outline-primary" id="gruposBtnLoadMore">Carregar mais</button>
+            <button class="btn btn-outline-primary" id="gruposBtnLoadMore"><?= __('purchase_groups_page.js.load_more', 'Carregar mais') ?></button>
         </div>
     </div>
 </div>
@@ -112,6 +112,25 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
 </style>
 
 <script>
+window.PG_SEARCH_I18N = {
+    club_exclusive: <?= json_encode(__('purchase_groups_page.js.club_exclusive', 'Exclusivo Clube'), JSON_UNESCAPED_UNICODE) ?>,
+    club: <?= json_encode(__('purchase_groups_page.js.club', 'Clube'), JSON_UNESCAPED_UNICODE) ?>,
+    learn_more: <?= json_encode(__('purchase_groups_page.js.learn_more', 'Saiba mais'), JSON_UNESCAPED_UNICODE) ?>,
+    view_details: <?= json_encode(__('purchase_groups_page.js.view_details', 'Ver detalhes'), JSON_UNESCAPED_UNICODE) ?>,
+    view_in_group: <?= json_encode(__('purchase_groups_page.js.view_in_group', 'Ver no grupo'), JSON_UNESCAPED_UNICODE) ?>,
+    add_to_cart: <?= json_encode(__('purchase_groups_page.js.add_to_cart', 'Adicionar ao carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    adding: <?= json_encode(__('purchase_groups_page.js.adding', 'Adicionando...'), JSON_UNESCAPED_UNICODE) ?>,
+    added: <?= json_encode(__('purchase_groups_page.js.added', 'Adicionado!'), JSON_UNESCAPED_UNICODE) ?>,
+    error: <?= json_encode(__('purchase_groups_page.js.error', 'Erro'), JSON_UNESCAPED_UNICODE) ?>,
+    no_products: <?= json_encode(__('purchase_groups_page.js.no_products', 'Nenhum produto encontrado'), JSON_UNESCAPED_UNICODE) ?>,
+    try_other_terms: <?= json_encode(__('purchase_groups_page.js.try_other_terms', 'Tente buscar com outros termos'), JSON_UNESCAPED_UNICODE) ?>,
+    found_singular: <?= json_encode(__('purchase_groups_page.js.found_singular', 'produto encontrado'), JSON_UNESCAPED_UNICODE) ?>,
+    found_plural: <?= json_encode(__('purchase_groups_page.js.found_plural', 'produtos encontrados'), JSON_UNESCAPED_UNICODE) ?>,
+    searching: <?= json_encode(__('purchase_groups_page.js.searching', 'Buscando...'), JSON_UNESCAPED_UNICODE) ?>,
+    search_error: <?= json_encode(__('purchase_groups_page.js.search_error', 'Erro ao buscar.'), JSON_UNESCAPED_UNICODE) ?>,
+    load_more: <?= json_encode(__('purchase_groups_page.js.load_more', 'Carregar mais'), JSON_UNESCAPED_UNICODE) ?>,
+    money_locale: <?= json_encode(\App\Core\I18n::getLocale() === 'en' ? 'en-US' : 'pt-BR') ?>
+};
 (function(){
     const inp = document.getElementById('buscaGruposInput');
     const clearBtn = document.getElementById('buscaGruposClear');
@@ -129,7 +148,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
     function formatMoney(v, moeda){
         const n = Number(v||0);
         const sym = (moeda||'USD')==='BRL' ? 'R$' : '$';
-        try { return sym+' '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+        try { return sym+' '+n.toLocaleString(window.PG_SEARCH_I18N.money_locale,{minimumFractionDigits:2,maximumFractionDigits:2}); }
         catch(e){ return sym+' '+n.toFixed(2); }
     }
 
@@ -146,22 +165,22 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
             grupoBadge = '<a href="/grupo/'+esc(p.grupo_slug)+'" class="badge bg-primary bg-opacity-10 text-primary text-decoration-none grupo-badge-link grupo-tag"><i class="fas fa-users me-1"></i>'+esc(p.grupo_nome)+'</a>';
         }
         if (isClubeBlocked) {
-            grupoBadge += '<span class="badge grupo-tag" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>';
+            grupoBadge += '<span class="badge grupo-tag" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff"><i class="fas fa-crown me-1"></i>'+window.PG_SEARCH_I18N.club_exclusive+'</span>';
         }
 
         const priceHtml = isClubeBlocked
-            ? '<span class="badge" style="background:#0b1f3a;font-size:.75rem"><i class="fas fa-lock me-1"></i>Clube</span>'
+            ? '<span class="badge" style="background:#0b1f3a;font-size:.75rem"><i class="fas fa-lock me-1"></i>'+window.PG_SEARCH_I18N.club+'</span>'
             : '<span class="h6 mb-0 text-primary">'+formatMoney(p.valor, p.moeda)+'</span>';
 
         let btns = '';
         if (isClubeBlocked) {
-            btns = '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais</a>';
+            btns = '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>'+window.PG_SEARCH_I18N.learn_more+'</a>';
         } else {
-            btns += '<a href="'+detalhesLink+'" class="btn btn-outline-primary btn-sm w-100 mb-2"><i class="fas fa-eye me-1"></i> Ver detalhes</a>';
+            btns += '<a href="'+detalhesLink+'" class="btn btn-outline-primary btn-sm w-100 mb-2"><i class="fas fa-eye me-1"></i> '+window.PG_SEARCH_I18N.view_details+'</a>';
             if (grupoLink) {
-                btns += '<a href="'+grupoLink+'" class="btn btn-outline-secondary btn-sm w-100 mb-2"><i class="fas fa-store me-1"></i> Ver no grupo</a>';
+                btns += '<a href="'+grupoLink+'" class="btn btn-outline-secondary btn-sm w-100 mb-2"><i class="fas fa-store me-1"></i> '+window.PG_SEARCH_I18N.view_in_group+'</a>';
             }
-            btns += '<button type="button" class="btn btn-primary btn-sm w-100 btn-add-cart" data-id="'+p.id+'"><i class="fas fa-cart-plus me-1"></i> Adicionar ao carrinho</button>';
+            btns += '<button type="button" class="btn btn-primary btn-sm w-100 btn-add-cart" data-id="'+p.id+'"><i class="fas fa-cart-plus me-1"></i> '+window.PG_SEARCH_I18N.add_to_cart+'</button>';
         }
 
         return '<div class="col-lg-3 col-md-4 col-sm-6">'
@@ -184,7 +203,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         if (!pid) return;
         const origHtml = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Adicionando...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> '+window.PG_SEARCH_I18N.adding;
         fetch('/api/carrinho/adicionar', {
             method:'POST',
             headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -193,14 +212,14 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         .then(r=>r.json())
         .then(function(resp){
             if (resp.success) {
-                btn.innerHTML = '<i class="fas fa-check me-1"></i> Adicionado!';
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> '+window.PG_SEARCH_I18N.added;
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-success');
                 setTimeout(function(){ btn.innerHTML=origHtml; btn.disabled=false; btn.classList.remove('btn-success'); btn.classList.add('btn-primary'); }, 2000);
                 const cartBadge = document.querySelector('.cart-count, #cart-count, [data-cart-count]');
                 if (cartBadge && resp.total_itens !== undefined) cartBadge.textContent = resp.total_itens;
             } else {
-                btn.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> '+(resp.error||'Erro');
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> '+(resp.error||window.PG_SEARCH_I18N.error);
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-danger');
                 setTimeout(function(){ btn.innerHTML=origHtml; btn.disabled=false; btn.classList.remove('btn-danger'); btn.classList.add('btn-primary'); }, 2500);
@@ -217,11 +236,11 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         currentPage = 0;
 
         if (allProducts.length === 0){
-            grid.innerHTML = '<div class="col-12 text-center py-5"><i class="fas fa-search fa-3x text-muted mb-3 d-block opacity-50"></i><h5 class="text-muted">Nenhum produto encontrado</h5><p class="text-muted small">Tente buscar com outros termos</p></div>';
+            grid.innerHTML = '<div class="col-12 text-center py-5"><i class="fas fa-search fa-3x text-muted mb-3 d-block opacity-50"></i><h5 class="text-muted">'+window.PG_SEARCH_I18N.no_products+'</h5><p class="text-muted small">'+window.PG_SEARCH_I18N.try_other_terms+'</p></div>';
             info.textContent = '';
             loadMoreWrap.style.display = 'none';
         } else {
-            info.innerHTML = '<i class="fas fa-search me-1"></i> <strong>'+allProducts.length+'</strong> produto'+(allProducts.length!==1?'s':'')+' encontrado'+(allProducts.length!==1?'s':'');
+            info.innerHTML = '<i class="fas fa-search me-1"></i> <strong>'+allProducts.length+'</strong> '+(allProducts.length!==1?window.PG_SEARCH_I18N.found_plural:window.PG_SEARCH_I18N.found_singular);
             grid.innerHTML = '';
             loadPage();
         }
@@ -258,13 +277,13 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         original.style.display = 'none';
         resultados.style.display = 'block';
         grid.innerHTML = '<div class="col-12 text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>';
-        info.textContent = 'Buscando...';
+        info.textContent = window.PG_SEARCH_I18N.searching;
         loadMoreWrap.style.display = 'none';
 
         fetch('/api/produtos/buscar-todos?q='+encodeURIComponent(q)+'&context=grupos&limit=60')
             .then(r=>r.json())
             .then(showResults)
-            .catch(function(){ grid.innerHTML='<div class="col-12 text-center py-4 text-muted">Erro ao buscar.</div>'; });
+            .catch(function(){ grid.innerHTML='<div class="col-12 text-center py-4 text-muted">'+window.PG_SEARCH_I18N.search_error+'</div>'; });
     }
 
     inp.addEventListener('input', function(){
