@@ -448,13 +448,21 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
     $fixed = [];
     error_log('[BRZ-FIX-META] post_id=' . $post_id . ' | body_keys=' . implode(',', array_keys($body ?? [])) . ' | items_count=' . (isset($body['items']) ? count($body['items']) : 'N/A'));
 
-    // Fix pedido_id_local: recebe do painel e atualiza
+    // Fix pedido_id_local: SOMENTE se o pacote ainda não tiver vínculo.
+    // NUNCA sobrescrever um vínculo já existente — isso corrompia o pacote (ex.: pacote do
+    // pedido 747 virava 738 ao gerar o PDF, porque o painel reenviava um pedidoIdLocal errado
+    // resolvido por wp_post_id). O vínculo correto é gravado na CRIAÇÃO do pacote e não deve mudar.
     if (!empty($body['pedidoIdLocal'])) {
         $pid = intval($body['pedidoIdLocal']);
-        update_post_meta($post_id, '_pedido_id_local', $pid);
-        // Formato não-numérico para que wc_get_order() retorne false (garante path output_only com _items_json)
-        update_post_meta($post_id, '_package_order_id', 'PED-' . $pid);
-        $fixed[] = 'pedido_id_local=' . $pid;
+        $existente = get_post_meta($post_id, '_pedido_id_local', true);
+        if (empty($existente)) {
+            update_post_meta($post_id, '_pedido_id_local', $pid);
+            // Formato não-numérico para que wc_get_order() retorne false (garante path output_only com _items_json)
+            update_post_meta($post_id, '_package_order_id', 'PED-' . $pid);
+            $fixed[] = 'pedido_id_local=' . $pid . ' (definido — estava vazio)';
+        } else {
+            $fixed[] = 'pedido_id_local preservado=' . $existente . ' (ignorado ' . $pid . ')';
+        }
     }
 
     // Fix items_json: SEMPRE sobrescrever se body tiver items (corrige dados corrompidos)

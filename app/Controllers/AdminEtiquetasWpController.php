@@ -1418,7 +1418,13 @@ class AdminEtiquetasWpController extends Controller
             error_log('[BRZ-PDF-FIX] wp_post_id=' . $wpPostId . ' | etiqueta_row=' . json_encode($row));
             if ($row && !empty($row['pedido_id'])) {
                 $pedidoId = (int) $row['pedido_id'];
-                $fixData = ['pedidoIdLocal' => $pedidoId];
+                // IMPORTANTE: NÃO reenviar 'pedidoIdLocal' aqui. O pacote já nasce no WordPress
+                // com o vínculo correto (_pedido_id_local / _package_order_id) na criação.
+                // Reescrevê-lo a cada download de PDF corrompia o vínculo quando o SELECT por
+                // wp_post_id (que não é único na tabela local) resolvia o pedido errado — foi
+                // exatamente o que fez o pacote do 747 virar 738 após gerar o PDF.
+                // O fix-meta do PDF deve corrigir SOMENTE os itens (descrição/NCM/valor/peso).
+                $fixData = [];
 
                 // Buscar itens do pedido para enviar ao WP
                 try {
@@ -1576,9 +1582,12 @@ class AdminEtiquetasWpController extends Controller
                     error_log('[BRZ-PDF-FIX] ERRO itens: ' . $e->getMessage());
                 }
 
-                error_log('[BRZ-PDF-FIX] Chamando fixPackageMeta | fixData=' . json_encode($fixData));
-                $fixResp = $this->wp->fixPackageMeta($wpPostId, $fixData);
-                error_log('[BRZ-PDF-FIX] fixPackageMeta resp=' . json_encode($fixResp));
+                // Só chamar o fix-meta se houver itens para corrigir (não reescrevemos mais o vínculo).
+                if (!empty($fixData['items'])) {
+                    error_log('[BRZ-PDF-FIX] Chamando fixPackageMeta | fixData=' . json_encode($fixData));
+                    $fixResp = $this->wp->fixPackageMeta($wpPostId, $fixData);
+                    error_log('[BRZ-PDF-FIX] fixPackageMeta resp=' . json_encode($fixResp));
+                }
             }
         } catch (\Exception $e) {
             error_log('[BRZ-PDF-FIX] ERRO geral: ' . $e->getMessage());
