@@ -19,6 +19,8 @@ class AdminEtiquetasWpController extends Controller
 {
     private WordPressEtiquetasService $wp;
     private \PDO $connection;
+    private ?string $ultimoErroSalvarEtiqueta = null;
+    private ?string $ultimoSqlSalvarEtiqueta = null;
 
     public function __construct()
     {
@@ -1007,6 +1009,20 @@ class AdminEtiquetasWpController extends Controller
             }, $listaExato);
         } catch (\Throwable $e) {
             $out['wp_filtro_exato_erro'] = $e->getMessage();
+        }
+
+        // TESTE DE GRAVAÇÃO: tentar sincronizar do WP e reportar se salvou + erro exato do INSERT.
+        try {
+            $rSync = $this->sincronizarPedidoDoWp($pedidoId);
+            $out['sincronizar_resultado'] = $rSync;
+            $out['salvar_erro'] = $this->ultimoErroSalvarEtiqueta;
+            $out['salvar_sql'] = $this->ultimoSqlSalvarEtiqueta;
+            // Reler a tabela local após a tentativa
+            $st = $this->connection->prepare('SELECT id, pedido_id, tracking_number, wp_post_id FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
+            $st->execute([$pedidoId]);
+            $out['correios_packet_etiquetas_apos_sync'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            $out['sincronizar_erro'] = $e->getMessage();
         }
 
         // Últimos pacotes do WP (sem filtro) para ver se o pacote deste pedido existe com outro código.
@@ -2225,10 +2241,13 @@ class AdminEtiquetasWpController extends Controller
                 $sqlIns .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts);
             }
 
+            $this->ultimoSqlSalvarEtiqueta = $sqlIns;
             $stIns = $this->connection->prepare($sqlIns);
             $stIns->execute($valores);
+            $this->ultimoErroSalvarEtiqueta = null;
             return true;
         } catch (\Exception $e) {
+            $this->ultimoErroSalvarEtiqueta = $e->getMessage();
             error_log('[ETIQUETAS_WP] Erro ao salvar etiqueta local (pedido #' . $pedidoId . '): ' . $e->getMessage());
             return false;
         }
