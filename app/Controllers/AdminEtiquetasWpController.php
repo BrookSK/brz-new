@@ -1001,6 +1001,37 @@ class AdminEtiquetasWpController extends Controller
      * GET /admin/etiquetas-wp/diagnostico-rastreio?pedido_id=758
      * Remover após depuração.
      */
+
+    /**
+     * Teste ISOLADO de e-mail: chama EmailService::send() direto, sem dedupe e sem passar pelo
+     * fluxo de eventos. Serve para saber se o EmailService/SMTP realmente entrega.
+     * GET /admin/etiquetas-wp/testar-email-direto?to=alguem@exemplo.com
+     * Remover após depuração.
+     */
+    public function testarEmailDireto(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        $to = trim((string) $request->getParam('to', ''));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            $this->json(['success' => false, 'error' => 'Informe ?to=email@valido']);
+            return;
+        }
+
+        $assunto = 'Teste direto EmailService - ' . date('H:i:s');
+        $html = '<p>Teste direto do EmailService em ' . date('d/m/Y H:i:s') . '. Se você recebeu isto, o EmailService/SMTP entrega normalmente.</p>';
+
+        try {
+            // dedupeKey vazio = sem deduplicação (sempre tenta enviar).
+            (new \App\Services\EmailService())->send($to, $assunto, $html, '', ['evento' => 'teste_direto']);
+            $this->json(['success' => true, 'enviado_para' => $to, 'obs' => 'send() nao lancou excecao (SMTP aceitou). Verifique a caixa.']);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'erro' => $e->getMessage()]);
+        }
+    }
+
     public function diagnosticoRastreio(Request $request)
     {
         $auth = new AuthService();
