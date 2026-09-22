@@ -1519,11 +1519,13 @@ class AdminNotificacoesController extends Controller {
         }
 
         // Liberar o dedupe de e-mail deste evento/pedido para permitir o reenvio.
+        // Filtrar SÓ pela dedupe_key (já é específica do evento+pedido); não depender do
+        // pedido_id da linha, que pode estar NULL e impediria a limpeza (bloqueando o reenvio).
         $db = \Config\Database::getConnection();
         if ($this->tabelaExisteNotif($db, 'email_event_log')) {
             try {
-                $st = $db->prepare("DELETE FROM email_event_log WHERE pedido_id = ? AND dedupe_key LIKE ?");
-                $st->execute([$pedidoId, 'pedido_event:' . $evento . ':' . $pedidoId . ':%']);
+                $st = $db->prepare("DELETE FROM email_event_log WHERE dedupe_key LIKE ?");
+                $st->execute(['pedido_event:' . $evento . ':' . $pedidoId . ':%']);
             } catch (\Exception $e) {
                 error_log('[NOTIF][REENVIO] limpar dedupe: ' . $e->getMessage());
             }

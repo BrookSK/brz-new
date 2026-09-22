@@ -321,11 +321,16 @@ class NotificationService {
             $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
             $this->ultimoDestinoEmail = $to;
             try {
-                $this->emailService->send($to, $subject, $html, $dedupeKey, [
+                $enviouEste = $this->emailService->send($to, $subject, $html, $dedupeKey, [
                     'evento' => $eventoNome,
                     'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
                 ]);
-                $enviados++;
+                if ($enviouEste) {
+                    $enviados++;
+                } else {
+                    // send() retornou false = pulado (dedupe/desativado). Não conta como enviado.
+                    $this->motivoEmailNaoEnviado = 'E-mail não enviado (bloqueado por deduplicação — já enviado antes — ou envio desativado). Use o reenvio que limpa o dedupe.';
+                }
             } catch (\Throwable $e) {
                 $ultimoErro = $e->getMessage();
                 error_log('[NOTIFICACOES][EMAIL] Falha ao enviar para ' . $to . ': ' . $e->getMessage());
