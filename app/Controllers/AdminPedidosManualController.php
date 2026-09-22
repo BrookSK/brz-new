@@ -4210,7 +4210,9 @@ JS;
                 $impostos = 0.0;
             }
 
-            // Imposto local do grupo de compras OU do produto individual
+            // Imposto local: calculado POR ITEM, usando o percentual próprio de cada
+            // produto (ou do seu grupo de compras) aplicado apenas sobre o valor daquele
+            // item. Produtos sem imposto local configurado não são taxados.
             $impostoLocal = 0.0;
             $impostoLocalPercent = 0.0;
             try {
@@ -4224,28 +4226,54 @@ JS;
                 if (!empty($pids)) {
                     $in = implode(',', array_fill(0, count($pids), '?'));
 
-                    // MAX do grupo de compras
-                    $maxGrupo = 0.0;
-                    $stImpL = $db->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                    // Percentual do grupo de compras por produto
+                    $pctGrupoPorProduto = [];
+                    $stImpL = $db->prepare("SELECT p.id, g.imposto_local_percent FROM produtos p INNER JOIN grupos_compras g ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
                     $stImpL->execute($pids);
-                    $maxGrupo = (float) ($stImpL->fetchColumn() ?: 0);
+                    foreach ($stImpL->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $row) {
+                        $pctGrupoPorProduto[(int) $row['id']] = (float) $row['imposto_local_percent'];
+                    }
 
-                    // MAX direto do produto
-                    $maxProduto = 0.0;
+                    // Percentual direto do produto
+                    $pctProdutoPorProduto = [];
                     try {
                         $prodCols = [];
                         $stCols2 = $db->query('DESCRIBE produtos');
                         $prodCols = $stCols2 ? ($stCols2->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
                         if (in_array('imposto_local_percent', $prodCols, true)) {
-                            $stImpP = $db->prepare("SELECT MAX(imposto_local_percent) FROM produtos WHERE id IN ($in) AND imposto_local_percent > 0");
+                            $stImpP = $db->prepare("SELECT id, imposto_local_percent FROM produtos WHERE id IN ($in) AND imposto_local_percent > 0");
                             $stImpP->execute($pids);
-                            $maxProduto = (float) ($stImpP->fetchColumn() ?: 0);
+                            foreach ($stImpP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $row) {
+                                $pctProdutoPorProduto[(int) $row['id']] = (float) $row['imposto_local_percent'];
+                            }
                         }
                     } catch (\Throwable $e) {}
 
-                    $impostoLocalPercent = max($maxGrupo, $maxProduto);
-                    if ($impostoLocalPercent > 0) {
-                        $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
+                    // Soma o imposto local item a item (valor do item × percentual do item)
+                    $maxPctAplicado = 0.0;
+                    foreach ($itens as $it) {
+                        if (!is_array($it)) continue;
+                        $pid = (int) ($it['produto_id'] ?? 0);
+                        if ($pid <= 0) continue;
+
+                        $pct = max(
+                            (float) ($pctGrupoPorProduto[$pid] ?? 0),
+                            (float) ($pctProdutoPorProduto[$pid] ?? 0)
+                        );
+                        if ($pct <= 0) continue;
+
+                        $qtd = (float) ($it['quantidade'] ?? 0);
+                        $valUnit = (float) ($it['valor_unitario'] ?? 0);
+                        $valorItem = $qtd * $valUnit;
+                        if ($valorItem <= 0) continue;
+
+                        $impostoLocal += $valorItem * ($pct / 100.0);
+                        if ($pct > $maxPctAplicado) $maxPctAplicado = $pct;
+                    }
+
+                    // Percentual exibido no resumo (referência): maior alíquota aplicada
+                    $impostoLocalPercent = $maxPctAplicado;
+                    if ($impostoLocal > 0) {
                         $total = $total + $impostoLocal;
                     }
                 }
