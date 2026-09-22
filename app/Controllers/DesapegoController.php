@@ -93,7 +93,7 @@ class DesapegoController extends Controller {
 
         $this->view('desapego/index', [
             'produtos' => $produtos,
-            'title' => 'Desapego Braziliana'
+            'title' => __('desapego_page.title', 'Desapego Braziliana')
         ]);
     }
 

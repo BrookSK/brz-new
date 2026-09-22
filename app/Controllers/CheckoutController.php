@@ -3816,7 +3816,7 @@ class CheckoutController extends Controller {
                     }
                     if ($temDesapego) {
                         $this->json([
-                            'error' => 'Seu carrinho contém produto(s) da seção Desapego Braziliana, que estão disponíveis exclusivamente para entrega nos Estados Unidos. Altere o país de entrega para EUA ou remova o(s) produto(s) de desapego do carrinho.'
+                            'error' => __('checkout.desapego_us_only', 'Seu carrinho contém produto(s) da seção Desapego Braziliana, que estão disponíveis exclusivamente para entrega nos Estados Unidos. Altere o país de entrega para EUA ou remova o(s) produto(s) de desapego do carrinho.')
                         ], 400);
                         return;
                     }

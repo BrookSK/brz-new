@@ -154,8 +154,8 @@
                             <i class="fas fa-hand-holding-heart fa-lg"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold" style="color: #0891b2;">Desapego Braziliana</h5>
-                            <small class="text-muted">Você é um desapeguista credenciado</small>
+                            <h5 class="mb-0 fw-bold" style="color: #0891b2;"><?= __('user.desapego.brand', 'Desapego Braziliana') ?></h5>
+                            <small class="text-muted"><?= __('user.desapego.accredited', 'Você é um desapeguista credenciado') ?></small>
                         </div>
                     </div>
                     <div class="row g-3">
