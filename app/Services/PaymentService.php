@@ -1090,7 +1090,7 @@ class PaymentService {
 
         // --- Conta 1: Produtos ---
         $results['produtos'] = $this->testSingleCambioRealAccount(
-            'Câmbio Real (Produtos)',
+            __('admin.cambioreal_health.account_products', 'Câmbio Real (Produtos)'),
             $this->cambioRealEnabled,
             $this->cambioRealAppId,
             $this->cambioRealAppSecret,
@@ -1099,7 +1099,7 @@ class PaymentService {
 
         // --- Conta 2: Taxas ---
         $results['taxas'] = $this->testSingleCambioRealAccount(
-            'Câmbio Real (Taxas)',
+            __('admin.cambioreal_health.account_fees', 'Câmbio Real (Taxas)'),
             (!empty($this->cambioRealTaxasAppId) && !empty($this->cambioRealTaxasAppSecret)) ? '1' : '0',
             $this->cambioRealTaxasAppId ?? '',
             $this->cambioRealTaxasAppSecret ?? '',

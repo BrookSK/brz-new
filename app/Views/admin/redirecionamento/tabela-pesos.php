@@ -13,7 +13,7 @@ $_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
             <div class="text-muted small"><?= __('admin.redirect.controls_all_redirect_charging', 'Controla toda a cobrança do redirecionamento') ?></div>
         </div>
         <a href="/admin/redirecionamento/tabela-pesos/pdf" target="_blank" class="btn btn-outline-danger">
-            <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+            <i class="fas fa-file-pdf me-2"></i><?= __('admin.redirect.export_pdf', 'Exportar PDF') ?>
         </a>
     </div>
 

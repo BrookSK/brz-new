@@ -1,63 +1,63 @@
-<?php $d = $demanda; $etapas = json_decode($d['bloco4_etapas'] ?? '[]', true) ?: []; $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído']; ?>
+<?php $d = $demanda; $etapas = json_decode($d['bloco4_etapas'] ?? '[]', true) ?: []; $statusLabels = ['pendente'=>__('admin.demands.status.pending','Pendente'),'em_analise'=>__('admin.demands.status.in_analysis','Em Análise'),'em_execucao'=>__('admin.demands.status.in_progress','Em Execução'),'em_teste'=>__('admin.demands.status.in_testing','Em Teste'),'recusado'=>__('admin.demands.status.rejected','Recusado'),'concluido'=>__('admin.demands.status.completed','Concluído')]; ?>
 <div class="container-fluid py-3">
-    <a href="/admin/demandas/painel" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
-    <?php if ($d['status'] === 'concluido'): ?><a href="/admin/demandas/pdf/<?= $d['id'] ?>" class="btn btn-sm btn-outline-dark mb-3 ms-2" target="_blank"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</a><?php endif; ?>
+    <a href="/admin/demandas/painel" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i><?= htmlspecialchars(__('admin.demands.back', 'Voltar'), ENT_QUOTES, 'UTF-8') ?></a>
+    <?php if ($d['status'] === 'concluido'): ?><a href="/admin/demandas/pdf/<?= $d['id'] ?>" class="btn btn-sm btn-outline-dark mb-3 ms-2" target="_blank"><i class="fas fa-file-pdf me-1"></i><?= htmlspecialchars(__('admin.demands.detail.generate_pdf', 'Gerar PDF'), ENT_QUOTES, 'UTF-8') ?></a><?php endif; ?>
     <form method="POST" action="/admin/demandas/arquivar/<?= $d['id'] ?>" class="d-inline">
         <input type="hidden" name="arquivar" value="<?= empty($d['arquivado']) ? 1 : 0 ?>">
-        <button type="submit" class="btn btn-sm btn-outline-secondary mb-3 ms-2"><i class="fas fa-archive me-1"></i><?= empty($d['arquivado']) ? 'Arquivar' : 'Desarquivar' ?></button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary mb-3 ms-2"><i class="fas fa-archive me-1"></i><?= empty($d['arquivado']) ? htmlspecialchars(__('admin.demands.archive', 'Arquivar'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('admin.demands.unarchive', 'Desarquivar'), ENT_QUOTES, 'UTF-8') ?></button>
     </form>
     <div class="row">
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h5 class="fw-bold mb-0"><?= htmlspecialchars($d['bloco1_titulo']) ?></h5><span class="badge bg-primary fs-6"><?= $statusLabels[$d['status']] ?? $d['status'] ?></span></div><div class="card-body">
-                <p><strong>Solicitante:</strong> <?= htmlspecialchars($d['bloco1_solicitante']) ?></p>
-                <p><strong>Criado em:</strong> <?= date('d/m/Y H:i', strtotime($d['created_at'])) ?></p>
-                <?php if ($d['prazo_entrega']): ?><p><strong>Prazo:</strong> <?= date('d/m/Y', strtotime($d['prazo_entrega'])) ?></p><?php endif; ?>
+                <p><strong><?= htmlspecialchars(__('admin.demands.col.requester', 'Solicitante'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= htmlspecialchars($d['bloco1_solicitante']) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.created_on', 'Criado em'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= date('d/m/Y H:i', strtotime($d['created_at'])) ?></p>
+                <?php if ($d['prazo_entrega']): ?><p><strong><?= htmlspecialchars(__('admin.demands.detail.deadline', 'Prazo'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= date('d/m/Y', strtotime($d['prazo_entrega'])) ?></p><?php endif; ?>
             </div></div>
 
-            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">2. Por que você quer isso?</h6></div><div class="card-body small">
-                <p><strong>Problema:</strong> <?= nl2br(htmlspecialchars($d['bloco2_problema'])) ?></p>
-                <p><strong>Melhoria:</strong> <?= nl2br(htmlspecialchars($d['bloco2_melhoria'])) ?></p>
-                <p><strong>Consequência:</strong> <?= nl2br(htmlspecialchars($d['bloco2_consequencia'])) ?></p>
+            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.form.b2_title', '2. Por que você quer isso?'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body small">
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.problem', 'Problema'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco2_problema'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.improvement', 'Melhoria'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco2_melhoria'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.consequence', 'Consequência'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco2_consequencia'])) ?></p>
             </div></div>
 
-            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">3. Impactos</h6></div><div class="card-body small">
-                <p><strong>Financeiro:</strong> <?= nl2br(htmlspecialchars($d['bloco3_financeiro'])) ?></p>
-                <p><strong>Capital de giro:</strong> <?= nl2br(htmlspecialchars($d['bloco3_capital_giro'])) ?></p>
-                <p><strong>Custos operacionais:</strong> <?= nl2br(htmlspecialchars($d['bloco3_custos_operacionais'])) ?></p>
-                <p><strong>Jornada do cliente:</strong> <?= nl2br(htmlspecialchars($d['bloco3_jornada_cliente'])) ?></p>
-                <p><strong>Equipe:</strong> <?= nl2br(htmlspecialchars($d['bloco3_equipe'])) ?></p>
-                <p><strong>Conflitos:</strong> <?= nl2br(htmlspecialchars($d['bloco3_conflitos'])) ?></p>
+            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.detail.impacts_title', '3. Impactos'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body small">
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.financial', 'Financeiro'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco3_financeiro'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.working_capital', 'Capital de giro'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco3_capital_giro'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.operational_costs', 'Custos operacionais'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco3_custos_operacionais'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.customer_journey', 'Jornada do cliente'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco3_jornada_cliente'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.team', 'Equipe'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco3_equipe'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.conflicts', 'Conflitos'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco3_conflitos'])) ?></p>
             </div></div>
 
-            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">4. Etapas e Custos</h6></div><div class="card-body p-0">
-                <table class="table table-sm mb-0"><thead class="table-light"><tr><th>Etapa</th><th>Custo</th></tr></thead><tbody>
+            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.detail.steps_title', '4. Etapas e Custos'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body p-0">
+                <table class="table table-sm mb-0"><thead class="table-light"><tr><th><?= htmlspecialchars(__('admin.demands.detail.step', 'Etapa'), ENT_QUOTES, 'UTF-8') ?></th><th><?= htmlspecialchars(__('admin.demands.pdf_cost_col', 'Custo'), ENT_QUOTES, 'UTF-8') ?></th></tr></thead><tbody>
                 <?php foreach ($etapas as $et): ?><tr><td><?= htmlspecialchars($et['descricao'] ?? '') ?></td><td><?= htmlspecialchars($et['custo'] ?? '') ?></td></tr><?php endforeach; ?>
                 </tbody></table>
             </div></div>
 
-            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">5. O que precisa ser feito?</h6></div><div class="card-body small">
-                <p><strong>Novo ou existente:</strong> <?= nl2br(htmlspecialchars($d['bloco5_novo_ou_existente'])) ?></p>
-                <p><strong>Ferramentas:</strong> <?= nl2br(htmlspecialchars($d['bloco5_ferramentas'])) ?></p>
-                <p><strong>Regras:</strong> <?= nl2br(htmlspecialchars($d['bloco5_regras'])) ?></p>
-                <p><strong>Usuários:</strong> <?= nl2br(htmlspecialchars($d['bloco5_usuarios'])) ?></p>
+            <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.form.b5_title', '5. O que precisa ser feito?'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body small">
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.new_or_existing', 'Novo ou existente'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco5_novo_ou_existente'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.tools', 'Ferramentas'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco5_ferramentas'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.rules', 'Regras'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco5_regras'])) ?></p>
+                <p><strong><?= htmlspecialchars(__('admin.demands.detail.users', 'Usuários'), ENT_QUOTES, 'UTF-8') ?>:</strong> <?= nl2br(htmlspecialchars($d['bloco5_usuarios'])) ?></p>
             </div></div>
         </div>
 
         <!-- Sidebar ações -->
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">Alterar Status</h6></div><div class="card-body">
+            <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.detail.change_status', 'Alterar Status'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body">
                 <form method="POST" action="/admin/demandas/mover/<?= $d['id'] ?>">
                     <select name="status" class="form-select form-select-sm mb-2">
                         <?php foreach ($statusLabels as $k => $v): ?><option value="<?= $k ?>" <?= $d['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
                     </select>
                     <div id="motivo-recusa-box" style="display:none;" class="mb-2">
-                        <label class="form-label small fw-semibold text-danger mb-1"><i class="fas fa-ban me-1"></i>Motivo da recusa</label>
-                        <textarea name="nota" id="nota-motivo" class="form-control form-control-sm border-danger" rows="3" placeholder="Explique o motivo da recusa (será enviado por email ao solicitante)"></textarea>
+                        <label class="form-label small fw-semibold text-danger mb-1"><i class="fas fa-ban me-1"></i><?= htmlspecialchars(__('admin.demands.detail.rejection_reason', 'Motivo da recusa'), ENT_QUOTES, 'UTF-8') ?></label>
+                        <textarea name="nota" id="nota-motivo" class="form-control form-control-sm border-danger" rows="3" placeholder="<?= htmlspecialchars(__('admin.demands.detail.rejection_reason_ph', 'Explique o motivo da recusa (será enviado por email ao solicitante)'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                     </div>
                     <div id="nota-normal-box" class="mb-2">
-                        <textarea name="nota" id="nota-normal" class="form-control form-control-sm" rows="2" placeholder="Nota interna (opcional)"></textarea>
+                        <textarea name="nota" id="nota-normal" class="form-control form-control-sm" rows="2" placeholder="<?= htmlspecialchars(__('admin.demands.detail.internal_note_ph', 'Nota interna (opcional)'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-check me-1"></i>Atualizar</button>
+                    <button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-check me-1"></i><?= htmlspecialchars(__('admin.demands.detail.update', 'Atualizar'), ENT_QUOTES, 'UTF-8') ?></button>
                 </form>
                 <script>
                 (function(){
@@ -77,10 +77,10 @@
             </div></div>
 
             <?php if ($d['nota_admin']): ?>
-            <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">Nota do Admin</h6></div><div class="card-body small"><?= nl2br(htmlspecialchars($d['nota_admin'])) ?></div></div>
+            <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.detail.admin_note', 'Nota do Admin'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body small"><?= nl2br(htmlspecialchars($d['nota_admin'])) ?></div></div>
             <?php endif; ?>
 
-            <div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small">Histórico</h6></div><div class="card-body p-0" style="max-height:300px;overflow-y:auto;">
+            <div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.history', 'Histórico'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body p-0" style="max-height:300px;overflow-y:auto;">
                 <ul class="list-group list-group-flush">
                 <?php foreach ($historico as $h): ?>
                 <li class="list-group-item small"><strong><?= date('d/m H:i', strtotime($h['created_at'])) ?></strong> — <?= ucfirst(str_replace('_',' ',$h['status_novo'])) ?><?php if ($h['observacao']): ?><br><span class="text-muted"><?= htmlspecialchars($h['observacao']) ?></span><?php endif; ?></li>
@@ -93,7 +93,7 @@
     <!-- Arquivos anexados (prints do bug) -->
     <?php if (!empty($arquivosBug)): ?>
     <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>Arquivos Anexados</h6></div>
+        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i><?= htmlspecialchars(__('admin.demands.attached_files', 'Arquivos Anexados'), ENT_QUOTES, 'UTF-8') ?></h6></div>
         <div class="card-body">
             <div class="row g-2">
                 <?php foreach ($arquivosBug as $arq):
@@ -121,12 +121,12 @@
     <!-- Chat / Comunicação -->
     <div class="card border-0 shadow-sm mb-4" id="chat">
         <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
-            <h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>Comunicação</h6>
+            <h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i><?= htmlspecialchars(__('admin.demands.communication', 'Comunicação'), ENT_QUOTES, 'UTF-8') ?></h6>
             <span class="badge bg-secondary"><?= count($mensagens ?? []) ?></span>
         </div>
         <div class="card-body" style="max-height:400px;overflow-y:auto;" id="chat-body">
             <?php if (empty($mensagens)): ?>
-                <div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>Nenhuma mensagem ainda. Use o campo abaixo para se comunicar.</div>
+                <div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i><?= htmlspecialchars(__('admin.demands.detail.no_messages', 'Nenhuma mensagem ainda. Use o campo abaixo para se comunicar.'), ENT_QUOTES, 'UTF-8') ?></div>
             <?php else: ?>
                 <?php $meuId = $_SESSION['usuario_id'] ?? 0; ?>
                 <?php foreach ($mensagens as $msg):
@@ -166,18 +166,18 @@
             <form method="POST" action="/admin/demandas/<?= $d['id'] ?>/mensagem" enctype="multipart/form-data">
                 <div class="d-flex gap-2">
                     <div class="flex-grow-1">
-                        <textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="Escreva uma mensagem..."></textarea>
+                        <textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="<?= htmlspecialchars(__('admin.demands.detail.write_message_ph', 'Escreva uma mensagem...'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                     </div>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <div>
                         <label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;">
-                            <i class="fas fa-paperclip me-1"></i>Anexar
-                            <input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip" onchange="this.closest('label').querySelector('span')&&this.closest('label').querySelector('span').remove();var s=document.createElement('span');s.className='ms-1 badge bg-primary';s.textContent=this.files.length+' arquivo(s)';this.closest('label').appendChild(s);">
+                            <i class="fas fa-paperclip me-1"></i><?= htmlspecialchars(__('admin.demands.attach', 'Anexar'), ENT_QUOTES, 'UTF-8') ?>
+                            <input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip" onchange="this.closest('label').querySelector('span')&&this.closest('label').querySelector('span').remove();var s=document.createElement('span');s.className='ms-1 badge bg-primary';s.textContent=this.files.length+' <?= htmlspecialchars(__('admin.demands.detail.files_count', 'arquivo(s)'), ENT_QUOTES, 'UTF-8') ?>';this.closest('label').appendChild(s);">
                         </label>
-                        <span class="text-muted small ms-2">Imagens, vídeos, PDF, DOC, ZIP</span>
+                        <span class="text-muted small ms-2"><?= htmlspecialchars(__('admin.demands.detail.file_types', 'Imagens, vídeos, PDF, DOC, ZIP'), ENT_QUOTES, 'UTF-8') ?></span>
                     </div>
-                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Enviar</button>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i><?= htmlspecialchars(__('common.send', 'Enviar'), ENT_QUOTES, 'UTF-8') ?></button>
                 </div>
             </form>
         </div>

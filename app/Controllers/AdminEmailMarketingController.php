@@ -1239,11 +1239,35 @@ async function verCampanha(id){
     const d=await r.json();
     if(!d.success){document.getElementById("modalCampBody").innerHTML="<p class=text-danger>"+d.error+"</p>";return;}
     const c=d.campanha;
+    var EM_STATUS_LABELS = ' . json_encode([
+        'rascunho_ia' => __('admin.email_marketing.status_draft_ai', 'Rascunho IA'),
+        'pendente_revisao' => __('admin.email_marketing.status_pending', 'Pendente'),
+        'aprovada' => __('admin.email_marketing.status_approved', 'Aprovada'),
+        'agendada' => __('admin.email_marketing.status_scheduled', 'Agendada'),
+        'disparando' => __('admin.email_marketing.status_dispatching', 'Disparando'),
+        'finalizada' => __('admin.email_marketing.status_finished', 'Finalizada'),
+        'rejeitada' => __('admin.email_marketing.status_rejected', 'Rejeitada'),
+        'cancelada' => __('admin.email_marketing.status_cancelled', 'Cancelada'),
+        'arquivada' => __('admin.email_marketing.status_archived', 'Arquivada'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
+    var EM_TYPE_LABELS = ' . json_encode([
+        'reativacao' => __('admin.email_marketing.type_short_reactivation', 'Reativação'),
+        'aniversario' => __('admin.email_marketing.type_short_birthday', 'Aniversário'),
+        'pos_venda' => __('admin.email_marketing.type_short_post_sale', 'Pós-venda'),
+        'categoria' => __('admin.email_marketing.type_short_category', 'Por Categoria'),
+        'vip' => __('admin.email_marketing.type_short_vip', 'Clientes VIP'),
+        'institucional' => __('admin.email_marketing.type_short_institutional', 'Institucional'),
+        'recompra' => __('admin.email_marketing.type_short_repurchase', 'Recompra'),
+        'carrinho_abandonado' => __('admin.email_marketing.type_short_abandoned_cart', 'Carrinho Abandonado'),
+        'individual' => __('admin.email_marketing.type_short_individual', 'Individual'),
+        'produtos' => __('admin.email_marketing.type_short_products', 'Vitrine de Produtos'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
+    function emLabel(map, k){ var key=String(k||"").toLowerCase().trim(); if(key==="") return "-"; return map[key] || (key.charAt(0).toUpperCase()+key.slice(1).replace(/_/g," ")); }
     document.getElementById("modalCampTitle").textContent=c.nome||"' . htmlspecialchars(__('admin.email_marketing.campaign_hash', 'Campanha #'), ENT_QUOTES, 'UTF-8') . '"+c.id;
     let html="<div class=row><div class=col-md-6>";
-    html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_status', 'Status:'), ENT_QUOTES, 'UTF-8') . '</strong> "+c.status+"</p>";
-    html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_type', 'Tipo:'), ENT_QUOTES, 'UTF-8') . '</strong> "+c.tipo+"</p>";
-    html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_trigger', 'Gatilho:'), ENT_QUOTES, 'UTF-8') . '</strong> "+(c.gatilho||"-")+"</p>";
+    html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_status', 'Status:'), ENT_QUOTES, 'UTF-8') . '</strong> "+emLabel(EM_STATUS_LABELS, c.status)+"</p>";
+    html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_type', 'Tipo:'), ENT_QUOTES, 'UTF-8') . '</strong> "+emLabel(EM_TYPE_LABELS, c.tipo)+"</p>";
+    html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_trigger', 'Gatilho:'), ENT_QUOTES, 'UTF-8') . '</strong> "+emLabel(EM_TYPE_LABELS, c.gatilho)+"</p>";
     html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_subject', 'Assunto:'), ENT_QUOTES, 'UTF-8') . '</strong> "+(c.assunto||"-")+"</p>";
     html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_clients', 'Clientes:'), ENT_QUOTES, 'UTF-8') . '</strong> "+c.total_clientes+"</p>";
     html+="<p><strong>' . htmlspecialchars(__('admin.email_marketing.label_ai_notes', 'Observações IA:'), ENT_QUOTES, 'UTF-8') . '</strong><br><small>"+(c.observacoes_ia||"-")+"</small></p>";

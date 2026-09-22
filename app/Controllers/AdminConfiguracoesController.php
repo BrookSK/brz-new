@@ -1172,7 +1172,7 @@ class AdminConfiguracoesController extends Controller {
   "channel": "whatsapp",
   "evento": "novo_pedido",
   "to": "5511999999999",
-  "message": "Olá Cliente, seu pedido #ABC123 está aprovado.",
+  "message": "' . __('admin.settings.payload_example_message', 'Olá Cliente, seu pedido #ABC123 está aprovado.') . '",
   "vars": {
     "evento": "novo_pedido",
     "pedido_id": "123",

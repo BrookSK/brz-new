@@ -364,5 +364,75 @@
     });
     </script>
     <?php endif; ?>
+
+    <!-- Localized file input (replaces the browser's native "Escolher arquivo / Nenhum arquivo escolhido") -->
+    <style>
+        .brz-file-i18n { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; max-width: 100%; }
+        .brz-file-i18n > input[type="file"] { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+        .brz-file-btn { display: inline-block; padding: .375rem .75rem; font-size: .875rem; line-height: 1.5; color: #212529; background: #f8f9fa; border: 1px solid #ced4da; border-radius: .375rem; cursor: pointer; white-space: nowrap; }
+        .brz-file-btn:hover { background: #e9ecef; }
+        .brz-file-name { color: #6c757d; font-size: .875rem; word-break: break-word; }
+    </style>
+    <script>
+    (function() {
+        var LABEL_CHOOSE = <?= json_encode(__('common.file.choose', 'Choose file'), JSON_UNESCAPED_UNICODE) ?>;
+        var LABEL_CHOOSE_MULTIPLE = <?= json_encode(__('common.file.choose_multiple', 'Choose files'), JSON_UNESCAPED_UNICODE) ?>;
+        var LABEL_NONE = <?= json_encode(__('common.file.none_selected', 'No file selected'), JSON_UNESCAPED_UNICODE) ?>;
+        var LABEL_COUNT = <?= json_encode(__('common.file.count_selected', '{n} files selected'), JSON_UNESCAPED_UNICODE) ?>;
+
+        function decorate(input) {
+            if (input.dataset.brzFileI18n === '1') return;
+            // Skip inputs that already have a custom picker (e.g. purchase-group picker)
+            if (input.classList.contains('purchase-group-file-input')) return;
+            if (input.getAttribute('type') !== 'file') return;
+            input.dataset.brzFileI18n = '1';
+
+            var wrap = document.createElement('span');
+            wrap.className = 'brz-file-i18n';
+            input.parentNode.insertBefore(wrap, input);
+
+            var btn = document.createElement('span');
+            btn.className = 'brz-file-btn';
+            btn.textContent = input.multiple ? LABEL_CHOOSE_MULTIPLE : LABEL_CHOOSE;
+
+            var name = document.createElement('span');
+            name.className = 'brz-file-name';
+            name.textContent = LABEL_NONE;
+
+            wrap.appendChild(input);
+            wrap.appendChild(btn);
+            wrap.appendChild(name);
+
+            btn.addEventListener('click', function() { input.click(); });
+            input.addEventListener('change', function() {
+                var files = input.files;
+                if (!files || files.length === 0) { name.textContent = LABEL_NONE; }
+                else if (files.length === 1) { name.textContent = files[0].name; }
+                else { name.textContent = LABEL_COUNT.replace('{n}', String(files.length)); }
+            });
+        }
+
+        function decorateAll(root) {
+            (root || document).querySelectorAll('input[type="file"]').forEach(decorate);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() { decorateAll(document); });
+        // Catch file inputs injected later (modals, dynamic rows)
+        if (window.MutationObserver) {
+            var mo = new MutationObserver(function(muts) {
+                muts.forEach(function(m) {
+                    m.addedNodes && m.addedNodes.forEach(function(n) {
+                        if (n.nodeType !== 1) return;
+                        if (n.matches && n.matches('input[type="file"]')) decorate(n);
+                        else if (n.querySelectorAll) decorateAll(n);
+                    });
+                });
+            });
+            document.addEventListener('DOMContentLoaded', function() {
+                mo.observe(document.body, { childList: true, subtree: true });
+            });
+        }
+    })();
+    </script>
 </body>
 </html>
