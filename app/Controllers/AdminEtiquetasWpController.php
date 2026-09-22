@@ -400,8 +400,8 @@ class AdminEtiquetasWpController extends Controller
         if (!empty($resp['success'])) {
             $tracking = $resp['tracking_number'] ?? '';
 
-            // Salvar no banco local também
-            $this->salvarEtiquetaLocal($pedidoId, $packageData['customerControlCode'], $tracking, $resp);
+            // Salvar no banco local também (retorna false se falhar ao persistir).
+            $salvouLocal = $this->salvarEtiquetaLocal($pedidoId, $packageData['customerControlCode'], $tracking, $resp);
 
             // Atualizar status do pedido
             try {
@@ -413,6 +413,8 @@ class AdminEtiquetasWpController extends Controller
                 'pedido_id' => $pedidoId,
                 'tracking_number' => $tracking,
                 'wp_post_id' => $resp['wp_post_id'] ?? null,
+                'salvo_local' => $salvouLocal,
+                'aviso_local' => $salvouLocal ? null : __('admin.labels_wp.label_not_saved_local', 'Atenção: etiqueta gerada no Correios, mas não foi possível salvar o rastreio no banco local. Verifique a tabela correios_packet_etiquetas.'),
             ]);
         } else {
             $this->json([
@@ -925,6 +927,103 @@ class AdminEtiquetasWpController extends Controller
         }
 
         $this->json(['success' => true, 'diagnostico' => $out]);
+    }
+
+    /**
+     * Recupera/sincroniza a etiqueta de um pedido a partir do WordPress quando a linha local
+     * em correios_packet_etiquetas está ausente (ex.: falha antiga ao salvar, apesar do status
+     * já estar 'etiqueta_gerada'). Busca o pacote no WP pelo código do pedido e grava localmente.
+     * POST /admin/etiquetas-wp/sincronizar-rastreio
+     * Body JSON: { pedido_id: int }
+     */
+    public function sincronizarRastreio(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) { $body = []; }
+        $pedidoId = (int) ($body['pedido_id'] ?? $request->getParam('pedido_id', 0));
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_order_id', 'pedido_id inválido')], 400);
+            return;
+        }
+
+        // Já existe linha local com tracking? Então nada a fazer.
+        try {
+            $st = $this->connection->prepare("SELECT tracking_number FROM correios_packet_etiquetas WHERE pedido_id = ? AND tracking_number IS NOT NULL AND tracking_number <> '' ORDER BY id DESC LIMIT 1");
+            $st->execute([$pedidoId]);
+            $ja = trim((string) ($st->fetchColumn() ?: ''));
+            if ($ja !== '') {
+                $this->json(['success' => true, 'tracking_number' => $ja, 'ja_existia' => true]);
+                return;
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Descobrir o código do pedido (customerControlCode usado ao gerar a etiqueta).
+        $pedidoModel = new PedidoEcommerce();
+        $pedido = $pedidoModel->getComDetalhes($pedidoId);
+        if (!is_array($pedido) || empty($pedido['id'])) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.order_not_found', 'Pedido não encontrado')], 404);
+            return;
+        }
+        $codigo = trim((string) ($pedido['codigo_pedido'] ?? ($pedido['numero_pedido'] ?? '')));
+        $termosBusca = array_values(array_filter([
+            $codigo,
+            'PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT),
+            (string) $pedidoId,
+        ], fn($v) => trim((string) $v) !== ''));
+
+        // Buscar o pacote no WordPress por cada termo até encontrar.
+        $encontrado = null;
+        foreach ($termosBusca as $termo) {
+            try {
+                $resp = $this->wp->listPackages(['search' => $termo, 'per_page' => 50]);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $lista = (is_array($resp) && isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : [];
+            foreach ($lista as $pkg) {
+                $orderId = trim((string) ($pkg['order_id'] ?? ''));
+                $trk = trim((string) ($pkg['tracking_code'] ?? ''));
+                if ($trk === '') continue;
+                // Casar por código do pedido OU pelo pedido_id local (meta) quando presente.
+                $pidMeta = (int) ($pkg['pedido_id_local'] ?? ($pkg['_pedido_id_local'] ?? 0));
+                if (($codigo !== '' && $orderId === $codigo) || $orderId === $termo || $pidMeta === $pedidoId) {
+                    $encontrado = $pkg;
+                    break 2;
+                }
+            }
+            // Se só houver um resultado com tracking, aceitar como match do termo.
+            if ($encontrado === null && count($lista) === 1) {
+                $trk = trim((string) ($lista[0]['tracking_code'] ?? ''));
+                if ($trk !== '') { $encontrado = $lista[0]; break; }
+            }
+        }
+
+        if ($encontrado === null) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.wp_package_not_found', 'Não encontrei o pacote correspondente no WordPress. Verifique se a etiqueta foi realmente gerada.')], 404);
+            return;
+        }
+
+        $tracking = trim((string) ($encontrado['tracking_code'] ?? ''));
+        $wpPostId = $encontrado['wp_post_id'] ?? null;
+        $salvou = $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $tracking, [
+            'tracking_number' => $tracking,
+            'wp_post_id' => $wpPostId,
+            'origem' => 'sincronizacao',
+        ]);
+
+        $this->json([
+            'success' => $salvou,
+            'pedido_id' => $pedidoId,
+            'tracking_number' => $tracking,
+            'wp_post_id' => $wpPostId,
+            'error' => $salvou ? null : __('admin.labels_wp.label_not_saved_local', 'Não foi possível salvar o rastreio no banco local.'),
+        ]);
     }
 
     /**
@@ -1814,7 +1913,7 @@ class AdminEtiquetasWpController extends Controller
         return $payload;
     }
 
-    private function salvarEtiquetaLocal(int $pedidoId, string $controlCode, string $tracking, array $resp): void
+    private function salvarEtiquetaLocal(int $pedidoId, string $controlCode, string $tracking, array $resp): bool
     {
         // Fallback robusto: se o tracking veio vazio, tentar extrair de formatos alternativos
         // que o WordPress/Correios possam retornar (aninhado, camelCase, etc.).
@@ -1858,27 +1957,74 @@ class AdminEtiquetasWpController extends Controller
                 $this->connection->exec($sql);
             }
 
-            // Garantir coluna wp_post_id existe
+            // Descobrir as colunas realmente existentes na tabela e montar o INSERT
+            // apenas com o que existe. Sem isso, se a coluna wp_post_id (ou outra) não
+            // existir e o ALTER falhar (ex.: permissão), o INSERT quebrava e a etiqueta
+            // NÃO era salva — apesar de o status do pedido já ter mudado (bug do #758).
+            $cols = [];
             try {
-                $cols = [];
                 $st = $this->connection->query('DESCRIBE correios_packet_etiquetas');
                 $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                if (!in_array('wp_post_id', $cols, true)) {
-                    $this->connection->exec('ALTER TABLE correios_packet_etiquetas ADD COLUMN wp_post_id INT NULL DEFAULT NULL');
-                }
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+                $cols = [];
+            }
 
-            $stIns = $this->connection->prepare('INSERT INTO correios_packet_etiquetas (pedido_id, customer_control_code, tracking_number, status, wp_post_id, last_response_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE tracking_number = VALUES(tracking_number), status = VALUES(status), wp_post_id = VALUES(wp_post_id), last_response_json = VALUES(last_response_json), updated_at = NOW()');
-            $stIns->execute([
-                $pedidoId,
-                $controlCode,
-                $tracking,
-                'gerada',
-                $resp['wp_post_id'] ?? null,
-                json_encode($resp),
-            ]);
+            // Tentar adicionar wp_post_id se faltar (best-effort).
+            if (!empty($cols) && !in_array('wp_post_id', $cols, true)) {
+                try {
+                    $this->connection->exec('ALTER TABLE correios_packet_etiquetas ADD COLUMN wp_post_id INT NULL DEFAULT NULL');
+                    $cols[] = 'wp_post_id';
+                } catch (\Exception $e) {
+                    // Segue sem a coluna — o INSERT abaixo simplesmente não a inclui.
+                }
+            }
+
+            // Montar dinamicamente colunas/valores conforme o schema real.
+            $dados = [
+                'pedido_id' => $pedidoId,
+                'customer_control_code' => $controlCode,
+                'tracking_number' => $tracking,
+                'status' => 'gerada',
+                'wp_post_id' => $resp['wp_post_id'] ?? null,
+                'last_response_json' => json_encode($resp),
+            ];
+            $insertCols = [];
+            $placeholders = [];
+            $valores = [];
+            $updateParts = [];
+            foreach ($dados as $col => $val) {
+                // pedido_id sempre entra; as demais só se a coluna existir no schema.
+                if ($col !== 'pedido_id' && !empty($cols) && !in_array($col, $cols, true)) {
+                    continue;
+                }
+                $insertCols[] = $col;
+                $placeholders[] = '?';
+                $valores[] = $val;
+                if ($col !== 'pedido_id') {
+                    $updateParts[] = $col . ' = VALUES(' . $col . ')';
+                }
+            }
+            // updated_at, se existir
+            $hasUpdatedAt = empty($cols) || in_array('updated_at', $cols, true);
+            $hasCreatedAt = empty($cols) || in_array('created_at', $cols, true);
+
+            $sqlCols = implode(', ', $insertCols);
+            $sqlVals = implode(', ', $placeholders);
+            if ($hasCreatedAt) { $sqlCols .= ', created_at'; $sqlVals .= ', NOW()'; }
+            if ($hasUpdatedAt) { $sqlCols .= ', updated_at'; $sqlVals .= ', NOW()'; }
+            if ($hasUpdatedAt) { $updateParts[] = 'updated_at = NOW()'; }
+
+            $sqlIns = 'INSERT INTO correios_packet_etiquetas (' . $sqlCols . ') VALUES (' . $sqlVals . ')';
+            if (!empty($updateParts)) {
+                $sqlIns .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts);
+            }
+
+            $stIns = $this->connection->prepare($sqlIns);
+            $stIns->execute($valores);
+            return true;
         } catch (\Exception $e) {
-            error_log('[ETIQUETAS_WP] Erro ao salvar etiqueta local: ' . $e->getMessage());
+            error_log('[ETIQUETAS_WP] Erro ao salvar etiqueta local (pedido #' . $pedidoId . '): ' . $e->getMessage());
+            return false;
         }
     }
 
