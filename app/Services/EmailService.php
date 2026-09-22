@@ -304,12 +304,24 @@ class EmailService {
             $this->smtpCmd($fp, 'RCPT TO:<' . $to . '>', [250, 251]);
             $this->smtpCmd($fp, 'DATA', [354]);
 
+            // Domínio do remetente para compor o Message-ID (o Gmail descarta silenciosamente
+            // e-mails sem Date/Message-ID válidos, mesmo o SMTP tendo aceitado).
+            $fromDomain = 'brazilianashop.com.br';
+            if (strpos($fromEmail, '@') !== false) {
+                $fromDomain = substr($fromEmail, strpos($fromEmail, '@') + 1);
+            }
+            $messageId = '<' . bin2hex(random_bytes(16)) . '@' . $fromDomain . '>';
+
             $headers = [];
+            $headers[] = 'Date: ' . date('r');
+            $headers[] = 'Message-ID: ' . $messageId;
             $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
             $headers[] = 'To: <' . $to . '>';
+            $headers[] = 'Reply-To: ' . $fromEmail;
             $headers[] = 'Subject: ' . $this->encodeHeaderName($subject);
             $headers[] = 'MIME-Version: 1.0';
             $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'Content-Transfer-Encoding: 8bit';
 
             $data = implode("\r\n", $headers) . "\r\n\r\n" . $html;
             $data = str_replace("\r\n.", "\r\n..", $data);
@@ -405,27 +417,50 @@ class EmailService {
         $meta['to_email'] = $to;
         $meta['subject'] = $subject;
 
+        $reserved = false;
         if ($dedupeKey !== '') {
             $ok = $this->reserveDedupeKey($pdo, $dedupeKey, $meta);
             if (!$ok) {
                 return;
             }
+            $reserved = true;
         }
 
-        if ($driver === 'smtp') {
-            $this->sendSmtpEmail($cfg, $to, $subject, $html, $fromEmail, $fromName);
+        // Envolver o envio para que, em caso de falha, a chave de deduplicação seja LIBERADA.
+        // Sem isso, um envio que falhou (ex.: SMTP indisponível) deixaria a chave reservada,
+        // fazendo o log parecer "enviado" e bloqueando futuros reenvios do mesmo evento/pedido.
+        try {
+            if ($driver === 'smtp') {
+                $this->sendSmtpEmail($cfg, $to, $subject, $html, $fromEmail, $fromName);
+                return;
+            }
+
+            $headers = [];
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
+            $headers[] = 'Reply-To: ' . $fromEmail;
+
+            $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
+            if (!$ok) {
+                throw new \Exception('Falha ao enviar e-mail (mail())');
+            }
+        } catch (\Throwable $e) {
+            if ($reserved) {
+                $this->releaseDedupeKey($pdo, $dedupeKey);
+            }
+            throw $e;
+        }
+    }
+
+    private function releaseDedupeKey(\PDO $pdo, string $dedupeKey): void {
+        if ($dedupeKey === '') {
             return;
         }
-
-        $headers = [];
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
-        $headers[] = 'Reply-To: ' . $fromEmail;
-
-        $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
-        if (!$ok) {
-            throw new \Exception('Falha ao enviar e-mail (mail())');
+        try {
+            $st = $pdo->prepare('DELETE FROM email_event_log WHERE dedupe_key = ?');
+            $st->execute([$dedupeKey]);
+        } catch (\Exception $e) {
         }
     }
 

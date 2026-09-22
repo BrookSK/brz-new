@@ -119,6 +119,15 @@ class WordPressEtiquetasService
         return $this->listPackages(['without_container' => '1', 'per_page' => 200]);
     }
 
+    /**
+     * Buscar pacotes de um pedido local específico por vínculo EXATO (_pedido_id_local = id).
+     * Confiável — não usa match parcial como o 'search'.
+     */
+    public function listPackagesByPedidoLocal(int $pedidoIdLocal): array
+    {
+        return $this->listPackages(['pedido_id_local' => $pedidoIdLocal, 'per_page' => 50]);
+    }
+
     // =========================================================
     // CONTAINERS (Unitizadores)
     // =========================================================

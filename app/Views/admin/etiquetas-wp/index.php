@@ -50,6 +50,7 @@
         <button class="ewp-tab-btn" onclick="switchTab('faturas')">🧾 <?= __('admin.labels_wp.tab_invoices','Faturas') ?></button>
         <button class="ewp-tab-btn" onclick="switchTab('embarques')">✈️ <?= __('admin.labels_wp.tab_shipments','Embarques') ?></button>
         <button class="ewp-tab-btn" onclick="switchTab('documentacao')">📄 <?= __('admin.labels_wp.tab_documentation','Documentação') ?></button>
+        <button class="ewp-tab-btn" onclick="switchTab('notificacoes')">🔔 <?= __('admin.labels_wp.tab_notifications','Notificações') ?></button>
     </div>
     <!-- ETIQUETAS -->
     <div class="ewp-panel" id="panel-etiquetas">
@@ -90,6 +91,7 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
                     <select class="form-select form-select-sm" id="mala-mover-select" style="width:auto;min-width:160px;display:none;"><option value=""><?= __('admin.labels_wp.select_bag','Selecione a mala...') ?></option></select>
                     <button class="btn btn-sm btn-primary" id="btnMoverParaMala" style="display:none;" onclick="moverParaMala()"><i class="fas fa-suitcase me-1"></i><span id="btnMoverParaMalaText"><?= __('admin.labels_wp.move_to_bag','Mover para mala') ?></span></button>
                     <button class="btn btn-sm btn-outline-danger" id="btnBaixarMassa" style="display:none;" onclick="baixarEtiquetasMassa()"><i class="fas fa-download me-1"></i><span id="btnBaixarMassaText"><?= __('admin.labels_wp.download_labels','Baixar Etiquetas') ?></span></button>
+                    <button class="btn btn-sm btn-success" id="btnNotificarSelecionados" style="display:none;" onclick="notificarSelecionados()"><i class="fas fa-paper-plane me-1"></i><span id="btnNotificarSelecionadosText"><?= __('admin.labels_wp.notify_customers','Notificar clientes') ?></span></button>
                 </div>
             </div>
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
@@ -218,6 +220,77 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
             </div>
         </div>
     </div>
+
+    <!-- NOTIFICAÇÕES -->
+    <div class="ewp-panel" id="panel-notificacoes" style="display:none;">
+        <div class="card ewp-card">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
+                <strong class="small"><?= __('admin.labels_wp.notify_tracking_title','Notificar rastreio ao cliente') ?></strong>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm" id="notif-busca" style="width:auto;min-width:180px;" placeholder="<?= htmlspecialchars(__('admin.labels_wp.search_placeholder','Buscar por pedido, cliente, tracking...'), ENT_QUOTES, 'UTF-8') ?>" oninput="filtrarNotif(this.value)">
+                    <button class="btn btn-sm btn-success" id="btnNotificarLista" style="display:none;" onclick="notificarDaLista()"><i class="fas fa-paper-plane me-1"></i><span id="btnNotificarListaText"><?= __('admin.labels_wp.notify_customers','Notificar clientes') ?></span></button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <p class="text-muted small px-3 pt-2 mb-2"><?= __('admin.labels_wp.notify_tracking_help','Todos os pedidos com etiqueta gerada (independente de container/fatura/embarque). Selecione e clique em notificar para enviar o rastreio por e-mail e WhatsApp.') ?></p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light"><tr>
+                            <th style="width:30px"><input type="checkbox" id="checkAllNotif" onclick="toggleAllNotif()"></th>
+                            <th><?= __('admin.labels_wp.col_order','Pedido') ?></th>
+                            <th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_customer','Cliente') ?></th>
+                            <th><?= __('admin.labels_wp.col_tracking','Tracking') ?></th>
+                            <th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_email','E-mail') ?></th>
+                            <th><?= __('admin.labels_wp.col_generated_at','Gerada em') ?></th>
+                        </tr></thead>
+                        <tbody id="notif-body">
+<?php
+$pedidosNotif = [];
+try {
+    $conn = \Config\Database::getConnection();
+    // Detectar coluna de nome/email do cliente na tabela pedidos (preferir dados do pedido).
+    $colsPed = [];
+    try { $stc = $conn->query('DESCRIBE pedidos'); $colsPed = $stc ? $stc->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+    $selNome = in_array('cliente_nome', $colsPed, true) ? 'p.cliente_nome' : 'NULL';
+    $selEmail = in_array('cliente_email', $colsPed, true) ? 'p.cliente_email' : 'NULL';
+    $selCodigo = in_array('codigo_pedido', $colsPed, true) ? 'p.codigo_pedido' : (in_array('numero_pedido', $colsPed, true) ? 'p.numero_pedido' : 'NULL');
+    $st = $conn->prepare("SELECT cpe.pedido_id, cpe.tracking_number, cpe.created_at,
+                {$selNome} AS cliente_nome, {$selEmail} AS cliente_email, {$selCodigo} AS codigo_pedido,
+                u.nome AS usu_nome, u.email AS usu_email
+            FROM correios_packet_etiquetas cpe
+            LEFT JOIN pedidos p ON p.id = cpe.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            WHERE cpe.tracking_number IS NOT NULL AND cpe.tracking_number <> ''
+              AND (cpe.status IS NULL OR LOWER(cpe.status) NOT IN ('cancelado','cancelada','cancelled'))
+            ORDER BY cpe.id DESC LIMIT 500");
+    $st->execute();
+    $pedidosNotif = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+} catch (\Exception $e) { $pedidosNotif = []; }
+if (empty($pedidosNotif)): ?>
+                            <tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i><?= __('admin.labels_wp.no_labels_generated','Nenhuma etiqueta gerada ainda') ?></td></tr>
+<?php else: foreach ($pedidosNotif as $pn):
+    $pid = (int) ($pn['pedido_id'] ?? 0);
+    $nome = trim((string) ($pn['cliente_nome'] ?? '')) !== '' ? (string) $pn['cliente_nome'] : (string) ($pn['usu_nome'] ?? '-');
+    $email = trim((string) ($pn['cliente_email'] ?? '')) !== '' ? (string) $pn['cliente_email'] : (string) ($pn['usu_email'] ?? '');
+    $trk = (string) ($pn['tracking_number'] ?? '');
+    $cod = trim((string) ($pn['codigo_pedido'] ?? '')) !== '' ? (string) $pn['codigo_pedido'] : ('#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT));
+    $ger = !empty($pn['created_at']) ? date('d/m/Y H:i', strtotime((string) $pn['created_at'])) : '-';
+?>
+                            <tr class="notif-row">
+                                <td><input type="checkbox" class="chk-notif" value="<?= $pid ?>" data-email="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>" onchange="updateNotificarLista()"></td>
+                                <td><strong><?= htmlspecialchars($cod, ENT_QUOTES, 'UTF-8') ?></strong><?= $pid > 0 ? (' <a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="small">#' . $pid . '</a>') : '' ?></td>
+                                <td class="d-none d-md-table-cell"><?= htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><code class="small"><?= htmlspecialchars($trk, ENT_QUOTES, 'UTF-8') ?></code></td>
+                                <td class="d-none d-md-table-cell small"><?= $email !== '' ? htmlspecialchars($email, ENT_QUOTES, 'UTF-8') : '<span class="text-danger">—</span>' ?></td>
+                                <td class="small text-nowrap"><?= $ger ?></td>
+                            </tr>
+<?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Nova Mala -->
@@ -314,7 +387,7 @@ function renderPacoteRow(tbody, p) {
     const badge = isCancelado ? ' <span class="badge bg-secondary" style="font-size:0.65rem;">' + <?= json_encode(__('admin.labels_wp.cancelled','Cancelado')) ?> + '</span>' : '';
     const malaBadge = (p.mala_nome && !isCancelado) ? ' <span class="badge bg-info text-dark" style="font-size:0.6rem;">' + escHtmlCnt(p.mala_nome) + '</span>' : '';
     const pdfUrl = (p.wp_post_id && !isCancelado) ? BASE + '/pdf/pacote/' + p.wp_post_id : '';
-    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala()">' : '';
+    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala();updateNotificarSelecionados()">' : '';
     const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="' + <?= json_encode(__('admin.labels_wp.regenerate_label','Regerar etiqueta')) ?> + '"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
     if (tbody) tbody.innerHTML += row;
     return row;
@@ -401,9 +474,81 @@ function updateMassBtn(){const n=document.querySelectorAll('.chk-pedido:checked'
 async function gerarEtiquetasMassa(){const ids=[...document.querySelectorAll('.chk-pedido:checked')].map(e=>parseInt(e.value));if(!ids.length)return;const malaId=document.getElementById('mala-geracaoMassa').value;const malaMsg=malaId?(' '+<?= json_encode(__('admin.labels_wp.assign_selected_bag','(atribuir à mala selecionada)')) ?>):'';if(!confirm(<?= json_encode(__('admin.labels_wp.confirm_generate_wp','Gerar {n} etiqueta(s) via WordPress?')) ?>.replace('{n}', ids.length)+malaMsg))return;const btn=document.getElementById('btnGerarMassa');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>'+<?= json_encode(__('admin.labels_wp.generating','Gerando...')) ?>;try{const r=await fetch(BASE+'/gerar-etiquetas-massa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});const d=await r.json();const el=document.getElementById('pedidos-resultado');el.style.display='block';if(d.success){let h='<div class="alert alert-'+(d.failed>0?'warning':'success')+' py-2 small"><strong>'+<?= json_encode(__('admin.labels_wp.n_generated','{n} gerada(s)')) ?>.replace('{n}', d.generated)+'</strong>'+(d.failed>0?(', '+<?= json_encode(__('admin.labels_wp.n_failures','{n} falha(s)')) ?>.replace('{n}', d.failed)):'');if(d.results)d.results.forEach(r=>{if(r.tracking_number)h+='<br><code>'+r.tracking_number+'</code>';if(r.error)h+='<br><span class="text-danger">#'+r.pedido_id+': '+r.error+'</span>';});h+='</div>';el.innerHTML=h;if(d.generated>0&&malaId){const trackings=d.results.filter(r=>r.success&&r.tracking_number).map(r=>r.tracking_number);const pedidoIds=d.results.filter(r=>r.success).map(r=>r.pedido_id);if(trackings.length>0){try{await fetch(BASE+'/atribuir-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mala_id:parseInt(malaId),tracking_codes:trackings,pedido_ids:pedidoIds})});}catch(e){}}}if(d.generated>0)setTimeout(()=>location.reload(),2000);}else{el.innerHTML='<div class="alert alert-danger py-2 small">'+(d.error||<?= json_encode(__('admin.labels_wp.error','Erro')) ?>)+'</div>';}}catch(e){alert(<?= json_encode(__('admin.labels_wp.error_prefix','Erro:')) ?>+' '+e.message);}btn.disabled=false;updateMassBtn();}
 
 // TOGGLE ALL PACOTES (download em massa)
-function toggleAllPacotes(){const checked=document.getElementById('checkAllPacotes').checked;document.querySelectorAll('.chk-pacote-dl').forEach(cb=>{cb.checked=checked;});updateBaixarMassa();updateMoverMala();}
+function toggleAllPacotes(){const checked=document.getElementById('checkAllPacotes').checked;document.querySelectorAll('.chk-pacote-dl').forEach(cb=>{cb.checked=checked;});updateBaixarMassa();updateMoverMala();updateNotificarSelecionados();}
 function updateBaixarMassa(){const checked=document.querySelectorAll('.chk-pacote-dl:checked').length;const btn=document.getElementById('btnBaixarMassa');const txt=document.getElementById('btnBaixarMassaText');if(btn){btn.style.display=checked>0?'':'none';}if(txt){txt.textContent=checked>1?(<?= json_encode(__('admin.labels_wp.download_n_labels','Baixar {n} Etiquetas')) ?>.replace('{n}', checked)):<?= json_encode(__('admin.labels_wp.download_label','Baixar Etiqueta')) ?>;}}
 async function baixarEtiquetasMassa(){const checks=[...document.querySelectorAll('.chk-pacote-dl:checked')];if(!checks.length){alert(<?= json_encode(__('admin.labels_wp.select_at_least_one_label','Selecione pelo menos 1 etiqueta.')) ?>);return;}const btn=document.getElementById('btnBaixarMassa');if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>'+<?= json_encode(__('admin.labels_wp.downloading','Baixando...')) ?>;}let downloaded=0;for(const cb of checks){const url=cb.getAttribute('data-pdf-url');const pedido=cb.getAttribute('data-pedido')||'etiqueta';if(!url)continue;try{const resp=await fetch(url);if(!resp.ok)continue;const blob=await resp.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='etiqueta_'+pedido.replace('#','')+'.pdf';document.body.appendChild(link);link.click();document.body.removeChild(link);URL.revokeObjectURL(link.href);downloaded++;await new Promise(r=>setTimeout(r,300));}catch(e){console.error('Erro baixando '+url,e);}}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-download me-1"></i><span id="btnBaixarMassaText">'+<?= json_encode(__('admin.labels_wp.download_labels','Baixar Etiquetas')) ?>+'</span>';updateBaixarMassa();}if(downloaded>0)alert(<?= json_encode(__('admin.labels_wp.n_labels_downloaded','{n} etiqueta(s) baixada(s) com sucesso!')) ?>.replace('{n}', downloaded));}
+
+// NOTIFICAR CLIENTES SELECIONADOS (e-mail + WhatsApp com o rastreio)
+// Mostra/esconde o botão conforme houver pacotes selecionados COM pedido local vinculado.
+function updateNotificarSelecionados(){
+    const pedidoIds=[...document.querySelectorAll('.chk-pacote-dl:checked')].map(cb=>parseInt(cb.getAttribute('data-pedido-id')||'0')).filter(v=>v>0);
+    const btn=document.getElementById('btnNotificarSelecionados');
+    const txt=document.getElementById('btnNotificarSelecionadosText');
+    if(!btn)return;
+    if(pedidoIds.length>0){
+        btn.style.display='';
+        if(txt)txt.textContent=(<?= json_encode(__('admin.labels_wp.notify_n_customers','Notificar {n} cliente(s)')) ?>).replace('{n}', pedidoIds.length);
+    } else {
+        btn.style.display='none';
+    }
+}
+async function notificarSelecionados(){
+    const pedidoIds=[...document.querySelectorAll('.chk-pacote-dl:checked')].map(cb=>parseInt(cb.getAttribute('data-pedido-id')||'0')).filter(v=>v>0);
+    if(!pedidoIds.length){alert(<?= json_encode(__('admin.labels_wp.no_linked_order_selected','Selecione ao menos um pacote com pedido vinculado.')) ?>);return;}
+    if(!confirm((<?= json_encode(__('admin.labels_wp.confirm_notify_n','Enviar notificação de rastreio (e-mail e WhatsApp) para {n} cliente(s)?')) ?>).replace('{n}', pedidoIds.length)))return;
+    const btn=document.getElementById('btnNotificarSelecionados');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>';}
+    try{
+        const r=await fetch(BASE+'/notificar-selecionados',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedido_ids:pedidoIds})});
+        const d=await r.json();
+        if(d.success){
+            alert((<?= json_encode(__('admin.labels_wp.notify_result','Notificações enviadas: {ok}. Falhas: {fail}.')) ?>).replace('{ok}', d.enviadas||0).replace('{fail}', d.falhas||0));
+        } else {
+            alert((<?= json_encode(__('admin.labels_wp.error_prefix','Erro:')) ?>)+' '+(d.error||(<?= json_encode(__('admin.labels_wp.notify_failed','Falha ao enviar notificações.')) ?>)));
+        }
+    }catch(e){alert(e.message);}
+    finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane me-1"></i><span id="btnNotificarSelecionadosText">'+(<?= json_encode(__('admin.labels_wp.notify_customers','Notificar clientes')) ?>)+'</span>';updateNotificarSelecionados();}}
+}
+
+// ABA NOTIFICAÇÕES (lista server-side de pedidos com etiqueta gerada, independente de estágio)
+function filtrarNotif(termo){
+    const t=(termo||'').toLowerCase();
+    document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>{
+        tr.style.display=(!t||tr.textContent.toLowerCase().includes(t))?'':'none';
+    });
+}
+function toggleAllNotif(){
+    const c=document.getElementById('checkAllNotif').checked;
+    document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>{
+        if(tr.style.display==='none')return; // só marca os visíveis (respeita filtro)
+        const cb=tr.querySelector('.chk-notif');if(cb)cb.checked=c;
+    });
+    updateNotificarLista();
+}
+function updateNotificarLista(){
+    const n=document.querySelectorAll('.chk-notif:checked').length;
+    const btn=document.getElementById('btnNotificarLista');
+    const txt=document.getElementById('btnNotificarListaText');
+    if(!btn)return;
+    if(n>0){btn.style.display='';if(txt)txt.textContent=(<?= json_encode(__('admin.labels_wp.notify_n_customers','Notificar {n} cliente(s)')) ?>).replace('{n}', n);}
+    else{btn.style.display='none';}
+}
+async function notificarDaLista(){
+    const ids=[...document.querySelectorAll('.chk-notif:checked')].map(cb=>parseInt(cb.value)).filter(v=>v>0);
+    if(!ids.length){alert(<?= json_encode(__('admin.labels_wp.select_at_least_one_label','Selecione pelo menos 1 etiqueta.')) ?>);return;}
+    if(!confirm((<?= json_encode(__('admin.labels_wp.confirm_notify_n','Enviar notificação de rastreio (e-mail e WhatsApp) para {n} cliente(s)?')) ?>).replace('{n}', ids.length)))return;
+    const btn=document.getElementById('btnNotificarLista');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>';}
+    try{
+        const r=await fetch(BASE+'/notificar-selecionados',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedido_ids:ids})});
+        const d=await r.json();
+        if(d.success){alert((<?= json_encode(__('admin.labels_wp.notify_result','Notificações enviadas: {ok}. Falhas: {fail}.')) ?>).replace('{ok}', d.enviadas||0).replace('{fail}', d.falhas||0));}
+        else{alert((<?= json_encode(__('admin.labels_wp.error_prefix','Erro:')) ?>)+' '+(d.error||(<?= json_encode(__('admin.labels_wp.notify_failed','Falha ao enviar notificações.')) ?>)));}
+    }catch(e){alert(e.message);}
+    finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane me-1"></i><span id="btnNotificarListaText">'+(<?= json_encode(__('admin.labels_wp.notify_customers','Notificar clientes')) ?>)+'</span>';updateNotificarLista();}}
+}
 
 // MOVER ETIQUETAS PARA MALA
 // Popula o select de malas do card "Pacotes gerados".

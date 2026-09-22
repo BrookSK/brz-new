@@ -7,6 +7,8 @@ use App\Services\EmailService;
 class NotificationService {
     private PedidoEcommerce $pedidoModel;
     private EmailService $emailService;
+    private ?string $motivoEmailNaoEnviado = null;
+    private ?string $ultimoDestinoEmail = null;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -22,29 +24,49 @@ class NotificationService {
         return $aliases[$e] ?? $e;
     }
 
-    public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): void {
+    public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): array {
+        $resultado = [
+            'email_enviado' => false,
+            'email_erro' => null,
+            'whatsapp_enviado' => false,
+            'whatsapp_erro' => null,
+        ];
+
         if (empty($eventoNome)) {
-            return;
+            $resultado['email_erro'] = 'Evento vazio';
+            return $resultado;
         }
 
         $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
         if (!is_array($pedido) || empty($pedido['id'])) {
-            return;
+            $resultado['email_erro'] = 'Pedido não encontrado';
+            return $resultado;
         }
 
         $vars = $this->buildVars($pedido, $eventoNome, $extra);
 
+        $resultado['email_destino'] = (string) ($vars['email'] ?? '');
         try {
-            $this->enviarEmailPorEvento($eventoNome, $vars);
-        } catch (\Exception $e) {
+            $enviados = $this->enviarEmailPorEvento($eventoNome, $vars);
+            $resultado['email_enviado'] = $enviados > 0;
+            $resultado['email_destino'] = $this->ultimoDestinoEmail ?? (string) ($vars['email'] ?? '');
+            if ($enviados === 0) {
+                $resultado['email_erro'] = $this->motivoEmailNaoEnviado ?? 'Nenhum e-mail enviado (sem destinatário, template ou envio desativado)';
+            }
+        } catch (\Throwable $e) {
+            $resultado['email_erro'] = $e->getMessage();
             error_log('[NOTIFICACOES][EMAIL] Falha ao enviar: ' . $e->getMessage());
         }
 
         try {
-            $this->enviarWhatsAppPorWebhook($eventoNome, $vars);
-        } catch (\Exception $e) {
+            $enviouWa = $this->enviarWhatsAppPorWebhook($eventoNome, $vars);
+            $resultado['whatsapp_enviado'] = (bool) $enviouWa;
+        } catch (\Throwable $e) {
+            $resultado['whatsapp_erro'] = $e->getMessage();
             error_log('[NOTIFICACOES][WHATSAPP] Falha ao enviar: ' . $e->getMessage());
         }
+
+        return $resultado;
     }
 
     private function buildVars(array $pedido, string $eventoNome, array $extra): array {
@@ -205,10 +227,12 @@ class NotificationService {
         return $base;
     }
 
-    private function enviarEmailPorEvento(string $eventoNome, array $vars): void {
+    private function enviarEmailPorEvento(string $eventoNome, array $vars): int {
+        $this->motivoEmailNaoEnviado = null;
         $enabled = $this->getConfig('email', 'enabled', '1');
         if ($enabled === '0' || strtolower($enabled) === 'false') {
-            return;
+            $this->motivoEmailNaoEnviado = 'Envio de e-mail desativado (config email_enabled = ' . $enabled . ')';
+            return 0;
         }
 
         $tplEventoNome = $this->resolveTemplateEventoNome($eventoNome);
@@ -260,7 +284,8 @@ class NotificationService {
         }
 
         if (empty($tos)) {
-            return;
+            $this->motivoEmailNaoEnviado = 'Sem destinatário válido (cliente_email do pedido vazio/inválido e sem override configurado). email recebido="' . (string) ($vars['email'] ?? '') . '"';
+            return 0;
         }
         $tpl = $this->getEmailTemplate($eventoNome);
         $subjectTpl = (string) ($tpl['assunto'] ?? '');
@@ -286,20 +311,36 @@ class NotificationService {
         $pedidoId = (int) ($vars['pedido_id'] ?? 0);
         $dedupeKeyEvento = $tplEventoNome !== '' ? $tplEventoNome : $eventoNome;
 
+        $enviados = 0;
+        $ultimoErro = null;
         foreach ($tos as $to) {
             $to = trim((string) $to);
             if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
                 continue;
             }
             $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
-            $this->emailService->send($to, $subject, $html, $dedupeKey, [
-                'evento' => $eventoNome,
-                'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
-            ]);
+            $this->ultimoDestinoEmail = $to;
+            try {
+                $this->emailService->send($to, $subject, $html, $dedupeKey, [
+                    'evento' => $eventoNome,
+                    'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
+                ]);
+                $enviados++;
+            } catch (\Throwable $e) {
+                $ultimoErro = $e->getMessage();
+                error_log('[NOTIFICACOES][EMAIL] Falha ao enviar para ' . $to . ': ' . $e->getMessage());
+            }
         }
+
+        // Se havia destinatário mas NENHUM e-mail saiu, propagar o erro para o chamador saber.
+        if ($enviados === 0 && $ultimoErro !== null) {
+            throw new \Exception($ultimoErro);
+        }
+
+        return $enviados;
     }
 
-    private function enviarWhatsAppPorWebhook(string $eventoNome, array $vars): void {
+    private function enviarWhatsAppPorWebhook(string $eventoNome, array $vars): bool {
         $webhookConfig = $this->getWebhookConfig($eventoNome);
 
         $url = (string) ($webhookConfig['url'] ?? '');
@@ -310,12 +351,12 @@ class NotificationService {
             }
         }
         if ($url === '') {
-            return;
+            return false;
         }
 
         $telefone = preg_replace('/\D+/', '', (string) ($vars['telefone'] ?? ''));
         if ($telefone === '') {
-            return;
+            return false;
         }
 
         $template = (string) ($webhookConfig['template'] ?? '');
@@ -400,7 +441,7 @@ class NotificationService {
             if (!empty($disparoId)) {
                 $this->finalizarLogDisparo((int) $disparoId, $code, (string) $resp, 'sucesso');
             }
-            return;
+            return true;
         }
 
         $context = stream_context_create([
@@ -416,6 +457,7 @@ class NotificationService {
         if (!empty($disparoId)) {
             $this->finalizarLogDisparo((int) $disparoId, 0, (string) $resp, 'sucesso');
         }
+        return $resp !== false;
     }
 
     private function getWebhookConfig(string $eventoNome): array {
