@@ -9,6 +9,7 @@ class NotificationService {
     private EmailService $emailService;
     private ?string $motivoEmailNaoEnviado = null;
     private ?string $ultimoDestinoEmail = null;
+    private bool $ignorarDedupe = false;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -24,7 +25,8 @@ class NotificationService {
         return $aliases[$e] ?? $e;
     }
 
-    public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): array {
+    public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = [], bool $ignorarDedupe = false): array {
+        $this->ignorarDedupe = $ignorarDedupe;
         $resultado = [
             'email_enviado' => false,
             'email_erro' => null,
@@ -318,7 +320,10 @@ class NotificationService {
             if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
                 continue;
             }
-            $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+            // Reenvio manual (ignorarDedupe) usa dedupeKey vazio = envia SEMPRE, sem bloqueio.
+            $dedupeKey = $this->ignorarDedupe
+                ? ''
+                : ('pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to));
             $this->ultimoDestinoEmail = $to;
             try {
                 $enviouEste = $this->emailService->send($to, $subject, $html, $dedupeKey, [

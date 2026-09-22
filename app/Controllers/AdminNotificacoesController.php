@@ -1538,7 +1538,8 @@ class AdminNotificacoesController extends Controller {
         }
 
         try {
-            $r = (new \App\Services\NotificationService())->notificarEventoPedido($evento, $pedidoId, []);
+            // Reenvio manual: ignorar deduplicação (forçar envio sempre).
+            $r = (new \App\Services\NotificationService())->notificarEventoPedido($evento, $pedidoId, [], true);
         } catch (\Throwable $e) {
             $this->json(['success' => false, 'error' => __('admin.notifications.resend_failed', 'Falha ao reenviar: ') . $e->getMessage()], 500);
             return;
