@@ -8019,6 +8019,7 @@ return [
     'admin.order_details.comp_products' => 'Products',
     'admin.order_details.comp_service_fee' => 'Service Fee',
     'admin.order_details.comp_taxes' => 'Taxes',
+    'admin.order_details.comp_local_tax' => 'Local Tax',
     'admin.order_details.comp_total_payment' => 'Total Payment',
     'admin.order_details.comp_wallet' => 'Wallet',
     'admin.order_details.comp_gateway_taxes_diff' => 'Gateway (Taxes + Difference)',

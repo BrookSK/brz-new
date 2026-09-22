@@ -1,5 +1,31 @@
 <?php $title = __('admin.installment.purchases_title', 'Compras do Carnê'); ?>
-<?php $allModals = []; ?>
+<?php
+$allModals = [];
+// i18n maps for the plan status (carne) and purchase status columns
+$carneStatusLabels = [
+    'aguardando_primeira_parcela' => __('admin.installment.status_awaiting_first', 'Aguardando 1ª Parcela'),
+    'ativo' => __('admin.installment.status_active', 'Ativo'),
+    'em_andamento' => __('admin.installment.status_in_progress', 'Em Andamento'),
+    'com_atraso' => __('admin.installment.status_overdue', 'Com Atraso'),
+    'quitado' => __('admin.installment.status_paid_off', 'Quitado'),
+    'cancelado' => __('admin.installment.status_cancelled', 'Cancelado'),
+];
+$purchaseStatusLabels = [
+    'aguardando_compra' => __('admin.installment.purchase_status_awaiting', 'Aguardando compra'),
+    'comprado' => __('admin.installment.purchase_status_purchased', 'Comprado'),
+    'recebido' => __('admin.installment.purchase_status_received', 'Recebido'),
+];
+$carneStatusLabel = function(?string $k) use ($carneStatusLabels): string {
+    $key = strtolower(trim((string) $k));
+    if ($key === '') return '-';
+    return $carneStatusLabels[$key] ?? ucfirst(str_replace('_', ' ', $key));
+};
+$purchaseStatusLabel = function(?string $k) use ($purchaseStatusLabels): string {
+    $key = strtolower(trim((string) $k));
+    if ($key === '') return '-';
+    return $purchaseStatusLabels[$key] ?? ucfirst(str_replace('_', ' ', $key));
+};
+?>
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
@@ -172,10 +198,10 @@
                                         <div style="font-size:10px;" class="text-danger"><i class="fas fa-times-circle"></i> <?= __('admin.installment.first_pending', '1ª pendente') ?></div>
                                     <?php endif; ?>
                                 </td>
-                                <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $carneStatus === 'quitado' ? 'success' : ($carneStatus === 'com_atraso' ? 'danger' : 'primary') ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $carneStatus)) ?></span></td>
+                                <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $carneStatus === 'quitado' ? 'success' : ($carneStatus === 'com_atraso' ? 'danger' : 'primary') ?>" style="font-size:10px;"><?= htmlspecialchars($carneStatusLabel($carneStatus)) ?></span></td>
                                 <td class="d-none d-xl-table-cell small text-muted"><?= !empty($ci['data_inicio']) ? date('d/m/Y', strtotime($ci['data_inicio'])) : '-' ?></td>
                                 <td class="d-none d-xl-table-cell small text-muted"><?= !empty($ci['data_fim_estimada']) ? date('d/m/Y', strtotime($ci['data_fim_estimada'])) : '-' ?></td>
-                                <td><span class="badge bg-<?= $statusCompra === 'comprado' ? 'success' : ($statusCompra === 'recebido' ? 'info' : 'warning') ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $statusCompra)) ?></span></td>
+                                <td><span class="badge bg-<?= $statusCompra === 'comprado' ? 'success' : ($statusCompra === 'recebido' ? 'info' : 'warning') ?>" style="font-size:10px;"><?= htmlspecialchars($purchaseStatusLabel($statusCompra)) ?></span></td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#<?= $modalId ?>" title="<?= htmlspecialchars(__('admin.installment.view_details', 'Ver detalhes'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-eye"></i></button>
@@ -215,10 +241,10 @@
                     <tr><th><?= __('admin.installment.col_product', 'Produto') ?></th><td><?= htmlspecialchars($m['prodNome']) ?> (<?= __('admin.installment.qty_short', 'Qtd:') ?> <?= (int) ($m['ci']['quantidade'] ?? 1) ?>)</td></tr>
                     <tr><th><?= __('admin.installment.total_plan', 'Total Carnê') ?></th><td>R$ <?= number_format((float) ($m['ci']['total_geral'] ?? 0), 2, ',', '.') ?></td></tr>
                     <tr><th><?= __('admin.installment.installments', 'Parcelas') ?></th><td><?= __('admin.installment.paid_of', '{p} pagas de {t}', ['p' => (int) ($m['ci']['parcelas_pagas'] ?? 0), 't' => (int) ($m['ci']['quantidade_parcelas'] ?? 0)]) ?></td></tr>
-                    <tr><th><?= __('admin.installment.col_plan_status', 'Status Carnê') ?></th><td><?= ucfirst(str_replace('_', ' ', $m['carneStatus'])) ?></td></tr>
+                    <tr><th><?= __('admin.installment.col_plan_status', 'Status Carnê') ?></th><td><?= htmlspecialchars($carneStatusLabel($m['carneStatus'])) ?></td></tr>
                     <tr><th><?= __('admin.installment.col_start', 'Início') ?></th><td><?= !empty($m['ci']['data_inicio']) ? date('d/m/Y', strtotime($m['ci']['data_inicio'])) : '-' ?></td></tr>
                     <tr><th><?= __('admin.installment.col_estimated_end', 'Fim Estimado') ?></th><td><?= !empty($m['ci']['data_fim_estimada']) ? date('d/m/Y', strtotime($m['ci']['data_fim_estimada'])) : '-' ?></td></tr>
-                    <tr><th><?= __('admin.installment.purchase_status', 'Status Compra') ?></th><td><?= ucfirst(str_replace('_', ' ', $m['statusCompra'])) ?></td></tr>
+                    <tr><th><?= __('admin.installment.purchase_status', 'Status Compra') ?></th><td><?= htmlspecialchars($purchaseStatusLabel($m['statusCompra'])) ?></td></tr>
                 </table>
             </div>
             <div class="modal-footer">
