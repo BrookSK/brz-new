@@ -304,12 +304,24 @@ class EmailService {
             $this->smtpCmd($fp, 'RCPT TO:<' . $to . '>', [250, 251]);
             $this->smtpCmd($fp, 'DATA', [354]);
 
+            // Domínio do remetente para compor o Message-ID (o Gmail descarta silenciosamente
+            // e-mails sem Date/Message-ID válidos, mesmo o SMTP tendo aceitado).
+            $fromDomain = 'brazilianashop.com.br';
+            if (strpos($fromEmail, '@') !== false) {
+                $fromDomain = substr($fromEmail, strpos($fromEmail, '@') + 1);
+            }
+            $messageId = '<' . bin2hex(random_bytes(16)) . '@' . $fromDomain . '>';
+
             $headers = [];
+            $headers[] = 'Date: ' . date('r');
+            $headers[] = 'Message-ID: ' . $messageId;
             $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
             $headers[] = 'To: <' . $to . '>';
+            $headers[] = 'Reply-To: ' . $fromEmail;
             $headers[] = 'Subject: ' . $this->encodeHeaderName($subject);
             $headers[] = 'MIME-Version: 1.0';
             $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'Content-Transfer-Encoding: 8bit';
 
             $data = implode("\r\n", $headers) . "\r\n\r\n" . $html;
             $data = str_replace("\r\n.", "\r\n..", $data);
