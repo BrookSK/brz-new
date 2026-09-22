@@ -178,6 +178,7 @@ $router->post('/admin/etiquetas-wp/deletar-container', 'AdminEtiquetasWpControll
 $router->post('/admin/etiquetas-wp/deletar-fatura', 'AdminEtiquetasWpController', 'deletarFatura');
 $router->post('/admin/etiquetas-wp/deletar-embarque', 'AdminEtiquetasWpController', 'deletarEmbarque');
 $router->post('/admin/etiquetas-wp/regerar-etiqueta', 'AdminEtiquetasWpController', 'regerarEtiqueta');
+$router->post('/admin/etiquetas-wp/notificar-selecionados', 'AdminEtiquetasWpController', 'notificarSelecionados');
 
 // Malas (agrupamento de pacotes)
 $router->get('/admin/etiquetas-wp/listar-malas', 'AdminEtiquetasWpController', 'listarMalas');

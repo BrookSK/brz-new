@@ -90,6 +90,7 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
                     <select class="form-select form-select-sm" id="mala-mover-select" style="width:auto;min-width:160px;display:none;"><option value=""><?= __('admin.labels_wp.select_bag','Selecione a mala...') ?></option></select>
                     <button class="btn btn-sm btn-primary" id="btnMoverParaMala" style="display:none;" onclick="moverParaMala()"><i class="fas fa-suitcase me-1"></i><span id="btnMoverParaMalaText"><?= __('admin.labels_wp.move_to_bag','Mover para mala') ?></span></button>
                     <button class="btn btn-sm btn-outline-danger" id="btnBaixarMassa" style="display:none;" onclick="baixarEtiquetasMassa()"><i class="fas fa-download me-1"></i><span id="btnBaixarMassaText"><?= __('admin.labels_wp.download_labels','Baixar Etiquetas') ?></span></button>
+                    <button class="btn btn-sm btn-success" id="btnNotificarSelecionados" style="display:none;" onclick="notificarSelecionados()"><i class="fas fa-paper-plane me-1"></i><span id="btnNotificarSelecionadosText"><?= __('admin.labels_wp.notify_customers','Notificar clientes') ?></span></button>
                 </div>
             </div>
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
@@ -314,7 +315,7 @@ function renderPacoteRow(tbody, p) {
     const badge = isCancelado ? ' <span class="badge bg-secondary" style="font-size:0.65rem;">' + <?= json_encode(__('admin.labels_wp.cancelled','Cancelado')) ?> + '</span>' : '';
     const malaBadge = (p.mala_nome && !isCancelado) ? ' <span class="badge bg-info text-dark" style="font-size:0.6rem;">' + escHtmlCnt(p.mala_nome) + '</span>' : '';
     const pdfUrl = (p.wp_post_id && !isCancelado) ? BASE + '/pdf/pacote/' + p.wp_post_id : '';
-    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala()">' : '';
+    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala();updateNotificarSelecionados()">' : '';
     const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="' + <?= json_encode(__('admin.labels_wp.regenerate_label','Regerar etiqueta')) ?> + '"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
     if (tbody) tbody.innerHTML += row;
     return row;
@@ -401,9 +402,42 @@ function updateMassBtn(){const n=document.querySelectorAll('.chk-pedido:checked'
 async function gerarEtiquetasMassa(){const ids=[...document.querySelectorAll('.chk-pedido:checked')].map(e=>parseInt(e.value));if(!ids.length)return;const malaId=document.getElementById('mala-geracaoMassa').value;const malaMsg=malaId?(' '+<?= json_encode(__('admin.labels_wp.assign_selected_bag','(atribuir à mala selecionada)')) ?>):'';if(!confirm(<?= json_encode(__('admin.labels_wp.confirm_generate_wp','Gerar {n} etiqueta(s) via WordPress?')) ?>.replace('{n}', ids.length)+malaMsg))return;const btn=document.getElementById('btnGerarMassa');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>'+<?= json_encode(__('admin.labels_wp.generating','Gerando...')) ?>;try{const r=await fetch(BASE+'/gerar-etiquetas-massa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});const d=await r.json();const el=document.getElementById('pedidos-resultado');el.style.display='block';if(d.success){let h='<div class="alert alert-'+(d.failed>0?'warning':'success')+' py-2 small"><strong>'+<?= json_encode(__('admin.labels_wp.n_generated','{n} gerada(s)')) ?>.replace('{n}', d.generated)+'</strong>'+(d.failed>0?(', '+<?= json_encode(__('admin.labels_wp.n_failures','{n} falha(s)')) ?>.replace('{n}', d.failed)):'');if(d.results)d.results.forEach(r=>{if(r.tracking_number)h+='<br><code>'+r.tracking_number+'</code>';if(r.error)h+='<br><span class="text-danger">#'+r.pedido_id+': '+r.error+'</span>';});h+='</div>';el.innerHTML=h;if(d.generated>0&&malaId){const trackings=d.results.filter(r=>r.success&&r.tracking_number).map(r=>r.tracking_number);const pedidoIds=d.results.filter(r=>r.success).map(r=>r.pedido_id);if(trackings.length>0){try{await fetch(BASE+'/atribuir-mala',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mala_id:parseInt(malaId),tracking_codes:trackings,pedido_ids:pedidoIds})});}catch(e){}}}if(d.generated>0)setTimeout(()=>location.reload(),2000);}else{el.innerHTML='<div class="alert alert-danger py-2 small">'+(d.error||<?= json_encode(__('admin.labels_wp.error','Erro')) ?>)+'</div>';}}catch(e){alert(<?= json_encode(__('admin.labels_wp.error_prefix','Erro:')) ?>+' '+e.message);}btn.disabled=false;updateMassBtn();}
 
 // TOGGLE ALL PACOTES (download em massa)
-function toggleAllPacotes(){const checked=document.getElementById('checkAllPacotes').checked;document.querySelectorAll('.chk-pacote-dl').forEach(cb=>{cb.checked=checked;});updateBaixarMassa();updateMoverMala();}
+function toggleAllPacotes(){const checked=document.getElementById('checkAllPacotes').checked;document.querySelectorAll('.chk-pacote-dl').forEach(cb=>{cb.checked=checked;});updateBaixarMassa();updateMoverMala();updateNotificarSelecionados();}
 function updateBaixarMassa(){const checked=document.querySelectorAll('.chk-pacote-dl:checked').length;const btn=document.getElementById('btnBaixarMassa');const txt=document.getElementById('btnBaixarMassaText');if(btn){btn.style.display=checked>0?'':'none';}if(txt){txt.textContent=checked>1?(<?= json_encode(__('admin.labels_wp.download_n_labels','Baixar {n} Etiquetas')) ?>.replace('{n}', checked)):<?= json_encode(__('admin.labels_wp.download_label','Baixar Etiqueta')) ?>;}}
 async function baixarEtiquetasMassa(){const checks=[...document.querySelectorAll('.chk-pacote-dl:checked')];if(!checks.length){alert(<?= json_encode(__('admin.labels_wp.select_at_least_one_label','Selecione pelo menos 1 etiqueta.')) ?>);return;}const btn=document.getElementById('btnBaixarMassa');if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>'+<?= json_encode(__('admin.labels_wp.downloading','Baixando...')) ?>;}let downloaded=0;for(const cb of checks){const url=cb.getAttribute('data-pdf-url');const pedido=cb.getAttribute('data-pedido')||'etiqueta';if(!url)continue;try{const resp=await fetch(url);if(!resp.ok)continue;const blob=await resp.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='etiqueta_'+pedido.replace('#','')+'.pdf';document.body.appendChild(link);link.click();document.body.removeChild(link);URL.revokeObjectURL(link.href);downloaded++;await new Promise(r=>setTimeout(r,300));}catch(e){console.error('Erro baixando '+url,e);}}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-download me-1"></i><span id="btnBaixarMassaText">'+<?= json_encode(__('admin.labels_wp.download_labels','Baixar Etiquetas')) ?>+'</span>';updateBaixarMassa();}if(downloaded>0)alert(<?= json_encode(__('admin.labels_wp.n_labels_downloaded','{n} etiqueta(s) baixada(s) com sucesso!')) ?>.replace('{n}', downloaded));}
+
+// NOTIFICAR CLIENTES SELECIONADOS (e-mail + WhatsApp com o rastreio)
+// Mostra/esconde o botão conforme houver pacotes selecionados COM pedido local vinculado.
+function updateNotificarSelecionados(){
+    const pedidoIds=[...document.querySelectorAll('.chk-pacote-dl:checked')].map(cb=>parseInt(cb.getAttribute('data-pedido-id')||'0')).filter(v=>v>0);
+    const btn=document.getElementById('btnNotificarSelecionados');
+    const txt=document.getElementById('btnNotificarSelecionadosText');
+    if(!btn)return;
+    if(pedidoIds.length>0){
+        btn.style.display='';
+        if(txt)txt.textContent=(<?= json_encode(__('admin.labels_wp.notify_n_customers','Notificar {n} cliente(s)')) ?>).replace('{n}', pedidoIds.length);
+    } else {
+        btn.style.display='none';
+    }
+}
+async function notificarSelecionados(){
+    const pedidoIds=[...document.querySelectorAll('.chk-pacote-dl:checked')].map(cb=>parseInt(cb.getAttribute('data-pedido-id')||'0')).filter(v=>v>0);
+    if(!pedidoIds.length){alert(<?= json_encode(__('admin.labels_wp.no_linked_order_selected','Selecione ao menos um pacote com pedido vinculado.')) ?>);return;}
+    if(!confirm((<?= json_encode(__('admin.labels_wp.confirm_notify_n','Enviar notificação de rastreio (e-mail e WhatsApp) para {n} cliente(s)?')) ?>).replace('{n}', pedidoIds.length)))return;
+    const btn=document.getElementById('btnNotificarSelecionados');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>';}
+    try{
+        const r=await fetch(BASE+'/notificar-selecionados',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedido_ids:pedidoIds})});
+        const d=await r.json();
+        if(d.success){
+            alert((<?= json_encode(__('admin.labels_wp.notify_result','Notificações enviadas: {ok}. Falhas: {fail}.')) ?>).replace('{ok}', d.enviadas||0).replace('{fail}', d.falhas||0));
+        } else {
+            alert((<?= json_encode(__('admin.labels_wp.error_prefix','Erro:')) ?>)+' '+(d.error||(<?= json_encode(__('admin.labels_wp.notify_failed','Falha ao enviar notificações.')) ?>)));
+        }
+    }catch(e){alert(e.message);}
+    finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane me-1"></i><span id="btnNotificarSelecionadosText">'+(<?= json_encode(__('admin.labels_wp.notify_customers','Notificar clientes')) ?>)+'</span>';updateNotificarSelecionados();}}
+}
 
 // MOVER ETIQUETAS PARA MALA
 // Popula o select de malas do card "Pacotes gerados".

@@ -866,6 +866,71 @@ class AdminEtiquetasWpController extends Controller
         return ['enviadas' => $enviadas, 'falhas' => $falhas, 'pedidos' => $pedidos];
     }
 
+    /**
+     * Notifica os clientes dos pacotes selecionados na tela de etiquetas (e-mail + WhatsApp)
+     * com o código de rastreio da etiqueta gerada. Não depende de container/fatura/embarque.
+     * POST /admin/etiquetas-wp/notificar-selecionados
+     * Body JSON: { pedido_ids: [int, ...] }
+     */
+    public function notificarSelecionados(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) {
+            $body = [];
+        }
+        $pedidoIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($body['pedido_ids'] ?? [])),
+            fn($v) => $v > 0
+        )));
+
+        if (empty($pedidoIds)) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.no_order_selected', 'Nenhum pedido selecionado')], 400);
+            return;
+        }
+
+        $enviadas = 0;
+        $falhas = 0;
+        $detalhes = [];
+        $notif = new \App\Services\NotificationService();
+
+        foreach ($pedidoIds as $pid) {
+            // Buscar o rastreio da etiqueta PACKET do pedido para incluir na notificação.
+            $tracking = '';
+            if ($this->tableExists('correios_packet_etiquetas')) {
+                try {
+                    $st = $this->connection->prepare('SELECT tracking_number FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                    $st->execute([$pid]);
+                    $tracking = trim((string) ($st->fetchColumn() ?: ''));
+                } catch (\Exception $e) {
+                }
+            }
+
+            try {
+                $notif->notificarEventoPedido('correios_packet_label_created', $pid, [
+                    'tracking_number' => $tracking,
+                ]);
+                $enviadas++;
+                $detalhes[] = ['pedido_id' => $pid, 'success' => true, 'tracking_number' => $tracking];
+            } catch (\Throwable $e) {
+                $falhas++;
+                $detalhes[] = ['pedido_id' => $pid, 'success' => false, 'error' => $e->getMessage()];
+                error_log('[ETIQUETAS_WP][NOTIF] Falha ao notificar pedido #' . $pid . ': ' . $e->getMessage());
+            }
+        }
+
+        $this->json([
+            'success' => $enviadas > 0,
+            'enviadas' => $enviadas,
+            'falhas' => $falhas,
+            'detalhes' => $detalhes,
+        ]);
+    }
+
     // =========================================================
     // DELETAR/DESVINCULAR
     // =========================================================

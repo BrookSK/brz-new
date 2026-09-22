@@ -4022,6 +4022,40 @@ HTML;
                         }
                     }
 
+                    // Correios Mundial / PACKET (etiqueta gerada via WordPress ou API direta)
+                    if ($tracking === '') {
+                        try {
+                            $st = $pdoTrack->prepare("SELECT tracking_number FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $trk = trim((string) ($st->fetchColumn() ?: ''));
+                            if ($trk !== '') {
+                                $tracking = $trk;
+                                $trackingFonte = 'Correios Mundial (PACKET)';
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
+                    // Shippo (internacional)
+                    if ($tracking === '') {
+                        try {
+                            $st = $pdoTrack->prepare("SELECT tracking_number, tracking_url, label_url, carrier FROM shippo_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $trk = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($trk !== '') {
+                                $tracking = $trk;
+                                $car = trim((string) ($row['carrier'] ?? ''));
+                                $trackingFonte = 'Shippo' . ($car !== '' ? (' (' . $car . ')') : '');
+                                $trackingUrl = trim((string) ($row['tracking_url'] ?? ''));
+                                if ($trackingUrl === '') {
+                                    $trackingUrl = trim((string) ($row['label_url'] ?? ''));
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
                     // W-Express (internacional)
                     if ($tracking === '') {
                         try {
