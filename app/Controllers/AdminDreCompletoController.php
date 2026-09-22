@@ -719,7 +719,7 @@ class AdminDreCompletoController extends Controller {
             $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('pagamentos_stripe_secret_key','stripe_secret_key') AND valor != '' LIMIT 1");
             $st->execute();
             $stripeKey = trim((string)($st->fetchColumn() ?: ''));
-            if ($stripeKey === '') { $result['erro'] = 'Stripe não configurado'; return $result; }
+            if ($stripeKey === '') { $result['erro'] = __('admin.report_general.stripe_not_configured', 'Stripe não configurado'); return $result; }
 
             // 1. Saldo atual
             $saldoResp = $this->stripeRequest($stripeKey, 'GET', '/v1/balance');

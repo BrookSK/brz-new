@@ -26,7 +26,7 @@
             <?php if (!empty($pedidos)): ?>
                 <div class="d-flex align-items-center gap-2">
                     <select class="form-select form-select-sm" id="carrierAccountMassa" style="width:190px">
-                        <option value="">Conta para o lote</option>
+                        <option value=""><?= htmlspecialchars(__('admin.shippo.batch_account', 'Conta para o lote'), ENT_QUOTES, 'UTF-8') ?></option>
                         <?php foreach ($carrierAccounts as $carrierAccount): ?>
                             <option value="<?= htmlspecialchars((string) $carrierAccount['key'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $carrierAccount['name'], ENT_QUOTES, 'UTF-8') ?></option>
                         <?php endforeach; ?>
