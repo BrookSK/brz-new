@@ -7,6 +7,7 @@ use App\Services\EmailService;
 class NotificationService {
     private PedidoEcommerce $pedidoModel;
     private EmailService $emailService;
+    private ?string $motivoEmailNaoEnviado = null;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -47,7 +48,7 @@ class NotificationService {
             $enviados = $this->enviarEmailPorEvento($eventoNome, $vars);
             $resultado['email_enviado'] = $enviados > 0;
             if ($enviados === 0) {
-                $resultado['email_erro'] = 'Nenhum e-mail enviado (sem destinatário, template ou envio desativado)';
+                $resultado['email_erro'] = $this->motivoEmailNaoEnviado ?? 'Nenhum e-mail enviado (sem destinatário, template ou envio desativado)';
             }
         } catch (\Throwable $e) {
             $resultado['email_erro'] = $e->getMessage();
@@ -224,8 +225,10 @@ class NotificationService {
     }
 
     private function enviarEmailPorEvento(string $eventoNome, array $vars): int {
+        $this->motivoEmailNaoEnviado = null;
         $enabled = $this->getConfig('email', 'enabled', '1');
         if ($enabled === '0' || strtolower($enabled) === 'false') {
+            $this->motivoEmailNaoEnviado = 'Envio de e-mail desativado (config email_enabled = ' . $enabled . ')';
             return 0;
         }
 
@@ -278,6 +281,7 @@ class NotificationService {
         }
 
         if (empty($tos)) {
+            $this->motivoEmailNaoEnviado = 'Sem destinatário válido (cliente_email do pedido vazio/inválido e sem override configurado). email recebido="' . (string) ($vars['email'] ?? '') . '"';
             return 0;
         }
         $tpl = $this->getEmailTemplate($eventoNome);
