@@ -974,6 +974,40 @@ class AdminEtiquetasWpController extends Controller
             }
         }
 
+        // Filtro EXATO por pedido_id_local (só funciona se o snippet do WP já foi atualizado).
+        try {
+            $respExato = $this->wp->listPackagesByPedidoLocal($pedidoId);
+            $listaExato = (is_array($respExato) && isset($respExato['data']) && is_array($respExato['data'])) ? $respExato['data'] : [];
+            $out['wp_filtro_exato_pedido_id_local'] = array_map(function ($pkg) {
+                return [
+                    'wp_post_id' => $pkg['wp_post_id'] ?? null,
+                    'order_id' => $pkg['order_id'] ?? null,
+                    'pedido_id_local' => $pkg['pedido_id_local'] ?? null,
+                    'tracking_code' => $pkg['tracking_code'] ?? null,
+                ];
+            }, $listaExato);
+        } catch (\Throwable $e) {
+            $out['wp_filtro_exato_erro'] = $e->getMessage();
+        }
+
+        // Últimos pacotes do WP (sem filtro) para ver se o pacote deste pedido existe com outro código.
+        try {
+            $respUlt = $this->wp->listPackages(['per_page' => 15]);
+            $listaUlt = (is_array($respUlt) && isset($respUlt['data']) && is_array($respUlt['data'])) ? $respUlt['data'] : [];
+            $out['wp_ultimos_pacotes'] = array_map(function ($pkg) {
+                return [
+                    'wp_post_id' => $pkg['wp_post_id'] ?? null,
+                    'order_id' => $pkg['order_id'] ?? null,
+                    'pedido_id_local' => $pkg['pedido_id_local'] ?? null,
+                    'tracking_code' => $pkg['tracking_code'] ?? null,
+                    'recipient_name' => $pkg['recipient_name'] ?? null,
+                    'created_at' => $pkg['created_at'] ?? null,
+                ];
+            }, $listaUlt);
+        } catch (\Throwable $e) {
+            $out['wp_ultimos_erro'] = $e->getMessage();
+        }
+
         $this->json(['success' => true, 'diagnostico' => $out]);
     }
 
