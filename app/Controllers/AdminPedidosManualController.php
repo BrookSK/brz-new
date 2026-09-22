@@ -813,6 +813,18 @@ class AdminPedidosManualController extends Controller {
         echo 'const USD_BRL_RATE = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaConversaoUSDBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
 
+        // i18n bridge for strings used inside the (non-interpolated) JS blocks below
+        echo 'const PMI18N = ' . json_encode([
+            'search_product' => __('admin.orders_manual.search_product_ph', 'Buscar produto...'),
+            'search_ncm' => __('admin.orders_manual.search_ncm_ph', 'Buscar NCM...'),
+            'cost_required' => __('admin.orders_manual.cost_required_ph', 'Custo (obrigatório)'),
+            'ncm_required' => __('admin.orders_manual.ncm_required_ph', 'NCM (obrigatório)'),
+            'request_discount' => __('admin.orders_manual.request_discount', 'Solicitar desconto'),
+            'free_shipping' => __('admin.orders_manual.free_shipping', 'Frete grátis'),
+            'payment_link_info' => __('admin.orders_manual.payment_link_info_js', 'After creating the manual order, click <strong>Generate Payment Link</strong> to generate the charge links.') . '<br><small class="text-muted">' . __('admin.orders_manual.payment_link_info_brl_js', 'BRL: Cambio Real checkout link (products) + Cambio Real Taxas payment link (fees/taxes). Copy and send to the customer.') . '</small>',
+            'payment_link_info_carne' => __('admin.orders_manual.payment_link_info_carne_js', 'After creating the manual order, click <strong>Generate Payment Link</strong> to generate the installment payment links.') . '<br><small class="text-muted">' . __('admin.orders_manual.payment_link_info_carne_detail_js', 'Each installment will have two links: one for products (Cambio Real) and one for fees (Cambio Real Taxas). Copy and send to the customer.') . '</small>',
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+
         echo "\n";
         echo <<<'JSCB'
 function initClienteBusca(){
@@ -1054,7 +1066,7 @@ function updateExtraCamposProduto(tr, prod){
         const searchInp = document.createElement('input');
         searchInp.type = 'text';
         searchInp.className = 'form-control form-control-sm mb-1';
-        searchInp.placeholder = 'Buscar NCM...';
+        searchInp.placeholder = PMI18N.search_ncm;
         searchInp.addEventListener('input', function(){
             const term = this.value.toLowerCase().trim();
             let firstVisible = null;
@@ -1080,14 +1092,14 @@ function updateExtraCamposProduto(tr, prod){
             ncmInp.value = '';
             // Mostrar campo de busca
             const searchEl = ncmInp.previousElementSibling;
-            if (searchEl && searchEl.placeholder === 'Buscar NCM...') searchEl.style.display = '';
+            if (searchEl && searchEl.placeholder === PMI18N.search_ncm) searchEl.style.display = '';
         } else {
             ncmInp.style.display = 'none';
             ncmInp.required = false;
             ncmInp.value = ncmAtual;
             // Esconder campo de busca
             const searchEl = ncmInp.previousElementSibling;
-            if (searchEl && searchEl.placeholder === 'Buscar NCM...') searchEl.style.display = 'none';
+            if (searchEl && searchEl.placeholder === PMI18N.search_ncm) searchEl.style.display = 'none';
         }
     }
 
@@ -1104,14 +1116,14 @@ function addItemRow(){
                 <img src="/uploads/produtos/placeholder.jpg" class="rounded border" style="width:34px;height:34px;object-fit:cover" alt="" onerror="this.onerror=null;this.src='/uploads/produtos/placeholder.jpg';">
                 <div class="flex-grow-1">
                     <input type="hidden" class="produtoIdInp" name="produto_id[]" value="" required>
-                    <input type="text" class="form-control form-control-sm produtoSearch" placeholder="Buscar produto..." autocomplete="off" oninput="onProdutoSearchInput(this)" onfocus="onProdutoSearchInput(this)">
+                    <input type="text" class="form-control form-control-sm produtoSearch" placeholder="${PMI18N.search_product}" autocomplete="off" oninput="onProdutoSearchInput(this)" onfocus="onProdutoSearchInput(this)">
                     <div class="list-group position-absolute w-100 prodResults" style="z-index: 1050; display:none; max-height: 420px; overflow:auto;"></div>
                     <div class="row g-2 mt-2 extraProdutoCampos" style="display:none;">
                         <div class="col-6">
-                            <input type="text" class="form-control form-control-sm custoInp" name="produto_custo[]" value="" placeholder="Custo (obrigatório)">
+                            <input type="text" class="form-control form-control-sm custoInp" name="produto_custo[]" value="" placeholder="${PMI18N.cost_required}">
                         </div>
                         <div class="col-6">
-                            <input type="text" class="form-control form-control-sm ncmInp" name="produto_ncm[]" value="" placeholder="NCM (obrigatório)">
+                            <input type="text" class="form-control form-control-sm ncmInp" name="produto_ncm[]" value="" placeholder="${PMI18N.ncm_required}">
                         </div>
                     </div>
                 </div>
@@ -1135,7 +1147,7 @@ function addItemRow(){
                 <input type="hidden" class="descontoTokenInp" value="">
                 <div class="descontoStatus mt-1" style="font-size:11px;"></div>
                 <button type="button" class="btn btn-outline-warning btn-sm mt-1 btnSolicitarDesconto" onclick="solicitarDesconto(this)" style="font-size:11px;" disabled>
-                    <i class="fas fa-tag"></i> Solicitar desconto
+                    <i class="fas fa-tag"></i> ${PMI18N.request_discount}
                 </button>
             </div>
         </td>
@@ -1340,9 +1352,9 @@ function updateLinkVisibility(){
         } else {
             linkInfo.style.display = '';
             if (isCarne) {
-                linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de pagamento das parcelas do carnê.<br><small class="text-muted">Cada parcela terá dois links: um para produtos (Câmbio Real) e outro para taxas (Câmbio Real Taxas). Copie e envie para o cliente.</small>';
+                linkInfo.innerHTML = PMI18N.payment_link_info_carne;
             } else {
-                linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento Câmbio Real Taxas (taxas/impostos). Copie e envie para o cliente.</small>';
+                linkInfo.innerHTML = PMI18N.payment_link_info;
             }
         }
     }
@@ -1529,7 +1541,7 @@ function calcTotal(){
 
             const freteWrap = document.getElementById('resumoFreteWrap');
             if (Number(frete) <= 0) {
-                if (freteWrap) freteWrap.textContent = 'Frete grátis';
+                if (freteWrap) freteWrap.textContent = PMI18N.free_shipping;
             } else {
                 if (freteWrap) freteWrap.innerHTML = `<span id="resumoMoedaSymbol5">${escapeHtml(sym)}</span> <span id="resumoFrete">${escapeHtml(formatForDisplay(frete, moeda))}</span>`;
                 const rf = document.getElementById('resumoFrete');

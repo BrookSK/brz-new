@@ -144,7 +144,16 @@ $filtroBusca = $filtros['busca'] ?? '';
                             <a href="/admin/remessa-internacional/janela/<?= $jId ?>" class="badge bg-light text-dark border text-decoration-none">#<?= $jId ?></a>
                             <div class="text-muted small"><?= !empty($p['janela_inicio']) ? date('d/m', strtotime($p['janela_inicio'])) . '-' . date('d/m', strtotime($p['janela_fim'])) : '' ?></div>
                         </td>
-                        <td><span class="badge bg-<?= $jBadge ?>"><?= ucfirst(str_replace('_', ' ', $jStatus)) ?></span></td>
+                        <?php
+                        $jStatusMap = [
+                            'aberta' => __('admin.intl_shipment.status_open', 'Aberta'),
+                            'finalizada' => __('admin.intl_shipment.status_finished', 'Finalizada'),
+                            'atraso' => __('admin.intl_shipment.status_overdue', 'Em Atraso'),
+                            'remessa_gerada' => __('admin.intl_shipment.status_shipment_generated', 'Remessa Gerada'),
+                        ];
+                        $jStatusLabel = $jStatus !== '' ? ($jStatusMap[$jStatus] ?? ucfirst(str_replace('_', ' ', $jStatus))) : '-';
+                        ?>
+                        <td><span class="badge bg-<?= $jBadge ?>"><?= htmlspecialchars($jStatusLabel) ?></span></td>
                         <td>
                             <?php if ($et): ?>
                                 <span class="badge bg-success"><?= __('admin.intl_shipment.label_generated','Gerada') ?></span>

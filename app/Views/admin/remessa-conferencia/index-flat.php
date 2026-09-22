@@ -144,7 +144,16 @@ $filtroBusca = $filtros['busca'] ?? '';
                         <td>
                             <a href="/admin/remessa-conferencia/janela/<?= $jId ?>" class="badge bg-light text-dark border text-decoration-none">#<?= $jId ?></a>
                         </td>
-                        <td><span class="badge bg-<?= $jBadge ?>"><?= ucfirst(str_replace('_', ' ', $jStatus)) ?></span></td>
+                        <?php
+                        $jStatusMap = [
+                            'aberta' => __('admin.shipment_check.status_open', 'Aberta'),
+                            'finalizada' => __('admin.shipment_check.status_finished', 'Finalizada'),
+                            'atraso' => __('admin.shipment_check.status_overdue', 'Em Atraso'),
+                            'remessa_gerada' => __('admin.shipment_check.status_shipment_generated', 'Remessa Gerada'),
+                        ];
+                        $jStatusLabel = $jStatus !== '' ? ($jStatusMap[$jStatus] ?? ucfirst(str_replace('_', ' ', $jStatus))) : '-';
+                        ?>
+                        <td><span class="badge bg-<?= $jBadge ?>"><?= htmlspecialchars($jStatusLabel) ?></span></td>
                         <td>
                             <?php if ($et): ?>
                                 <span class="badge bg-success"><?= __('admin.shipment_check.label_generated','Gerada') ?></span>

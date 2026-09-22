@@ -9,6 +9,44 @@ $comissoes = $comissoes ?? [];
 $filtros = $filtros ?? [];
 function fmtD($v) { return 'R$ ' . number_format((float)($v ?? 0), 2, ',', '.'); }
 
+// i18n maps for system enum values rendered in the rows (status, origin, frequency, category group)
+$despStatusLabels = [
+    'prevista' => __('admin.expenses.status_forecast', 'Prevista'),
+    'a_vencer' => __('admin.expenses.status_upcoming', 'A vencer'),
+    'vencida' => __('admin.expenses.status_overdue', 'Vencida'),
+    'paga' => __('admin.expenses.status_paid', 'Paga'),
+    'parcialmente_paga' => __('admin.expenses.status_partially_paid', 'Parcialmente paga'),
+    'cancelada' => __('admin.expenses.status_cancelled', 'Cancelada'),
+];
+$despOriginLabels = [
+    'manual' => __('admin.expenses.origin_manual', 'Manual'),
+    'sistema' => __('admin.expenses.origin_system', 'Sistema'),
+    'recorrencia' => __('admin.expenses.origin_recurrence', 'Recorrência'),
+    'recorrente' => __('admin.expenses.origin_recurrence', 'Recorrência'),
+    'parcelamento' => __('admin.expenses.origin_installment', 'Parcelamento'),
+    'comissao' => __('admin.expenses.origin_commission', 'Comissão'),
+];
+$despFreqLabels = [
+    'mensal' => __('admin.expenses.freq_monthly', 'Mensal'),
+    'semanal' => __('admin.expenses.freq_weekly', 'Semanal'),
+    'quinzenal' => __('admin.expenses.freq_biweekly', 'Quinzenal'),
+    'anual' => __('admin.expenses.freq_yearly', 'Anual'),
+];
+$despGroupLabels = [
+    'despesa_operacional' => __('admin.expenses.group_operational', 'Despesa operacional'),
+    'despesa_administrativa' => __('admin.expenses.group_administrative', 'Despesa administrativa'),
+    'despesa_financeira' => __('admin.expenses.group_financial', 'Despesa financeira'),
+    'custo_produto' => __('admin.expenses.group_product_cost', 'Custo produto'),
+    'comissoes' => __('admin.expenses.group_commissions', 'Comissões'),
+    'tributos' => __('admin.expenses.group_taxes', 'Tributos'),
+    'outros' => __('admin.expenses.group_others', 'Outros'),
+];
+$despLabel = function(array $map, ?string $key): string {
+    $k = strtolower(trim((string) $key));
+    if ($k === '') return '-';
+    return $map[$k] ?? ucfirst(str_replace('_', ' ', $k));
+};
+
 $countAll = count($despesas);
 $countVencidas = count(array_filter($despesas, fn($d) => ($d['status'] ?? '') === 'vencida'));
 $countHoje = count(array_filter($despesas, fn($d) => ($d['vencimento'] ?? '') === date('Y-m-d') && ($d['status'] ?? '') !== 'paga'));
@@ -226,7 +264,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <div class="fw-semibold text-truncate" style="font-size:12px;"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
                             <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                 <span class="fw-bold" style="font-size:11px;"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></span>
-                                <span class="badge <?= $stClassMobile ?>" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span>
+                                <span class="badge <?= $stClassMobile ?>" style="font-size:9px;"><?= htmlspecialchars($despLabel($despStatusLabels, $d['status'] ?? '')) ?></span>
                             </div>
                             <div class="text-muted" style="font-size:10px;"><?= __('admin.expenses.due_short', 'Venc:') ?> <?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></div>
                         </div>
@@ -267,8 +305,8 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><?= $d['competencia'] ? date('m/Y', strtotime($d['competencia'])) : '-' ?></td>
                         <td><?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></td>
                         <td class="text-end fw-bold"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></td>
-                        <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
-                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
+                        <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= htmlspecialchars($despLabel($despStatusLabels, $d['status'] ?? '')) ?></span></td>
+                        <td><span class="text-muted" style="font-size:10px;"><?= htmlspecialchars($despLabel($despOriginLabels, $d['origem'] ?? 'manual')) ?></span></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-editar-despesa" title="<?= htmlspecialchars(__('admin.expenses.edit', 'Editar'), ENT_QUOTES, 'UTF-8') ?>" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>" data-virtual="0"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
@@ -309,7 +347,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($r['descricao']) ?></td>
                         <td><?= !empty($r['categoria_nome']) ? '<span class="badge" style="background:'.($r['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($r['categoria_nome']).'</span>' : '-' ?></td>
-                        <td><?= ucfirst($r['frequencia'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($despLabel($despFreqLabels, $r['frequencia'] ?? '')) ?></td>
                         <td><?= $r['dia_vencimento'] ?? '-' ?></td>
                         <td class="text-end fw-bold"><?= fmtD($r['valor']) ?></td>
                         <td><?= $r['proxima_geracao'] ? date('d/m/Y', strtotime($r['proxima_geracao'])) : '-' ?></td>
@@ -369,7 +407,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <tr>
                         <td><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:<?= $cat['cor'] ?? '#6b7280' ?>;"></span></td>
                         <td class="fw-semibold"><?= htmlspecialchars($cat['nome']) ?></td>
-                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $cat['grupo'] ?? '')) ?></span></td>
+                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= htmlspecialchars($despLabel($despGroupLabels, $cat['grupo'] ?? '')) ?></span></td>
                         <td><?= $cat['ativa'] ? '<span class="badge bg-success">' . __('admin.expenses.active', 'Ativa') . '</span>' : '<span class="badge bg-secondary">' . __('admin.expenses.inactive', 'Inativa') . '</span>' ?></td>
                     </tr>
                     <?php endforeach; ?>

@@ -510,6 +510,14 @@ class AdminComprasController extends Controller {
                 return "$ " + n.toFixed(2);
             }
 
+            var ORDER_STATUS_MAP_SEL = ' . json_encode(\App\Controllers\AdminPedidosController::getStatusList(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
+            function traduzStatusPedidoSel(st){
+                var key = String(st || "").toLowerCase().trim();
+                if (key === "") return "";
+                if (ORDER_STATUS_MAP_SEL[key]) return ORDER_STATUS_MAP_SEL[key];
+                return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+            }
+
             function loadPedidosDoUsuario(usuarioId){
                 var sel = document.getElementById("novo_pedido_id");
                 if (!sel) return;
@@ -536,7 +544,7 @@ class AdminComprasController extends Controller {
                         if (!pid) return;
                         var label = "' . htmlspecialchars(__('admin.purchases.js_order', 'Pedido'), ENT_QUOTES, 'UTF-8') . ' #" + pid;
                         if (p.codigo_pedido) label += " (" + p.codigo_pedido + ")";
-                        if (p.status) label += " - " + p.status;
+                        if (p.status) label += " - " + traduzStatusPedidoSel(p.status);
                         if (p.valor_total !== null && p.valor_total !== undefined) label += " - " + formatMoney(p.valor_total);
                         html += "<option value=\"" + escapeHtml(pid) + "\">" + escapeHtml(label) + "</option>";
                     });
@@ -2196,6 +2204,14 @@ class AdminComprasController extends Controller {
                         return prefix + n.toFixed(2);
                     }
 
+                    var ORDER_STATUS_MAP = ' . json_encode(\App\Controllers\AdminPedidosController::getStatusList(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
+                    function traduzStatusPedido(st){
+                        var key = String(st || "").toLowerCase().trim();
+                        if (key === "") return "";
+                        if (ORDER_STATUS_MAP[key]) return ORDER_STATUS_MAP[key];
+                        return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+                    }
+
                     function renderPedidosAccordion(pedidos){
                         var acc = document.getElementById("accordionPedidos");
                         if (!acc) return;
@@ -2210,7 +2226,7 @@ class AdminComprasController extends Controller {
                             var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
                             var criado = p.created_at ? escapeHtml(p.created_at) : "";
                             var pagoEm = p.pago_em ? escapeHtml(p.pago_em) : "";
-                            var status = p.status ? escapeHtml(p.status) : "";
+                            var status = p.status ? escapeHtml(traduzStatusPedido(p.status)) : "";
                             var codigo = p.codigo_pedido ? escapeHtml(p.codigo_pedido) : "";
 
                             var itensHtml = "";

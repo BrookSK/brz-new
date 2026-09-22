@@ -14,6 +14,22 @@ $moedaFilter = $moedaFilter ?? '';
 $usd = $totaisPorMoedaCards['USD'] ?? [];
 $brl = $totaisPorMoedaCards['BRL'] ?? [];
 
+// i18n map for expense category groups (system enum values)
+$despGroupLabels = [
+    'despesa_operacional' => __('admin.expenses.group_operational', 'Despesa operacional'),
+    'despesa_administrativa' => __('admin.expenses.group_administrative', 'Despesa administrativa'),
+    'despesa_financeira' => __('admin.expenses.group_financial', 'Despesa financeira'),
+    'custo_produto' => __('admin.expenses.group_product_cost', 'Custo produto'),
+    'comissoes' => __('admin.expenses.group_commissions', 'Comissões'),
+    'tributos' => __('admin.expenses.group_taxes', 'Tributos'),
+    'outros' => __('admin.expenses.group_others', 'Outros'),
+];
+$despGroupLabel = function(?string $key) use ($despGroupLabels): string {
+    $k = strtolower(trim((string) $key));
+    if ($k === '') return '';
+    return $despGroupLabels[$k] ?? ucfirst(str_replace('_', ' ', $k));
+};
+
 function fmtNum($v) { return number_format((float)($v ?? 0), 2, ',', '.'); }
 function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
     return (float)($brlRow[$campo] ?? 0) + ((float)($usdRow[$campo] ?? 0) * $taxa);
@@ -462,7 +478,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     ?>
                                     <tr>
                                         <td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:<?= $dc['cor'] ?? '#6b7280' ?>;"></span><?= htmlspecialchars($dc['categoria'] ?? __('admin.report_general.no_category','Sem categoria')) ?></td>
-                                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $dc['grupo'] ?? '')) ?></span></td>
+                                        <td><span class="text-muted" style="font-size:10px;"><?= htmlspecialchars($despGroupLabel($dc['grupo'] ?? '')) ?></span></td>
                                         <td class="text-end"><?= (int)($dc['qtd'] ?? 0) ?></td>
                                         <td class="text-end fw-bold"><?= fmtNum($dc['total'] ?? 0) ?></td>
                                         <td><div class="d-flex align-items-center gap-1"><div class="progress flex-grow-1" style="height:4px;width:60px;"><div class="progress-bar bg-danger" style="width:<?= $pctCat ?>%"></div></div><span class="text-muted" style="font-size:10px;"><?= $pctCat ?>%</span></div></td>
@@ -811,6 +827,8 @@ function fmtCSV(v) {
 
 // === GLOBAL VIEW: Moeda + Idioma ===
 const TAXA_GLOBAL = <?= $taxaUsdBrl ?>;
+const GROUP_LABELS = <?= json_encode($despGroupLabels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+function traduzGrupoDespesa(g){ var k=String(g||'').toLowerCase().trim(); if(k==='') return ''; return GROUP_LABELS[k] || k.replace(/_/g,' '); }
 const LABELS_PT = {financeiro:'Financeiro',visao:'Visão consolidada de pedidos, receitas e impostos',total_pedidos:'Total de pedidos',periodo:'Período',total_geral:'Total geral',subtotal:'Subtotal produtos',servicos:'Taxa de serviço',impostos:'Impostos',imposto_local:'Imposto local',frete:'Frete',por_status:'Por Status',por_moeda:'Por Moeda',por_pagamento:'Por Pagamento',receita_bruta:'RECEITA BRUTA',despesas_totais:'DESPESAS TOTAIS',resultado:'RESULTADO LÍQUIDO',margem:'Margem',pagas:'Pagas no período',aberto:'Em aberto',despesas_cat:'Despesas por Categoria',ver_despesas:'Ver despesas',sem_valores:'Sem valores no período',total_em_brl:'Total em BRL'};
 const LABELS_EN = {financeiro:'Financial',visao:'Consolidated view of orders, revenue and taxes',total_pedidos:'Total orders',periodo:'Period',total_geral:'Grand total',subtotal:'Products subtotal',servicos:'Service fee',impostos:'Taxes',imposto_local:'Local tax',frete:'Shipping',por_status:'By Status',por_moeda:'By Currency',por_pagamento:'By Payment',receita_bruta:'GROSS REVENUE',despesas_totais:'TOTAL EXPENSES',resultado:'NET RESULT',margem:'Margin',pagas:'Paid in period',aberto:'Outstanding',despesas_cat:'Expenses by Category',ver_despesas:'View expenses',sem_valores:'No values in period',total_em_brl:'Total in BRL'};
 
@@ -955,7 +973,7 @@ function renderDreCompleto(d) {
     // Despesas por Categoria + Favorecido
     h += '<div class="row g-4 mb-4"><div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-tags me-2 text-muted"></i><?= htmlspecialchars(__('admin.report_general.expenses_by_category','Despesas por Categoria'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;"><thead class="table-light"><tr><th><?= htmlspecialchars(__('admin.report_general.th_category','Categoria'), ENT_QUOTES, 'UTF-8') ?></th><th><?= htmlspecialchars(__('admin.report_general.th_group','Grupo'), ENT_QUOTES, 'UTF-8') ?></th><th class="text-end"><?= htmlspecialchars(__('admin.report_general.th_total','Total'), ENT_QUOTES, 'UTF-8') ?></th><th class="text-end">%</th></tr></thead><tbody>';
     const catMap={};(d.despesas_categoria||[]).forEach(c=>{const k=c.categoria||'<?= htmlspecialchars(__('admin.report_general.no_category','Sem categoria'), ENT_QUOTES, 'UTF-8') ?>';if(!catMap[k])catMap[k]={categoria:k,grupo:c.grupo||'',cor:c.cor||'#6b7280',total:0};catMap[k].total+=(c.moeda==='USD'?(parseFloat(c.total)||0)*taxa:(parseFloat(c.total)||0));});const catArr=Object.values(catMap).sort((a,b)=>b.total-a.total);const catTotal=catArr.reduce((s,c)=>s+c.total,0);
-    catArr.forEach(c=>{const pct=catTotal>0?(c.total/catTotal*100).toFixed(1):'0.0';h+='<tr><td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:'+c.cor+';"></span>'+c.categoria+'</td><td class="text-muted small">'+c.grupo.replace(/_/g,' ')+'</td><td class="text-end fw-bold">'+fmtR(c.total)+'</td><td class="text-end small text-muted">'+pct+'%</td></tr>';});
+    catArr.forEach(c=>{const pct=catTotal>0?(c.total/catTotal*100).toFixed(1):'0.0';h+='<tr><td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:'+c.cor+';"></span>'+c.categoria+'</td><td class="text-muted small">'+traduzGrupoDespesa(c.grupo)+'</td><td class="text-end fw-bold">'+fmtR(c.total)+'</td><td class="text-end small text-muted">'+pct+'%</td></tr>';});
     h += '</tbody></table></div></div></div></div><div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-user me-2 text-muted"></i><?= htmlspecialchars(__('admin.report_general.top_payees','Maiores Favorecidos'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;"><thead class="table-light"><tr><th><?= htmlspecialchars(__('admin.report_general.th_payee','Favorecido'), ENT_QUOTES, 'UTF-8') ?></th><th class="text-end"><?= htmlspecialchars(__('admin.report_general.th_qty','Qtd'), ENT_QUOTES, 'UTF-8') ?></th><th class="text-end"><?= htmlspecialchars(__('admin.report_general.th_total','Total'), ENT_QUOTES, 'UTF-8') ?></th></tr></thead><tbody>';
     const favMap={};(d.despesas_favorecido||[]).forEach(f=>{const k=f.favorecido;if(!favMap[k])favMap[k]={favorecido:k,total:0,qtd:0};favMap[k].total+=(f.moeda==='USD'?(parseFloat(f.total)||0)*taxa:(parseFloat(f.total)||0));favMap[k].qtd+=parseInt(f.qtd)||0;});Object.values(favMap).sort((a,b)=>b.total-a.total).slice(0,15).forEach(f=>{h+='<tr><td>'+f.favorecido+'</td><td class="text-end">'+f.qtd+'</td><td class="text-end fw-bold">'+fmtR(f.total)+'</td></tr>';});
     h += '</tbody></table></div></div></div></div>';
