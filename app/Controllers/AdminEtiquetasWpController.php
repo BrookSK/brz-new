@@ -928,9 +928,11 @@ class AdminEtiquetasWpController extends Controller
         }
 
         // O que o getComDetalhes resolve como tracking
+        $codigoPedido = '';
         try {
             $pm = new PedidoEcommerce();
             $ped = $pm->getComDetalhes($pedidoId);
+            $codigoPedido = (string) ($ped['codigo_pedido'] ?? ($ped['numero_pedido'] ?? ''));
             $out['getComDetalhes_tracking'] = [
                 'tracking_code' => $ped['tracking_code'] ?? null,
                 'tracking_source' => $ped['tracking_source'] ?? null,
@@ -943,6 +945,33 @@ class AdminEtiquetasWpController extends Controller
             ];
         } catch (\Throwable $e) {
             $out['getComDetalhes_erro'] = $e->getMessage();
+        }
+
+        // O que o WordPress retorna ao buscar por este pedido (revela order_id / pedido_id_local / tracking).
+        $termos = array_values(array_filter([
+            $codigoPedido,
+            'PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT),
+            (string) $pedidoId,
+        ], fn($v) => trim((string) $v) !== ''));
+        $out['wp_termos_busca'] = $termos;
+        $out['wp_pacotes'] = [];
+        foreach ($termos as $termo) {
+            try {
+                $resp = $this->wp->listPackages(['search' => $termo, 'per_page' => 20]);
+                $lista = (is_array($resp) && isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : [];
+                foreach ($lista as $pkg) {
+                    $out['wp_pacotes'][] = [
+                        'termo' => $termo,
+                        'wp_post_id' => $pkg['wp_post_id'] ?? null,
+                        'order_id' => $pkg['order_id'] ?? null,
+                        'pedido_id_local' => $pkg['pedido_id_local'] ?? null,
+                        'tracking_code' => $pkg['tracking_code'] ?? null,
+                        'recipient_name' => $pkg['recipient_name'] ?? null,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $out['wp_pacotes_erro'][] = $termo . ': ' . $e->getMessage();
+            }
         }
 
         $this->json(['success' => true, 'diagnostico' => $out]);
