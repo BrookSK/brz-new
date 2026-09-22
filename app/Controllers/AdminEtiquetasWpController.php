@@ -966,8 +966,22 @@ class AdminEtiquetasWpController extends Controller
                 $passos['erro_unique_pedido_id'] = $e->getMessage();
             }
 
-            // 4) Corrigir o AUTO_INCREMENT.
+            // 4) CAUSA RAIZ: a coluna id perdeu o AUTO_INCREMENT (todo INSERT gravava id=0 e
+            //    colidia na PRIMARY KEY, virando UPDATE). Primeiro corrigir qualquer linha id=0
+            //    existente para um id válido, depois redefinir a coluna como AUTO_INCREMENT.
             try {
+                // Se ainda houver linha id=0, dar a ela um id novo acima do máximo.
+                $temZero = (int) $this->connection->query('SELECT COUNT(*) FROM correios_packet_etiquetas WHERE id = 0')->fetchColumn();
+                if ($temZero > 0) {
+                    $novoId = ((int) $this->connection->query('SELECT COALESCE(MAX(id),0) FROM correios_packet_etiquetas')->fetchColumn()) + 1;
+                    $stUp = $this->connection->prepare('UPDATE correios_packet_etiquetas SET id = ? WHERE id = 0 LIMIT 1');
+                    $stUp->execute([$novoId]);
+                    $passos['linha_id_zero_reindexada_para'] = $novoId;
+                }
+                // Redefinir a coluna id como AUTO_INCREMENT (recupera a propriedade perdida).
+                $this->connection->exec('ALTER TABLE correios_packet_etiquetas MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT');
+                $passos['coluna_id_auto_increment_restaurada'] = true;
+
                 $maxId = (int) $this->connection->query('SELECT COALESCE(MAX(id),0) FROM correios_packet_etiquetas')->fetchColumn();
                 $this->connection->exec('ALTER TABLE correios_packet_etiquetas AUTO_INCREMENT = ' . ($maxId + 1));
                 $passos['auto_increment_ajustado_para'] = $maxId + 1;
