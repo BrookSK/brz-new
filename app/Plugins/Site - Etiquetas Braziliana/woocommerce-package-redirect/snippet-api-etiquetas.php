@@ -366,6 +366,16 @@ function brz_api_list_packages(WP_REST_Request $request) {
         ]];
     }
 
+    // Filtro EXATO por pedido_id_local (vínculo confiável, sem match parcial).
+    // Usar este em vez de "search" quando quiser o pacote de UM pedido específico.
+    if ($request->get_param('pedido_id_local')) {
+        $args['meta_query'] = [[
+            'key' => '_pedido_id_local',
+            'value' => (string) intval($request->get_param('pedido_id_local')),
+            'compare' => '=',
+        ]];
+    }
+
     // Filtro de busca genérica (order_id, tracking, recipient_name)
     $search = $request->get_param('search');
     if ($search && strlen(trim($search)) >= 2) {

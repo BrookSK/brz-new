@@ -1096,45 +1096,54 @@ class AdminEtiquetasWpController extends Controller
         if (!is_array($pedido) || empty($pedido['id'])) return $vazio;
 
         $codigo = trim((string) ($pedido['codigo_pedido'] ?? ($pedido['numero_pedido'] ?? '')));
-        $termosBusca = array_values(array_filter([
-            $codigo,
-            'PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT),
-            (string) $pedidoId,
-        ], fn($v) => trim((string) $v) !== ''));
 
-        foreach ($termosBusca as $termo) {
+        // Coletar candidatos de pacotes do WP por vínculo EXATO (nunca busca parcial/fuzzy,
+        // que casava com pedidos de outros clientes — ex.: "761" batendo em "67617").
+        $candidatos = [];
+
+        // 1) Vínculo exato por pedido_id_local (meta gravada na geração). É o mais confiável.
+        try {
+            $respPid = $this->wp->listPackagesByPedidoLocal($pedidoId);
+            $listaPid = (is_array($respPid) && isset($respPid['data']) && is_array($respPid['data'])) ? $respPid['data'] : [];
+            foreach ($listaPid as $pkg) {
+                if ((int) ($pkg['pedido_id_local'] ?? 0) === $pedidoId) {
+                    $candidatos[] = $pkg;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // 2) Fallback: busca pelo código do pedido, mas só aceitando match EXATO de order_id.
+        if (empty($candidatos) && $codigo !== '') {
             try {
-                $resp = $this->wp->listPackages(['search' => $termo, 'per_page' => 50]);
+                $resp = $this->wp->listPackages(['search' => $codigo, 'per_page' => 50]);
+                $lista = (is_array($resp) && isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : [];
+                foreach ($lista as $pkg) {
+                    if (trim((string) ($pkg['order_id'] ?? '')) === $codigo) {
+                        $candidatos[] = $pkg;
+                    }
+                }
             } catch (\Throwable $e) {
-                continue;
             }
-            $lista = (is_array($resp) && isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : [];
-            foreach ($lista as $pkg) {
-                $orderId = trim((string) ($pkg['order_id'] ?? ''));
-                $trk = trim((string) ($pkg['tracking_code'] ?? ''));
-                if ($trk === '') continue;
-                $pidMeta = (int) ($pkg['pedido_id_local'] ?? ($pkg['_pedido_id_local'] ?? 0));
-                // Casar prioritariamente pelo pedido_id_local (ID exato do WP); depois por código do pedido.
-                if ($pidMeta === $pedidoId || ($codigo !== '' && $orderId === $codigo) || $orderId === $termo) {
-                    $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $trk, [
-                        'tracking_number' => $trk,
-                        'wp_post_id' => $pkg['wp_post_id'] ?? null,
-                        'origem' => 'sincronizacao_lote',
-                    ]);
-                    return ['tracking_number' => $trk, 'wp_post_id' => $pkg['wp_post_id'] ?? null];
-                }
+        }
+
+        // Escolher o candidato com tracking preenchido (o mais recente por wp_post_id).
+        $escolhido = null;
+        foreach ($candidatos as $pkg) {
+            if (trim((string) ($pkg['tracking_code'] ?? '')) === '') continue;
+            if ($escolhido === null || (int) ($pkg['wp_post_id'] ?? 0) > (int) ($escolhido['wp_post_id'] ?? 0)) {
+                $escolhido = $pkg;
             }
-            if (count($lista) === 1) {
-                $trk = trim((string) ($lista[0]['tracking_code'] ?? ''));
-                if ($trk !== '') {
-                    $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $trk, [
-                        'tracking_number' => $trk,
-                        'wp_post_id' => $lista[0]['wp_post_id'] ?? null,
-                        'origem' => 'sincronizacao_lote',
-                    ]);
-                    return ['tracking_number' => $trk, 'wp_post_id' => $lista[0]['wp_post_id'] ?? null];
-                }
-            }
+        }
+
+        if ($escolhido !== null) {
+            $trk = trim((string) ($escolhido['tracking_code'] ?? ''));
+            $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $trk, [
+                'tracking_number' => $trk,
+                'wp_post_id' => $escolhido['wp_post_id'] ?? null,
+                'origem' => 'sincronizacao',
+            ]);
+            return ['tracking_number' => $trk, 'wp_post_id' => $escolhido['wp_post_id'] ?? null];
         }
 
         return $vazio;
