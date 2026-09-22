@@ -181,6 +181,7 @@ $router->post('/admin/etiquetas-wp/regerar-etiqueta', 'AdminEtiquetasWpControlle
 $router->post('/admin/etiquetas-wp/notificar-selecionados', 'AdminEtiquetasWpController', 'notificarSelecionados');
 $router->get('/admin/etiquetas-wp/diagnostico-rastreio', 'AdminEtiquetasWpController', 'diagnosticoRastreio');
 $router->post('/admin/etiquetas-wp/sincronizar-rastreio', 'AdminEtiquetasWpController', 'sincronizarRastreio');
+$router->get('/admin/etiquetas-wp/sincronizar-todos', 'AdminEtiquetasWpController', 'sincronizarTodosRastreios');
 
 // Malas (agrupamento de pacotes)
 $router->get('/admin/etiquetas-wp/listar-malas', 'AdminEtiquetasWpController', 'listarMalas');

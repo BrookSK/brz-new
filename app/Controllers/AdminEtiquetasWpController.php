@@ -408,12 +408,24 @@ class AdminEtiquetasWpController extends Controller
                 $pedidoModel->atualizarStatus($pedidoId, 'etiqueta_gerada', __('admin.labels_wp.status_label_via_wp', 'Etiqueta via WordPress - Rastreio: ') . $tracking, $_SESSION['usuario_id'] ?? null);
             } catch (\Exception $e) {}
 
+            // Notificar o cliente automaticamente (e-mail + WhatsApp) com o rastreio. Best-effort.
+            $notif = ['email_enviado' => false, 'whatsapp_enviado' => false];
+            try {
+                $notif = (new \App\Services\NotificationService())->notificarEventoPedido('correios_packet_label_created', $pedidoId, [
+                    'tracking_number' => $tracking,
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[ETIQUETAS_WP][NOTIF] Falha ao notificar pedido #' . $pedidoId . ': ' . $e->getMessage());
+            }
+
             $this->json([
                 'success' => true,
                 'pedido_id' => $pedidoId,
                 'tracking_number' => $tracking,
                 'wp_post_id' => $resp['wp_post_id'] ?? null,
                 'salvo_local' => $salvouLocal,
+                'notificado_email' => !empty($notif['email_enviado']),
+                'notificado_whatsapp' => !empty($notif['whatsapp_enviado']),
                 'aviso_local' => $salvouLocal ? null : __('admin.labels_wp.label_not_saved_local', 'Atenção: etiqueta gerada no Correios, mas não foi possível salvar o rastreio no banco local. Verifique a tabela correios_packet_etiquetas.'),
             ]);
         } else {
@@ -496,6 +508,13 @@ class AdminEtiquetasWpController extends Controller
                     $this->salvarEtiquetaLocal($pid, $packageData['customerControlCode'], $tracking, $resp);
 
                     try { $pedidoModel->atualizarStatus($pid, 'etiqueta_gerada', __('admin.labels_wp.status_label_via_wp_bulk', 'Etiqueta via WP em massa - Rastreio: ') . $tracking, $_SESSION['usuario_id'] ?? null); } catch (\Exception $e) {}
+
+                    // Notificar o cliente automaticamente (e-mail + WhatsApp). Best-effort.
+                    try {
+                        (new \App\Services\NotificationService())->notificarEventoPedido('correios_packet_label_created', $pid, ['tracking_number' => $tracking]);
+                    } catch (\Throwable $e) {
+                        error_log('[ETIQUETAS_WP][NOTIF] Falha ao notificar pedido #' . $pid . ': ' . $e->getMessage());
+                    }
 
                     $result['success'] = true;
                     $result['tracking_number'] = $tracking;
@@ -963,13 +982,90 @@ class AdminEtiquetasWpController extends Controller
         } catch (\Exception $e) {
         }
 
-        // Descobrir o código do pedido (customerControlCode usado ao gerar a etiqueta).
-        $pedidoModel = new PedidoEcommerce();
-        $pedido = $pedidoModel->getComDetalhes($pedidoId);
-        if (!is_array($pedido) || empty($pedido['id'])) {
-            $this->json(['success' => false, 'error' => __('admin.labels_wp.order_not_found', 'Pedido não encontrado')], 404);
+        // Buscar no WordPress e salvar localmente (núcleo reutilizável).
+        $r = $this->sincronizarPedidoDoWp($pedidoId);
+        $tracking = (string) ($r['tracking_number'] ?? '');
+
+        if ($tracking === '') {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.wp_package_not_found', 'Não encontrei o pacote correspondente no WordPress. Verifique se a etiqueta foi realmente gerada.')], 404);
             return;
         }
+
+        $this->json([
+            'success' => true,
+            'pedido_id' => $pedidoId,
+            'tracking_number' => $tracking,
+            'wp_post_id' => $r['wp_post_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Sincroniza de uma vez TODOS os pedidos que estão com status 'etiqueta_gerada' mas sem
+     * rastreio salvo localmente. Busca cada um no WordPress e grava. Rode uma única vez após
+     * subir para produção para resolver o backlog. Idempotente (pula quem já tem tracking).
+     * GET /admin/etiquetas-wp/sincronizar-todos
+     */
+    public function sincronizarTodosRastreios(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        // Buscar pedidos com etiqueta gerada porém sem linha local com tracking.
+        $pedidoIds = [];
+        try {
+            $sql = "SELECT p.id FROM pedidos p
+                    LEFT JOIN correios_packet_etiquetas cpe
+                      ON cpe.pedido_id = p.id AND cpe.tracking_number IS NOT NULL AND cpe.tracking_number <> ''
+                    WHERE LOWER(COALESCE(p.status,'')) IN ('etiqueta_gerada','em_transporte','aguardando_liberacao_aduaneira','enviado_ao_destinatario','entregue')
+                      AND cpe.id IS NULL
+                    ORDER BY p.id DESC
+                    LIMIT 1000";
+            $st = $this->connection->query($sql);
+            $pedidoIds = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao listar pedidos: ' . $e->getMessage()], 500);
+            return;
+        }
+
+        $pedidoIds = array_values(array_filter(array_map('intval', $pedidoIds), fn($v) => $v > 0));
+
+        $sincronizados = 0;
+        $naoEncontrados = 0;
+        $detalhes = [];
+        foreach ($pedidoIds as $pid) {
+            $r = $this->sincronizarPedidoDoWp($pid);
+            if (!empty($r['tracking_number'])) {
+                $sincronizados++;
+                $detalhes[] = ['pedido_id' => $pid, 'tracking_number' => $r['tracking_number']];
+            } else {
+                $naoEncontrados++;
+            }
+        }
+
+        $this->json([
+            'success' => true,
+            'total_verificados' => count($pedidoIds),
+            'sincronizados' => $sincronizados,
+            'nao_encontrados_no_wp' => $naoEncontrados,
+            'detalhes' => $detalhes,
+        ]);
+    }
+
+    /**
+     * Núcleo reutilizável: busca a etiqueta de um pedido no WordPress e grava localmente.
+     * Retorna ['tracking_number' => string|'', 'wp_post_id' => mixed].
+     */
+    private function sincronizarPedidoDoWp(int $pedidoId): array
+    {
+        $vazio = ['tracking_number' => '', 'wp_post_id' => null];
+        if ($pedidoId <= 0) return $vazio;
+
+        $pedidoModel = new PedidoEcommerce();
+        $pedido = $pedidoModel->getComDetalhes($pedidoId);
+        if (!is_array($pedido) || empty($pedido['id'])) return $vazio;
+
         $codigo = trim((string) ($pedido['codigo_pedido'] ?? ($pedido['numero_pedido'] ?? '')));
         $termosBusca = array_values(array_filter([
             $codigo,
@@ -977,8 +1073,6 @@ class AdminEtiquetasWpController extends Controller
             (string) $pedidoId,
         ], fn($v) => trim((string) $v) !== ''));
 
-        // Buscar o pacote no WordPress por cada termo até encontrar.
-        $encontrado = null;
         foreach ($termosBusca as $termo) {
             try {
                 $resp = $this->wp->listPackages(['search' => $termo, 'per_page' => 50]);
@@ -990,40 +1084,30 @@ class AdminEtiquetasWpController extends Controller
                 $orderId = trim((string) ($pkg['order_id'] ?? ''));
                 $trk = trim((string) ($pkg['tracking_code'] ?? ''));
                 if ($trk === '') continue;
-                // Casar por código do pedido OU pelo pedido_id local (meta) quando presente.
                 $pidMeta = (int) ($pkg['pedido_id_local'] ?? ($pkg['_pedido_id_local'] ?? 0));
                 if (($codigo !== '' && $orderId === $codigo) || $orderId === $termo || $pidMeta === $pedidoId) {
-                    $encontrado = $pkg;
-                    break 2;
+                    $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $trk, [
+                        'tracking_number' => $trk,
+                        'wp_post_id' => $pkg['wp_post_id'] ?? null,
+                        'origem' => 'sincronizacao_lote',
+                    ]);
+                    return ['tracking_number' => $trk, 'wp_post_id' => $pkg['wp_post_id'] ?? null];
                 }
             }
-            // Se só houver um resultado com tracking, aceitar como match do termo.
-            if ($encontrado === null && count($lista) === 1) {
+            if (count($lista) === 1) {
                 $trk = trim((string) ($lista[0]['tracking_code'] ?? ''));
-                if ($trk !== '') { $encontrado = $lista[0]; break; }
+                if ($trk !== '') {
+                    $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $trk, [
+                        'tracking_number' => $trk,
+                        'wp_post_id' => $lista[0]['wp_post_id'] ?? null,
+                        'origem' => 'sincronizacao_lote',
+                    ]);
+                    return ['tracking_number' => $trk, 'wp_post_id' => $lista[0]['wp_post_id'] ?? null];
+                }
             }
         }
 
-        if ($encontrado === null) {
-            $this->json(['success' => false, 'error' => __('admin.labels_wp.wp_package_not_found', 'Não encontrei o pacote correspondente no WordPress. Verifique se a etiqueta foi realmente gerada.')], 404);
-            return;
-        }
-
-        $tracking = trim((string) ($encontrado['tracking_code'] ?? ''));
-        $wpPostId = $encontrado['wp_post_id'] ?? null;
-        $salvou = $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $tracking, [
-            'tracking_number' => $tracking,
-            'wp_post_id' => $wpPostId,
-            'origem' => 'sincronizacao',
-        ]);
-
-        $this->json([
-            'success' => $salvou,
-            'pedido_id' => $pedidoId,
-            'tracking_number' => $tracking,
-            'wp_post_id' => $wpPostId,
-            'error' => $salvou ? null : __('admin.labels_wp.label_not_saved_local', 'Não foi possível salvar o rastreio no banco local.'),
-        ]);
+        return $vazio;
     }
 
     /**
