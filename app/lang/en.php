@@ -6766,7 +6766,7 @@ return [
     'admin.installment.unavailable_action_wallet_credit' => 'Wallet credit',
     'admin.installment.unavailable_action_difference_link' => 'Difference payment link',
     'admin.installment.settings_title' => 'Installment Plan Settings - Admin',
-    'admin.installment.settings_heading' => 'Settings — Carnê Braziliana',
+    'admin.installment.settings_heading' => 'Settings — Installment Plan',
     'admin.installment.general' => 'General',
     'admin.installment.publish_all_customers' => 'Publish to all customers',
     'admin.installment.publish_all_hint' => 'When enabled, all customers see the installment plan at checkout. Disabling does not affect existing plans.',
