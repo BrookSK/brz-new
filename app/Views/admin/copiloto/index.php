@@ -180,7 +180,7 @@
             <?php
             $baseUrl = (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br');
             $qrUrl = $baseUrl . '/?bri=1';
-            $msgBoasVindas = !empty($configs['qrcode_mensagem']) ? $configs['qrcode_mensagem'] : 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉
+            $msgBoasVindasDefault = __('admin.copilot.qr_welcome_default', 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉
 
 Eu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar com tudo:
 
@@ -190,7 +190,8 @@ Eu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar com tudo:
 📦 **Acompanhar pedidos** — consulto o status dos seus pedidos
 ❓ **Tirar dúvidas** — sobre como funciona, prazos, pagamento, etc.
 
-Pode mandar sua dúvida ou o que você procura! 💚';
+Pode mandar sua dúvida ou o que você procura! 💚');
+            $msgBoasVindas = !empty($configs['qrcode_mensagem']) ? $configs['qrcode_mensagem'] : $msgBoasVindasDefault;
             ?>
             <div class="card mb-4">
                 <div class="card-header">

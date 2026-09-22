@@ -8180,6 +8180,17 @@ return [
     'admin.copilot.qr_welcome_label' => 'Welcome message (QR Code)',
     'admin.copilot.qr_welcome_placeholder' => 'Message Bri sends when the visitor comes from the QR Code...',
     'admin.copilot.qr_welcome_help' => 'This message appears automatically when someone scans the QR Code. Use **bold** and emojis freely.',
+    'admin.copilot.qr_welcome_default' => 'Hi! I see you came from our QR Code! 😊🎉
+
+I\'m Bri, your Braziliana shopping assistant. I can help you with everything:
+
+🛍️ **Find products** — tell me what you\'re looking for and I\'ll search the catalog
+🔗 **Buy by link** — send me the link to any US product and I\'ll prepare a quote
+💰 **Calculate costs** — I\'ll show you the total with fees and taxes
+📦 **Track orders** — I\'ll check the status of your orders
+❓ **Answer questions** — about how it works, deadlines, payment, etc.
+
+Send me your question or what you\'re looking for! 💚',
 
     // ===== Group keys (auto EN) =====
     'admin.settings.shipping_title' => 'Delivery Settings',
