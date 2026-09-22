@@ -288,6 +288,10 @@ if (empty($pedidosNotif)): ?>
                         </tbody>
                     </table>
                 </div>
+                <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top flex-wrap gap-2" id="notif-paginacao" style="display:none;">
+                    <small class="text-muted" id="notif-pag-info"></small>
+                    <nav><ul class="pagination pagination-sm mb-0" id="notif-pag-controles"></ul></nav>
+                </div>
             </div>
         </div>
     </div>
@@ -459,8 +463,8 @@ function renderPacotesPagination() {
     el.innerHTML = h;
 }
 
-function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarMalasParaContainer();carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}if(t==='documentacao'){carregarDocumentacaoTab();}}
-document.addEventListener('DOMContentLoaded',()=>{checkConnection();carregarPacotes();carregarMalasSelect();carregarMalasMoverSelect();carregarMalas();});
+function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarMalasParaContainer();carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}if(t==='documentacao'){carregarDocumentacaoTab();}if(t==='notificacoes'){paginarNotif();}}
+document.addEventListener('DOMContentLoaded',()=>{checkConnection();carregarPacotes();carregarMalasSelect();carregarMalasMoverSelect();carregarMalas();if(typeof paginarNotif==='function')paginarNotif();});
 document.addEventListener('change',e=>{if(e.target.classList.contains('chk-pedido'))updateMassBtn();if(e.target.classList.contains('chk-cnt-pacote'))updateCntCount();});
 
 // CONNECTION
@@ -512,16 +516,63 @@ async function notificarSelecionados(){
 }
 
 // ABA NOTIFICAÇÕES (lista server-side de pedidos com etiqueta gerada, independente de estágio)
-function filtrarNotif(termo){
-    const t=(termo||'').toLowerCase();
-    document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>{
-        tr.style.display=(!t||tr.textContent.toLowerCase().includes(t))?'':'none';
+var _notifPagina = 1;
+var _notifPorPagina = 50;
+var _notifTermo = '';
+// Retorna as linhas que passam pelo filtro de busca atual.
+function _notifLinhasFiltradas(){
+    return [...document.querySelectorAll('#notif-body tr.notif-row')].filter(tr=>{
+        return !_notifTermo || tr.textContent.toLowerCase().includes(_notifTermo);
     });
+}
+function filtrarNotif(termo){
+    _notifTermo=(termo||'').toLowerCase();
+    _notifPagina=1;
+    paginarNotif();
+}
+// Mostra apenas as linhas da página atual (dentre as filtradas) e monta os controles.
+function paginarNotif(){
+    const filtradas=_notifLinhasFiltradas();
+    // Esconde tudo primeiro (inclusive as que não passaram no filtro).
+    document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>tr.style.display='none');
+    const total=filtradas.length;
+    const totalPaginas=Math.max(1, Math.ceil(total/_notifPorPagina));
+    if(_notifPagina>totalPaginas)_notifPagina=totalPaginas;
+    const ini=(_notifPagina-1)*_notifPorPagina;
+    const fim=ini+_notifPorPagina;
+    filtradas.slice(ini,fim).forEach(tr=>tr.style.display='');
+    // Rodapé de paginação.
+    const wrap=document.getElementById('notif-paginacao');
+    const info=document.getElementById('notif-pag-info');
+    const ctrl=document.getElementById('notif-pag-controles');
+    if(!wrap||!info||!ctrl)return;
+    if(total===0){wrap.style.display='none';return;}
+    wrap.style.display='';
+    const primeiro=total===0?0:(ini+1);
+    const ultimo=Math.min(fim,total);
+    info.textContent=primeiro+'–'+ultimo+' de '+total;
+    ctrl.innerHTML='';
+    const addBtn=(label,pagina,disabled,ativo)=>{
+        const li=document.createElement('li');
+        li.className='page-item'+(disabled?' disabled':'')+(ativo?' active':'');
+        const a=document.createElement('a');
+        a.className='page-link';a.href='#';a.innerHTML=label;
+        a.onclick=(e)=>{e.preventDefault();if(disabled||ativo)return;_notifPagina=pagina;paginarNotif();};
+        li.appendChild(a);ctrl.appendChild(li);
+    };
+    addBtn('&laquo;',_notifPagina-1,_notifPagina<=1,false);
+    // Janela de páginas em torno da atual (máx 5 botões numéricos).
+    let de=Math.max(1,_notifPagina-2), ate=Math.min(totalPaginas,de+4);
+    de=Math.max(1,ate-4);
+    for(let p=de;p<=ate;p++){addBtn(String(p),p,false,p===_notifPagina);}
+    addBtn('&raquo;',_notifPagina+1,_notifPagina>=totalPaginas,false);
+    // Ao trocar de página, o "selecionar todos" reflete só os visíveis.
+    const chkAll=document.getElementById('checkAllNotif');if(chkAll)chkAll.checked=false;
 }
 function toggleAllNotif(){
     const c=document.getElementById('checkAllNotif').checked;
     document.querySelectorAll('#notif-body tr.notif-row').forEach(tr=>{
-        if(tr.style.display==='none')return; // só marca os visíveis (respeita filtro)
+        if(tr.style.display==='none')return; // só marca os visíveis (respeita filtro + página)
         const cb=tr.querySelector('.chk-notif');if(cb)cb.checked=c;
     });
     updateNotificarLista();
