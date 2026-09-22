@@ -1037,6 +1037,16 @@ class AdminEtiquetasWpController extends Controller
             try {
                 $out['total_linhas_tabela'] = (int) $this->connection->query('SELECT COUNT(*) FROM correios_packet_etiquetas')->fetchColumn();
             } catch (\Throwable $e) {}
+            // Índices (revela UNIQUE que causa colisão no ON DUPLICATE KEY UPDATE).
+            try {
+                $stIdx = $this->connection->query('SHOW INDEX FROM correios_packet_etiquetas');
+                $out['tabela_indices'] = $stIdx ? ($stIdx->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            } catch (\Throwable $e) {}
+            // As linhas que realmente existem na tabela.
+            try {
+                $stAll = $this->connection->query('SELECT id, pedido_id, tracking_number, wp_post_id, customer_control_code FROM correios_packet_etiquetas ORDER BY id DESC LIMIT 20');
+                $out['tabela_linhas_existentes'] = $stAll ? ($stAll->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            } catch (\Throwable $e) {}
 
             // Reler a tabela local após a tentativa
             $st = $this->connection->prepare('SELECT id, pedido_id, tracking_number, wp_post_id FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
