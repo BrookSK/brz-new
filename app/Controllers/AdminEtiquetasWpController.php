@@ -1085,7 +1085,8 @@ class AdminEtiquetasWpController extends Controller
                 $trk = trim((string) ($pkg['tracking_code'] ?? ''));
                 if ($trk === '') continue;
                 $pidMeta = (int) ($pkg['pedido_id_local'] ?? ($pkg['_pedido_id_local'] ?? 0));
-                if (($codigo !== '' && $orderId === $codigo) || $orderId === $termo || $pidMeta === $pedidoId) {
+                // Casar prioritariamente pelo pedido_id_local (ID exato do WP); depois por código do pedido.
+                if ($pidMeta === $pedidoId || ($codigo !== '' && $orderId === $codigo) || $orderId === $termo) {
                     $this->salvarEtiquetaLocal($pedidoId, $codigo !== '' ? $codigo : (string) $pedidoId, $trk, [
                         'tracking_number' => $trk,
                         'wp_post_id' => $pkg['wp_post_id'] ?? null,
@@ -1636,7 +1637,11 @@ class AdminEtiquetasWpController extends Controller
                 foreach ($resp['data'] as &$pkg) {
                     $tc = $pkg['tracking_code'] ?? '';
                     $oid = $pkg['order_id'] ?? '';
-                    if (isset($mapByTracking[$tc])) {
+                    // Prioridade 1: pedido_id_local que o próprio WP guarda (ID exato, sem ambiguidade).
+                    $pidWp = (int) ($pkg['pedido_id_local'] ?? 0);
+                    if ($pidWp > 0) {
+                        $pkg['pedido_id_local'] = $pidWp;
+                    } elseif (isset($mapByTracking[$tc])) {
                         $pkg['pedido_id_local'] = $mapByTracking[$tc];
                     } elseif (isset($mapByOrderId[$oid])) {
                         $pkg['pedido_id_local'] = $mapByOrderId[$oid];
