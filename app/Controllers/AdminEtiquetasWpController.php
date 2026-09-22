@@ -1050,6 +1050,103 @@ class AdminEtiquetasWpController extends Controller
         }
     }
 
+    /**
+     * Aplica o LAYOUT padronizado da Braziliana aos templates de e-mail de rastreio,
+     * gravando direto em email_templates (upsert). Evita depender de rodar migration.
+     * GET /admin/etiquetas-wp/aplicar-layout-emails
+     * Remover após uso.
+     */
+    public function aplicarLayoutEmails(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        // Template HTML padronizado (cabeçalho escuro, box de rastreio, botão, rodapé).
+        $montarHtml = function (string $intro, string $urlBtn): string {
+            return '<div style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">'
+                . '<div style="max-width:600px;margin:0 auto;padding:24px 12px;">'
+                . '<div style="background:#0b1f3a;border-radius:10px 10px 0 0;padding:22px 28px;text-align:center;">'
+                . '<span style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:.5px;">BRAZILIANA</span>'
+                . '</div>'
+                . '<div style="background:#ffffff;padding:28px;border:1px solid #e6e8eb;border-top:0;">'
+                . '<p style="margin:0 0 16px;color:#0b1f3a;font-size:16px;">Olá <strong>{{nome}}</strong>,</p>'
+                . '<p style="margin:0 0 16px;color:#444;font-size:14px;line-height:1.6;">' . $intro . '</p>'
+                . '<div style="background:#f4f7ff;border:1px solid #dbe4ff;border-radius:8px;padding:16px 20px;margin:20px 0;">'
+                . '<div style="color:#8a94a6;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Código de rastreio</div>'
+                . '<div style="color:#0b1f3a;font-size:20px;font-weight:bold;letter-spacing:1px;">{{tracking_number}}</div>'
+                . '</div>'
+                . '<div style="text-align:center;margin:26px 0 10px;">'
+                . '<a href="' . $urlBtn . '" style="display:inline-block;background:#0b1f3a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:13px 30px;border-radius:6px;">Acompanhar rastreio</a>'
+                . '</div>'
+                . '<p style="margin:18px 0 0;color:#8a94a6;font-size:13px;line-height:1.6;">Você também pode acompanhar o status na sua conta, em <strong>Meus Pedidos</strong>.</p>'
+                . '</div>'
+                . '<div style="background:#f4f5f7;padding:18px;text-align:center;color:#9aa2ad;font-size:12px;border:1px solid #e6e8eb;border-top:0;border-radius:0 0 10px 10px;">'
+                . 'Braziliana • Este é um e-mail automático, não responda.'
+                . '</div>'
+                . '</div></div>';
+        };
+
+        $urlCorreios = 'https://brazilianashop.com.br/rastreamento?codigo={{tracking_number}}';
+        $templates = [
+            'correios_packet_label_created' => [
+                'assunto' => 'Etiqueta gerada - Pedido #{{codigo_pedido}}',
+                'html' => $montarHtml('A etiqueta de envio do seu pedido <strong>#{{codigo_pedido}}</strong> foi gerada com sucesso. Em breve ele estará a caminho!', $urlCorreios),
+            ],
+            'correios_packet_shipment_departed' => [
+                'assunto' => 'Seu pedido #{{codigo_pedido}} foi embarcado - Rastreio {{tracking_number}}',
+                'html' => $montarHtml('Boas notícias! Seu pedido <strong>#{{codigo_pedido}}</strong> foi embarcado e já está a caminho do destino.', $urlCorreios),
+            ],
+            'shippo_label_created' => [
+                'assunto' => 'Seu pedido #{{codigo_pedido}} foi despachado - Rastreio {{tracking_number}}',
+                'html' => $montarHtml('A etiqueta de envio do seu pedido <strong>#{{codigo_pedido}}</strong> foi gerada e ele já está a caminho.', '{{tracking_url}}'),
+            ],
+        ];
+
+        $resultado = [];
+        try {
+            // Descobrir colunas de email_templates.
+            $cols = [];
+            try { $stc = $this->connection->query('DESCRIBE email_templates'); $cols = $stc ? $stc->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+            if (empty($cols)) {
+                $this->json(['success' => false, 'error' => 'Tabela email_templates não encontrada']);
+                return;
+            }
+            $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('evento', $cols, true) ? 'evento' : 'nome');
+            $htmlCol = in_array('corpo_html', $cols, true) ? 'corpo_html' : (in_array('html', $cols, true) ? 'html' : 'corpo_html');
+            $temAssunto = in_array('assunto', $cols, true);
+            $temAtivo = in_array('ativo', $cols, true);
+
+            foreach ($templates as $nome => $tpl) {
+                // Existe?
+                $stChk = $this->connection->prepare("SELECT id FROM email_templates WHERE {$nomeCol} = ? ORDER BY id DESC LIMIT 1");
+                $stChk->execute([$nome]);
+                $id = (int) ($stChk->fetchColumn() ?: 0);
+
+                if ($id > 0) {
+                    $sets = [$htmlCol . ' = :html'];
+                    $params = [':html' => $tpl['html'], ':id' => $id];
+                    if ($temAssunto) { $sets[] = 'assunto = :assunto'; $params[':assunto'] = $tpl['assunto']; }
+                    $stUp = $this->connection->prepare('UPDATE email_templates SET ' . implode(', ', $sets) . ' WHERE id = :id');
+                    $stUp->execute($params);
+                    $resultado[$nome] = 'atualizado (id ' . $id . ')';
+                } else {
+                    $insCols = [$nomeCol, $htmlCol];
+                    $insVals = [':nome', ':html'];
+                    $params = [':nome' => $nome, ':html' => $tpl['html']];
+                    if ($temAssunto) { $insCols[] = 'assunto'; $insVals[] = ':assunto'; $params[':assunto'] = $tpl['assunto']; }
+                    if ($temAtivo) { $insCols[] = 'ativo'; $insVals[] = '1'; }
+                    $stIns = $this->connection->prepare('INSERT INTO email_templates (' . implode(', ', $insCols) . ') VALUES (' . implode(', ', $insVals) . ')');
+                    $stIns->execute($params);
+                    $resultado[$nome] = 'criado';
+                }
+            }
+            $this->json(['success' => true, 'templates' => $resultado]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage(), 'parcial' => $resultado], 500);
+        }
+    }
+
     public function diagnosticoRastreio(Request $request)
     {
         $auth = new AuthService();

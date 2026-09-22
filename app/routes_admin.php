@@ -182,6 +182,7 @@ $router->post('/admin/etiquetas-wp/notificar-selecionados', 'AdminEtiquetasWpCon
 $router->get('/admin/etiquetas-wp/diagnostico-rastreio', 'AdminEtiquetasWpController', 'diagnosticoRastreio');
 $router->get('/admin/etiquetas-wp/reparar-tabela-etiquetas', 'AdminEtiquetasWpController', 'repararTabelaEtiquetas');
 $router->get('/admin/etiquetas-wp/testar-email-direto', 'AdminEtiquetasWpController', 'testarEmailDireto');
+$router->get('/admin/etiquetas-wp/aplicar-layout-emails', 'AdminEtiquetasWpController', 'aplicarLayoutEmails');
 $router->post('/admin/etiquetas-wp/sincronizar-rastreio', 'AdminEtiquetasWpController', 'sincronizarRastreio');
 $router->get('/admin/etiquetas-wp/sincronizar-todos', 'AdminEtiquetasWpController', 'sincronizarTodosRastreios');
 
