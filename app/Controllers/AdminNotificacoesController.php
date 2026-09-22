@@ -1548,6 +1548,7 @@ class AdminNotificacoesController extends Controller {
             'success' => true,
             'email_enviado' => $okEmail,
             'whatsapp_enviado' => $okWhats,
+            'email_destino' => (string) ($r['email_destino'] ?? ''),
             'message' => __('admin.notifications.resend_ok', 'Notificação reenviada (e-mail e WhatsApp, conforme configurado).'),
         ]);
     }

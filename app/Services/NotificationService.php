@@ -8,6 +8,7 @@ class NotificationService {
     private PedidoEcommerce $pedidoModel;
     private EmailService $emailService;
     private ?string $motivoEmailNaoEnviado = null;
+    private ?string $ultimoDestinoEmail = null;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -44,9 +45,11 @@ class NotificationService {
 
         $vars = $this->buildVars($pedido, $eventoNome, $extra);
 
+        $resultado['email_destino'] = (string) ($vars['email'] ?? '');
         try {
             $enviados = $this->enviarEmailPorEvento($eventoNome, $vars);
             $resultado['email_enviado'] = $enviados > 0;
+            $resultado['email_destino'] = $this->ultimoDestinoEmail ?? (string) ($vars['email'] ?? '');
             if ($enviados === 0) {
                 $resultado['email_erro'] = $this->motivoEmailNaoEnviado ?? 'Nenhum e-mail enviado (sem destinatário, template ou envio desativado)';
             }
@@ -316,6 +319,7 @@ class NotificationService {
                 continue;
             }
             $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+            $this->ultimoDestinoEmail = $to;
             try {
                 $this->emailService->send($to, $subject, $html, $dedupeKey, [
                     'evento' => $eventoNome,
