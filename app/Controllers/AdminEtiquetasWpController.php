@@ -1014,6 +1014,24 @@ class AdminEtiquetasWpController extends Controller
         $auth->requerPerfis(['admin']);
         header('Content-Type: application/json; charset=utf-8');
 
+        // Modo dump: ?dump_dedupe=PEDIDO_ID lista o email_event_log do pedido (não envia).
+        $dumpPid = (int) $request->getParam('dump_dedupe', 0);
+        if ($dumpPid > 0) {
+            $out = ['pedido_id' => $dumpPid];
+            try {
+                $st = $this->connection->prepare("SELECT id, dedupe_key, evento, to_email, pedido_id, created_at FROM email_event_log WHERE pedido_id = ? OR dedupe_key LIKE ? ORDER BY id DESC LIMIT 50");
+                $st->execute([$dumpPid, '%:' . $dumpPid . ':%']);
+                $out['linhas'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $out['erro'] = $e->getMessage();
+            }
+            try {
+                $out['total_email_event_log'] = (int) $this->connection->query('SELECT COUNT(*) FROM email_event_log')->fetchColumn();
+            } catch (\Throwable $e) {}
+            $this->json(['success' => true, 'dump' => $out]);
+            return;
+        }
+
         $to = trim((string) $request->getParam('to', ''));
         if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             $this->json(['success' => false, 'error' => 'Informe ?to=email@valido']);
