@@ -1360,6 +1360,12 @@ if (!defined('_ADMIN_COP_WIDGET_REGISTERED')) {
         }
         if (strpos($contentType, 'application/json') !== false) return;
         if (strpos($contentType, 'application/pdf') !== false) return;
+        // Garantir que os scripts comuns (inclui abrirPrefsModal + modal de Preferências)
+        // existam em páginas inline que renderizam a sidebar mas esqueceram renderAdminScripts().
+        // renderAdminScripts() tem guarda static — não renderiza duas vezes.
+        if (function_exists('renderAdminScripts')) {
+            renderAdminScripts();
+        }
         renderAdminCopilotoWidget();
     });
 }

@@ -356,8 +356,9 @@ class AdminDesapegoController extends Controller {
             if (json.ok) { location.reload(); } else { alert("' . htmlspecialchars(__('admin.desapego.js_error_prefix', 'Erro:'), ENT_QUOTES, 'UTF-8') . ' " + (json.error || "' . htmlspecialchars(__('admin.desapego.js_failure', 'Falha'), ENT_QUOTES, 'UTF-8') . '")); }
         } catch(e) { alert("' . htmlspecialchars(__('admin.desapego.js_connection_error', 'Erro de conexão'), ENT_QUOTES, 'UTF-8') . '"); }
     }
-    </script>
-</body>
+    </script>';
+        renderAdminScripts();
+        echo '</body>
 </html>';
     }
 
@@ -513,8 +514,9 @@ class AdminDesapegoController extends Controller {
         }
 
         echo '</main></div></div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+        renderAdminScripts();
+        echo '</body>
 </html>';
     }
 
