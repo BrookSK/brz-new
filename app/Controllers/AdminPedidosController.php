@@ -837,8 +837,8 @@ class AdminPedidosController extends Controller {
             }
 
             if (!in_array('deleted_at', $colsPedidos, true)) {
-                echo '<div class="alert alert-warning">Sua base ainda não possui lixeira (deleted_at). Rode a migration 087_soft_delete_pedidos_lixeira.sql.</div>';
-                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                echo '<div class="alert alert-warning">' . __('admin.orders_trash.no_trash_column', 'Your database does not have a trash yet (deleted_at). Run the migration 087_soft_delete_pedidos_lixeira.sql.') . '</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
                 exit;
             }
 
@@ -868,7 +868,7 @@ class AdminPedidosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lixeira de Pedidos - Braziliana Admin</title>
+    <title>' . __('admin.orders_trash.title', 'Lixeira de Pedidos') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -879,18 +879,18 @@ class AdminPedidosController extends Controller {
         renderAdminSidebar('pedidos');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Lixeira de Pedidos</h1>
+                    <h1 class="page-title">' . __('admin.orders_trash.title', 'Lixeira de Pedidos') . '</h1>
                     <div>
-                        <a href="/admin/pedidos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                        <a href="/admin/pedidos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> ' . __('common.back', 'Voltar') . '</a>
                     </div>
                 </div>';
 
         if (empty($pedidos)) {
-            echo '<div class="text-muted">Nenhum pedido na lixeira.</div>';
+            echo '<div class="text-muted">' . __('admin.orders_trash.empty', 'Nenhum pedido na lixeira.') . '</div>';
         } else {
             echo '<div class="table-responsive">'
                 . '<table class="table table-sm align-middle">'
-                . '<thead><tr><th>Pedido</th><th>Cliente</th><th>Email</th><th>Excluído por</th><th>Excluído em</th><th>Ações</th></tr></thead><tbody>';
+                . '<thead><tr><th>' . __('admin.orders_trash.col_order', 'Pedido') . '</th><th>' . __('admin.orders_trash.col_customer', 'Cliente') . '</th><th>' . __('admin.orders_trash.col_email', 'Email') . '</th><th>' . __('admin.orders_trash.col_deleted_by', 'Excluído por') . '</th><th>' . __('admin.orders_trash.col_deleted_at', 'Excluído em') . '</th><th>' . __('admin.orders_trash.col_actions', 'Ações') . '</th></tr></thead><tbody>';
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['id'] ?? 0);
                 $dt = (string) ($p['deleted_at'] ?? '');
@@ -908,7 +908,7 @@ class AdminPedidosController extends Controller {
                     . '<div class="d-flex gap-2">'
                     . '<a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i></a>'
                     . '<form method="POST" action="/admin/pedidos/restaurar/' . $pid . '">'
-                    . '<button type="submit" class="btn btn-sm btn-success"><i class="fas fa-rotate-left me-1"></i>Restaurar</button>'
+                    . '<button type="submit" class="btn btn-sm btn-success"><i class="fas fa-rotate-left me-1"></i>' . __('admin.orders_trash.restore', 'Restaurar') . '</button>'
                     . '</form>'
                     . '</div>'
                     . '</td>'
@@ -1085,7 +1085,7 @@ class AdminPedidosController extends Controller {
             unset($_p);
 
             header('Content-Type: text/html; charset=UTF-8');
-            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pedidos Arquivados</title>
+            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . __('admin.orders_archived.title', 'Pedidos Arquivados') . '</title>
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
             </head><body>';
@@ -1095,33 +1095,37 @@ class AdminPedidosController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h4><i class="fas fa-archive me-2"></i>Pedidos Arquivados</h4>
-                <a href="/admin/pedidos" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                <h4><i class="fas fa-archive me-2"></i>' . __('admin.orders_archived.title', 'Pedidos Arquivados') . '</h4>
+                <a href="/admin/pedidos" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>' . __('common.back', 'Voltar') . '</a>
             </div>
-            <p class="text-muted small">Pedidos cancelados automaticamente (carnê expirado, inadimplência). Para restaurar, clique em "Restaurar".</p>';
+            <p class="text-muted small">' . __('admin.orders_archived.subtitle', 'Pedidos cancelados automaticamente (carnê expirado, inadimplência). Para restaurar, clique em "Restaurar".') . '</p>';
+
+            $statusListArquivados = self::getStatusList();
 
             if (empty($pedidos)) {
-                echo '<div class="alert alert-info">Nenhum pedido arquivado.</div>';
+                echo '<div class="alert alert-info">' . __('admin.orders_archived.empty', 'Nenhum pedido arquivado.') . '</div>';
             } else {
                 echo '<div class="table-responsive"><table class="table table-sm table-hover">
                 <thead><tr>
-                    <th>#</th><th>Cliente</th><th>Status</th><th>Total</th><th>Data</th><th>Ações</th>
+                    <th>#</th><th>' . __('admin.orders_archived.col_customer', 'Cliente') . '</th><th>' . __('admin.orders_archived.col_status', 'Status') . '</th><th>' . __('admin.orders_archived.col_total', 'Total') . '</th><th>' . __('admin.orders_archived.col_date', 'Data') . '</th><th>' . __('admin.orders_archived.col_actions', 'Ações') . '</th>
                 </tr></thead><tbody>';
 
                 foreach ($pedidos as $p) {
                     $total = (float) ($p['total'] ?? 0);
                     $data = !empty($p['created_at']) ? date('d/m/Y', strtotime($p['created_at'])) : '-';
                     $nome = htmlspecialchars((string) ($p['cliente_nome'] ?? ''));
+                    $statusRaw = (string) ($p['status'] ?? '');
+                    $statusLabel = $statusRaw !== '' ? ($statusListArquivados[$statusRaw] ?? ucfirst(str_replace('_', ' ', $statusRaw))) : '-';
                     echo '<tr>
                         <td>' . (int) $p['id'] . '</td>
                         <td>' . $nome . '</td>
-                        <td><span class="badge bg-secondary">' . htmlspecialchars((string) ($p['status'] ?? '')) . '</span></td>
+                        <td><span class="badge bg-secondary">' . htmlspecialchars($statusLabel) . '</span></td>
                         <td>R$ ' . number_format($total, 2, ',', '.') . '</td>
                         <td class="small">' . $data . '</td>
                         <td>
-                            <a href="/admin/pedidos/detalhes/' . (int) $p['id'] . '" class="btn btn-sm btn-outline-primary" title="Ver"><i class="fas fa-eye"></i></a>
+                            <a href="/admin/pedidos/detalhes/' . (int) $p['id'] . '" class="btn btn-sm btn-outline-primary" title="' . __('common.view', 'Ver') . '"><i class="fas fa-eye"></i></a>
                             <form method="POST" action="/admin/pedidos/restaurar/' . (int) $p['id'] . '" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Restaurar"><i class="fas fa-undo"></i></button>
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="' . __('admin.orders_archived.restore', 'Restaurar') . '"><i class="fas fa-undo"></i></button>
                             </form>
                         </td>
                     </tr>';
@@ -1131,8 +1135,8 @@ class AdminPedidosController extends Controller {
             echo '</main></body></html>';
 
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
-            echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+            echo '<div class="alert alert-danger">' . __('common.error', 'Erro') . ': ' . htmlspecialchars($e->getMessage()) . '</div>';
+            echo '<a href="/admin/pedidos" class="btn btn-secondary">' . __('common.back', 'Voltar') . '</a>';
         }
         exit;
     }
