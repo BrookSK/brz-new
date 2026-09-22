@@ -403,6 +403,15 @@ class AdminEtiquetasWpController extends Controller
             // Salvar no banco local também (retorna false se falhar ao persistir).
             $salvouLocal = $this->salvarEtiquetaLocal($pedidoId, $packageData['customerControlCode'], $tracking, $resp);
 
+            // Fallback: se não gravou local, buscar do WP e regravar (garante rastreio na conta/admin).
+            if ($this->pedidoSemTrackingLocal($pedidoId)) {
+                $rSync = $this->sincronizarPedidoDoWp($pedidoId);
+                if (!empty($rSync['tracking_number'])) {
+                    $tracking = $rSync['tracking_number'];
+                    $salvouLocal = true;
+                }
+            }
+
             // Atualizar status do pedido
             try {
                 $pedidoModel->atualizarStatus($pedidoId, 'etiqueta_gerada', __('admin.labels_wp.status_label_via_wp', 'Etiqueta via WordPress - Rastreio: ') . $tracking, $_SESSION['usuario_id'] ?? null);
@@ -506,6 +515,16 @@ class AdminEtiquetasWpController extends Controller
                 if (!empty($resp['success'])) {
                     $tracking = $resp['tracking_number'] ?? '';
                     $this->salvarEtiquetaLocal($pid, $packageData['customerControlCode'], $tracking, $resp);
+
+                    // Garantir que o rastreio ficou salvo localmente. Se por algum motivo não
+                    // gravou (tracking vazio na resposta, etc.), buscar do WP e regravar — assim
+                    // o rastreio SEMPRE aparece na conta/admin sem depender de sincronização manual.
+                    if ($this->pedidoSemTrackingLocal($pid)) {
+                        $rSync = $this->sincronizarPedidoDoWp($pid);
+                        if (!empty($rSync['tracking_number'])) {
+                            $tracking = $rSync['tracking_number'];
+                        }
+                    }
 
                     try { $pedidoModel->atualizarStatus($pid, 'etiqueta_gerada', __('admin.labels_wp.status_label_via_wp_bulk', 'Etiqueta via WP em massa - Rastreio: ') . $tracking, $_SESSION['usuario_id'] ?? null); } catch (\Exception $e) {}
 
@@ -1114,6 +1133,23 @@ class AdminEtiquetasWpController extends Controller
             'nao_encontrados_no_wp' => $naoEncontrados,
             'detalhes' => $detalhes,
         ]);
+    }
+
+    /**
+     * Retorna true se o pedido NÃO tem rastreio salvo localmente em correios_packet_etiquetas.
+     */
+    private function pedidoSemTrackingLocal(int $pedidoId): bool
+    {
+        if ($pedidoId <= 0 || !$this->tableExists('correios_packet_etiquetas')) {
+            return true;
+        }
+        try {
+            $st = $this->connection->prepare("SELECT tracking_number FROM correios_packet_etiquetas WHERE pedido_id = ? AND tracking_number IS NOT NULL AND tracking_number <> '' ORDER BY id DESC LIMIT 1");
+            $st->execute([$pedidoId]);
+            return trim((string) ($st->fetchColumn() ?: '')) === '';
+        } catch (\Exception $e) {
+            return true;
+        }
     }
 
     /**
