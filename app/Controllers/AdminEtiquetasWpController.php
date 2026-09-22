@@ -1002,6 +1002,23 @@ class AdminEtiquetasWpController extends Controller
 
         $out = ['pedido_id' => $pedidoId];
 
+        // Coluna tracking_code DIRETO na tabela pedidos (tem PRIORIDADE no getComDetalhes).
+        try {
+            $colsP = [];
+            try { $stcp = $this->connection->query('DESCRIBE pedidos'); $colsP = $stcp ? $stcp->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+            $trackCols = array_values(array_filter(['tracking_code','codigo_rastreio','rastreamento','tracking','tracking_source'], fn($c) => in_array($c, $colsP, true)));
+            if (!empty($trackCols)) {
+                $sel = implode(', ', $trackCols);
+                $stP = $this->connection->prepare("SELECT {$sel} FROM pedidos WHERE id = ? LIMIT 1");
+                $stP->execute([$pedidoId]);
+                $out['pedidos_colunas_tracking'] = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } else {
+                $out['pedidos_colunas_tracking'] = 'nenhuma coluna de tracking na tabela pedidos';
+            }
+        } catch (\Throwable $e) {
+            $out['pedidos_colunas_tracking_erro'] = $e->getMessage();
+        }
+
         // Linha em correios_packet_etiquetas
         try {
             $st = $this->connection->prepare('SELECT id, pedido_id, customer_control_code, tracking_number, status, wp_post_id, created_at FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
