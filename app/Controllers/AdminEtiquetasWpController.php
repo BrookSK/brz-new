@@ -911,6 +911,78 @@ class AdminEtiquetasWpController extends Controller
     }
 
     /**
+     * Reparo TEMPORÁRIO da tabela correios_packet_etiquetas, que ficou corrompida:
+     * - Linha com id=0 (AUTO_INCREMENT quebrado) fazia todo INSERT virar UPDATE dessa linha.
+     * - Índice de pedido_id não era UNIQUE (permitia duplicatas e quebrava o ON DUPLICATE KEY).
+     * GET /admin/etiquetas-wp/reparar-tabela-etiquetas
+     * Remover após uso.
+     */
+    public function repararTabelaEtiquetas(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $passos = [];
+        try {
+            // 1) Remover a linha corrompida id=0 (guardando o que era, para log).
+            try {
+                $st = $this->connection->query('SELECT id, pedido_id, tracking_number, wp_post_id FROM correios_packet_etiquetas WHERE id = 0');
+                $linhaZero = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
+                $passos['linha_id_zero_antes'] = $linhaZero;
+                if (!empty($linhaZero)) {
+                    $this->connection->exec('DELETE FROM correios_packet_etiquetas WHERE id = 0');
+                    $passos['linha_id_zero_removida'] = true;
+                }
+            } catch (\Throwable $e) {
+                $passos['erro_remover_id_zero'] = $e->getMessage();
+            }
+
+            // 2) Remover duplicatas de pedido_id (mantém a de maior id/mais recente).
+            try {
+                $this->connection->exec(
+                    'DELETE t1 FROM correios_packet_etiquetas t1
+                     INNER JOIN correios_packet_etiquetas t2
+                       ON t1.pedido_id = t2.pedido_id AND t1.id < t2.id'
+                );
+                $passos['duplicatas_removidas'] = true;
+            } catch (\Throwable $e) {
+                $passos['erro_remover_duplicatas'] = $e->getMessage();
+            }
+
+            // 3) Tornar pedido_id realmente UNIQUE (dropar índice não-único e recriar UNIQUE).
+            try {
+                // Descobrir o nome do índice atual de pedido_id.
+                $idx = $this->connection->query('SHOW INDEX FROM correios_packet_etiquetas')->fetchAll(\PDO::FETCH_ASSOC);
+                foreach ($idx as $i) {
+                    if ($i['Column_name'] === 'pedido_id' && strtoupper((string) $i['Key_name']) !== 'PRIMARY') {
+                        try { $this->connection->exec('ALTER TABLE correios_packet_etiquetas DROP INDEX `' . $i['Key_name'] . '`'); } catch (\Throwable $e) {}
+                    }
+                }
+                $this->connection->exec('ALTER TABLE correios_packet_etiquetas ADD UNIQUE KEY uniq_pedido_id (pedido_id)');
+                $passos['unique_pedido_id_criado'] = true;
+            } catch (\Throwable $e) {
+                $passos['erro_unique_pedido_id'] = $e->getMessage();
+            }
+
+            // 4) Corrigir o AUTO_INCREMENT.
+            try {
+                $maxId = (int) $this->connection->query('SELECT COALESCE(MAX(id),0) FROM correios_packet_etiquetas')->fetchColumn();
+                $this->connection->exec('ALTER TABLE correios_packet_etiquetas AUTO_INCREMENT = ' . ($maxId + 1));
+                $passos['auto_increment_ajustado_para'] = $maxId + 1;
+            } catch (\Throwable $e) {
+                $passos['erro_auto_increment'] = $e->getMessage();
+            }
+
+            $passos['total_linhas_apos'] = (int) $this->connection->query('SELECT COUNT(*) FROM correios_packet_etiquetas')->fetchColumn();
+            $this->json(['success' => true, 'passos' => $passos]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage(), 'passos' => $passos], 500);
+        }
+    }
+
+    /**
      * Diagnóstico temporário: mostra o que está gravado para um pedido em relação ao rastreio.
      * GET /admin/etiquetas-wp/diagnostico-rastreio?pedido_id=758
      * Remover após depuração.

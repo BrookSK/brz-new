@@ -180,6 +180,7 @@ $router->post('/admin/etiquetas-wp/deletar-embarque', 'AdminEtiquetasWpControlle
 $router->post('/admin/etiquetas-wp/regerar-etiqueta', 'AdminEtiquetasWpController', 'regerarEtiqueta');
 $router->post('/admin/etiquetas-wp/notificar-selecionados', 'AdminEtiquetasWpController', 'notificarSelecionados');
 $router->get('/admin/etiquetas-wp/diagnostico-rastreio', 'AdminEtiquetasWpController', 'diagnosticoRastreio');
+$router->get('/admin/etiquetas-wp/reparar-tabela-etiquetas', 'AdminEtiquetasWpController', 'repararTabelaEtiquetas');
 $router->post('/admin/etiquetas-wp/sincronizar-rastreio', 'AdminEtiquetasWpController', 'sincronizarRastreio');
 $router->get('/admin/etiquetas-wp/sincronizar-todos', 'AdminEtiquetasWpController', 'sincronizarTodosRastreios');
 
