@@ -1423,7 +1423,7 @@ PROMPT;
     public function chamarClaudeAdmin(string $mensagem, array $historico): array {
         $apiKey = $this->configs['api_key_claude'] ?? '';
         if (empty($apiKey)) {
-            return ['texto' => 'API Key do Co-Piloto não configurada.', 'tokens_usados' => 0];
+            return ['texto' => __('admin.copilot.api_key_not_configured', 'API Key do Co-Piloto não configurada.'), 'tokens_usados' => 0];
         }
 
         // Busca automática de produtos (igual ao cliente)

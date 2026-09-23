@@ -799,7 +799,7 @@ class AuthController extends Controller {
                 if ($usuario) {
                     // Verificar se é login admin
                     if ($isAdmin && !$this->authService->podeAcessarPainelAdmin()) {
-                        $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
+                        $_SESSION['message'] = __('auth.admin_access_denied', 'Acesso administrativo negado. Usuário não tem permissão de administrador.');
                         $_SESSION['message_type'] = 'danger';
                         $this->redirect('/login');
                         return;
@@ -1008,7 +1008,7 @@ class AuthController extends Controller {
 
                 $this->redirect('/admin/dashboard');
             } else {
-                $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
+                $_SESSION['message'] = __('auth.admin_access_denied', 'Acesso administrativo negado. Usuário não tem permissão de administrador.');
                 $_SESSION['message_type'] = 'danger';
 
                 if ($isAjax) {
@@ -1032,7 +1032,7 @@ class AuthController extends Controller {
                 if ($usuario) {
                     // Verificar se é admin
                     if (!$this->authService->podeAcessarPainelAdmin()) {
-                        $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
+                        $_SESSION['message'] = __('auth.admin_access_denied', 'Acesso administrativo negado. Usuário não tem permissão de administrador.');
                         $_SESSION['message_type'] = 'danger';
 
                         if ($isAjax) {
@@ -1065,7 +1065,7 @@ class AuthController extends Controller {
                         $displayName = 'Usuário';
                     }
 
-                    $_SESSION['message'] = 'Bem-vindo, ' . $displayName . '! Acesso administrativo.';
+                    $_SESSION['message'] = __('auth.welcome_admin_access', 'Bem-vindo, {name}! Acesso administrativo.', ['name' => $displayName]);
                     $_SESSION['message_type'] = 'success';
 
                     $adminTarget = $redirectTo !== '' ? $redirectTo : '/admin/dashboard';

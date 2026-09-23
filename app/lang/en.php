@@ -1501,6 +1501,8 @@ return [
     'auth.account_created_redirect' => 'Account created successfully! Redirecting...',
     'auth.error_create_account' => 'Error creating account',
     'auth.returned_to_profile' => 'You returned to your profile.',
+    'auth.welcome_admin_access' => 'Welcome, {name}! Administrative access.',
+    'auth.admin_access_denied' => 'Administrative access denied. User does not have administrator permission.',
 
     // Admin - Pedidos (Orders)
     'admin.orders.new_manual_order' => 'New Manual Order',
@@ -5060,6 +5062,7 @@ return [
     'admin.copilot.conversation_title' => 'Conversation — {name}',
     'admin.copilot.visitor' => 'Visitor',
     // Co-Pilot conversations list
+    'admin.copilot.api_key_not_configured' => 'Co-Pilot API Key not configured.',
     'admin.copilot.conversations_heading' => 'Co-Pilot Conversations',
     'admin.copilot.conversations_subtitle' => 'History of customer chats with Bri',
     'admin.copilot.search_placeholder' => 'Search by name, email or session ID...',
