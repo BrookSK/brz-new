@@ -83,7 +83,7 @@
             <div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><?= htmlspecialchars(__('admin.demands.history', 'Histórico'), ENT_QUOTES, 'UTF-8') ?></h6></div><div class="card-body p-0" style="max-height:300px;overflow-y:auto;">
                 <ul class="list-group list-group-flush">
                 <?php foreach ($historico as $h): ?>
-                <li class="list-group-item small"><strong><?= date('d/m H:i', strtotime($h['created_at'])) ?></strong> — <?= ucfirst(str_replace('_',' ',$h['status_novo'])) ?><?php if ($h['observacao']): ?><br><span class="text-muted"><?= htmlspecialchars($h['observacao']) ?></span><?php endif; ?></li>
+                <li class="list-group-item small"><strong><?= date('d/m H:i', strtotime($h['created_at'])) ?></strong> — <?= htmlspecialchars($statusLabels[$h['status_novo']] ?? ucfirst(str_replace('_',' ',$h['status_novo']))) ?><?php if ($h['observacao']): ?><br><span class="text-muted"><?= htmlspecialchars($h['observacao']) ?></span><?php endif; ?></li>
                 <?php endforeach; ?>
                 </ul>
             </div></div>

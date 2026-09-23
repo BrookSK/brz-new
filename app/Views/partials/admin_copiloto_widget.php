@@ -1,21 +1,27 @@
 <!-- Co-Piloto Admin (chat interno) -->
 <div id="adminCopiloto" style="position:fixed;bottom:20px;right:20px;z-index:9999;">
-    <button id="adminCopBtn" onclick="toggleAdminCop()" style="width:52px;height:52px;border-radius:50%;border:none;background:#0b1f3a;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;" title="Co-Piloto Admin">
+    <button id="adminCopBtn" onclick="toggleAdminCop()" style="width:52px;height:52px;border-radius:50%;border:none;background:#0b1f3a;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;" title="<?= htmlspecialchars(__('admin.copilot_widget.title', 'Co-Piloto Admin'), ENT_QUOTES, 'UTF-8') ?>">
         <i class="fas fa-robot"></i>
     </button>
     <div id="adminCopChat" style="display:none;position:absolute;bottom:62px;right:0;width:380px;max-height:520px;background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);overflow:hidden;flex-direction:column;">
         <div style="background:#0b1f3a;color:#fff;padding:12px 16px;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
-            <span><i class="fas fa-robot me-2"></i>Co-Piloto Admin</span>
+            <span><i class="fas fa-robot me-2"></i><?= htmlspecialchars(__('admin.copilot_widget.title', 'Co-Piloto Admin'), ENT_QUOTES, 'UTF-8') ?></span>
             <button onclick="toggleAdminCop()" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;"><i class="fas fa-times"></i></button>
         </div>
         <div id="adminCopMsgs" style="flex:1;overflow-y:auto;padding:12px;min-height:300px;max-height:380px;font-size:13px;display:flex;flex-direction:column;gap:8px;"></div>
         <div style="border-top:1px solid #e2e8f0;padding:10px 12px;display:flex;gap:8px;">
-            <input id="adminCopInput" type="text" placeholder="Pergunte algo..." style="flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" onkeydown="if(event.key==='Enter')enviarAdminCop()">
+            <input id="adminCopInput" type="text" placeholder="<?= htmlspecialchars(__('admin.copilot_widget.input_placeholder', 'Pergunte algo...'), ENT_QUOTES, 'UTF-8') ?>" style="flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" onkeydown="if(event.key==='Enter')enviarAdminCop()">
             <button onclick="enviarAdminCop()" style="background:#0b1f3a;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
 </div>
 <script>
+window.ADMIN_COP_I18N = {
+    empty: <?= json_encode(__('admin.copilot_widget.empty', 'Pergunte sobre produtos, regras, processos...'), JSON_UNESCAPED_UNICODE) ?>,
+    thinking: <?= json_encode(__('admin.copilot_widget.thinking', 'Pensando...'), JSON_UNESCAPED_UNICODE) ?>,
+    no_response: <?= json_encode(__('admin.copilot_widget.no_response', 'Sem resposta.'), JSON_UNESCAPED_UNICODE) ?>,
+    connection_error: <?= json_encode(__('admin.copilot_widget.connection_error', 'Erro de conexão. Tente novamente.'), JSON_UNESCAPED_UNICODE) ?>
+};
 if (typeof window.toggleAdminCop === 'undefined') {
 (function(){
     var aberto = false;
@@ -38,7 +44,7 @@ if (typeof window.toggleAdminCop === 'undefined') {
         var el = document.getElementById('adminCopMsgs');
         if (!el) return;
         if (historico.length === 0) {
-            el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:40px 0;">Pergunte sobre produtos, regras, processos...</div>';
+            el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:40px 0;">' + escHtml(window.ADMIN_COP_I18N.empty) + '</div>';
             return;
         }
         var html = '';
@@ -74,7 +80,7 @@ if (typeof window.toggleAdminCop === 'undefined') {
         var msgsEl = document.getElementById('adminCopMsgs');
         var typing = document.createElement('div');
         typing.style.cssText = 'align-self:flex-start;padding:8px 12px;border-radius:10px;background:#f1f5f9;color:#94a3b8;font-size:12px;';
-        typing.textContent = 'Pensando...';
+        typing.textContent = window.ADMIN_COP_I18N.thinking;
         msgsEl.appendChild(typing);
         scrollBottom();
 
@@ -96,7 +102,7 @@ if (typeof window.toggleAdminCop === 'undefined') {
         })
         .then(function(data){
             typing.remove();
-            var resp = data.resposta || 'Sem resposta.';
+            var resp = data.resposta || window.ADMIN_COP_I18N.no_response;
             historico.push({role:'assistant', content: resp});
             try { sessionStorage.setItem('adm_cop_hist', JSON.stringify(historico.slice(-20))); } catch(e){}
             renderMsgs();
@@ -104,7 +110,7 @@ if (typeof window.toggleAdminCop === 'undefined') {
         })
         .catch(function(err){
             typing.remove();
-            historico.push({role:'assistant', content: err && err.message ? err.message : 'Erro de conexão. Tente novamente.'});
+            historico.push({role:'assistant', content: err && err.message ? err.message : window.ADMIN_COP_I18N.connection_error});
             renderMsgs();
             scrollBottom();
         })

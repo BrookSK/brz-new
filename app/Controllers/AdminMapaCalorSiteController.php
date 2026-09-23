@@ -486,10 +486,37 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         // Top Clicks
         echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">' . __('admin.heatmap.top_clicks', 'O que mais clicam') . '</h2></div><div class="section-body">
 <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">' . __('admin.heatmap.top_clicks_desc', 'Botões, links e áreas que seus clientes mais clicam. Isso mostra o que eles procuram.') . '</p>';
+        // Translation map for common/known clicked element labels (standard site UI).
+        // Unknown/ad-hoc captured text falls through unchanged (tracking data).
+        $clickLabelMap = [
+            'buscar' => __('admin.heatmap.click_search', 'Buscar'),
+            'buscar produtos...' => __('admin.heatmap.click_search_products', 'Buscar produtos...'),
+            'produtos' => __('admin.heatmap.click_products', 'Produtos'),
+            'ver produtos' => __('admin.heatmap.click_view_products', 'Ver produtos'),
+            'todas as categorias' => __('admin.heatmap.click_all_categories', 'Todas as Categorias'),
+            'explorar agora' => __('admin.heatmap.click_explore_now', 'Explorar agora'),
+            'aceitar todos' => __('admin.heatmap.click_accept_all', 'Aceitar todos'),
+            'aceitou todos' => __('admin.heatmap.click_accepted_all', 'Aceitou todos'),
+            'próxima' => __('admin.heatmap.click_next', 'Próxima'),
+            'proxima' => __('admin.heatmap.click_next', 'Próxima'),
+            'anterior' => __('admin.heatmap.click_previous', 'Anterior'),
+            'adicionar ao carrinho' => __('admin.heatmap.click_add_to_cart', 'Adicionar ao Carrinho'),
+            'ver detalhes' => __('admin.heatmap.click_view_details', 'Ver Detalhes'),
+            'finalizar compra' => __('admin.heatmap.click_checkout', 'Finalizar Compra'),
+            'entrar' => __('admin.heatmap.click_login', 'Entrar'),
+            'criar conta' => __('admin.heatmap.click_create_account', 'Criar conta'),
+            'saiba mais' => __('admin.heatmap.click_learn_more', 'Saiba mais'),
+            'fazer login' => __('admin.heatmap.click_do_login', 'Fazer login'),
+        ];
+        $clickLabel = function(?string $raw) use ($clickLabelMap): string {
+            $t = trim((string) $raw);
+            if ($t === '') return '';
+            return $clickLabelMap[mb_strtolower($t)] ?? $t;
+        };
         if (!empty($topClicks)) {
             echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;">';
             foreach ($topClicks as $c) {
-                $elem = htmlspecialchars($c['elemento'] ?? '');
+                $elem = htmlspecialchars($clickLabel($c['elemento'] ?? ''));
                 // Make page path friendly
                 $paginaFriendly = $c['pagina'] ?? '/';
                 $pageLabels = ['/'=>__('admin.heatmap.page_home', 'Página Inicial'), '/produtos'=>__('admin.heatmap.page_products', 'Produtos'), '/carrinho'=>__('admin.heatmap.page_cart', 'Carrinho'), '/checkout'=>__('admin.heatmap.page_checkout', 'Checkout'), '/contato'=>__('admin.heatmap.page_contact', 'Contato'), '/faq'=>__('admin.heatmap.page_faq', 'FAQ'), '/assessoria'=>__('admin.heatmap.page_advisory', 'Assessoria')];

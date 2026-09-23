@@ -69,7 +69,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                     <div class="d-flex align-items-start justify-content-between mb-2">
                         <div>
                             <div class="fw-bold fs-6"><?= htmlspecialchars($g['nome'], ENT_QUOTES, 'UTF-8') ?></div>
-                            <div class="small text-muted">/grupo/<?= $slug ?></div>
+                            <div class="small text-muted"><?= __('admin.purchase_groups.url_prefix', '/grupo/') ?><?= $slug ?></div>
                         </div>
                         <span class="badge <?= $ativo ? 'bg-success' : 'bg-secondary' ?> ms-2"><?= $ativo ? __('admin.purchase_groups.active', 'Ativo') : __('admin.purchase_groups.inactive', 'Inativo') ?></span>
                         <?php if ($clubeOnly): ?>

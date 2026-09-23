@@ -22,6 +22,7 @@ $despGroupLabels = [
     'custo_produto' => __('admin.expenses.group_product_cost', 'Custo produto'),
     'comissoes' => __('admin.expenses.group_commissions', 'Comissões'),
     'tributos' => __('admin.expenses.group_taxes', 'Tributos'),
+    'outras' => __('admin.expenses.group_others', 'Outros'),
     'outros' => __('admin.expenses.group_others', 'Outros'),
 ];
 $despGroupLabel = function(?string $key) use ($despGroupLabels): string {

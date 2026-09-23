@@ -5036,12 +5036,28 @@ CUSTOSCRIPT;
                     $jsEditSaveFail = json_encode(__('admin.order_details.save_failed', 'Falha ao salvar'), JSON_UNESCAPED_UNICODE);
                     $jsEditSaved = json_encode(__('admin.order_details.customer_data_saved', 'Dados atualizados. Recarregue a página para ver tudo refletido.'), JSON_UNESCAPED_UNICODE);
                     $jsEditNetErr = json_encode(__('admin.order_details.save_network_error', 'Erro de rede ao salvar'), JSON_UNESCAPED_UNICODE);
+                    // Rótulos de endereço traduzidos (seguem o idioma do admin). BR usa termos locais (CEP), internacional usa termos genéricos.
+                    $jsAddrLabels = json_encode([
+                        'cep_br' => __('admin.order_details.zip_br', 'CEP'),
+                        'cep_intl' => __('admin.order_details.zip_intl', 'ZIP / Postal Code'),
+                        'address_br' => __('common.address', 'Endereço'),
+                        'address_intl' => __('admin.order_details.address_line1', 'Address line 1'),
+                        'number' => __('admin.order_details.number', 'Número'),
+                        'complement_br' => __('admin.order_details.complement', 'Complemento'),
+                        'complement_intl' => __('admin.order_details.address_line2', 'Address line 2'),
+                        'district' => __('admin.order_details.district', 'Bairro'),
+                        'city' => __('common.city', 'Cidade'),
+                        'state_br' => __('common.state', 'Estado'),
+                        'state_intl' => __('admin.order_details.state_province', 'State / Province'),
+                    ], JSON_UNESCAPED_UNICODE);
                     echo <<<HTML
 <script>
+var EDIT_ADDR_LABELS = {$jsAddrLabels};
 function onEditPaisChange() {
     var pais = (document.getElementById('editClientePais') || {}).value || 'BR';
     pais = pais.toUpperCase().trim();
     var isBR = (pais === 'BR');
+    var L = EDIT_ADDR_LABELS;
 
     var lCep = document.getElementById('editLabelCep');
     var lEnd = document.getElementById('editLabelEndereco');
@@ -5051,13 +5067,13 @@ function onEditPaisChange() {
     var lCidade = document.getElementById('editLabelCidade');
     var lEstado = document.getElementById('editLabelEstado');
 
-    if (lCep) lCep.textContent = isBR ? 'CEP' : 'ZIP / Postal Code';
-    if (lEnd) lEnd.textContent = isBR ? 'Endere\u00e7o' : 'Address line 1';
-    if (lNum) lNum.textContent = isBR ? 'N\u00famero' : 'Number';
-    if (lComp) lComp.textContent = isBR ? 'Complemento' : 'Address line 2';
-    if (lBairro) lBairro.textContent = isBR ? 'Bairro' : 'District';
-    if (lCidade) lCidade.textContent = isBR ? 'Cidade' : 'City';
-    if (lEstado) lEstado.textContent = isBR ? 'Estado' : 'State / Province';
+    if (lCep) lCep.textContent = isBR ? L.cep_br : L.cep_intl;
+    if (lEnd) lEnd.textContent = isBR ? L.address_br : L.address_intl;
+    if (lNum) lNum.textContent = L.number;
+    if (lComp) lComp.textContent = isBR ? L.complement_br : L.complement_intl;
+    if (lBairro) lBairro.textContent = L.district;
+    if (lCidade) lCidade.textContent = L.city;
+    if (lEstado) lEstado.textContent = isBR ? L.state_br : L.state_intl;
 
     var wBairro = document.getElementById('editWrapBairro');
     var wNumero = document.getElementById('editWrapNumero');

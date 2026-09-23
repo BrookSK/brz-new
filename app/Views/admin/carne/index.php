@@ -56,7 +56,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small"><?= __('admin.installment.total_financed', 'Total Financiado') ?></div><div class="fs-4 fw-bold"><?= fmtBrl($stats['total_financiado'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.total_financed', 'Total Financiado') ?></div><div class="fs-4 fw-bold" data-value-brl="<?= (float)($stats['total_financiado'] ?? 0) ?>"><?= fmtBrl($stats['total_financiado'] ?? 0) ?></div></div>
                         <i class="fas fa-coins fs-3 text-primary opacity-25"></i>
                     </div>
                     <div class="text-muted small mt-1"><?= __('admin.installment.plans_in_period', '{n} carnês no período', ['n' => (int)($stats['total'] ?? 0)]) ?></div>
@@ -67,7 +67,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small"><?= __('admin.installment.already_received', 'Já Recebido') ?></div><div class="fs-4 fw-bold text-success"><?= fmtBrl($stats['total_recebido'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.already_received', 'Já Recebido') ?></div><div class="fs-4 fw-bold text-success" data-value-brl="<?= (float)($stats['total_recebido'] ?? 0) ?>"><?= fmtBrl($stats['total_recebido'] ?? 0) ?></div></div>
                         <i class="fas fa-check-circle fs-3 text-success opacity-25"></i>
                     </div>
                     <?php $pctRecebido = ($stats['total_financiado'] ?? 0) > 0 ? round(($stats['total_recebido'] ?? 0) / $stats['total_financiado'] * 100) : 0; ?>
@@ -80,7 +80,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small"><?= __('admin.installment.open_balance', 'Em Aberto') ?></div><div class="fs-4 fw-bold text-warning"><?= fmtBrl($stats['total_aberto'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.open_balance', 'Em Aberto') ?></div><div class="fs-4 fw-bold text-warning" data-value-brl="<?= (float)($stats['total_aberto'] ?? 0) ?>"><?= fmtBrl($stats['total_aberto'] ?? 0) ?></div></div>
                         <i class="fas fa-clock fs-3 text-warning opacity-25"></i>
                     </div>
                     <div class="text-muted small mt-1"><?= __('admin.installment.to_receive_next_months', 'a receber nos próximos meses') ?></div>
@@ -91,7 +91,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center justify-content-between">
-                        <div><div class="text-muted small"><?= __('admin.installment.overdue', 'Em Atraso') ?></div><div class="fs-4 fw-bold text-danger"><?= fmtBrl($stats['total_atraso'] ?? 0) ?></div></div>
+                        <div><div class="text-muted small"><?= __('admin.installment.overdue', 'Em Atraso') ?></div><div class="fs-4 fw-bold text-danger" data-value-brl="<?= (float)($stats['total_atraso'] ?? 0) ?>"><?= fmtBrl($stats['total_atraso'] ?? 0) ?></div></div>
                         <i class="fas fa-exclamation-triangle fs-3 text-danger opacity-25"></i>
                     </div>
                     <div class="text-muted small mt-1"><?= __('admin.installment.plans_delinquency', '{n} carnês · inadimplência {p}%', ['n' => $countAtrasados, 'p' => (($stats['total_financiado'] ?? 0) > 0 ? round(($stats['total_atraso'] ?? 0) / $stats['total_financiado'] * 100, 1) : 0)]) ?></div>
@@ -284,10 +284,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                     <a href="/admin/pedidos/detalhes/<?= $c['pedido_id'] ?>" class="text-decoration-none fw-semibold">#<?= $c['pedido_id'] ?></a>
                                     <div class="text-muted small text-truncate" style="max-width:120px;"><?= htmlspecialchars($c['cliente_nome'] ?? '') ?></div>
                                 </td>
-                                <td class="text-end fw-semibold d-none d-lg-table-cell"><?= fmtBrl($c['total_geral']) ?></td>
+                                <td class="text-end fw-semibold d-none d-lg-table-cell"><span data-value-brl="<?= (float)$c['total_geral'] ?>"><?= fmtBrl($c['total_geral']) ?></span></td>
                                 <td class="text-end d-none d-lg-table-cell">
-                                    <span class="text-success small"><?= fmtBrl($pago) ?></span>
-                                    <div class="text-muted small"><?= fmtBrl($saldo) ?> <?= __('admin.installment.remaining', 'restante') ?></div>
+                                    <span class="text-success small" data-value-brl="<?= (float)$pago ?>"><?= fmtBrl($pago) ?></span>
+                                    <div class="text-muted small"><span data-value-brl="<?= (float)$saldo ?>"><?= fmtBrl($saldo) ?></span> <?= __('admin.installment.remaining', 'restante') ?></div>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark border"><?= $pagas ?>/<?= $totalParcelas ?></span>
@@ -414,7 +414,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                     <div class="fw-semibold"><?= htmlspecialchars($cob['cliente_nome'] ?? '') ?></div>
                                     <div class="text-muted small">#<?= $cob['pedido_id'] ?? '' ?> · parcela <?= $cob['numero_parcela'] ?? '' ?></div>
                                 </td>
-                                <td class="text-end fw-semibold"><?= fmtBrl($cob['valor_total'] ?? 0) ?></td>
+                                <td class="text-end fw-semibold"><span data-value-brl="<?= (float)($cob['valor_total'] ?? 0) ?>"><?= fmtBrl($cob['valor_total'] ?? 0) ?></span></td>
                                 <td><?= date('d/m/Y', $venc) ?></td>
                                 <td><span class="badge bg-<?= $corSit ?>"><?= $situacao ?></span></td>
                                 <td><?= $diasAtraso > 0 ? __('admin.installment.days_count', '{n} dias', ['n' => $diasAtraso]) : '—' ?></td>
@@ -496,7 +496,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                     <div class="fw-semibold"><?= htmlspecialchars($env['cliente_nome'] ?? '') ?></div>
                                     <div class="text-muted small">#<?= $env['pedido_id'] ?? '' ?></div>
                                 </td>
-                                <td class="text-end fw-semibold"><?= fmtBrl($env['total_geral'] ?? 0) ?></td>
+                                <td class="text-end fw-semibold"><span data-value-brl="<?= (float)($env['total_geral'] ?? 0) ?>"><?= fmtBrl($env['total_geral'] ?? 0) ?></span></td>
                                 <td><span class="badge bg-<?= $stEnv['cor'] ?>"><?= $stEnv['label'] ?></span></td>
                                 <td><span class="badge bg-success"><?= __('admin.installment.ready_for_shipping', 'Pronto p/ envio') ?></span></td>
                                 <td>

@@ -7023,6 +7023,26 @@ HTML;
         ob_start();
         ?>
         <script>
+        // Friendly (translated) labels for known email event keys — the raw key is kept for the flow.
+        window.EMAIL_EVENT_LABELS = <?= json_encode([
+            'novo_pedido' => __('admin.settings.email_event.new_order', 'Novo Pedido'),
+            'pedido_aprovado' => __('admin.settings.email_event.order_approved', 'Pedido Aprovado'),
+            'pedido_enviado' => __('admin.settings.email_event.order_shipped', 'Pedido Enviado'),
+            'pedido_entregue' => __('admin.settings.email_event.order_delivered', 'Pedido Entregue'),
+            'pedido_cancelado' => __('admin.settings.email_event.order_cancelled', 'Pedido Cancelado'),
+            'novo_usuario' => __('admin.settings.email_event.new_user', 'Novo Usuário'),
+            'recuperar_senha' => __('admin.settings.email_event.password_recovery', 'Recuperação de Senha'),
+            'contato_contato' => __('admin.settings.email_event.contact_message', 'Mensagem de Contato'),
+            'carne_criado' => __('admin.settings.email_event.plan_created', 'Carnê Criado'),
+            'carne_cancelado' => __('admin.settings.email_event.plan_cancelled', 'Carnê Cancelado'),
+            'carne_quitado' => __('admin.settings.email_event.plan_paid_off', 'Carnê Quitado'),
+            'carne_aviso_cancelamento' => __('admin.settings.email_event.plan_cancellation_warning', 'Carnê - Aviso de Cancelamento'),
+            'carne_envio_liberado' => __('admin.settings.email_event.plan_shipping_released', 'Carnê - Envio Liberado'),
+            'parcela_paga' => __('admin.settings.email_event.installment_paid', 'Parcela Paga'),
+            'parcela_vencida' => __('admin.settings.email_event.installment_overdue', 'Parcela Vencida'),
+            'parcela_proxima_vencimento' => __('admin.settings.email_event.installment_due_soon', 'Parcela Próxima do Vencimento'),
+            'parcela_gerada' => __('admin.settings.email_event.installment_generated', 'Parcela Gerada'),
+        ], JSON_UNESCAPED_UNICODE) ?>;
         // Variáveis disponíveis por evento
         const variaveisEvento = {
             "novo_pedido": {
@@ -7286,10 +7306,12 @@ HTML;
                 let html = "<div class=\"row\">";
                 for (const tpl of templates) {
                     const evento = tpl.evento;
+                    const eventoLabel = (window.EMAIL_EVENT_LABELS && window.EMAIL_EVENT_LABELS[evento]) ? window.EMAIL_EVENT_LABELS[evento] : (evento || '');
                     html += "<div class=\"col-md-4 mb-3\">";
                     html += "<div class=\"card\">";
                     html += "<div class=\"card-body\">";
-                    html += "<h6 class=\"card-title\">" + (evento || '') + "</h6>";
+                    html += "<h6 class=\"card-title\">" + eventoLabel + "</h6>";
+                    html += "<p class=\"card-text\"><small class=\"text-muted\" style=\"font-family:monospace;font-size:10px;\">" + (evento || '') + "</small></p>";
                     html += "<p class=\"card-text\"><small>" + (tpl.assunto || '') + "</small></p>";
                     html += "<p class=\"card-text\"><small class=\"text-muted\">" + (tpl.updated_at || '') + "</small></p>";
                     html += "<div class=\"d-flex gap-2\">";

@@ -294,9 +294,9 @@ class AdminComissoesGlobalController
         if (!empty($organico)) {
             echo '<div class="card mb-4"><div class="card-header bg-success bg-opacity-10"><strong><i class="fas fa-leaf me-1"></i>' . __('admin.commissions_global.organic_sales', 'Vendas Orgânicas (sem vendedor atribuído)') . '</strong></div><div class="card-body">';
             echo $organico['qtd'] . ' ' . __('admin.commissions_global.orders_word', 'pedidos') . ' | ' . __('admin.commissions_global.gross', 'Bruto:') . ' <strong>' . $this->fmt($organico['faturado'], 'BRL') . '</strong>';
-            echo ' | ' . __('admin.commissions_global.cost', 'Custo:') . ' ' . $this->fmt($organico['custo'], 'BRL');
-            echo ' | ' . __('admin.commissions_global.taxes', 'Impostos:') . ' ' . $this->fmt($organico['impostos'], 'BRL');
-            echo ' | ' . __('admin.commissions_global.net', 'Líquido:') . ' <strong>' . $this->fmt($organico['liquido'], 'BRL') . '</strong>';
+            echo ' | ' . __('admin.commissions_global.cost', 'Custo:') . ' <span data-value-brl="' . (float)$organico['custo'] . '">' . $this->fmt($organico['custo'], 'BRL') . '</span>';
+            echo ' | ' . __('admin.commissions_global.taxes', 'Impostos:') . ' <span data-value-brl="' . (float)$organico['impostos'] . '">' . $this->fmt($organico['impostos'], 'BRL') . '</span>';
+            echo ' | ' . __('admin.commissions_global.net', 'Líquido:') . ' <strong><span data-value-brl="' . (float)$organico['liquido'] . '">' . $this->fmt($organico['liquido'], 'BRL') . '</span></strong>';
             echo '</div></div>';
         }
 
@@ -334,19 +334,19 @@ class AdminComissoesGlobalController
             echo '<td>' . htmlspecialchars($nome) . '</td>';
             echo '<td class="text-end">' . $t['qtd'] . '</td>';
             echo '<td class="text-end">' . $this->fmt($t['faturado'], 'BRL') . '</td>';
-            echo '<td class="text-end">' . $this->fmt($t['custo'], 'BRL') . '</td>';
-            echo '<td class="text-end">' . $this->fmt($t['impostos'], 'BRL') . '</td>';
-            echo '<td class="text-end">' . $this->fmt($t['liquido'], 'BRL') . '</td>';
+            echo '<td class="text-end"><span data-value-brl="' . (float)$t['custo'] . '">' . $this->fmt($t['custo'], 'BRL') . '</span></td>';
+            echo '<td class="text-end"><span data-value-brl="' . (float)$t['impostos'] . '">' . $this->fmt($t['impostos'], 'BRL') . '</span></td>';
+            echo '<td class="text-end"><span data-value-brl="' . (float)$t['liquido'] . '">' . $this->fmt($t['liquido'], 'BRL') . '</span></td>';
             echo '<td class="text-end">' . number_format($pct, 2, ',', '.') . '%</td>';
-            echo '<td class="text-end">' . $this->fmt($comManual, 'BRL') . '</td>';
-            echo '<td class="text-end">' . $this->fmt($comProcVal, 'BRL') . '</td>';
-            echo '<td class="text-end fw-bold">' . $this->fmt($totalCom, 'BRL') . '</td>';
+            echo '<td class="text-end"><span data-value-brl="' . (float)$comManual . '">' . $this->fmt($comManual, 'BRL') . '</span></td>';
+            echo '<td class="text-end"><span data-value-brl="' . (float)$comProcVal . '">' . $this->fmt($comProcVal, 'BRL') . '</span></td>';
+            echo '<td class="text-end fw-bold"><span data-value-brl="' . (float)$totalCom . '">' . $this->fmt($totalCom, 'BRL') . '</span></td>';
             echo '</tr>';
         }
 
         echo '</tbody><tfoot><tr class="table-dark">';
         echo '<td colspan="9" class="text-end fw-bold">' . __('admin.commissions_global.grand_total', 'Total Geral') . '</td>';
-        echo '<td class="text-end fw-bold">' . $this->fmt($grandTotal, 'BRL') . '</td>';
+        echo '<td class="text-end fw-bold"><span data-value-brl="' . (float)$grandTotal . '">' . $this->fmt($grandTotal, 'BRL') . '</span></td>';
         echo '</tr></tfoot></table></div></div></div>';
 
         echo '</div>';

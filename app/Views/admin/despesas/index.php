@@ -39,12 +39,39 @@ $despGroupLabels = [
     'custo_produto' => __('admin.expenses.group_product_cost', 'Custo produto'),
     'comissoes' => __('admin.expenses.group_commissions', 'Comissões'),
     'tributos' => __('admin.expenses.group_taxes', 'Tributos'),
+    'outras' => __('admin.expenses.group_others', 'Outros'),
     'outros' => __('admin.expenses.group_others', 'Outros'),
 ];
 $despLabel = function(array $map, ?string $key): string {
     $k = strtolower(trim((string) $key));
     if ($k === '') return '-';
     return $map[$k] ?? ucfirst(str_replace('_', ' ', $k));
+};
+
+// Default (seeded) expense category names → translated display label.
+// Custom category names typed by the admin fall through unchanged (data).
+$despCategoryLabels = [
+    'aluguel' => __('admin.expenses.cat_rent', 'Aluguel'),
+    'comissões' => __('admin.expenses.cat_commissions', 'Comissões'),
+    'comissoes' => __('admin.expenses.cat_commissions', 'Comissões'),
+    'equipamentos' => __('admin.expenses.cat_equipment', 'Equipamentos'),
+    'folha de pagamento' => __('admin.expenses.cat_payroll', 'Folha de pagamento'),
+    'fornecedores' => __('admin.expenses.cat_suppliers', 'Fornecedores'),
+    'frete - correios' => __('admin.expenses.cat_shipping_correios', 'Frete - Correios'),
+    'marketing' => __('admin.expenses.cat_marketing', 'Marketing'),
+    'outros' => __('admin.expenses.cat_others', 'Outros'),
+    'reembolso' => __('admin.expenses.cat_refund', 'Reembolso'),
+    'software - saas' => __('admin.expenses.cat_software_saas', 'Software - SaaS'),
+    'taxas bancárias' => __('admin.expenses.cat_bank_fees', 'Taxas bancárias'),
+    'taxas bancarias' => __('admin.expenses.cat_bank_fees', 'Taxas bancárias'),
+    'tributos' => __('admin.expenses.cat_taxes', 'Tributos'),
+    'utilidades' => __('admin.expenses.cat_utilities', 'Utilidades'),
+];
+$despCategoryLabel = function(?string $name) use ($despCategoryLabels): string {
+    $raw = trim((string) $name);
+    if ($raw === '') return '-';
+    $k = mb_strtolower($raw);
+    return $despCategoryLabels[$k] ?? $raw;
 };
 
 $countAll = count($despesas);
@@ -118,7 +145,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <div class="list-group list-group-flush">
                         <?php foreach (array_slice($recorrencias, 0, 5) as $r): ?>
                         <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= ucfirst($r['frequencia']) ?> · <?= __('admin.expenses.day', 'dia') ?> <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· ' . __('admin.expenses.until', 'até') . ' ' . date('m/Y', strtotime($r['data_fim'])) : '· ' . __('admin.expenses.no_end', 'sem fim') ?></div></div>
+                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($despLabel($despFreqLabels, $r['frequencia'] ?? '')) ?> · <?= __('admin.expenses.day', 'dia') ?> <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· ' . __('admin.expenses.until', 'até') . ' ' . date('m/Y', strtotime($r['data_fim'])) : '· ' . __('admin.expenses.no_end', 'sem fim') ?></div></div>
                             <span class="fw-bold small"><?= fmtD($r['valor']) ?></span>
                         </div>
                         <?php endforeach; ?>
@@ -187,7 +214,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
 
             <!-- Stats -->
             <div class="row g-3 mb-4">
-                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.generated_in_period', 'Geradas no período') ?></div><div class="fw-bold fs-5"><?= fmtD($comTotal) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.generated_in_period', 'Geradas no período') ?></div><div class="fw-bold fs-5" data-value-brl="<?= (float)$comTotal ?>"><?= fmtD($comTotal) ?></div></div></div>
                 <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.sellers', 'Vendedores') ?></div><div class="fw-bold fs-5"><?= count($comVendedores) ?></div></div></div>
                 <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.orders', 'Pedidos') ?></div><div class="fw-bold fs-5"><?= array_sum(array_column($comVendedores, 'pedidos')) ?></div></div></div>
                 <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.billed_brl', 'Faturado (BRL)') ?></div><div class="fw-bold fs-5"><?= fmtD(array_sum(array_column($comVendedores, 'faturado'))) ?></div></div></div>
@@ -205,16 +232,16 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><div class="fw-semibold"><?= htmlspecialchars($v['nome']) ?></div><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($v['email']) ?></div></td>
                         <td class="text-end"><?= $v['pedidos'] ?></td>
                         <td class="text-end"><?= fmtD($v['faturado']) ?></td>
-                        <td class="text-end"><?= fmtD($v['custo']) ?></td>
-                        <td class="text-end"><?= fmtD($v['impostos']) ?></td>
-                        <td class="text-end"><?= fmtD($v['liquido']) ?></td>
+                        <td class="text-end"><span data-value-brl="<?= (float)($v['custo'] ?? 0) ?>"><?= fmtD($v['custo']) ?></span></td>
+                        <td class="text-end"><span data-value-brl="<?= (float)($v['impostos'] ?? 0) ?>"><?= fmtD($v['impostos']) ?></span></td>
+                        <td class="text-end"><span data-value-brl="<?= (float)($v['liquido'] ?? 0) ?>"><?= fmtD($v['liquido']) ?></span></td>
                         <td class="text-end"><?= number_format($v['percentual'], 2, ',', '.') ?>%</td>
-                        <td class="text-end"><?= fmtD($v['comissao_manual']) ?></td>
-                        <td class="text-end"><?= fmtD($v['comissao_proc']) ?></td>
-                        <td class="text-end fw-bold"><?= fmtD($v['total_comissao']) ?></td>
+                        <td class="text-end"><span data-value-brl="<?= (float)($v['comissao_manual'] ?? 0) ?>"><?= fmtD($v['comissao_manual']) ?></span></td>
+                        <td class="text-end"><span data-value-brl="<?= (float)($v['comissao_proc'] ?? 0) ?>"><?= fmtD($v['comissao_proc']) ?></span></td>
+                        <td class="text-end fw-bold"><span data-value-brl="<?= (float)($v['total_comissao'] ?? 0) ?>"><?= fmtD($v['total_comissao']) ?></span></td>
                     </tr>
                     <?php endforeach; ?>
-                    <tr class="table-dark fw-bold"><td colspan="9" class="text-end"><?= __('admin.expenses.grand_total', 'Total Geral') ?></td><td class="text-end"><?= fmtD($comTotal) ?></td></tr>
+                    <tr class="table-dark fw-bold"><td colspan="9" class="text-end"><?= __('admin.expenses.grand_total', 'Total Geral') ?></td><td class="text-end"><span data-value-brl="<?= (float)$comTotal ?>"><?= fmtD($comTotal) ?></span></td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -300,11 +327,11 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <div class="fw-semibold"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
                             <?php if ($d['favorecido']): ?><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($d['favorecido']) ?></div><?php endif; ?>
                         </td>
-                        <td><?php if ($d['categoria_nome']): ?><span class="badge" style="background:<?= $d['categoria_cor'] ?? '#6b7280' ?>;font-size:10px;"><?= htmlspecialchars($d['categoria_nome']) ?></span><?php else: ?>-<?php endif; ?></td>
+                        <td><?php if ($d['categoria_nome']): ?><span class="badge" style="background:<?= $d['categoria_cor'] ?? '#6b7280' ?>;font-size:10px;"><?= htmlspecialchars($despCategoryLabel($d['categoria_nome'])) ?></span><?php else: ?>-<?php endif; ?></td>
                         <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= $tipoBadge[$d['tipo'] ?? ''] ?? $d['tipo'] ?></span></td>
                         <td><?= $d['competencia'] ? date('m/Y', strtotime($d['competencia'])) : '-' ?></td>
                         <td><?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></td>
-                        <td class="text-end fw-bold"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></td>
+                        <td class="text-end fw-bold"><?php $__dMoeda = ($d['moeda'] ?? 'BRL') === 'USD' ? 'usd' : 'brl'; ?><span data-value-<?= $__dMoeda ?>="<?= (float)($d['valor'] ?? 0) ?>"><?= $__dMoeda === 'usd' ? '$ ' . number_format((float)($d['valor'] ?? 0), 2, '.', ',') : 'R$ ' . number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></span></td>
                         <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= htmlspecialchars($despLabel($despStatusLabels, $d['status'] ?? '')) ?></span></td>
                         <td><span class="text-muted" style="font-size:10px;"><?= htmlspecialchars($despLabel($despOriginLabels, $d['origem'] ?? 'manual')) ?></span></td>
                         <td>
@@ -346,10 +373,10 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <?php else: foreach ($recorrencias as $r): ?>
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($r['descricao']) ?></td>
-                        <td><?= !empty($r['categoria_nome']) ? '<span class="badge" style="background:'.($r['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($r['categoria_nome']).'</span>' : '-' ?></td>
+                        <td><?= !empty($r['categoria_nome']) ? '<span class="badge" style="background:'.($r['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($despCategoryLabel($r['categoria_nome'])).'</span>' : '-' ?></td>
                         <td><?= htmlspecialchars($despLabel($despFreqLabels, $r['frequencia'] ?? '')) ?></td>
                         <td><?= $r['dia_vencimento'] ?? '-' ?></td>
-                        <td class="text-end fw-bold"><?= fmtD($r['valor']) ?></td>
+                        <td class="text-end fw-bold"><span data-value-brl="<?= (float)($r['valor'] ?? 0) ?>"><?= fmtD($r['valor']) ?></span></td>
                         <td><?= $r['proxima_geracao'] ? date('d/m/Y', strtotime($r['proxima_geracao'])) : '-' ?></td>
                         <td><?= $r['data_fim'] ? date('m/Y', strtotime($r['data_fim'])) : __('admin.expenses.no_end_cap', 'Sem fim') ?></td>
                     </tr>
@@ -378,8 +405,8 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <?php else: foreach ($parcelamentos as $p): $pct = $p['quantidade_parcelas'] > 0 ? round($p['parcelas_pagas'] / $p['quantidade_parcelas'] * 100) : 0; ?>
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($p['descricao']) ?></td>
-                        <td><?= !empty($p['categoria_nome']) ? '<span class="badge" style="background:'.($p['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($p['categoria_nome']).'</span>' : '-' ?></td>
-                        <td class="text-end fw-bold"><?= fmtD($p['valor_total']) ?></td>
+                        <td><?= !empty($p['categoria_nome']) ? '<span class="badge" style="background:'.($p['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($despCategoryLabel($p['categoria_nome'])).'</span>' : '-' ?></td>
+                        <td class="text-end fw-bold"><span data-value-brl="<?= (float)($p['valor_total'] ?? 0) ?>"><?= fmtD($p['valor_total']) ?></span></td>
                         <td><span class="badge bg-light text-dark border"><?= $p['parcelas_pagas'] ?>/<?= $p['quantidade_parcelas'] ?></span></td>
                         <td class="text-end"><?= fmtD($p['valor_parcela']) ?></td>
                         <td class="text-end text-success"><?= fmtD($p['valor_total'] - $p['saldo_restante']) ?></td>
@@ -406,7 +433,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <?php foreach ($categorias as $cat): ?>
                     <tr>
                         <td><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:<?= $cat['cor'] ?? '#6b7280' ?>;"></span></td>
-                        <td class="fw-semibold"><?= htmlspecialchars($cat['nome']) ?></td>
+                        <td class="fw-semibold"><?= htmlspecialchars($despCategoryLabel($cat['nome'])) ?></td>
                         <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= htmlspecialchars($despLabel($despGroupLabels, $cat['grupo'] ?? '')) ?></span></td>
                         <td><?= $cat['ativa'] ? '<span class="badge bg-success">' . __('admin.expenses.active', 'Ativa') . '</span>' : '<span class="badge bg-secondary">' . __('admin.expenses.inactive', 'Inativa') . '</span>' ?></td>
                     </tr>
