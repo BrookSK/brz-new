@@ -1519,18 +1519,27 @@ class AdminNotificacoesController extends Controller {
         }
 
         // Liberar o dedupe de e-mail deste evento/pedido para permitir o reenvio.
+        // Apaga por dedupe_key (específica do evento+pedido) OU pelo pedido_id, cobrindo
+        // variações de alias de evento e linhas com pedido_id preenchido.
         $db = \Config\Database::getConnection();
+        $dedupeRemovidos = 0;
         if ($this->tabelaExisteNotif($db, 'email_event_log')) {
             try {
-                $st = $db->prepare("DELETE FROM email_event_log WHERE pedido_id = ? AND dedupe_key LIKE ?");
-                $st->execute([$pedidoId, 'pedido_event:' . $evento . ':' . $pedidoId . ':%']);
+                $st = $db->prepare("DELETE FROM email_event_log WHERE dedupe_key LIKE ? OR (pedido_id = ? AND dedupe_key LIKE ?)");
+                $st->execute([
+                    'pedido_event:' . $evento . ':' . $pedidoId . ':%',
+                    $pedidoId,
+                    'pedido_event:%',
+                ]);
+                $dedupeRemovidos = $st->rowCount();
             } catch (\Exception $e) {
                 error_log('[NOTIF][REENVIO] limpar dedupe: ' . $e->getMessage());
             }
         }
 
         try {
-            $r = (new \App\Services\NotificationService())->notificarEventoPedido($evento, $pedidoId, []);
+            // Reenvio manual: ignorar deduplicação (forçar envio sempre).
+            $r = (new \App\Services\NotificationService())->notificarEventoPedido($evento, $pedidoId, [], true);
         } catch (\Throwable $e) {
             $this->json(['success' => false, 'error' => __('admin.notifications.resend_failed', 'Falha ao reenviar: ') . $e->getMessage()], 500);
             return;
@@ -1540,7 +1549,7 @@ class AdminNotificacoesController extends Controller {
         $okWhats = !empty($r['whatsapp_enviado']);
         if (!$okEmail && !$okWhats) {
             $motivo = (string) ($r['email_erro'] ?? $r['whatsapp_erro'] ?? 'Nenhum canal enviou');
-            $this->json(['success' => false, 'error' => __('admin.notifications.resend_nothing_sent', 'Nada foi enviado: ') . $motivo], 200);
+            $this->json(['success' => false, 'error' => __('admin.notifications.resend_nothing_sent', 'Nada foi enviado: ') . $motivo, 'dedupe_removidos' => $dedupeRemovidos, 'email_destino' => (string) ($r['email_destino'] ?? '')], 200);
             return;
         }
 
@@ -1549,6 +1558,7 @@ class AdminNotificacoesController extends Controller {
             'email_enviado' => $okEmail,
             'whatsapp_enviado' => $okWhats,
             'email_destino' => (string) ($r['email_destino'] ?? ''),
+            'dedupe_removidos' => $dedupeRemovidos,
             'message' => __('admin.notifications.resend_ok', 'Notificação reenviada (e-mail e WhatsApp, conforme configurado).'),
         ]);
     }

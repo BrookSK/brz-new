@@ -387,10 +387,10 @@ class EmailService {
         }
     }
 
-    public function send(string $to, string $subject, string $html, string $dedupeKey = '', array $meta = []): void {
+    public function send(string $to, string $subject, string $html, string $dedupeKey = '', array $meta = []): bool {
         $to = trim($to);
         if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-            return;
+            return false;
         }
 
         $pdo = \Config\Database::getConnection();
@@ -398,7 +398,7 @@ class EmailService {
 
         $enabled = strtolower(trim((string) ($cfg['enabled'] ?? '1')));
         if ($enabled === '0' || $enabled === 'false') {
-            return;
+            return false;
         }
 
         $driver = strtolower(trim((string) ($cfg['driver'] ?? 'smtp')));
@@ -421,7 +421,8 @@ class EmailService {
         if ($dedupeKey !== '') {
             $ok = $this->reserveDedupeKey($pdo, $dedupeKey, $meta);
             if (!$ok) {
-                return;
+                // Bloqueado por deduplicação (já enviado antes). NÃO enviou agora.
+                return false;
             }
             $reserved = true;
         }
@@ -432,7 +433,7 @@ class EmailService {
         try {
             if ($driver === 'smtp') {
                 $this->sendSmtpEmail($cfg, $to, $subject, $html, $fromEmail, $fromName);
-                return;
+                return true;
             }
 
             $headers = [];
@@ -445,6 +446,7 @@ class EmailService {
             if (!$ok) {
                 throw new \Exception('Falha ao enviar e-mail (mail())');
             }
+            return true;
         } catch (\Throwable $e) {
             if ($reserved) {
                 $this->releaseDedupeKey($pdo, $dedupeKey);

@@ -997,187 +997,100 @@ class AdminEtiquetasWpController extends Controller
     }
 
     /**
-     * Diagnóstico temporário: mostra o que está gravado para um pedido em relação ao rastreio.
-     * GET /admin/etiquetas-wp/diagnostico-rastreio?pedido_id=758
-     * Remover após depuração.
+     * Aplica o LAYOUT padronizado da Braziliana aos templates de e-mail de rastreio,
+     * gravando direto em email_templates (upsert). Evita depender de rodar migration.
+     * GET /admin/etiquetas-wp/aplicar-layout-emails
+     * Remover após uso.
      */
-    public function diagnosticoRastreio(Request $request)
+    public function aplicarLayoutEmails(Request $request)
     {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
-
+        $auth->requerPerfis(['admin']);
         header('Content-Type: application/json; charset=utf-8');
 
-        $pedidoId = (int) $request->getParam('pedido_id', 0);
-        if ($pedidoId <= 0) {
-            $this->json(['success' => false, 'error' => 'Informe ?pedido_id=']);
-            return;
-        }
+        // Template HTML padronizado (cabeçalho escuro, box de rastreio, botão, rodapé).
+        $montarHtml = function (string $intro, string $urlBtn): string {
+            return '<div style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">'
+                . '<div style="max-width:600px;margin:0 auto;padding:24px 12px;">'
+                . '<div style="background:#0b1f3a;border-radius:10px 10px 0 0;padding:22px 28px;text-align:center;">'
+                . '<span style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:.5px;">BRAZILIANA</span>'
+                . '</div>'
+                . '<div style="background:#ffffff;padding:28px;border:1px solid #e6e8eb;border-top:0;">'
+                . '<p style="margin:0 0 16px;color:#0b1f3a;font-size:16px;">Olá <strong>{{nome}}</strong>,</p>'
+                . '<p style="margin:0 0 16px;color:#444;font-size:14px;line-height:1.6;">' . $intro . '</p>'
+                . '<div style="background:#f4f7ff;border:1px solid #dbe4ff;border-radius:8px;padding:16px 20px;margin:20px 0;">'
+                . '<div style="color:#8a94a6;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Código de rastreio</div>'
+                . '<div style="color:#0b1f3a;font-size:20px;font-weight:bold;letter-spacing:1px;">{{tracking_number}}</div>'
+                . '</div>'
+                . '<div style="text-align:center;margin:26px 0 10px;">'
+                . '<a href="' . $urlBtn . '" style="display:inline-block;background:#0b1f3a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:13px 30px;border-radius:6px;">Acompanhar rastreio</a>'
+                . '</div>'
+                . '<p style="margin:18px 0 0;color:#8a94a6;font-size:13px;line-height:1.6;">Você também pode acompanhar o status na sua conta, em <strong>Meus Pedidos</strong>.</p>'
+                . '</div>'
+                . '<div style="background:#f4f5f7;padding:18px;text-align:center;color:#9aa2ad;font-size:12px;border:1px solid #e6e8eb;border-top:0;border-radius:0 0 10px 10px;">'
+                . 'Braziliana • Este é um e-mail automático, não responda.'
+                . '</div>'
+                . '</div></div>';
+        };
 
-        $out = ['pedido_id' => $pedidoId];
+        $urlCorreios = 'https://brazilianashop.com.br/rastreamento?codigo={{tracking_number}}';
+        $templates = [
+            'correios_packet_label_created' => [
+                'assunto' => 'Etiqueta gerada - Pedido #{{codigo_pedido}}',
+                'html' => $montarHtml('A etiqueta de envio do seu pedido <strong>#{{codigo_pedido}}</strong> foi gerada com sucesso. Em breve ele estará a caminho!', $urlCorreios),
+            ],
+            'correios_packet_shipment_departed' => [
+                'assunto' => 'Seu pedido #{{codigo_pedido}} foi embarcado - Rastreio {{tracking_number}}',
+                'html' => $montarHtml('Boas notícias! Seu pedido <strong>#{{codigo_pedido}}</strong> foi embarcado e já está a caminho do destino.', $urlCorreios),
+            ],
+            'shippo_label_created' => [
+                'assunto' => 'Seu pedido #{{codigo_pedido}} foi despachado - Rastreio {{tracking_number}}',
+                'html' => $montarHtml('A etiqueta de envio do seu pedido <strong>#{{codigo_pedido}}</strong> foi gerada e ele já está a caminho.', '{{tracking_url}}'),
+            ],
+        ];
 
-        // Coluna tracking_code DIRETO na tabela pedidos (tem PRIORIDADE no getComDetalhes).
+        $resultado = [];
         try {
-            $colsP = [];
-            try { $stcp = $this->connection->query('DESCRIBE pedidos'); $colsP = $stcp ? $stcp->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
-            $trackCols = array_values(array_filter(['tracking_code','codigo_rastreio','rastreamento','tracking','tracking_source'], fn($c) => in_array($c, $colsP, true)));
-            if (!empty($trackCols)) {
-                $sel = implode(', ', $trackCols);
-                $stP = $this->connection->prepare("SELECT {$sel} FROM pedidos WHERE id = ? LIMIT 1");
-                $stP->execute([$pedidoId]);
-                $out['pedidos_colunas_tracking'] = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
-            } else {
-                $out['pedidos_colunas_tracking'] = 'nenhuma coluna de tracking na tabela pedidos';
+            // Descobrir colunas de email_templates.
+            $cols = [];
+            try { $stc = $this->connection->query('DESCRIBE email_templates'); $cols = $stc ? $stc->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) {}
+            if (empty($cols)) {
+                $this->json(['success' => false, 'error' => 'Tabela email_templates não encontrada']);
+                return;
             }
-        } catch (\Throwable $e) {
-            $out['pedidos_colunas_tracking_erro'] = $e->getMessage();
-        }
+            $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('evento', $cols, true) ? 'evento' : 'nome');
+            $htmlCol = in_array('corpo_html', $cols, true) ? 'corpo_html' : (in_array('html', $cols, true) ? 'html' : 'corpo_html');
+            $temAssunto = in_array('assunto', $cols, true);
+            $temAtivo = in_array('ativo', $cols, true);
 
-        // Linha em correios_packet_etiquetas
-        try {
-            $st = $this->connection->prepare('SELECT id, pedido_id, customer_control_code, tracking_number, status, wp_post_id, created_at FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
-            $st->execute([$pedidoId]);
-            $out['correios_packet_etiquetas'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } catch (\Throwable $e) {
-            $out['correios_packet_etiquetas_erro'] = $e->getMessage();
-        }
+            foreach ($templates as $nome => $tpl) {
+                // Existe?
+                $stChk = $this->connection->prepare("SELECT id FROM email_templates WHERE {$nomeCol} = ? ORDER BY id DESC LIMIT 1");
+                $stChk->execute([$nome]);
+                $id = (int) ($stChk->fetchColumn() ?: 0);
 
-        // shippo_etiquetas
-        try {
-            if ($this->tableExists('shippo_etiquetas')) {
-                $st = $this->connection->prepare('SELECT id, pedido_id, tracking_number, status FROM shippo_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
-                $st->execute([$pedidoId]);
-                $out['shippo_etiquetas'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            }
-        } catch (\Throwable $e) {
-            $out['shippo_etiquetas_erro'] = $e->getMessage();
-        }
-
-        // O que o getComDetalhes resolve como tracking
-        $codigoPedido = '';
-        try {
-            $pm = new PedidoEcommerce();
-            $ped = $pm->getComDetalhes($pedidoId);
-            $codigoPedido = (string) ($ped['codigo_pedido'] ?? ($ped['numero_pedido'] ?? ''));
-            $out['getComDetalhes_tracking'] = [
-                'tracking_code' => $ped['tracking_code'] ?? null,
-                'tracking_source' => $ped['tracking_source'] ?? null,
-                'tracking_label_url' => $ped['tracking_label_url'] ?? null,
-                'status' => $ped['status'] ?? null,
-                'codigo_pedido' => $ped['codigo_pedido'] ?? null,
-                'numero_pedido' => $ped['numero_pedido'] ?? null,
-                'cliente_email' => $ped['cliente_email'] ?? ($ped['email'] ?? null),
-                'cliente_telefone' => $ped['cliente_telefone'] ?? ($ped['telefone'] ?? null),
-            ];
-        } catch (\Throwable $e) {
-            $out['getComDetalhes_erro'] = $e->getMessage();
-        }
-
-        // O que o WordPress retorna ao buscar por este pedido (revela order_id / pedido_id_local / tracking).
-        $termos = array_values(array_filter([
-            $codigoPedido,
-            'PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT),
-            (string) $pedidoId,
-        ], fn($v) => trim((string) $v) !== ''));
-        $out['wp_termos_busca'] = $termos;
-        $out['wp_pacotes'] = [];
-        foreach ($termos as $termo) {
-            try {
-                $resp = $this->wp->listPackages(['search' => $termo, 'per_page' => 20]);
-                $lista = (is_array($resp) && isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : [];
-                foreach ($lista as $pkg) {
-                    $out['wp_pacotes'][] = [
-                        'termo' => $termo,
-                        'wp_post_id' => $pkg['wp_post_id'] ?? null,
-                        'order_id' => $pkg['order_id'] ?? null,
-                        'pedido_id_local' => $pkg['pedido_id_local'] ?? null,
-                        'tracking_code' => $pkg['tracking_code'] ?? null,
-                        'recipient_name' => $pkg['recipient_name'] ?? null,
-                    ];
+                if ($id > 0) {
+                    $sets = [$htmlCol . ' = :html'];
+                    $params = [':html' => $tpl['html'], ':id' => $id];
+                    if ($temAssunto) { $sets[] = 'assunto = :assunto'; $params[':assunto'] = $tpl['assunto']; }
+                    $stUp = $this->connection->prepare('UPDATE email_templates SET ' . implode(', ', $sets) . ' WHERE id = :id');
+                    $stUp->execute($params);
+                    $resultado[$nome] = 'atualizado (id ' . $id . ')';
+                } else {
+                    $insCols = [$nomeCol, $htmlCol];
+                    $insVals = [':nome', ':html'];
+                    $params = [':nome' => $nome, ':html' => $tpl['html']];
+                    if ($temAssunto) { $insCols[] = 'assunto'; $insVals[] = ':assunto'; $params[':assunto'] = $tpl['assunto']; }
+                    if ($temAtivo) { $insCols[] = 'ativo'; $insVals[] = '1'; }
+                    $stIns = $this->connection->prepare('INSERT INTO email_templates (' . implode(', ', $insCols) . ') VALUES (' . implode(', ', $insVals) . ')');
+                    $stIns->execute($params);
+                    $resultado[$nome] = 'criado';
                 }
-            } catch (\Throwable $e) {
-                $out['wp_pacotes_erro'][] = $termo . ': ' . $e->getMessage();
             }
-        }
-
-        // Filtro EXATO por pedido_id_local (só funciona se o snippet do WP já foi atualizado).
-        try {
-            $respExato = $this->wp->listPackagesByPedidoLocal($pedidoId);
-            $listaExato = (is_array($respExato) && isset($respExato['data']) && is_array($respExato['data'])) ? $respExato['data'] : [];
-            $out['wp_filtro_exato_pedido_id_local'] = array_map(function ($pkg) {
-                return [
-                    'wp_post_id' => $pkg['wp_post_id'] ?? null,
-                    'order_id' => $pkg['order_id'] ?? null,
-                    'pedido_id_local' => $pkg['pedido_id_local'] ?? null,
-                    'tracking_code' => $pkg['tracking_code'] ?? null,
-                ];
-            }, $listaExato);
+            $this->json(['success' => true, 'templates' => $resultado]);
         } catch (\Throwable $e) {
-            $out['wp_filtro_exato_erro'] = $e->getMessage();
+            $this->json(['success' => false, 'error' => $e->getMessage(), 'parcial' => $resultado], 500);
         }
-
-        // TESTE DE GRAVAÇÃO: tentar sincronizar do WP e reportar se salvou + erro exato do INSERT.
-        try {
-            $rSync = $this->sincronizarPedidoDoWp($pedidoId);
-            $out['sincronizar_resultado'] = $rSync;
-            $out['salvar_erro'] = $this->ultimoErroSalvarEtiqueta;
-            $out['salvar_sql'] = $this->ultimoSqlSalvarEtiqueta;
-            $out['salvar_rowcount'] = $this->ultimoRowCountSalvar;
-            $out['salvar_last_insert_id'] = $this->ultimoLastInsertId;
-
-            // Diagnóstico de infra: banco atual, se a tabela é VIEW e se há triggers.
-            try {
-                $out['db_atual'] = (string) $this->connection->query('SELECT DATABASE()')->fetchColumn();
-            } catch (\Throwable $e) {}
-            try {
-                $stT = $this->connection->query("SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'correios_packet_etiquetas'");
-                $out['tabela_tipo'] = $stT ? (string) $stT->fetchColumn() : null;
-            } catch (\Throwable $e) {}
-            try {
-                $stTr = $this->connection->query("SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND EVENT_OBJECT_TABLE = 'correios_packet_etiquetas'");
-                $out['tabela_triggers'] = $stTr ? ($stTr->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
-            } catch (\Throwable $e) {}
-            try {
-                $out['total_linhas_tabela'] = (int) $this->connection->query('SELECT COUNT(*) FROM correios_packet_etiquetas')->fetchColumn();
-            } catch (\Throwable $e) {}
-            // Índices (revela UNIQUE que causa colisão no ON DUPLICATE KEY UPDATE).
-            try {
-                $stIdx = $this->connection->query('SHOW INDEX FROM correios_packet_etiquetas');
-                $out['tabela_indices'] = $stIdx ? ($stIdx->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
-            } catch (\Throwable $e) {}
-            // As linhas que realmente existem na tabela.
-            try {
-                $stAll = $this->connection->query('SELECT id, pedido_id, tracking_number, wp_post_id, customer_control_code FROM correios_packet_etiquetas ORDER BY id DESC LIMIT 20');
-                $out['tabela_linhas_existentes'] = $stAll ? ($stAll->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
-            } catch (\Throwable $e) {}
-
-            // Reler a tabela local após a tentativa
-            $st = $this->connection->prepare('SELECT id, pedido_id, tracking_number, wp_post_id FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC');
-            $st->execute([$pedidoId]);
-            $out['correios_packet_etiquetas_apos_sync'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } catch (\Throwable $e) {
-            $out['sincronizar_erro'] = $e->getMessage();
-        }
-
-        // Últimos pacotes do WP (sem filtro) para ver se o pacote deste pedido existe com outro código.
-        try {
-            $respUlt = $this->wp->listPackages(['per_page' => 15]);
-            $listaUlt = (is_array($respUlt) && isset($respUlt['data']) && is_array($respUlt['data'])) ? $respUlt['data'] : [];
-            $out['wp_ultimos_pacotes'] = array_map(function ($pkg) {
-                return [
-                    'wp_post_id' => $pkg['wp_post_id'] ?? null,
-                    'order_id' => $pkg['order_id'] ?? null,
-                    'pedido_id_local' => $pkg['pedido_id_local'] ?? null,
-                    'tracking_code' => $pkg['tracking_code'] ?? null,
-                    'recipient_name' => $pkg['recipient_name'] ?? null,
-                    'created_at' => $pkg['created_at'] ?? null,
-                ];
-            }, $listaUlt);
-        } catch (\Throwable $e) {
-            $out['wp_ultimos_erro'] = $e->getMessage();
-        }
-
-        $this->json(['success' => true, 'diagnostico' => $out]);
     }
 
     /**
@@ -1367,6 +1280,92 @@ class AdminEtiquetasWpController extends Controller
         }
 
         return $vazio;
+    }
+
+    /**
+     * Notifica TODOS os clientes dos pedidos de uma FATURA (bill) de uma vez.
+     * Usado na aba Documentação (cada fatura tem um botão "Notificar clientes").
+     * POST /admin/etiquetas-wp/notificar-fatura  Body JSON: { bill_wp_post_id: int }
+     */
+    public function notificarFatura(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) { $body = []; }
+        $billId = (int) ($body['bill_wp_post_id'] ?? 0);
+        if ($billId <= 0) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
+            return;
+        }
+
+        // Reusar a resolução fatura -> containers -> trackings -> pedidos, e notificar cada pedido.
+        $pares = $this->resolverPedidosTrackingDoEmbarque([$billId]);
+        $resumo = $this->notificarPedidosEmbarque($pares, ['origem' => 'notificacao_fatura_manual']);
+
+        $this->json([
+            'success' => (int) ($resumo['enviadas'] ?? 0) > 0,
+            'enviadas' => (int) ($resumo['enviadas'] ?? 0),
+            'falhas' => (int) ($resumo['falhas'] ?? 0),
+            'pedidos' => $resumo['pedidos'] ?? [],
+            'aviso' => $resumo['aviso'] ?? null,
+        ]);
+    }
+
+    /**
+     * Notifica TODOS os clientes dos pedidos de um embarque (departure) de uma vez.
+     * POST /admin/etiquetas-wp/notificar-embarque  Body JSON: { wp_post_id: int }
+     * Resolve: embarque -> faturas vinculadas (departure_id) -> trackings -> pedidos.
+     */
+    public function notificarEmbarque(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) { $body = []; }
+        $embarqueWpId = (int) ($body['wp_post_id'] ?? 0);
+        if ($embarqueWpId <= 0) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.invalid_wp_post_id', 'wp_post_id inválido')], 400);
+            return;
+        }
+
+        // Achar as faturas vinculadas a este embarque (fatura.departure_id == embarque wp_post_id).
+        $billIds = [];
+        try {
+            $resp = $this->wp->listBills(['per_page' => 500]);
+            $bills = $this->extrairLista($resp);
+            foreach ($bills as $bill) {
+                if ((int) ($bill['departure_id'] ?? 0) === $embarqueWpId) {
+                    $bwid = (int) ($bill['wp_post_id'] ?? ($bill['id'] ?? 0));
+                    if ($bwid > 0) $billIds[] = $bwid;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[EMBARQUE][NOTIF] Erro ao listar faturas do embarque: ' . $e->getMessage());
+        }
+
+        if (empty($billIds)) {
+            $this->json(['success' => false, 'error' => __('admin.labels_wp.no_bills_in_shipment', 'Nenhuma fatura encontrada para este embarque.'), 'enviadas' => 0, 'falhas' => 0], 200);
+            return;
+        }
+
+        // Reusar a resolução por faturas -> trackings -> pedidos, e notificar cada pedido.
+        $pares = $this->resolverPedidosTrackingDoEmbarque($billIds);
+        $resumo = $this->notificarPedidosEmbarque($pares, [
+            'origem' => 'notificacao_embarque_manual',
+        ]);
+
+        $this->json([
+            'success' => (int) ($resumo['enviadas'] ?? 0) > 0,
+            'enviadas' => (int) ($resumo['enviadas'] ?? 0),
+            'falhas' => (int) ($resumo['falhas'] ?? 0),
+            'pedidos' => $resumo['pedidos'] ?? [],
+            'aviso' => $resumo['aviso'] ?? null,
+        ]);
     }
 
     /**

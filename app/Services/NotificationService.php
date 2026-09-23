@@ -9,6 +9,7 @@ class NotificationService {
     private EmailService $emailService;
     private ?string $motivoEmailNaoEnviado = null;
     private ?string $ultimoDestinoEmail = null;
+    private bool $ignorarDedupe = false;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -24,7 +25,8 @@ class NotificationService {
         return $aliases[$e] ?? $e;
     }
 
-    public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): array {
+    public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = [], bool $ignorarDedupe = false): array {
+        $this->ignorarDedupe = $ignorarDedupe;
         $resultado = [
             'email_enviado' => false,
             'email_erro' => null,
@@ -208,6 +210,15 @@ class NotificationService {
             'data' => date('Y-m-d H:i:s'),
             'data_pedido' => $dataPedido,
 
+            // Rastreio: o getComDetalhes já resolve tracking_code (correios_packet_etiquetas,
+            // shippo, etc.). Preencher os placeholders comuns para que os templates funcionem
+            // mesmo quando o tracking não é passado no $extra (ex.: reenvio manual).
+            'tracking_number' => (string) ($pedido['tracking_code'] ?? ''),
+            'tracking_code' => (string) ($pedido['tracking_code'] ?? ''),
+            'codigo_rastreio' => (string) ($pedido['tracking_code'] ?? ''),
+            'tracking_url' => (string) ($pedido['tracking_label_url'] ?? ''),
+            'customer_control_code' => (string) ($pedido['customer_control_code'] ?? ($pedido['codigo_pedido'] ?? '')),
+
             'itens' => $itensHtml,
             'endereco_entrega' => $enderecoEntrega,
 
@@ -318,14 +329,22 @@ class NotificationService {
             if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
                 continue;
             }
-            $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+            // Reenvio manual (ignorarDedupe) usa dedupeKey vazio = envia SEMPRE, sem bloqueio.
+            $dedupeKey = $this->ignorarDedupe
+                ? ''
+                : ('pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to));
             $this->ultimoDestinoEmail = $to;
             try {
-                $this->emailService->send($to, $subject, $html, $dedupeKey, [
+                $enviouEste = $this->emailService->send($to, $subject, $html, $dedupeKey, [
                     'evento' => $eventoNome,
                     'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
                 ]);
-                $enviados++;
+                if ($enviouEste) {
+                    $enviados++;
+                } else {
+                    // send() retornou false = pulado (dedupe/desativado). Não conta como enviado.
+                    $this->motivoEmailNaoEnviado = 'E-mail não enviado (bloqueado por deduplicação — já enviado antes — ou envio desativado). Use o reenvio que limpa o dedupe.';
+                }
             } catch (\Throwable $e) {
                 $ultimoErro = $e->getMessage();
                 error_log('[NOTIFICACOES][EMAIL] Falha ao enviar para ' . $to . ': ' . $e->getMessage());
