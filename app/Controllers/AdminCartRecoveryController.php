@@ -3,9 +3,40 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Services\RateLimiter;
 use Config\Database;
 
 class AdminCartRecoveryController extends Controller {
+
+    /**
+     * Aplica rate limit por IP para o endpoint atual. Se exceder, responde 429
+     * e encerra o request ANTES de abrir sessão ou consultar o banco.
+     * Isto contém floods/ataques de repetição contra endpoints caros.
+     */
+    private function guardRate(string $scope, int $limit = 60, int $window = 60): void {
+        $ip = RateLimiter::clientIp();
+        if (!RateLimiter::allow('cartrec:' . $scope . ':' . $ip, $limit, $window)) {
+            RateLimiter::reject($window);
+        }
+    }
+
+    /** Cache da coluna de nome de cada tabela para evitar DESCRIBE repetido. */
+    private static $colCache = [];
+
+    private function colunaNome(\PDO $pdo, string $tabela): string {
+        if (isset(self::$colCache[$tabela])) {
+            return self::$colCache[$tabela];
+        }
+        $nomeCol = 'nome';
+        try {
+            $cols = $pdo->query("DESCRIBE {$tabela}")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) {
+                $nomeCol = 'name';
+            }
+        } catch (\Exception $e) {}
+        self::$colCache[$tabela] = $nomeCol;
+        return $nomeCol;
+    }
 
     private function ensureTable(\PDO $pdo): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS cart_recovery (
@@ -31,7 +62,16 @@ class AdminCartRecoveryController extends Controller {
     }
 
     public function index(Request $request) {
+        $this->guardRate('index', 40, 60);
+
         $auth = new AuthService(); $auth->requerPerfis(['admin','vendedor']);
+
+        // Liberar o lock de sessão: a página é somente-leitura a partir daqui
+        // e as consultas de detecção de abandono podem demorar.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $pdo = Database::getConnection();
         $this->ensureTable($pdo);
 
@@ -57,19 +97,18 @@ class AdminCartRecoveryController extends Controller {
         elseif ($filtro === 'recuperado') $where = "cr.status='recuperado'";
         elseif ($filtro === 'perdido') $where = "cr.status IN ('perdido','nao_retornou')";
 
-        $userNomeCol = 'nome';
-        try {
-            $cols = $pdo->query("DESCRIBE usuarios")->fetchAll(\PDO::FETCH_COLUMN);
-            if (!in_array('nome', $cols) && in_array('name', $cols)) $userNomeCol = 'name';
-        } catch (\Exception $e) {}
+        $userNomeCol = $this->colunaNome($pdo, 'usuarios');
 
         $registros = [];
         try {
+            // LIMIT evita renderizar/consultar centenas de linhas de uma vez.
+            // Ordena pelos mais recentes para que a página mostre o que interessa.
             $sql = "SELECT cr.*, u.{$userNomeCol} AS cliente_nome, u.email AS cliente_email, u.telefone AS cliente_telefone
                     FROM cart_recovery cr
                     LEFT JOIN usuarios u ON u.id = cr.usuario_id
                     WHERE {$where}
-                    ORDER BY cr.detectado_em ASC";
+                    ORDER BY cr.detectado_em DESC
+                    LIMIT 100";
             $registros = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
@@ -162,8 +201,18 @@ class AdminCartRecoveryController extends Controller {
     }
 
     public function detalhes(Request $request) {
+        // 1) Rate limit por IP antes de qualquer trabalho caro (sessão/DB).
+        $this->guardRate('detalhes', 60, 60);
+
         header('Content-Type: application/json; charset=UTF-8');
         $auth = new AuthService(); $auth->requerPerfis(['admin','vendedor']);
+
+        // 2) Já validamos o perfil; liberar o lock de sessão para não segurar
+        //    workers concorrentes em session_start durante as queries a seguir.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $pdo = Database::getConnection();
         $id = (int)$request->getParam('id');
         
@@ -176,16 +225,19 @@ class AdminCartRecoveryController extends Controller {
         $uid = (int)$record['usuario_id'];
         $itens = [];
         try {
-            $nomeCol = 'nome';
-            $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN);
-            if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
+            $nomeCol = $this->colunaNome($pdo, 'produtos');
 
+            // Busca itens apenas do carrinho mais recente do usuário.
+            // Índices envolvidos: carrinhos(usuario_id), carrinho_items(carrinho_id), produtos(id).
             $sql = "SELECT ci.quantidade, ci.subtotal, p.{$nomeCol} AS nome
                     FROM carrinho_items ci
-                    JOIN carrinhos c ON c.id = ci.carrinho_id
                     JOIN produtos p ON p.id = ci.produto_id
-                    WHERE c.usuario_id = ?
-                    ORDER BY c.created_at DESC";
+                    WHERE ci.carrinho_id = (
+                        SELECT c.id FROM carrinhos c
+                        WHERE c.usuario_id = ?
+                        ORDER BY c.updated_at DESC, c.id DESC
+                        LIMIT 1
+                    )";
             $st2 = $pdo->prepare($sql); $st2->execute([$uid]);
             $itens = $st2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             foreach ($itens as &$i) {
@@ -197,8 +249,18 @@ class AdminCartRecoveryController extends Controller {
     }
 
     public function atualizarStatus(Request $request) {
+        $this->guardRate('status', 60, 60);
+
         header('Content-Type: application/json; charset=UTF-8');
         $auth = new AuthService(); $auth->requerPerfis(['admin','vendedor']);
+
+        $adminId = (int)($_SESSION['usuario_id'] ?? 0);
+
+        // Capturado o adminId, liberar o lock de sessão antes das escritas no banco.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $pdo = Database::getConnection();
 
         $data = json_decode(file_get_contents('php://input'), true);
@@ -210,8 +272,6 @@ class AdminCartRecoveryController extends Controller {
             echo json_encode(['success'=>false,'error'=>__('admin.cart_recovery.invalid_data', 'Dados inválidos')]);
             return;
         }
-
-        $adminId = (int)($_SESSION['usuario_id'] ?? 0);
 
         $updates = "status=?, updated_at=NOW()";
         $params = [$status];
@@ -307,7 +367,7 @@ class AdminCartRecoveryController extends Controller {
 
                 echo '<tr style="border-bottom:1px solid #F1F5F9;">
 <td style="padding:12px 14px;">
-<div style="cursor:pointer;" onclick="this.parentElement.parentElement.nextElementSibling.style.display=this.parentElement.parentElement.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">
+<div style="cursor:pointer;" onclick="toggleDetalhesCarrinho('.(int)$r['id'].', this)">
 <strong style="font-size:14px;">'.$nome.'</strong>
 <div style="margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;">
 <a href="tel:'.htmlspecialchars($r['cliente_telefone'] ?? '').'" style="color:#18253D;font-weight:600;font-size:13px;text-decoration:none;"><i class="bi bi-telephone-fill me-1"></i>'.($tel ?: __('admin.cart_recovery.no_phone', 'Sem telefone')).'</a>
@@ -329,20 +389,8 @@ class AdminCartRecoveryController extends Controller {
 <option value="nao_retornou">' . __('admin.cart_recovery.status_not_returned', 'Não Retornou') . '</option>
 </select>
 </td></tr>
-<tr style="display:none;background:#FAFBFC;"><td colspan="6" style="padding:12px 20px;">
-<div style="font-size:12px;color:#64748B;" id="cart-detail-'.(int)$r['id'].'">' . htmlspecialchars(__('admin.cart_recovery.loading_items', 'Carregando itens...'), ENT_QUOTES, 'UTF-8') . '</div>
-<script>
-(function(){
-    fetch("/admin/cart-recovery/detalhes?id='.(int)$r['id'].'").then(r=>r.json()).then(d=>{
-        if(d.success && d.itens && d.itens.length){
-            var html="<table style=\\"width:100%;font-size:12px;border-collapse:collapse;\\"><tr style=\\"color:#94A3B8;\\"><th style=\\"padding:4px 8px;text-align:left;\\">' . htmlspecialchars(__('admin.cart_recovery.js_product', 'Produto'), ENT_QUOTES, 'UTF-8') . '</th><th style=\\"padding:4px 8px;text-align:center;\\">' . htmlspecialchars(__('admin.cart_recovery.js_qty', 'Qtd'), ENT_QUOTES, 'UTF-8') . '</th><th style=\\"padding:4px 8px;text-align:right;\\">' . htmlspecialchars(__('admin.cart_recovery.th_value', 'Valor'), ENT_QUOTES, 'UTF-8') . '</th></tr>";
-            d.itens.forEach(function(i){html+="<tr style=\\"border-top:1px solid #EBF0F6;\\"><td style=\\"padding:6px 8px;\\">"+i.nome+"</td><td style=\\"padding:6px 8px;text-align:center;\\">"+i.quantidade+"</td><td style=\\"padding:6px 8px;text-align:right;\\">US$ "+i.subtotal+"</td></tr>";});
-            html+="</table>";
-            document.getElementById("cart-detail-'.(int)$r['id'].'").innerHTML=html;
-        } else { document.getElementById("cart-detail-'.(int)$r['id'].'").innerHTML="<em>' . htmlspecialchars(__('admin.cart_recovery.no_items', 'Sem itens no carrinho'), ENT_QUOTES, 'UTF-8') . '</em>"; }
-    }).catch(function(){document.getElementById("cart-detail-'.(int)$r['id'].'").innerHTML="<em>' . htmlspecialchars(__('admin.cart_recovery.load_error', 'Erro ao carregar'), ENT_QUOTES, 'UTF-8') . '</em>";});
-})();
-</script>
+<tr class="cart-detail-row" style="display:none;background:#FAFBFC;"><td colspan="6" style="padding:12px 20px;">
+<div style="font-size:12px;color:#64748B;" id="cart-detail-'.(int)$r['id'].'" data-loaded="0"></div>
 </td></tr>';
             }
             echo '</tbody></table></div></div>';
@@ -350,7 +398,48 @@ class AdminCartRecoveryController extends Controller {
 
         echo '</div></main></div></div>';
         renderAdminScripts();
+
+        // Rótulos i18n usados pelo JS de carregamento sob demanda
+        $jsProduct = htmlspecialchars(__('admin.cart_recovery.js_product', 'Produto'), ENT_QUOTES, 'UTF-8');
+        $jsQty = htmlspecialchars(__('admin.cart_recovery.js_qty', 'Qtd'), ENT_QUOTES, 'UTF-8');
+        $jsValue = htmlspecialchars(__('admin.cart_recovery.th_value', 'Valor'), ENT_QUOTES, 'UTF-8');
+        $jsLoading = htmlspecialchars(__('admin.cart_recovery.loading_items', 'Carregando itens...'), ENT_QUOTES, 'UTF-8');
+        $jsNoItems = htmlspecialchars(__('admin.cart_recovery.no_items', 'Sem itens no carrinho'), ENT_QUOTES, 'UTF-8');
+        $jsLoadError = htmlspecialchars(__('admin.cart_recovery.load_error', 'Erro ao carregar'), ENT_QUOTES, 'UTF-8');
+
         echo '<script>
+// Carrega os itens do carrinho SOB DEMANDA, apenas quando o admin expande a linha.
+// Antes, cada linha disparava um fetch automaticamente no load da página, o que
+// gerava centenas de requisições simultâneas e travava os workers do PHP.
+function toggleDetalhesCarrinho(id, el){
+    var linhaPrincipal = el.parentElement.parentElement; // <tr> da linha
+    var linhaDetalhe = linhaPrincipal.nextElementSibling; // <tr class="cart-detail-row">
+    if(!linhaDetalhe) return;
+
+    var visivel = linhaDetalhe.style.display !== "none";
+    if(visivel){ linhaDetalhe.style.display = "none"; return; }
+    linhaDetalhe.style.display = "table-row";
+
+    var alvo = document.getElementById("cart-detail-" + id);
+    if(!alvo || alvo.getAttribute("data-loaded") === "1") return; // já carregado
+    alvo.setAttribute("data-loaded", "1");
+    alvo.innerHTML = "' . $jsLoading . '";
+
+    fetch("/admin/cart-recovery/detalhes?id=" + id).then(function(r){ return r.json(); }).then(function(d){
+        if(d.success && d.itens && d.itens.length){
+            var html = "<table style=\"width:100%;font-size:12px;border-collapse:collapse;\"><tr style=\"color:#94A3B8;\"><th style=\"padding:4px 8px;text-align:left;\">' . $jsProduct . '</th><th style=\"padding:4px 8px;text-align:center;\">' . $jsQty . '</th><th style=\"padding:4px 8px;text-align:right;\">' . $jsValue . '</th></tr>";
+            d.itens.forEach(function(i){ html += "<tr style=\"border-top:1px solid #EBF0F6;\"><td style=\"padding:6px 8px;\">" + i.nome + "</td><td style=\"padding:6px 8px;text-align:center;\">" + i.quantidade + "</td><td style=\"padding:6px 8px;text-align:right;\">US$ " + i.subtotal + "</td></tr>"; });
+            html += "</table>";
+            alvo.innerHTML = html;
+        } else {
+            alvo.innerHTML = "<em>' . $jsNoItems . '</em>";
+        }
+    }).catch(function(){
+        alvo.setAttribute("data-loaded", "0"); // permite tentar de novo
+        alvo.innerHTML = "<em>' . $jsLoadError . '</em>";
+    });
+}
+
 async function atualizarStatusCarrinho(id, status){
     if(!status) return;
     var pedidoId = 0;
