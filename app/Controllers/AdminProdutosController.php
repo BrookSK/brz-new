@@ -4081,6 +4081,16 @@ HTML;
             if ($outletFiltro === '1' && !empty($colNames['outlet'])) {
                 $where .= " AND p.outlet = 1 ";
             }
+            // Filtro por grupo de compra: '' = todos, 'sem' = sem grupo, 'com' = apenas de grupo
+            $grupoFiltro = (string) $request->getParam('grupo_filtro', '');
+            // Filtro por grupo de compra ('sem' = fora de grupo, 'com' = apenas de grupo).
+            if ($grupoFiltro !== '' && !empty($colNames['grupo_compras_id'])) {
+                if ($grupoFiltro === 'sem') {
+                    $where .= " AND (p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0) ";
+                } elseif ($grupoFiltro === 'com') {
+                    $where .= " AND (p.grupo_compras_id IS NOT NULL AND p.grupo_compras_id > 0) ";
+                }
+            }
 
             // Quando há busca ativa, retornar todos os resultados sem paginação
             $buscaAtiva = (trim($busca) !== '');
@@ -4195,6 +4205,13 @@ HTML;
             . '<select class="form-select" name="outlet_filtro">'
             . '<option value="">Outlet</option>'
             . '<option value="1"' . ((isset($outletFiltro) && $outletFiltro === '1') ? ' selected' : '') . '>' . __('admin.products.yes', 'Sim') . '</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-2">'
+            . '<select class="form-select" name="grupo_filtro">'
+            . '<option value="">' . __('admin.products.group_filter_all', 'Grupo de compra: todos') . '</option>'
+            . '<option value="sem"' . ($grupoFiltro === 'sem' ? ' selected' : '') . '>' . __('admin.products.group_filter_without', 'Sem grupo de compra') . '</option>'
+            . '<option value="com"' . ($grupoFiltro === 'com' ? ' selected' : '') . '>' . __('admin.products.group_filter_with', 'Apenas de grupo de compra') . '</option>'
             . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
@@ -4364,6 +4381,15 @@ HTML;
                 <option value="0">' . __('admin.products.no', 'Não') . '</option>
               </select>
             </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">' . __('admin.products.on_demand', 'Venda sob demanda') . '</label>
+              <select class="form-select" name="massa_venda_sob_demanda">
+                <option value="">— ' . __('admin.products.do_not_change', 'Não alterar') . ' —</option>
+                <option value="1">' . __('admin.products.yes', 'Sim') . '</option>
+                <option value="0">' . __('admin.products.no', 'Não') . '</option>
+              </select>
+              <small class="text-muted">' . __('admin.products.on_demand_help', 'Se ativo, o produto fica comprável mesmo sem estoque físico. A compra entra na lista de compras em vez de baixar o inventário.') . '</small>
+            </div>
           </div>
         </form>
       </div>
@@ -4484,7 +4510,7 @@ HTML;
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
             if (!isset($outletFiltro)) $outletFiltro = '';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
@@ -4500,6 +4526,9 @@ HTML;
                 }
                 if (trim($outletFiltro ?? '') !== '') {
                     $url .= "&outlet_filtro=" . urlencode($outletFiltro);
+                }
+                if (trim($grupoFiltro ?? '') !== '') {
+                    $url .= "&grupo_filtro=" . urlencode($grupoFiltro);
                 }
                 return $url;
             };
@@ -4608,7 +4637,9 @@ HTML;
             $params[] = (int) $outlet;
         }
 
-        if (empty($campos)) {
+        $vendaSobDemanda = $_POST['massa_venda_sob_demanda'] ?? '';
+
+        if (empty($campos) && $vendaSobDemanda === '') {
             echo json_encode(['success' => false, 'error' => __('admin.products.err_no_field_update', 'Nenhum campo para atualizar.')]);
             exit;
         }
@@ -4616,6 +4647,23 @@ HTML;
         try {
             $pdo = \Config\Database::getConnection();
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            // Só inclui venda_sob_demanda se a coluna existir (migração 224).
+            if ($vendaSobDemanda !== '') {
+                $temColunaSD = false;
+                try {
+                    $temColunaSD = (bool) $pdo->query("SHOW COLUMNS FROM produtos LIKE 'venda_sob_demanda'")->fetchColumn();
+                } catch (\Exception $e) {}
+                if ($temColunaSD) {
+                    $campos[] = 'venda_sob_demanda = ?';
+                    $params[] = ((int) $vendaSobDemanda === 1 ? 1 : 0);
+                }
+            }
+
+            if (empty($campos)) {
+                echo json_encode(['success' => false, 'error' => __('admin.products.err_no_field_update', 'Nenhum campo para atualizar.')]);
+                exit;
+            }
             $in = implode(',', array_fill(0, count($ids), '?'));
             $sql = 'UPDATE produtos SET ' . implode(', ', $campos) . ' WHERE id IN (' . $in . ')';
             $stmt = $pdo->prepare($sql);
