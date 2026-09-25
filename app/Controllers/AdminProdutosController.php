@@ -4091,6 +4091,15 @@ HTML;
                     $where .= " AND (p.grupo_compras_id IS NOT NULL AND p.grupo_compras_id > 0) ";
                 }
             }
+            // Filtro por visibilidade no site: '' = todos, '1' = ocultos, '0' = visíveis
+            $ocultoFiltro = (string) $request->getParam('oculto_filtro', '');
+            if ($ocultoFiltro !== '' && !empty($colNames['oculto'])) {
+                if ($ocultoFiltro === '1') {
+                    $where .= " AND p.oculto = 1 ";
+                } elseif ($ocultoFiltro === '0') {
+                    $where .= " AND (p.oculto = 0 OR p.oculto IS NULL) ";
+                }
+            }
 
             // Quando há busca ativa, retornar todos os resultados sem paginação
             $buscaAtiva = (trim($busca) !== '');
@@ -4212,6 +4221,13 @@ HTML;
             . '<option value="">' . __('admin.products.group_filter_all', 'Grupo de compra: todos') . '</option>'
             . '<option value="sem"' . ($grupoFiltro === 'sem' ? ' selected' : '') . '>' . __('admin.products.group_filter_without', 'Sem grupo de compra') . '</option>'
             . '<option value="com"' . ($grupoFiltro === 'com' ? ' selected' : '') . '>' . __('admin.products.group_filter_with', 'Apenas de grupo de compra') . '</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-2">'
+            . '<select class="form-select" name="oculto_filtro">'
+            . '<option value="">' . __('admin.products.hidden_filter_all', 'Visibilidade: todos') . '</option>'
+            . '<option value="0"' . ($ocultoFiltro === '0' ? ' selected' : '') . '>' . __('admin.products.hidden_filter_visible', 'Visíveis no site') . '</option>'
+            . '<option value="1"' . ($ocultoFiltro === '1' ? ' selected' : '') . '>' . __('admin.products.hidden_filter_hidden', 'Ocultos no site') . '</option>'
             . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
@@ -4510,7 +4526,7 @@ HTML;
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
             if (!isset($outletFiltro)) $outletFiltro = '';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro, $ocultoFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
@@ -4529,6 +4545,9 @@ HTML;
                 }
                 if (trim($grupoFiltro ?? '') !== '') {
                     $url .= "&grupo_filtro=" . urlencode($grupoFiltro);
+                }
+                if (trim($ocultoFiltro ?? '') !== '') {
+                    $url .= "&oculto_filtro=" . urlencode($ocultoFiltro);
                 }
                 return $url;
             };
