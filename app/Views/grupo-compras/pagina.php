@@ -189,14 +189,15 @@ $busca = $busca ?? '';
                            class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-eye me-2"></i><?= htmlspecialchars(__('group_page.view_details', 'Ver Detalhes'), ENT_QUOTES, 'UTF-8') ?>
                         </a>
+                        <?php $podeComprar = !empty($produto['venda_sob_demanda']) || (int)($produto['stock'] ?? 0) > 0; ?>
                         <button class="btn btn-primary btn-sm btn-adicionar-modern"
                                 data-produto-id="<?= (int)$produto['id'] ?>"
                                 data-produto-nome="<?= htmlspecialchars($produto['name'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-produto-preco="<?= $precoExibir ?>"
                                 data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
-                                <?= (int)($produto['stock'] ?? 0) > 0 ? '' : 'disabled' ?>>
+                                <?= $podeComprar ? '' : 'disabled' ?>>
                             <i class="fas fa-cart-plus me-2"></i>
-                            <?= (int)($produto['stock'] ?? 0) > 0 ? htmlspecialchars(__('group_page.add_to_cart', 'Adicionar ao Carrinho'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('group_page.unavailable', 'Indisponível'), ENT_QUOTES, 'UTF-8') ?>
+                            <?= $podeComprar ? htmlspecialchars(__('group_page.add_to_cart', 'Adicionar ao Carrinho'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(__('group_page.unavailable', 'Indisponível'), ENT_QUOTES, 'UTF-8') ?>
                         </button>
                     </div>
                 </div>
