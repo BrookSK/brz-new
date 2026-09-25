@@ -7,7 +7,7 @@ use App\Services\AuthService;
 class AdminLojasController extends Controller {
 
     private function getPdo(): \PDO {
-        return new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+        return \Config\Database::getConnection();
     }
 
     private function ensureTable(\PDO $pdo): void {

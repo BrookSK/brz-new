@@ -13,7 +13,7 @@ class ProdutoController extends Controller {
     private $produtoFotoModel;
 
     private function getDirectPdo(): \PDO {
-        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = \Config\Database::getConnection();
         $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
         return $pdo;
     }

@@ -869,7 +869,7 @@ class AdminPagamentosController extends Controller {
         $rows = [];
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $hasSchema = true;
             foreach (['comissao_janelas', 'comissao_pagamentos', 'comissao_ajustes'] as $t) {
@@ -1192,7 +1192,7 @@ class AdminPagamentosController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $cols = [];
             try {
                 $stCols = $pdo->query('DESCRIBE comissao_ajustes');
@@ -1243,7 +1243,7 @@ class AdminPagamentosController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $colsPag = [];
             try {
@@ -1324,7 +1324,7 @@ class AdminPagamentosController extends Controller {
 
         $janelaId = 0;
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $st = $pdo->prepare('SELECT janela_id FROM comissao_pagamentos WHERE id = :id LIMIT 1');
             $st->execute([':id' => $id]);
             $janelaId = (int) ($st->fetchColumn() ?: 0);
@@ -1363,7 +1363,7 @@ class AdminPagamentosController extends Controller {
 
         $janelaId = 0;
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $st = $pdo->prepare('SELECT janela_id FROM comissao_pagamentos WHERE id = :id LIMIT 1');
             $st->execute([':id' => $id]);
             $janelaId = (int) ($st->fetchColumn() ?: 0);
@@ -1382,7 +1382,7 @@ class AdminPagamentosController extends Controller {
         $pedidoId = $request->getParam('id');
         
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $pdo->beginTransaction();
             
             // Atualizar status do pagamento

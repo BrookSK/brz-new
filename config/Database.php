@@ -24,6 +24,10 @@ class Database {
                     [
                         \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                         \PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '-03:00'",
+                        // rowCount() em UPDATE passa a contar as linhas que casaram
+                        // com o WHERE (encontradas), não só as que mudaram de valor.
+                        // Vários pontos do painel dependem desse comportamento.
+                        \PDO::MYSQL_ATTR_FOUND_ROWS => true,
                     ]
                 );
                 // Remover NO_AUTO_VALUE_ON_ZERO do sql_mode para evitar id=0 em auto_increment

@@ -25,9 +25,8 @@ class AdminPedidosController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$', [
-                \PDO::MYSQL_ATTR_FOUND_ROWS => true,
-            ]);
+            // Singleton já configura MYSQL_ATTR_FOUND_ROWS => true.
+            $pdo = \Config\Database::getConnection();
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
 
             // Garantir que exista uma coluna dedicada para o país de entrega no pedido.
@@ -574,7 +573,7 @@ class AdminPedidosController extends Controller {
         $status = (string) ($request->getParam('status', '') ?? '');
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $this->ensurePedidoMedidasColumnsPdo($pdo);
 
@@ -826,7 +825,7 @@ class AdminPedidosController extends Controller {
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $colsPedidos = [];
             try {
@@ -935,7 +934,7 @@ class AdminPedidosController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $colsPedidos = [];
             try {
                 $stmtCols = $pdo->query('DESCRIBE pedidos');
@@ -1224,7 +1223,7 @@ class AdminPedidosController extends Controller {
         @ini_set('max_execution_time', '0');
         @set_time_limit(0);
 
-        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = \Config\Database::getConnection();
         $token = trim((string) ($request->getParam('token') ?? ''));
         $batchSize = (int) ($request->getParam('batch') ?? 150);
         if ($batchSize <= 0) $batchSize = 150;
@@ -2195,7 +2194,7 @@ JS;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
             $offset = ($pagina - 1) * $limite;
@@ -3868,7 +3867,7 @@ HTML;
             // Destaque: pendência de pagamento (diferença)
             $colsPedido = [];
             try {
-                $pdoCols = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                $pdoCols = \Config\Database::getConnection();
                 $stmtColsP = $pdoCols->query('DESCRIBE pedidos');
                 $colsPedido = $stmtColsP ? $stmtColsP->fetchAll(\PDO::FETCH_COLUMN) : [];
             } catch (\Exception $e) {
@@ -3909,7 +3908,7 @@ HTML;
             try {
                 $pdoWarn = $pdoCols ?? null;
                 if (!($pdoWarn instanceof \PDO)) {
-                    $pdoWarn = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                    $pdoWarn = \Config\Database::getConnection();
                 }
                 $warnMap = $this->getPedidosMissingDataWarnings($pdoWarn, [(int) $id]);
                 $warn = isset($warnMap[(int) $id]) && is_array($warnMap[(int) $id]) ? $warnMap[(int) $id] : null;
@@ -3939,7 +3938,7 @@ HTML;
                     if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
                         $pdoTrack = $pdoCols;
                     } else {
-                        $pdoTrack = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                        $pdoTrack = \Config\Database::getConnection();
                     }
                 } catch (\Exception $e) {
                     $pdoTrack = null;
@@ -4127,7 +4126,7 @@ HTML;
                     if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
                         $pdoLocal2 = $pdoCols;
                     } else {
-                        $pdoLocal2 = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                        $pdoLocal2 = \Config\Database::getConnection();
                     }
                 } catch (\Exception $e) {
                     $pdoLocal2 = null;
@@ -4222,7 +4221,7 @@ HTML;
                         $pdoProd = null;
                     }
                     if (!($pdoProd instanceof \PDO)) {
-                        $pdoProd = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                        $pdoProd = \Config\Database::getConnection();
                     }
 
                     $colsProd = [];
@@ -4312,7 +4311,7 @@ HTML;
             // Verificar flag no pedido_meta (só carnês novos que usaram preço cheio)
             if ($isCarnePedidoAdmin && $exibirEmBrl) {
                 try {
-                    $pdoMeta = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                    $pdoMeta = \Config\Database::getConnection();
                     $stMeta = $pdoMeta->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
                     $stMeta->execute([(int) $id]);
                     $flagPrecoOriginal = ((string) $stMeta->fetchColumn() === '1');
@@ -4325,7 +4324,7 @@ HTML;
             // Buscar taxa se precisa converter mas não veio no pedido
             if ($precisaConverterAdmin && $taxaConvPedido <= 1.01) {
                 try {
-                    $pdoTx = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                    $pdoTx = \Config\Database::getConnection();
                     $stTx = $pdoTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
                     $stTx->execute();
                     $txVal = (float) ($stTx->fetchColumn() ?: 0);
@@ -5734,7 +5733,7 @@ LINKSCRIPT;
                                         if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
                                             $pdoLocal = $pdoCols;
                                         } else {
-                                            $pdoLocal = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+                                            $pdoLocal = \Config\Database::getConnection();
                                         }
                                     } catch (\Exception $e) {
                                         $pdoLocal = null;
@@ -6281,7 +6280,7 @@ LINKSCRIPT;
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $colsPedidos = [];
             try {
@@ -7396,7 +7395,7 @@ HTML;
         $estornar = (int) $request->getParam('estornar', 0) === 1;
         
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $cols = [];
             try {
@@ -8435,7 +8434,7 @@ HTML;
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
 
             $cols = [];
             try {
@@ -8675,7 +8674,7 @@ HTML;
         }
 
         try {
-            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $pdo->beginTransaction();
 
