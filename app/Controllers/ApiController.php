@@ -162,6 +162,8 @@ class ApiController extends Controller {
             if (!isset($produto['moeda'])) {
                 $produto['moeda'] = $produto['currency'] ?? ($produto['moeda'] ?? 'USD');
             }
+            // Normaliza venda_sob_demanda para o frontend decidir disponibilidade.
+            $produto['venda_sob_demanda'] = (int) ($produto['venda_sob_demanda'] ?? 0);
         }
 
         unset($produto);

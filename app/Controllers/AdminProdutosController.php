@@ -4047,9 +4047,21 @@ HTML;
                 }
             } catch (\Exception $e) {}
 
+            // Filtro de status: '' = ativos (padrão), 'inativo' = só inativos, 'todos' = ativos+inativos
+            $statusFiltro = (string) $request->getParam('status_filtro', '');
+
             $params = [];
             $where = ' WHERE 1=1 ';
-            $where .= " AND NOT (LOWER(COALESCE(p.status,'')) = 'archived' OR p.active = 0) ";
+            // Arquivados têm tela própria: sempre ficam de fora desta listagem.
+            $where .= " AND NOT (LOWER(COALESCE(p.status,'')) = 'archived') ";
+            if ($statusFiltro === 'inativo') {
+                $where .= " AND p.active = 0 ";
+            } elseif ($statusFiltro === 'todos') {
+                // não filtra por active: mostra ativos e inativos
+            } else {
+                // padrão: apenas ativos
+                $where .= " AND p.active = 1 ";
+            }
             if ($perfil === 'representante') {
                 if ($repId <= 0) {
                     header('Location: /login');
@@ -4231,6 +4243,13 @@ HTML;
             . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
+            . '<select class="form-select" name="status_filtro">'
+            . '<option value="">' . __('admin.products.status_filter_active', 'Ativos') . '</option>'
+            . '<option value="inativo"' . ($statusFiltro === 'inativo' ? ' selected' : '') . '>' . __('admin.products.status_filter_inactive', 'Inativos') . '</option>'
+            . '<option value="todos"' . ($statusFiltro === 'todos' ? ' selected' : '') . '>' . __('admin.products.status_filter_all', 'Ativos + Inativos') . '</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
             . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>' . __('admin.products.name', 'Nome') . '</option>'
             . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>' . __('admin.products.registration', 'Cadastro') . '</option>'
@@ -4258,6 +4277,7 @@ HTML;
             . '<div id="barraMassa" class="d-none mb-3 p-3 rounded-3 d-flex align-items-center gap-3 flex-wrap" style="background:rgba(11,31,58,0.06);border:1px solid rgba(11,31,58,0.14);">'
             . '<span class="fw-semibold text-primary"><span id="qtdSelecionados">0</span> ' . __('admin.products.products_selected', 'produto(s) selecionado(s)') . '</span>'
             . '<button type="button" class="btn btn-sm btn-primary" onclick="abrirModalMassa()"><i class="fas fa-edit me-1"></i>' . __('admin.products.mass_edit', 'Editar em massa') . '</button>'
+            . '<button type="button" class="btn btn-sm btn-danger" onclick="excluirMassaSelecionados()"><i class="fas fa-trash me-1"></i>' . __('admin.products.mass_delete', 'Excluir selecionados') . '</button>'
             . '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()"><i class="fas fa-times me-1"></i>' . __('admin.products.deselect_all', 'Desmarcar todos') . '</button>'
             . '</div>'
             . '<table class="table table-hover align-middle">'
@@ -4475,6 +4495,80 @@ HTML;
         new bootstrap.Modal(document.getElementById("modalMassa")).show();
     };
 
+    window.excluirMassaSelecionados = function() {
+        const ids = [...document.querySelectorAll(".check-produto:checked")].map(c => c.value);
+        if (ids.length === 0) return;
+
+        const idsPayload = function() {
+            const p = new URLSearchParams();
+            ids.forEach(id => p.append("ids[]", id));
+            return p;
+        };
+
+        // Passo 1: verificar quantos podem ser excluídos e quantos têm vendas.
+        const verif = idsPayload();
+        fetch("/admin/produtos/excluir-massa", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest" },
+            body: verif.toString()
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) {
+                alert("' . htmlspecialchars(__('admin.products.js_error_label', 'Erro:'), ENT_QUOTES, 'UTF-8') . ' " + (res.error || ""));
+                return;
+            }
+
+            const excluiveis = parseInt(res.excluiveis || 0);
+            const comVendas = parseInt(res.com_vendas || 0);
+            let inativarComVendas = false;
+
+            if (comVendas > 0) {
+                // Alguns estão protegidos (já têm pedidos). Perguntar o que fazer.
+                const msg = comVendas + " ' . htmlspecialchars(__('admin.products.js_delete_protected', 'produto(s) já possuem pedidos e não podem ser excluídos.'), ENT_QUOTES, 'UTF-8') . '\\n\\n' . htmlspecialchars(__('admin.products.js_delete_inactivate_ask', 'Deseja INATIVAR esses produtos e excluir os demais? (OK = inativar e excluir / Cancelar = excluir apenas os que podem)'), ENT_QUOTES, 'UTF-8') . '";
+                inativarComVendas = confirm(msg);
+                if (!inativarComVendas && excluiveis === 0) {
+                    // Nada a excluir e o usuário não quis inativar.
+                    return;
+                }
+            } else {
+                // Todos podem ser excluídos: confirmação simples.
+                if (!confirm(excluiveis + " ' . htmlspecialchars(__('admin.products.js_delete_confirm', 'produto(s) serão excluídos permanentemente. Confirmar?'), ENT_QUOTES, 'UTF-8') . '")) {
+                    return;
+                }
+            }
+
+            // Passo 2: executar.
+            const exec = idsPayload();
+            exec.append("confirmar", "1");
+            if (inativarComVendas) exec.append("inativar_com_vendas", "1");
+
+            fetch("/admin/produtos/excluir-massa", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest" },
+                body: exec.toString()
+            })
+            .then(r => r.json())
+            .then(res2 => {
+                if (!res2.success) {
+                    alert("' . htmlspecialchars(__('admin.products.js_error_label', 'Erro:'), ENT_QUOTES, 'UTF-8') . ' " + (res2.error || ""));
+                    return;
+                }
+                let msg = (parseInt(res2.excluidos || 0)) + " ' . htmlspecialchars(__('admin.products.js_deleted_count', 'excluído(s)'), ENT_QUOTES, 'UTF-8') . '";
+                if (parseInt(res2.inativados || 0) > 0) {
+                    msg += ", " + parseInt(res2.inativados) + " ' . htmlspecialchars(__('admin.products.js_inactivated_count', 'inativado(s)'), ENT_QUOTES, 'UTF-8') . '";
+                }
+                const toast = document.createElement("div");
+                toast.style.cssText = "position:fixed;top:20px;right:20px;z-index:99999;max-width:400px;";
+                toast.innerHTML = \'<div class="alert alert-success alert-dismissible fade show shadow"><i class="fas fa-check-circle me-2"></i>\' + msg + \'<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>\';
+                document.body.appendChild(toast);
+                setTimeout(() => { location.reload(); }, 1500);
+            })
+            .catch(() => alert("' . htmlspecialchars(__('admin.products.js_server_comm_error', 'Erro de comunicação com o servidor.'), ENT_QUOTES, 'UTF-8') . '"));
+        })
+        .catch(() => alert("' . htmlspecialchars(__('admin.products.js_server_comm_error', 'Erro de comunicação com o servidor.'), ENT_QUOTES, 'UTF-8') . '"));
+    };
+
     window.confirmarMassa = function() {
         const ids = [...document.querySelectorAll(".check-produto:checked")].map(c => c.value);
         if (ids.length === 0) return;
@@ -4535,7 +4629,7 @@ HTML;
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
             if (!isset($outletFiltro)) $outletFiltro = '';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro, $ocultoFiltro): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro, $ocultoFiltro, $statusFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
@@ -4557,6 +4651,9 @@ HTML;
                 }
                 if (trim($ocultoFiltro ?? '') !== '') {
                     $url .= "&oculto_filtro=" . urlencode($ocultoFiltro);
+                }
+                if (trim($statusFiltro ?? '') !== '') {
+                    $url .= "&status_filtro=" . urlencode($statusFiltro);
                 }
                 return $url;
             };
@@ -4712,6 +4809,114 @@ HTML;
             $stmt->execute($allParams);
             $affected = $stmt->rowCount();
             echo json_encode(['success' => true, 'message' => __('admin.products.msg_products_updated', '{n} produto(s) atualizado(s) com sucesso.', ['n' => $affected])]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Exclusão em massa de produtos.
+     *
+     * Dois modos:
+     *  - Verificação (padrão): separa os produtos que podem ser excluídos (sem
+     *    vendas) dos que estão protegidos (já em pedidos) e retorna essa contagem
+     *    SEM executar nada. O front usa isso para perguntar ao usuário.
+     *  - Execução (confirmar=1): exclui os sem vendas. Se inativar_com_vendas=1,
+     *    inativa (active=0) os que têm vendas em vez de deixá-los intactos.
+     */
+    public function excluirMassa(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json');
+
+        $ids = $_POST['ids'] ?? [];
+        if (!is_array($ids)) $ids = [];
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
+        if (empty($ids)) {
+            echo json_encode(['success' => false, 'error' => __('admin.products.err_no_product_selected', 'Nenhum produto selecionado.')]);
+            exit;
+        }
+
+        $confirmar = ((string) ($_POST['confirmar'] ?? '')) === '1';
+        $inativarComVendas = ((string) ($_POST['inativar_com_vendas'] ?? '')) === '1';
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            // Separar entre "com vendas" (protegidos) e "sem vendas" (excluíveis).
+            $comVendas = [];
+            $semVendas = [];
+            foreach ($ids as $pid) {
+                if ($this->produtoTemVendas($pdo, $pid)) {
+                    $comVendas[] = $pid;
+                } else {
+                    $semVendas[] = $pid;
+                }
+            }
+
+            // Modo verificação: apenas informar, sem executar.
+            if (!$confirmar) {
+                echo json_encode([
+                    'success' => true,
+                    'modo' => 'verificacao',
+                    'total' => count($ids),
+                    'excluiveis' => count($semVendas),
+                    'com_vendas' => count($comVendas),
+                ]);
+                exit;
+            }
+
+            // ── Execução ──
+            $excluidos = 0;
+            $inativados = 0;
+
+            // 1) Excluir os que não têm vendas (apaga fotos do disco + registros).
+            foreach ($semVendas as $pid) {
+                try {
+                    $pdo->beginTransaction();
+
+                    $stmtFotos = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ?");
+                    $stmtFotos->execute([$pid]);
+                    foreach ($stmtFotos->fetchAll(\PDO::FETCH_ASSOC) as $foto) {
+                        $rel = ltrim((string) ($foto['nome_arquivo'] ?? ''), '/');
+                        if ($rel === '') continue;
+                        $filePath = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . $rel;
+                        if ($filePath !== '/' && file_exists($filePath)) {
+                            @unlink($filePath);
+                        }
+                    }
+
+                    $pdo->prepare("DELETE FROM produto_fotos WHERE produto_id = ?")->execute([$pid]);
+                    $pdo->prepare("DELETE FROM produtos WHERE id = ?")->execute([$pid]);
+
+                    $pdo->commit();
+                    $excluidos++;
+                } catch (\Exception $e) {
+                    if ($pdo->inTransaction()) $pdo->rollBack();
+                    // Segue para os próximos; não aborta o lote inteiro.
+                }
+            }
+
+            // 2) Inativar os com vendas, se o usuário concordou.
+            if ($inativarComVendas && !empty($comVendas)) {
+                try {
+                    $in = implode(',', array_fill(0, count($comVendas), '?'));
+                    $stInat = $pdo->prepare("UPDATE produtos SET active = 0 WHERE id IN ($in)");
+                    $stInat->execute($comVendas);
+                    $inativados = $stInat->rowCount();
+                } catch (\Exception $e) {}
+            }
+
+            echo json_encode([
+                'success' => true,
+                'modo' => 'execucao',
+                'excluidos' => $excluidos,
+                'inativados' => $inativados,
+                'com_vendas_mantidos' => $inativarComVendas ? 0 : count($comVendas),
+            ]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

@@ -461,7 +461,7 @@ $(document).ready(function() {
                     var precoHtml = isClubeBlocked
                         ? '<span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>'
                         : '<span class="h5 mb-0 text-primary" data-original-price="' + produto.valor + '" data-currency="' + (produto.moeda || 'USD') + '">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
-                    var disponivel = parseInt(produto.estoque || 0) > 0;
+                    var disponivel = parseInt(produto.venda_sob_demanda || 0) === 1 || parseInt(produto.estoque || 0) > 0;
                     var dispBadge = disponivel
                         ? '<span class="badge bg-success" style="font-size:10px;">Disponível</span>'
                         : '<span class="badge bg-danger" style="font-size:10px;">Indisponível</span>';

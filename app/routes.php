@@ -349,6 +349,7 @@ $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 $router->get('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 $router->post('/admin/produtos/acoes-massa', 'AdminProdutosController', 'acoesMassa');
+$router->post('/admin/produtos/excluir-massa', 'AdminProdutosController', 'excluirMassa');
 $router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'importarProdutosModelo');
 $router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');
 $router->post('/admin/produtos/importar/processar', 'AdminProdutosController', 'importarProdutosProcessar');
