@@ -4406,6 +4406,15 @@ HTML;
               </select>
               <small class="text-muted">' . __('admin.products.on_demand_help', 'Se ativo, o produto fica comprável mesmo sem estoque físico. A compra entra na lista de compras em vez de baixar o inventário.') . '</small>
             </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">' . __('admin.products.hidden_on_site', 'Ocultar em todo o site') . '</label>
+              <select class="form-select" name="massa_oculto">
+                <option value="">— ' . __('admin.products.do_not_change', 'Não alterar') . ' —</option>
+                <option value="1">' . __('admin.products.yes', 'Sim') . '</option>
+                <option value="0">' . __('admin.products.no', 'Não') . '</option>
+              </select>
+              <small class="text-muted">' . __('admin.products.hidden_on_site_help', 'Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.') . '</small>
+            </div>
           </div>
         </form>
       </div>
@@ -4657,8 +4666,9 @@ HTML;
         }
 
         $vendaSobDemanda = $_POST['massa_venda_sob_demanda'] ?? '';
+        $oculto = $_POST['massa_oculto'] ?? '';
 
-        if (empty($campos) && $vendaSobDemanda === '') {
+        if (empty($campos) && $vendaSobDemanda === '' && $oculto === '') {
             echo json_encode(['success' => false, 'error' => __('admin.products.err_no_field_update', 'Nenhum campo para atualizar.')]);
             exit;
         }
@@ -4676,6 +4686,18 @@ HTML;
                 if ($temColunaSD) {
                     $campos[] = 'venda_sob_demanda = ?';
                     $params[] = ((int) $vendaSobDemanda === 1 ? 1 : 0);
+                }
+            }
+
+            // Só inclui oculto se a coluna existir.
+            if ($oculto !== '') {
+                $temColunaOculto = false;
+                try {
+                    $temColunaOculto = (bool) $pdo->query("SHOW COLUMNS FROM produtos LIKE 'oculto'")->fetchColumn();
+                } catch (\Exception $e) {}
+                if ($temColunaOculto) {
+                    $campos[] = 'oculto = ?';
+                    $params[] = ((int) $oculto === 1 ? 1 : 0);
                 }
             }
 

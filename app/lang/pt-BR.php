@@ -1975,6 +1975,8 @@ return [
     'admin.products.hidden_filter_all' => 'Visibilidade: todos',
     'admin.products.hidden_filter_visible' => 'Visíveis no site',
     'admin.products.hidden_filter_hidden' => 'Ocultos no site',
+    'admin.products.hidden_on_site' => 'Ocultar em todo o site',
+    'admin.products.hidden_on_site_help' => 'Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.',
     'admin.products.on_demand' => 'Venda sob demanda',
     'admin.products.on_demand_help' => 'Se ativo, o produto fica comprável mesmo sem estoque físico. A compra entra na lista de compras em vez de baixar o inventário.',
     'admin.products.eg_8' => 'Ex: 8',

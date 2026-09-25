@@ -4129,6 +4129,8 @@ return [
     'admin.products.hidden_filter_all' => 'Visibility: all',
     'admin.products.hidden_filter_visible' => 'Visible on site',
     'admin.products.hidden_filter_hidden' => 'Hidden on site',
+    'admin.products.hidden_on_site' => 'Hide across the site',
+    'admin.products.hidden_on_site_help' => 'If enabled, the product does not appear to customers anywhere on the site. It stays visible only to admin/seller in manual orders.',
     'admin.products.on_demand' => 'Sell on demand',
     'admin.products.on_demand_help' => 'If enabled, the product is purchasable even without physical stock. The purchase goes to the shopping list instead of reducing inventory.',
     'admin.products.eg_8' => 'Ex: 8',
