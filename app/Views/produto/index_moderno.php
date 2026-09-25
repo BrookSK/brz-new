@@ -125,7 +125,8 @@
                                 <?php endif; ?>
                             </div>
                             <div class="stock-info">
-                                <?php if ($produto['stock'] > 0): ?>
+                                <?php $podeComprar = !empty($produto['venda_sob_demanda']) || (int) ($produto['stock'] ?? 0) > 0; ?>
+                                <?php if ($podeComprar): ?>
                                     <span class="badge bg-success">
                                         <i class="fas fa-check-circle me-1"></i><?= __('products.available', 'Disponível') ?>
                                     </span>
@@ -154,9 +155,9 @@
                                     data-produto-nome="<?= htmlspecialchars($produto['name']) ?>"
                                     data-produto-preco="<?= $precoExibir ?>"
                                     data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
-                                    <?= $produto['stock'] > 0 ? '' : 'disabled' ?>>
+                                    <?= $podeComprar ? '' : 'disabled' ?>>
                                 <i class="fas fa-cart-plus me-2"></i>
-                                <?= $produto['stock'] > 0 ? __('products.add_to_cart', 'Adicionar ao Carrinho') : __('products.unavailable', 'Indisponível') ?>
+                                <?= $podeComprar ? __('products.add_to_cart', 'Adicionar ao Carrinho') : __('products.unavailable', 'Indisponível') ?>
                             </button>
                             <?php endif; ?>
                         </div>

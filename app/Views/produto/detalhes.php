@@ -203,7 +203,11 @@
                                         <?= __('product_details.variations_select_to_check', 'Selecione as opções para ver disponibilidade.') ?>
                                     </span>
                                 <?php else: ?>
-                                    <?php if ($produto['estoque'] > 0): ?>
+                                    <?php if (!empty($produto['venda_sob_demanda'])): ?>
+                                        <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                            <i class="fas fa-check-circle me-1"></i><?= __('product_details.on_demand', 'Disponível sob demanda') ?>
+                                        </span>
+                                    <?php elseif ($produto['estoque'] > 0): ?>
                                         <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
                                             <?= $produto['estoque'] ?> <?= __('product_details.units', 'unidades') ?>
                                         </span>
@@ -231,11 +235,12 @@
                             </div>
 
                             <div class="col-12">
-                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= ($variacoesEnabled || ($produto['estoque'] ?? 0) <= 0) ? 'disabled' : '' ?>>
+                                <?php $podeComprar = !empty($produto['venda_sob_demanda']) || ($produto['estoque'] ?? 0) > 0; ?>
+                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= ($variacoesEnabled || !$podeComprar) ? 'disabled' : '' ?>>
                                     <?php if ($variacoesEnabled): ?>
                                         <i class="fas fa-shopping-cart"></i> <?= __('product_details.add_to_cart', 'Adicionar ao Carrinho') ?>
                                     <?php else: ?>
-                                        <?php if ($produto['estoque'] > 0): ?>
+                                        <?php if ($podeComprar): ?>
                                             <i class="fas fa-shopping-cart"></i> <?= __('product_details.add_to_cart', 'Adicionar ao Carrinho') ?>
                                         <?php else: ?>
                                             <i class="fas fa-times"></i> <?= __('product_details.unavailable', 'Produto Indisponível') ?>

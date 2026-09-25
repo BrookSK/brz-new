@@ -4486,11 +4486,27 @@ class PaymentService {
             $colsP = [];
             try { $stC = $db->query('DESCRIBE produtos'); $colsP = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
             $stockCol = in_array('stock', $colsP, true) ? 'stock' : (in_array('estoque', $colsP, true) ? 'estoque' : '');
+            $temVendaSobDemanda = in_array('venda_sob_demanda', $colsP, true);
 
             foreach ($itens as $it) {
                 $produtoId = (int) ($it['produto_id'] ?? 0);
                 $qtdPedido = (int) ($it['quantidade'] ?? 0);
                 if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                // Produtos "venda sob demanda": NÃO consomem inventário físico (estoque_interno)
+                // nem geram reserva. A quantidade inteira segue para lista_compras (pendência de
+                // compra ao fornecedor) via inserirItensListaCompras().
+                $vendaSobDemanda = false;
+                if ($temVendaSobDemanda) {
+                    try {
+                        $stSD = $db->prepare('SELECT COALESCE(venda_sob_demanda,0) FROM produtos WHERE id = ? LIMIT 1');
+                        $stSD->execute([$produtoId]);
+                        $vendaSobDemanda = ((int) ($stSD->fetchColumn() ?: 0) === 1);
+                    } catch (\Exception $e) {}
+                }
+                if ($vendaSobDemanda) {
+                    continue; // não baixa estoque nem reserva; faltante vira lista_compras
+                }
 
                 // Verificar se já tem reserva ativa para este pedido+produto (evitar duplicação)
                 if ($temReservas) {

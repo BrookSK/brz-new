@@ -5517,6 +5517,7 @@ HTML;
             if (in_array('elegivel_oferta_gratis', $cols, true)) $data['elegivel_oferta_gratis'] = $request->getParam('elegivel_oferta_gratis') ?: 0;
             if (in_array('oculto', $cols, true)) $data['oculto'] = (int) ($request->getParam('oculto') ?: 0);
             if (in_array('outlet', $cols, true)) $data['outlet'] = (int) ($request->getParam('outlet') ?: 0);
+            if (in_array('venda_sob_demanda', $cols, true)) $data['venda_sob_demanda'] = (int) ($request->getParam('venda_sob_demanda') ?: 0);
             if (in_array('imposto_local_percent', $cols, true)) {
                 $impostoLocalVal = (float) str_replace(',', '.', (string) ($request->getParam('imposto_local_percent') ?: '0'));
                 if ($impostoLocalVal < 0) $impostoLocalVal = 0;
@@ -6308,6 +6309,14 @@ HTML;
                                         <small class="text-muted">Se ativo, o produto aparece na página Braziliana Outlet.</small>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Venda sob demanda</label>
+                                        <select class="form-select" name="venda_sob_demanda">
+                                            <option value="0" ' . (empty($produto['venda_sob_demanda']) ? 'selected' : '') . '>Não</option>
+                                            <option value="1" ' . (!empty($produto['venda_sob_demanda']) ? 'selected' : '') . '>Sim</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, o produto fica comprável no site mesmo sem estoque físico. A compra do cliente NÃO baixa o estoque do inventário: ela entra direto na lista de compras para ser adquirida do fornecedor.</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Imposto Local (%)</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" name="imposto_local_percent" value="' . htmlspecialchars((string) ($produto['imposto_local_percent'] ?? '0')) . '" placeholder="Ex: 8">
@@ -6982,6 +6991,11 @@ HTMLSCRIPT;
                 $stmtOutlet->execute([(int) ($request->getParam('outlet') ?: 0), (int) $id]);
             }
 
+            if (in_array('venda_sob_demanda', $cols, true)) {
+                $stmtSobDemanda = $pdo->prepare('UPDATE produtos SET venda_sob_demanda = ? WHERE id = ?');
+                $stmtSobDemanda->execute([(int) ($request->getParam('venda_sob_demanda') ?: 0), (int) $id]);
+            }
+
             if (in_array('imposto_local_percent', $cols, true)) {
                 $impostoLocalVal = (float) str_replace(',', '.', (string) ($request->getParam('imposto_local_percent') ?: '0'));
                 if ($impostoLocalVal < 0) $impostoLocalVal = 0;
@@ -7072,7 +7086,7 @@ HTMLSCRIPT;
                     $newRow = [];
                 }
 
-                $keys = ['name','sku','loja','ncm','description','short_description','category_id','price','cost_price','sale_price','stock','min_stock','weight','status','active','featured','foto_principal','loja_id','clube_ativo','moeda','currency','representante_id','representante_email','oculto'];
+                $keys = ['name','sku','loja','ncm','description','short_description','category_id','price','cost_price','sale_price','stock','min_stock','weight','status','active','featured','foto_principal','loja_id','clube_ativo','moeda','currency','representante_id','representante_email','oculto','outlet','venda_sob_demanda'];
                 $oldPick = [];
                 $newPick = [];
                 foreach ($keys as $k) {

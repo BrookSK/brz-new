@@ -87,9 +87,10 @@
                     </a>
                     <div class="card-footer">
                         <div class="input-group">
-                            <input type="number" class="form-control quantidade-input" value="1" min="1" max="<?= $produto['estoque'] ?>" data-produto-id="<?= $produto['id'] ?>">
-                            <button class="btn btn-primary btn-adicionar" data-produto-id="<?= $produto['id'] ?>" data-produto-nome="<?= htmlspecialchars($produto['nome']) ?>" data-produto-preco="<?= $produto['valor'] ?>" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
-                                <?php if ($produto['estoque'] > 0): ?>
+                            <?php $podeComprar = !empty($produto['venda_sob_demanda']) || ($produto['estoque'] ?? 0) > 0; ?>
+                            <input type="number" class="form-control quantidade-input" value="1" min="1" <?= empty($produto['venda_sob_demanda']) ? 'max="' . (int) $produto['estoque'] . '"' : '' ?> data-produto-id="<?= $produto['id'] ?>">
+                            <button class="btn btn-primary btn-adicionar" data-produto-id="<?= $produto['id'] ?>" data-produto-nome="<?= htmlspecialchars($produto['nome']) ?>" data-produto-preco="<?= $produto['valor'] ?>" <?= $podeComprar ? '' : 'disabled' ?>>
+                                <?php if ($podeComprar): ?>
                                     <i class="fas fa-cart-plus"></i> <?= __('products.add', 'Adicionar') ?>
                                 <?php else: ?>
                                     <i class="fas fa-times"></i> <?= __('products.unavailable', 'Indisponível') ?>

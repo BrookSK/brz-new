@@ -572,11 +572,18 @@ class ProdutoController extends Controller {
         
         // Estoque exibido na página: usar o estoque REAL (estoque_interno - reservas),
         // alinhando o badge/botão de "disponível" com a validação de adicionar ao carrinho.
-        $estoqueRealDetalhe = $this->getEstoqueRealProduto((int) $produtoId);
-        if ($estoqueRealDetalhe !== null) {
-            $produto['estoque'] = $estoqueRealDetalhe;
-            $this->syncProdutoStock((int) $produtoId, $estoqueRealDetalhe);
+        // Produtos "venda sob demanda" ignoram o estoque real: são sempre compráveis (a compra
+        // vira pendência em lista_compras, sem depender de inventário físico).
+        $vendaSobDemanda = (int) ($produto['venda_sob_demanda'] ?? 0) === 1;
+        if (!$vendaSobDemanda) {
+            $estoqueRealDetalhe = $this->getEstoqueRealProduto((int) $produtoId);
+            if ($estoqueRealDetalhe !== null) {
+                $produto['estoque'] = $estoqueRealDetalhe;
+                $this->syncProdutoStock((int) $produtoId, $estoqueRealDetalhe);
+            }
         }
+        // Flag usada pelas views para decidir se o botão de compra fica habilitado.
+        $produto['disponivel_compra'] = $vendaSobDemanda || ((int) ($produto['estoque'] ?? 0) > 0);
 
         $this->view('produto/detalhes', [
             'produto' => $produto,

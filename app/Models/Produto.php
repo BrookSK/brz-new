@@ -101,6 +101,7 @@ class Produto extends Model {
                 'published_at' => $produto['published_at'] ?? null,
                 'grupo_compras_id' => $produto['grupo_compras_id'] ?? null,
                 'oculto' => (int) ($produto['oculto'] ?? 0),
+                'venda_sob_demanda' => (int) ($produto['venda_sob_demanda'] ?? 0),
             ];
             
             $this->debugLog('[PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));
