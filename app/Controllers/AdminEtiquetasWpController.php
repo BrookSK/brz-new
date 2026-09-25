@@ -1057,18 +1057,19 @@ class AdminEtiquetasWpController extends Controller
                 . '</div></div>';
         };
 
-        $urlCorreios = 'https://brazilianashop.com.br/rastreamento?codigo={{tracking_number}}';
+        // Botão leva ao rastreamento oficial dos Correios (placeholder resolvido no envio).
+        $urlCorreios = '{{tracking_url_correios}}';
         $templates = [
             'correios_packet_label_created' => [
-                'assunto' => 'Sua caixa foi enviada! Pedido #{{codigo_pedido}}',
+                'assunto' => 'Sua caixa foi enviada! Pedido {{pedido_id_fmt}}',
                 'html' => $montarHtml($urlCorreios),
             ],
             'correios_packet_shipment_departed' => [
-                'assunto' => 'Sua caixa foi enviada! Pedido #{{codigo_pedido}} - Rastreio {{tracking_number}}',
+                'assunto' => 'Sua caixa foi enviada! Pedido {{pedido_id_fmt}} - Rastreio {{tracking_number}}',
                 'html' => $montarHtml($urlCorreios),
             ],
             'shippo_label_created' => [
-                'assunto' => 'Sua caixa foi enviada! Pedido #{{codigo_pedido}} - Rastreio {{tracking_number}}',
+                'assunto' => 'Sua caixa foi enviada! Pedido {{pedido_id_fmt}} - Rastreio {{tracking_number}}',
                 'html' => $montarHtml('{{tracking_url}}'),
             ],
         ];

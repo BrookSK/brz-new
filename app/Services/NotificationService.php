@@ -193,9 +193,19 @@ class NotificationService {
         $impostos = (float) ($pedido['valor_impostos'] ?? ($pedido['impostos'] ?? 0));
         $total = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
 
+        $pedidoIdNum = (int) ($pedido['id'] ?? 0);
+        // ID numérico do pedido formatado como #000762 (6 dígitos) para uso no assunto/corpo.
+        $pedidoIdFmt = $pedidoIdNum > 0 ? ('#' . str_pad((string) $pedidoIdNum, 6, '0', STR_PAD_LEFT)) : '';
+        // URL de rastreamento oficial dos Correios a partir do código de rastreio.
+        $trackingCode = (string) ($pedido['tracking_code'] ?? '');
+        $trackingUrlCorreios = $trackingCode !== ''
+            ? ('https://rastreamento.correios.com.br/app/index.php?objetos=' . rawurlencode($trackingCode))
+            : 'https://rastreamento.correios.com.br';
+
         $base = [
             'evento' => $eventoNome,
             'pedido_id' => (string) ($pedido['id'] ?? ''),
+            'pedido_id_fmt' => $pedidoIdFmt,
             'codigo_pedido' => $codigoPedido,
             'numero_pedido' => $numeroPedido,
             'status' => $status,
@@ -217,6 +227,7 @@ class NotificationService {
             'tracking_code' => (string) ($pedido['tracking_code'] ?? ''),
             'codigo_rastreio' => (string) ($pedido['tracking_code'] ?? ''),
             'tracking_url' => (string) ($pedido['tracking_label_url'] ?? ''),
+            'tracking_url_correios' => $trackingUrlCorreios,
             'customer_control_code' => (string) ($pedido['customer_control_code'] ?? ($pedido['codigo_pedido'] ?? '')),
 
             'itens' => $itensHtml,
@@ -234,6 +245,13 @@ class NotificationService {
                 $base[(string) $k] = (string) $v;
             }
         }
+
+        // Recalcula a URL de rastreamento dos Correios com o tracking final (pode vir do $extra,
+        // ex.: no momento da criação da etiqueta o tracking chega por $extra e não pelo $pedido).
+        $trackingFinal = (string) ($base['tracking_number'] ?? ($base['tracking_code'] ?? ''));
+        $base['tracking_url_correios'] = $trackingFinal !== ''
+            ? ('https://rastreamento.correios.com.br/app/index.php?objetos=' . rawurlencode($trackingFinal))
+            : 'https://rastreamento.correios.com.br';
 
         return $base;
     }

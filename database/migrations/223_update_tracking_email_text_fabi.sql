@@ -6,8 +6,9 @@
 -- Substitui o conteúdo aplicado pela migration 222 nesses três eventos.
 -- Idempotente: usa UPDATE (só altera se a linha existir) na tabela email_templates.
 --
--- Placeholders usados: {{codigo_pedido}} {{tracking_number}} {{tracking_url}}
--- Botão: eventos de Correios usam a página de rastreamento do site; Shippo usa {{tracking_url}}.
+-- Placeholders usados: {{pedido_id_fmt}} {{tracking_number}} {{tracking_url}} {{tracking_url_correios}}
+-- Assunto: usa o ID numérico do pedido formatado (#000762), não o codigo_pedido (MAN-...).
+-- Botão: eventos de Correios levam ao rastreamento oficial dos Correios; Shippo usa {{tracking_url}}.
 
 SET @has_email_templates := (
   SELECT COUNT(*) FROM information_schema.tables
@@ -63,27 +64,27 @@ SET @corpo_rastreio := CONCAT(
   '</div></div>'
 );
 
--- Variação por botão: Correios (URL de rastreamento do site) e Shippo ({{tracking_url}}).
-SET @corpo_btn_correios := REPLACE(@corpo_rastreio, '{URL_BTN}', 'https://brazilianashop.com.br/rastreamento?codigo={{tracking_number}}');
+-- Variação por botão: Correios (rastreamento oficial dos Correios) e Shippo ({{tracking_url}}).
+SET @corpo_btn_correios := REPLACE(@corpo_rastreio, '{URL_BTN}', '{{tracking_url_correios}}');
 SET @corpo_btn_shippo := REPLACE(@corpo_rastreio, '{URL_BTN}', '{{tracking_url}}');
 
 -- Etiqueta gerada (Correios Packet)
 SET @sql := IF(@has_email_templates > 0,
-  'UPDATE email_templates SET assunto = ''Sua caixa foi enviada! Pedido #{{codigo_pedido}}'', corpo_html = @corpo_btn_correios WHERE nome = ''correios_packet_label_created''',
+  'UPDATE email_templates SET assunto = ''Sua caixa foi enviada! Pedido {{pedido_id_fmt}}'', corpo_html = @corpo_btn_correios WHERE nome = ''correios_packet_label_created''',
   'SELECT 1'
 );
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- Embarque (shipment departed)
 SET @sql := IF(@has_email_templates > 0,
-  'UPDATE email_templates SET assunto = ''Sua caixa foi enviada! Pedido #{{codigo_pedido}} - Rastreio {{tracking_number}}'', corpo_html = @corpo_btn_correios WHERE nome = ''correios_packet_shipment_departed''',
+  'UPDATE email_templates SET assunto = ''Sua caixa foi enviada! Pedido {{pedido_id_fmt}} - Rastreio {{tracking_number}}'', corpo_html = @corpo_btn_correios WHERE nome = ''correios_packet_shipment_departed''',
   'SELECT 1'
 );
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- Shippo
 SET @sql := IF(@has_email_templates > 0,
-  'UPDATE email_templates SET assunto = ''Sua caixa foi enviada! Pedido #{{codigo_pedido}} - Rastreio {{tracking_number}}'', corpo_html = @corpo_btn_shippo WHERE nome = ''shippo_label_created''',
+  'UPDATE email_templates SET assunto = ''Sua caixa foi enviada! Pedido {{pedido_id_fmt}} - Rastreio {{tracking_number}}'', corpo_html = @corpo_btn_shippo WHERE nome = ''shippo_label_created''',
   'SELECT 1'
 );
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
