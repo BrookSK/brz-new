@@ -257,7 +257,13 @@ class Carrinho extends Model {
         $produtoModel = new Produto();
         $produto = $produtoModel->find($produtoId);
         
-        if (!$produto || $produto['estoque'] < $quantidade) {
+        if (!$produto) {
+            return false;
+        }
+        // Venda sob demanda: comprável sem estoque físico (a compra vira pendência
+        // em lista_compras). Só valida estoque para produtos normais.
+        $vendaSobDemanda = (int) ($produto['venda_sob_demanda'] ?? 0) === 1;
+        if (!$vendaSobDemanda && $produto['estoque'] < $quantidade) {
             return false;
         }
 

@@ -1698,9 +1698,11 @@ class CarrinhoController extends Controller {
 
         if ($itemKey !== null) {
             $produto = $this->produtoModel->find($produtoIdDb);
-            
+
+            // Venda sob demanda: comprável sem estoque físico (faltante vira lista de compras).
+            $vendaSobDemanda = (int) ($produto['venda_sob_demanda'] ?? 0) === 1;
             $produtoStock = intval($produto['estoque'] ?? 0);
-            if ($produtoStock < $quantidade) {
+            if (!$vendaSobDemanda && $produtoStock < $quantidade) {
                 $this->json(['error' => 'Estoque insuficiente'], 400);
                 return;
             }

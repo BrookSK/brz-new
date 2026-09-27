@@ -396,6 +396,9 @@ class CheckoutController extends Controller {
             if (!empty($produtoColStatus)) $select[] = $produtoColStatus;
             if (!empty($produtoColStock)) $select[] = $produtoColStock;
             if (!empty($produtoColControla)) $select[] = $produtoColControla;
+            if (is_array($produtoCols) && in_array('venda_sob_demanda', $produtoCols, true)) {
+                $select[] = 'venda_sob_demanda';
+            }
             $select = array_values(array_unique($select));
 
             $whereParts = [];
@@ -517,6 +520,10 @@ class CheckoutController extends Controller {
             if (trim($nomeProduto) === '') {
                 $nomeProduto = 'Produto #' . $produtoId;
             }
+
+            // Venda sob demanda: comprável sem estoque físico. Não bloqueia por estoque
+            // aqui (o faltante vira pendência em lista_compras na criação do pedido).
+            $vendaSobDemanda = (int) ($produtoRow['venda_sob_demanda'] ?? 0) === 1;
 
             if (!empty($produtoColAtivo)) {
                 $rawAtivo = $produtoRow[$produtoColAtivo] ?? 0;
@@ -669,7 +676,7 @@ class CheckoutController extends Controller {
                     }
                 }
             } else {
-                if (!empty($produtoColStock) && isset($produtoRow[$produtoColStock])) {
+                if (!$vendaSobDemanda && !empty($produtoColStock) && isset($produtoRow[$produtoColStock])) {
                     $controla = true;
                     if (!empty($produtoColControla) && array_key_exists($produtoColControla, $produtoRow)) {
                         $raw = $produtoRow[$produtoColControla];
@@ -6408,6 +6415,9 @@ class CheckoutController extends Controller {
                 if (!empty($prodStockCol) && in_array($prodStockCol, $colsProd, true) && !in_array($prodStockCol, $select, true)) {
                     $select[] = $prodStockCol;
                 }
+                if (in_array('venda_sob_demanda', $colsProd, true)) {
+                    $select[] = 'venda_sob_demanda';
+                }
                 $stmtP = $db->prepare('SELECT ' . implode(', ', array_values(array_unique($select))) . ' FROM produtos WHERE id = ? LIMIT 1');
                 $stmtP->execute([$produtoId]);
                 $produtoRow = $stmtP->fetch(\PDO::FETCH_ASSOC);
@@ -6585,6 +6595,11 @@ class CheckoutController extends Controller {
                     $raw = $produtoRow[$prodControlaCol];
                     $controlaEstoque = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
                 }
+                // Venda sob demanda: não debita estoque físico. Toda a quantidade vira
+                // pendência em lista_compras (ramo 'else' abaixo), igual ao PaymentService.
+                if (is_array($produtoRow) && (int) ($produtoRow['venda_sob_demanda'] ?? 0) === 1) {
+                    $controlaEstoque = false;
+                }
 
                 if ($controlaEstoque) {
                     if ($produtoVariacaoId !== null) {
@@ -6618,7 +6633,10 @@ class CheckoutController extends Controller {
                                     $faltante = max(0, ((int) $quantidade) - $stockAtual);
                                 } catch (\Exception $e) {
                                 }
-                            } elseif ($produtoVariacaoId === null && !empty($prodStockCol)) {
+                            } elseif ($produtoVariacaoId === null && !empty($prodStockCol)
+                                && !(is_array($produtoRow) && (int) ($produtoRow['venda_sob_demanda'] ?? 0) === 1)) {
+                                // Para venda sob demanda, NÃO descontar estoque: a quantidade
+                                // inteira vira pendência (igual ao PaymentService).
                                 try {
                                     $stS = $db->prepare('SELECT ' . $prodStockCol . ' FROM produtos WHERE id = ? LIMIT 1');
                                     $stS->execute([(int) $produtoId]);

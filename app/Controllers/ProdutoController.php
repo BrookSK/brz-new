@@ -725,6 +725,10 @@ class ProdutoController extends Controller {
         if (!$produto) {
             $this->json(['error' => 'Produto não encontrado'], 404);
         }
+
+        // Venda sob demanda: comprável mesmo sem estoque físico (a compra vira
+        // pendência em lista_compras). Não deve ser bloqueado por estoque.
+        $vendaSobDemanda = (int) ($produto['venda_sob_demanda'] ?? 0) === 1;
         
         $precoBase = (float) ($produto['preco'] ?? $produto['valor'] ?? 0);
         if ($precoBase < 0) $precoBase = 0.0;
@@ -770,7 +774,10 @@ class ProdutoController extends Controller {
             }
         }
 
-        if ($itemStock < (int) $quantidade) {
+        // Pular a checagem de estoque para produto de venda sob demanda (exceto quando
+        // uma variação específica foi escolhida, pois a variação tem estoque próprio).
+        $ignorarEstoque = ($vendaSobDemanda && ($pvId === null || $pvId <= 0));
+        if (!$ignorarEstoque && $itemStock < (int) $quantidade) {
             $this->json(['error' => 'Estoque insuficiente'], 400);
         }
         

@@ -352,8 +352,11 @@ class ApiController extends Controller {
             $this->json(['error' => 'Produto não encontrado'], 404);
             return;
         }
-        
-        if ($produto['estoque'] < $quantidade) {
+
+        // Venda sob demanda: comprável mesmo sem estoque físico (compra vira pendência
+        // em lista_compras). Só valida estoque para produtos normais.
+        $vendaSobDemanda = (int) ($produto['venda_sob_demanda'] ?? 0) === 1;
+        if (!$vendaSobDemanda && $produto['estoque'] < $quantidade) {
             $this->json(['error' => 'Estoque insuficiente'], 400);
             return;
         }
