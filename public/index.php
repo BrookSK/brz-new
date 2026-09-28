@@ -2,6 +2,38 @@
 // Timezone padrão: São Paulo
 date_default_timezone_set('America/Sao_Paulo');
 
+// ─────────────────────────────────────────────────────────────────────────
+// Bloqueio antecipado de varredura de bots (early return).
+// O site sofre flood de bots buscando /wp-login.php, /.env, shell.php, etc.
+// Cada um desses hits carregava TODO o framework (sessão, DB, autoload, rotas)
+// só para devolver 404 — desperdiçando workers do PHP-FPM e agravando a lentidão
+// para os usuários reais. Aqui devolvemos 404 imediatamente, antes de qualquer
+// custo, para esses padrões que NUNCA são rotas válidas da aplicação.
+$__botPath = strtolower((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH));
+if ($__botPath !== '') {
+    $__botHit = false;
+    // Arquivos .php soltos: a aplicação usa rotas limpas, nunca serve .php por URL
+    // (exceto o endpoint interno /admin/wp-etiqueta e o próprio front controller).
+    if (substr($__botPath, -4) === '.php' && strpos($__botPath, '/admin/wp-etiqueta') !== 0) {
+        $__botHit = true;
+    }
+    // Padrões conhecidos de varredura (WordPress, env, shells).
+    $__botNeedles = [
+        'wp-login', 'wp-admin', 'wp-content', 'wp-includes', 'wp-config', 'wp-json',
+        'xmlrpc', '/.env', '/.git', '/vendor/', 'phpunit', 'eval-stdin',
+        'wlwmanifest', '/.aws', '/.ssh', 'shell', 'wso.', 'alfa', 'filemanager',
+    ];
+    foreach ($__botNeedles as $__n) {
+        if (strpos($__botPath, $__n) !== false) { $__botHit = true; break; }
+    }
+    if ($__botHit) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo 'Not Found';
+        exit;
+    }
+}
+
 // Endpoint direto para etiqueta PDF (contorna OPcache)
 $_uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 if ($_uri === '/admin/wp-etiqueta') {

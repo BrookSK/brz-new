@@ -35,7 +35,6 @@ class BrindeService {
             ");
             $st->execute([$produtoId, $now, $now]);
             $row = $st->fetch(\PDO::FETCH_ASSOC);
-            error_log("[BRINDE] getBrindeAtivo produto={$produtoId} now={$now} encontrado=" . ($row ? 'SIM (id=' . $row['id'] . ')' : 'NAO'));
             return $row ?: null;
         } catch (\Exception $e) {
             error_log('[BRINDE] Erro ao buscar brinde ativo: ' . $e->getMessage());

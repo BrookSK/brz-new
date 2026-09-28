@@ -215,15 +215,12 @@ class Router {
             try {
                 if (!headers_sent()) {
                     header('X-App-Route-Status: no-match');
-                    header('X-App-Route-Method: ' . (string) $method);
-                    header('X-App-Route-Path: ' . (string) $path);
                 }
             } catch (\Throwable $e) {
             }
-            try {
-                error_log('[Router] no route match: ' . (string) $method . ' ' . (string) $path);
-            } catch (\Throwable $e) {
-            }
+            // Não logar 404 de rota: sob flood de bots (varredura de /wp-login.php,
+            // /.env, shell.php, etc.) isso gera milhares de linhas em stderr, poluindo
+            // o log do nginx e pressionando os workers FastCGI. 404 é resposta normal.
             $view404 = __DIR__ . '/../Views/errors/404.php';
             if (is_file($view404)) {
                 require $view404;
