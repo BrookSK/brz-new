@@ -5847,65 +5847,74 @@ HTML;
             
             $produto_id = $pdo->lastInsertId();
 
-            // Processar foto de capa
+            // Commit ANTES dos uploads: o INSERT do produto é rápido; os uploads de
+            // imagem (move_uploaded_file) podem demorar e não devem manter a transação
+            // aberta segurando locks no MySQL — sob servidor carregado isso "trava" o
+            // cadastro. Persistimos o produto já e tratamos as fotos fora da transação.
+            $pdo->commit();
+
+            // Processar foto de capa (fora da transação)
             if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-                $uploadDir = $this->getProdutoUploadsDir();
-                $webDir = '/uploads/produtos/';
-                $this->ensureDir($uploadDir);
+                try {
+                    $uploadDir = $this->getProdutoUploadsDir();
+                    $webDir = '/uploads/produtos/';
+                    $this->ensureDir($uploadDir);
 
-                $name = $_FILES['capa']['name'];
-                $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
-                $fileName = time() . '_' . $fileName;
-                $filePath = $uploadDir . $fileName;
-                $webPath = $webDir . $fileName;
+                    $name = $_FILES['capa']['name'];
+                    $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                    $fileName = time() . '_' . $fileName;
+                    $filePath = $uploadDir . $fileName;
+                    $webPath = $webDir . $fileName;
 
-                if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
-                    if (in_array('foto_principal', $cols, true)) {
-                        $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
-                        $stmtCover->execute([$webPath, $produto_id]);
-                    }
-                }
-            }
-            
-            // Processar galeria de imagens
-            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
-                $uploadDir = $this->getProdutoUploadsDir();
-                $webDir = '/uploads/produtos/';
-                $this->ensureDir($uploadDir);
-                
-                foreach ($_FILES['imagens']['name'] as $key => $name) {
-                    if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
-                        // Limpar nome do arquivo
-                        $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
-                        $fileName = time() . '_' . $fileName;
-                        
-                        $filePath = $uploadDir . $fileName;
-                        $webPath = $webDir . $fileName;
-                        
-                        if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
-                            $stmt = $pdo->prepare("
-                                INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem, created_at, updated_at)
-                                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-                            ");
-                            $stmt->execute([
-                                $produto_id,
-                                $webPath,
-                                $name,
-                                0,
-                                $key
-                            ]);
-                            
-                            error_log('✅ [ADMIN-PRODUTO] Foto salva: ' . $webPath);
-                        } else {
-                            error_log('❌ [ADMIN-PRODUTO] Erro ao salvar foto: ' . $name);
+                    if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                        if (in_array('foto_principal', $cols, true)) {
+                            $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                            $stmtCover->execute([$webPath, $produto_id]);
                         }
                     }
+                } catch (\Throwable $e) {
+                    error_log('[ADMIN-PRODUTO] Erro ao processar capa: ' . $e->getMessage());
                 }
-            } else {
-                error_log('⚠️ [ADMIN-PRODUTO] Nenhuma imagem enviada');
             }
             
-            $pdo->commit();
+            // Processar galeria de imagens (fora da transação)
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+                try {
+                    $uploadDir = $this->getProdutoUploadsDir();
+                    $webDir = '/uploads/produtos/';
+                    $this->ensureDir($uploadDir);
+
+                    foreach ($_FILES['imagens']['name'] as $key => $name) {
+                        if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
+                            // Limpar nome do arquivo
+                            $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                            $fileName = time() . '_' . $fileName;
+
+                            $filePath = $uploadDir . $fileName;
+                            $webPath = $webDir . $fileName;
+
+                            if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
+                                $stmt = $pdo->prepare("
+                                    INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem, created_at, updated_at)
+                                    VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+                                ");
+                                $stmt->execute([
+                                    $produto_id,
+                                    $webPath,
+                                    $name,
+                                    0,
+                                    $key
+                                ]);
+                            } else {
+                                error_log('[ADMIN-PRODUTO] Erro ao mover foto: ' . $name);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[ADMIN-PRODUTO] Erro ao processar galeria: ' . $e->getMessage());
+                }
+            }
+
             if ($perfil === 'representante') {
                 header('Location: /admin/representante/produtos?success=1');
             } else {
