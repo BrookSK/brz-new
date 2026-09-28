@@ -5704,7 +5704,193 @@ HTML;
         exit;
     }
     
+    /**
+     * Cadastro de produto ENXUTO e à prova de travamento.
+     *
+     * Criado para destravar o cadastro de produto do admin, que estava dando
+     * ERR_HTTP2_PING_FAILED (worker preso). Este método é deliberadamente mínimo:
+     *  - fecha o lock de sessão cedo;
+     *  - NÃO faz introspecção de schema pesada nem transação longa;
+     *  - faz UM INSERT com as colunas essenciais;
+     *  - processa UMA imagem (capa) e a galeria APÓS gravar o produto;
+     *  - sempre consome/deixa o corpo do upload ser lido antes de redirecionar.
+     */
     public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        // Perfil lido antes de liberar a sessão.
+        $perfil = $this->getSessionPerfil();
+        $repId = $this->getSessionUserId();
+        $repEmail = $this->getSessionUserEmail();
+
+        // Libera o lock de sessão imediatamente (a partir daqui é só banco/arquivo).
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            // Se herdou transação órfã de outro fluxo no mesmo worker, encerra.
+            if ($pdo->inTransaction()) {
+                try { $pdo->rollBack(); } catch (\Throwable $e) {}
+            }
+
+            // Detecta colunas UMA vez (fora de qualquer transação).
+            $cols = $this->getTableColumns($pdo, 'produtos');
+            $has = function (string $c) use ($cols): bool { return in_array($c, $cols, true); };
+
+            $nome = trim((string) $request->getParam('name'));
+            if ($nome === '') {
+                throw new \Exception('Informe o nome do produto.');
+            }
+
+            $price = $this->parseMoneyToDb($request->getParam('price'));
+            $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
+            $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
+            $weight = $this->parseMoneyToDb($request->getParam('weight'));
+
+            if ($perfil === 'representante' && trim((string) $costPrice) === '') {
+                throw new \Exception('Preço de custo (USD) é obrigatório para representante.');
+            }
+
+            // Loja: resolve slug antes (sem transação).
+            $lojaParam = $request->getParam('loja');
+            $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
+            $lojaSlug = null;
+            if ($lojaId > 0 && $has('loja')) {
+                try {
+                    $stmtL = $pdo->prepare('SELECT slug FROM lojas WHERE id = ? LIMIT 1');
+                    $stmtL->execute([$lojaId]);
+                    $lojaSlug = $stmtL->fetchColumn();
+                } catch (\Throwable $e) {}
+            }
+
+            // Categoria (opcional): valida sem transação.
+            $categoryId = null;
+            $categoryParam = $request->getParam('category_id');
+            if (!empty($categoryParam) && is_numeric($categoryParam)) {
+                try {
+                    $stmtCat = $pdo->prepare('SELECT id FROM categorias WHERE id = ? LIMIT 1');
+                    $stmtCat->execute([(int) $categoryParam]);
+                    if ($stmtCat->fetch()) {
+                        $categoryId = (int) $categoryParam;
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // Monta os dados só com colunas existentes.
+            $data = [];
+            if ($has('name')) $data['name'] = $nome; elseif ($has('nome')) $data['nome'] = $nome;
+            if ($has('sku')) { $sku = trim((string) $request->getParam('sku')); $data['sku'] = $sku !== '' ? $sku : null; }
+            if ($has('loja_id') && $lojaId > 0) $data['loja_id'] = $lojaId;
+            if ($has('loja')) $data['loja'] = ($lojaSlug !== null && $lojaSlug !== false && (string) $lojaSlug !== '') ? (string) $lojaSlug : $lojaParam;
+            if ($has('ncm')) $data['ncm'] = $request->getParam('ncm');
+            if ($has('short_description')) $data['short_description'] = $request->getParam('short_description');
+            if ($has('description')) $data['description'] = $request->getParam('description');
+            if ($has('category_id')) $data['category_id'] = $categoryId; elseif ($has('categoria_id')) $data['categoria_id'] = $categoryId;
+            if ($has('price')) $data['price'] = $price;
+            if ($has('cost_price') && $costPrice !== '') $data['cost_price'] = $costPrice;
+            if ($has('sale_price') && $salePrice !== '') $data['sale_price'] = $salePrice;
+            if ($has('weight')) $data['weight'] = $weight;
+            if ($has('stock')) $data['stock'] = (int) ($request->getParam('stock') ?: 0);
+            if ($has('min_stock')) $data['min_stock'] = (int) ($request->getParam('min_stock') ?: 0);
+            if ($has('status')) $data['status'] = $request->getParam('status') ?: 'published';
+            if ($has('active')) $data['active'] = (int) ($request->getParam('active') ?: 1);
+            if ($has('status') && $has('active') && strtolower(trim((string) ($data['status'] ?? ''))) === 'archived') {
+                $data['active'] = 0;
+            }
+            if ($has('featured')) $data['featured'] = (int) ($request->getParam('featured') ?: 0);
+            if ($has('oculto')) $data['oculto'] = (int) ($request->getParam('oculto') ?: 0);
+            if ($has('outlet')) $data['outlet'] = (int) ($request->getParam('outlet') ?: 0);
+            if ($has('venda_sob_demanda')) $data['venda_sob_demanda'] = (int) ($request->getParam('venda_sob_demanda') ?: 0);
+            if ($has('imposto_local_percent')) {
+                $il = (float) str_replace(',', '.', (string) ($request->getParam('imposto_local_percent') ?: '0'));
+                $data['imposto_local_percent'] = max(0, min(99, $il));
+            }
+            if ($perfil === 'representante') {
+                if ($has('moeda')) $data['moeda'] = 'USD';
+                if ($has('currency')) $data['currency'] = 'USD';
+                if ($has('representante_id')) $data['representante_id'] = $repId > 0 ? $repId : null;
+                if ($has('representante_email')) $data['representante_email'] = $repEmail !== '' ? $repEmail : null;
+            }
+            if ($has('created_at')) $data['created_at'] = date('Y-m-d H:i:s');
+            if ($has('updated_at')) $data['updated_at'] = date('Y-m-d H:i:s');
+
+            // INSERT único (sem transação — é uma escrita atômica só).
+            $columnsSql = implode(', ', array_keys($data));
+            $placeholders = ':' . implode(', :', array_keys($data));
+            $stmt = $pdo->prepare("INSERT INTO produtos ({$columnsSql}) VALUES ({$placeholders})");
+            foreach ($data as $k => $v) {
+                $stmt->bindValue(':' . $k, $v);
+            }
+            $stmt->execute();
+            $produto_id = (int) $pdo->lastInsertId();
+
+            // Fotos DEPOIS de gravar o produto (consome o corpo do upload antes de sair).
+            $this->processarUploadsProduto($pdo, $produto_id, $cols);
+
+            // Redirect de sucesso. Limpa qualquer buffer pendente para não deixar
+            // a resposta "presa" (que pode causar reset/ERR_HTTP2_PING_FAILED em POST).
+            while (ob_get_level() > 0) { @ob_end_clean(); }
+            $destino = ($perfil === 'representante')
+                ? '/admin/representante/produtos?success=1'
+                : '/admin/produtos?success=1';
+            header('Location: ' . $destino, true, 303);
+            header('Content-Length: 0');
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            exit;
+        } catch (\Throwable $e) {
+            error_log('[ADMIN-PRODUTO][salvar] ' . $e->getMessage());
+            echo '<div class="alert alert-danger">' . __('admin.products.error_label', 'Erro:') . ' ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</div>';
+            exit;
+        }
+    }
+
+    /** Processa capa + galeria de um produto. Isolado e tolerante a falhas. */
+    private function processarUploadsProduto(\PDO $pdo, int $produtoId, array $cols): void {
+        if ($produtoId <= 0) return;
+
+        // Capa
+        if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && (($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK)) {
+            try {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $this->ensureDir($uploadDir);
+                $name = (string) $_FILES['capa']['name'];
+                $fileName = time() . '_' . preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                if (move_uploaded_file($_FILES['capa']['tmp_name'], $uploadDir . $fileName)) {
+                    if (in_array('foto_principal', $cols, true)) {
+                        $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?')
+                            ->execute(['/uploads/produtos/' . $fileName, $produtoId]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[ADMIN-PRODUTO][capa] ' . $e->getMessage());
+            }
+        }
+
+        // Galeria
+        if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+            try {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $this->ensureDir($uploadDir);
+                $stmt = $pdo->prepare("INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem, created_at, updated_at) VALUES (?, ?, ?, 0, ?, NOW(), NOW())");
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if (($_FILES['imagens']['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                    $fileName = time() . '_' . $key . '_' . preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $name);
+                    if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $uploadDir . $fileName)) {
+                        $stmt->execute([$produtoId, '/uploads/produtos/' . $fileName, (string) $name, (int) $key]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[ADMIN-PRODUTO][galeria] ' . $e->getMessage());
+            }
+        }
+    }
+
+    public function salvarLegado(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
 
