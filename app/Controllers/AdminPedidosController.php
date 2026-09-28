@@ -2193,6 +2193,14 @@ JS;
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        // Liberar o lock de sessão antes das consultas da listagem: a página é
+        // somente-leitura a partir daqui e não precisa manter a sessão travada,
+        // o que serializaria requests concorrentes do mesmo usuário.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         try {
             $pdo = \Config\Database::getConnection();
             $pagina = $request->getParam('pagina', 1);

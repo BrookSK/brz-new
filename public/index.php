@@ -290,6 +290,16 @@ use App\Core\Router;
 use App\Core\Request;
 
 function _siteLockGetConfig(string $categoria, string $chave, string $default = ''): string {
+    // Cache por request: esta função roda em toda página (bloco de site-lock) e
+    // percorre SHOW TABLES/DESCRIBE em várias tabelas candidatas. Sem cache, o
+    // mesmo trabalho de introspecção se repete a cada chamada. Chaveado por
+    // categoria+chave; o default entra na chave para não mascarar valores vazios.
+    static $__siteLockCache = [];
+    $cacheKey = $categoria . "\0" . $chave;
+    if (array_key_exists($cacheKey, $__siteLockCache)) {
+        return $__siteLockCache[$cacheKey] !== '' ? $__siteLockCache[$cacheKey] : $default;
+    }
+
     try {
         $pdo = \Config\Database::getConnection();
         $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
@@ -313,6 +323,7 @@ function _siteLockGetConfig(string $categoria, string $chave, string $default = 
                         $stmt->execute([$categoria, $chave]);
                         $v = (string) ($stmt->fetchColumn() ?: '');
                         if ($v !== '') {
+                            $__siteLockCache[$cacheKey] = $v;
                             return $v;
                         }
                     }
@@ -333,6 +344,7 @@ function _siteLockGetConfig(string $categoria, string $chave, string $default = 
                     $stmt->execute([$full]);
                     $v = (string) ($stmt->fetchColumn() ?: '');
                     if ($v !== '') {
+                        $__siteLockCache[$cacheKey] = $v;
                         return $v;
                     }
                 }
@@ -343,6 +355,7 @@ function _siteLockGetConfig(string $categoria, string $chave, string $default = 
                     $stmt2 = $pdo->query('SELECT ' . $colDirect . ' AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
                     $v = (string) ($stmt2 ? ($stmt2->fetchColumn() ?: '') : '');
                     if ($v !== '') {
+                        $__siteLockCache[$cacheKey] = $v;
                         return $v;
                     }
                 }
@@ -351,6 +364,8 @@ function _siteLockGetConfig(string $categoria, string $chave, string $default = 
         }
     } catch (\Throwable $e) {
     }
+    // Nada encontrado: cachear vazio para não repetir a introspecção nesta request.
+    $__siteLockCache[$cacheKey] = '';
     return $default;
 }
 

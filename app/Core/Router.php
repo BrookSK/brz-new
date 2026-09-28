@@ -6,6 +6,9 @@ use Config\Database;
 class Router {
     private $routes = [];
 
+    /** Cache das colunas de auditoria_logs (evita DESCRIBE a cada request admin). */
+    private static $auditoriaColsCache = null;
+
     private function maskSensitive(array $data): array {
         $sensitive = ['senha', 'password', 'pass', 'token', 'access_token', 'secret', 'api_key', 'card_number', 'cpf', 'cnpj'];
         $out = [];
@@ -75,13 +78,19 @@ class Router {
 
             $db = Database::getConnection();
 
-            $cols = [];
-            try {
-                $stCols = $db->query('DESCRIBE auditoria_logs');
-                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            } catch (\Exception $e) {
+            // Colunas de auditoria_logs são estáveis: resolver uma vez por processo
+            // em vez de rodar DESCRIBE em toda request /admin.
+            if (self::$auditoriaColsCache === null) {
                 $cols = [];
+                try {
+                    $stCols = $db->query('DESCRIBE auditoria_logs');
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $cols = [];
+                }
+                self::$auditoriaColsCache = $cols;
             }
+            $cols = self::$auditoriaColsCache;
 
             $insertCols = ['usuario_id', 'acao', 'tabela', 'registro_id', 'valores_antigos', 'valores_novos', 'ip', 'user_agent'];
             $place = [':uid', ':acao', 'NULL', 'NULL', 'NULL', ':novos', ':ip', ':ua'];

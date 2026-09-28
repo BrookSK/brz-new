@@ -24,6 +24,13 @@ class AdminPacotesRecebidosController extends Controller {
      * Lista de pacotes recebidos com filtros e paginação
      */
     public function index(Request $request): void {
+        // Auth já validada no construtor. Liberar o lock de sessão antes das
+        // consultas de listagem: evita que requests concorrentes do mesmo
+        // usuário (várias abas) fiquem presos em session_start().
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $filtros = [
             'suite' => $request->getParams()['suite'] ?? '',
             'status' => $request->getParams()['status'] ?? '',
