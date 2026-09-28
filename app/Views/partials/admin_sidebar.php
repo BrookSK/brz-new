@@ -3,7 +3,11 @@
 function renderAdminSidebar($activePage = '') {
     $perfil = '';
     try {
-        if (session_status() === PHP_SESSION_NONE) {
+        // Só (re)abrir a sessão se ainda for possível enviar o cookie. Se a sessão
+        // já foi fechada com session_write_close() e o HTML começou a sair,
+        // $_SESSION continua legível — basta não chamar session_start() de novo
+        // (evita "headers already sent").
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             session_start();
         }
         $perfil = (string) ($_SESSION['usuario_perfil'] ?? '');
@@ -302,7 +306,7 @@ function renderAdminSidebar($activePage = '') {
     $unreadTickets = 0;
     $pendentesConferencia = 0;
     try {
-        if (session_status() === PHP_SESSION_NONE) {
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             session_start();
         }
         $adminUid = (int) ($_SESSION['usuario_id'] ?? 0);
