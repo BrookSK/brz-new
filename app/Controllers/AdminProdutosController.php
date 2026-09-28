@@ -5724,8 +5724,12 @@ HTML;
             // Reusar a conexão singleton em vez de abrir uma nova conexão MySQL
             // a cada request (o que esgota max_connections sob carga).
             $pdo = \Config\Database::getConnection();
-            $pdo->beginTransaction();
 
+            // IMPORTANTE: toda introspecção de schema (SHOW TABLES/DESCRIBE) e as
+            // leituras de apoio são feitas ANTES de abrir a transação. Comandos DDL
+            // como SHOW/DESCRIBE não podem rodar no meio de uma transação de negócio
+            // porque causam COMMIT IMPLÍCITO no MySQL — o que quebrava o pareamento
+            // begin/commit e deixava o INSERT preso em lock (travava o cadastro).
             $cols = $this->getTableColumns($pdo, 'produtos');
 
             $price = $this->parseMoneyToDb($request->getParam('price'));
@@ -5735,8 +5739,8 @@ HTML;
             if ($perfil === 'representante' && trim((string) $costPrice) === '') {
                 throw new \Exception('Preço de custo (USD) é obrigatório para representante.');
             }
-            
-            // Validar categoria se fornecida
+
+            // Validar categoria se fornecida (antes da transação)
             $categoryParam = $request->getParam('category_id');
             $categoryId = null;
             if (!empty($categoryParam)) {
@@ -5748,6 +5752,23 @@ HTML;
                 $categoryId = $categoryParam;
             }
 
+            // Resolver slug da loja (SHOW TABLES/SELECT) antes da transação
+            $lojaParam = $request->getParam('loja');
+            $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
+            $lojaSlugResolved = null;
+            if ($lojaId > 0 && in_array('loja', $cols, true)) {
+                try {
+                    $stmtT = $pdo->query("SHOW TABLES LIKE 'lojas'");
+                    if ($stmtT && $stmtT->fetchColumn()) {
+                        $stmtL = $pdo->prepare('SELECT slug FROM lojas WHERE id = :id LIMIT 1');
+                        $stmtL->execute([':id' => $lojaId]);
+                        $lojaSlugResolved = $stmtL->fetchColumn();
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            // A partir daqui, apenas montagem de dados em memória + INSERT.
             $data = [];
             if (in_array('name', $cols, true)) {
                 $data['name'] = $request->getParam('name');
@@ -5759,28 +5780,12 @@ HTML;
                 $skuVal = trim((string) $request->getParam('sku'));
                 $data['sku'] = ($skuVal !== '') ? $skuVal : null;
             }
-            $lojaParam = $request->getParam('loja');
-            $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
             if (in_array('loja_id', $cols, true) && $lojaId > 0) {
                 $data['loja_id'] = $lojaId;
             }
             if (in_array('loja', $cols, true)) {
-                // manter compatibilidade: salvar slug também quando possível
-                $lojaSlug = null;
-                if ($lojaId > 0) {
-                    try {
-                        $stmtT = $pdo->query("SHOW TABLES LIKE 'lojas'");
-                        if ($stmtT && $stmtT->fetchColumn()) {
-                            $stmtL = $pdo->prepare('SELECT slug FROM lojas WHERE id = :id LIMIT 1');
-                            $stmtL->execute([':id' => $lojaId]);
-                            $lojaSlug = $stmtL->fetchColumn();
-                        }
-                    } catch (\Exception $e) {
-                    }
-                }
-
-                if ($lojaSlug !== null && $lojaSlug !== false && (string) $lojaSlug !== '') {
-                    $data['loja'] = (string) $lojaSlug;
+                if ($lojaSlugResolved !== null && $lojaSlugResolved !== false && (string) $lojaSlugResolved !== '') {
+                    $data['loja'] = (string) $lojaSlugResolved;
                 } else {
                     $data['loja'] = $lojaParam;
                 }
@@ -5839,6 +5844,18 @@ HTML;
 
             $columnsSql = implode(', ', array_keys($data));
             $placeholders = ':' . implode(', :', array_keys($data));
+
+            // Blindagem: se a conexão singleton chegou aqui com uma transação órfã
+            // (aberta e não finalizada por outro fluxo no mesmo worker), encerra antes
+            // de iniciar a nossa — senão beginTransaction() falharia ou herdaríamos locks.
+            if ($pdo->inTransaction()) {
+                try { $pdo->rollBack(); } catch (\Throwable $e) {}
+            }
+
+            // Transação curta: abre imediatamente antes do INSERT e fecha logo depois.
+            // Nenhum SHOW/DESCRIBE/DDL entre begin e commit (evita commit implícito e lock preso).
+            $pdo->beginTransaction();
+
             $stmt = $pdo->prepare("INSERT INTO produtos ({$columnsSql}) VALUES ({$placeholders})");
             foreach ($data as $k => $v) {
                 $stmt->bindValue(':' . $k, $v);
