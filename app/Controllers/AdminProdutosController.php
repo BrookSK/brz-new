@@ -5716,6 +5716,10 @@ HTML;
      *  - sempre consome/deixa o corpo do upload ser lido antes de redirecionar.
      */
     public function salvar(Request $request) {
+        // Marca de versão: se esta linha aparecer no error_log, o código NOVO está ativo.
+        // Se aparecer "Nenhuma imagem enviada" (texto antigo), o servidor está com OPcache/deploy velho.
+        error_log('[ADMIN-PRODUTO][salvar] v2-enxuto INICIO ' . date('H:i:s'));
+
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
 
@@ -5730,14 +5734,23 @@ HTML;
         }
 
         try {
+            error_log('[ADMIN-PRODUTO][salvar] getConnection');
             $pdo = \Config\Database::getConnection();
             // Se herdou transação órfã de outro fluxo no mesmo worker, encerra.
             if ($pdo->inTransaction()) {
                 try { $pdo->rollBack(); } catch (\Throwable $e) {}
             }
 
+            // Timeout curto de espera por lock: se a tabela produtos estiver presa
+            // por uma transação órfã (ex.: sequela da invasão), falhamos rápido com
+            // erro claro em vez de o worker travar até o cliente cair (ERR_HTTP2_PING_FAILED).
+            try { $pdo->exec('SET SESSION innodb_lock_wait_timeout = 5'); } catch (\Throwable $e) {}
+            try { $pdo->exec('SET SESSION lock_wait_timeout = 5'); } catch (\Throwable $e) {}
+
+            error_log('[ADMIN-PRODUTO][salvar] antes SHOW COLUMNS');
             // Detecta colunas UMA vez (fora de qualquer transação).
             $cols = $this->getTableColumns($pdo, 'produtos');
+            error_log('[ADMIN-PRODUTO][salvar] depois SHOW COLUMNS: ' . count($cols) . ' cols');
             $has = function (string $c) use ($cols): bool { return in_array($c, $cols, true); };
 
             $nome = trim((string) $request->getParam('name'));
@@ -5824,8 +5837,10 @@ HTML;
             foreach ($data as $k => $v) {
                 $stmt->bindValue(':' . $k, $v);
             }
+            error_log('[ADMIN-PRODUTO][salvar] antes INSERT');
             $stmt->execute();
             $produto_id = (int) $pdo->lastInsertId();
+            error_log('[ADMIN-PRODUTO][salvar] depois INSERT id=' . $produto_id);
 
             // Fotos DEPOIS de gravar o produto (consome o corpo do upload antes de sair).
             $this->processarUploadsProduto($pdo, $produto_id, $cols);
