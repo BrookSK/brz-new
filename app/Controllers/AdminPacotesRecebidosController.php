@@ -190,7 +190,7 @@ class AdminPacotesRecebidosController extends Controller {
     }
 
     /**
-     * Sincroniza os dados editáveis do pacote (nome, peso, foto) nos itens de
+     * Sincroniza os dados editáveis do pacote (nome, peso, quantidade, foto) nos itens de
      * carrinho que já referenciam este pacote, para que a edição no admin
      * reflita imediatamente no carrinho do cliente.
      *
@@ -225,6 +225,10 @@ class AdminPacotesRecebidosController extends Controller {
             if (in_array('peso_kg', $cols, true)) {
                 $sets[] = 'peso_kg = ?';
                 $vals[] = (float) ($data['peso_kg'] ?? 0);
+            }
+            if (in_array('quantidade', $cols, true)) {
+                $sets[] = 'quantidade = ?';
+                $vals[] = max(1, (int) ($data['quantidade'] ?? 1));
             }
             if (in_array('foto_url', $cols, true)) {
                 $sets[] = 'foto_url = ?';
