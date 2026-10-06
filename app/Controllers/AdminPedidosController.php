@@ -97,6 +97,16 @@ class AdminPedidosController extends Controller {
             $set = [];
             $params = [];
 
+            // Params realmente enviados no request. Usado para distinguir "campo
+            // ausente no formulário" de "campo enviado vazio". Sem isso, um form
+            // parcial (ex.: o pop-up de edição que NÃO possui inputs de destinatário)
+            // gravava '' por cima de destinatario_nome/documento/telefone a cada
+            // salvamento, apagando o destinatário de pedidos (inclusive os de split).
+            $reqParams = $request->getParams();
+            $hasParam = function(string $key) use ($reqParams): bool {
+                return is_array($reqParams) && array_key_exists($key, $reqParams);
+            };
+
             $addSet = function(string $col, $val) use (&$set, &$params): void {
                 if ($col === '') return;
                 $set[] = $col . ' = ?';
@@ -140,12 +150,21 @@ class AdminPedidosController extends Controller {
             $addSetDual('estado_entrega', 'estado', trim((string) $request->getParam('estado')));
 
             // Destinatário (entrega para outra pessoa)
+            // Só gravar quando o campo foi REALMENTE enviado no request. Formulários
+            // que não possuem esses inputs (ex.: pop-up de edição de cliente) não devem
+            // apagar o destinatário já cadastrado no pedido.
             $colDestNome = $pickCol(['destinatario_nome']);
             $colDestDoc = $pickCol(['destinatario_documento']);
             $colDestTel = $pickCol(['destinatario_telefone']);
-            $addSet($colDestNome, trim((string) $request->getParam('destinatario_nome')));
-            $addSet($colDestDoc, trim((string) $request->getParam('destinatario_documento')));
-            $addSet($colDestTel, trim((string) $request->getParam('destinatario_telefone')));
+            if ($hasParam('destinatario_nome')) {
+                $addSet($colDestNome, trim((string) $request->getParam('destinatario_nome')));
+            }
+            if ($hasParam('destinatario_documento')) {
+                $addSet($colDestDoc, trim((string) $request->getParam('destinatario_documento')));
+            }
+            if ($hasParam('destinatario_telefone')) {
+                $addSet($colDestTel, trim((string) $request->getParam('destinatario_telefone')));
+            }
 
             $set = array_values(array_filter($set, static function($x){ return is_string($x) && trim($x) !== ''; }));
 

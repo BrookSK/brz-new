@@ -184,11 +184,24 @@ class AdminEtiquetasWpController extends Controller
 
     private function buildRecipientFromPedido(array $pedido): array
     {
-        $destNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
+        // Destinatário específico do pedido tem PRIORIDADE sobre os dados do cliente/titular.
+        // Em pedidos separados (split) ou com entrega para outra pessoa, o nome/documento de
+        // quem recebe fica em destinatario_nome/destinatario_documento. Esses campos aparecem
+        // na tela do pedido, então a etiqueta DEVE usá-los quando preenchidos; caso contrário a
+        // etiqueta cairia no cliente_nome/nome e, no limite, no titular da conta (via fallback
+        // do getComDetalhes), gerando etiqueta com o destinatário errado.
+        $destNome = trim((string) ($pedido['destinatario_nome'] ?? ''));
+        if ($destNome === '') {
+            $destNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
+        }
+
         $destEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
         $destTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
 
-        $destDoc = $this->pickFirstNonEmpty($pedido, ['cliente_cpf_cnpj', 'cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
+        $destDoc = trim((string) ($pedido['destinatario_documento'] ?? ''));
+        if ($destDoc === '') {
+            $destDoc = $this->pickFirstNonEmpty($pedido, ['cliente_cpf_cnpj', 'cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
+        }
         if ($destDoc === '' && isset($pedido['cliente']) && is_array($pedido['cliente'])) {
             $destDoc = $this->pickFirstNonEmpty((array) $pedido['cliente'], ['cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
         }
