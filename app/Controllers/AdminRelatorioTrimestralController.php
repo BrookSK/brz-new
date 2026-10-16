@@ -11,9 +11,13 @@ use App\Services\AuthService;
  * trimestres (Jan-Mar, Abr-Jun, Jul-Set, Out-Dez), com total por mês, total por
  * trimestre e total geral consolidado.
  *
+ * Opções:
+ *  - consolidar=brl : converte os valores em USD para BRL (pela taxa atual) e soma
+ *    tudo numa moeda só, para uma visão consolidada.
+ *  - format=pdf     : gera o relatório em PDF (via Dompdf; fallback para HTML imprimível).
+ *
  * Regra de negócio: itens de REDIRECIONAMENTO (tipo_item = 'pacote_redirecionamento'
- * ou produto_id >= 999990) NÃO entram na soma — eles não representam venda de produto
- * (o valor cobrado vem de frete/declaração, não do subtotal do item).
+ * ou produto_id >= 999990) NÃO entram na soma — eles não representam venda de produto.
  */
 class AdminRelatorioTrimestralController extends Controller {
     private $db;
@@ -35,21 +39,26 @@ class AdminRelatorioTrimestralController extends Controller {
         // Moeda opcional (filtro). Vazio = todas.
         $moedaFilter = strtoupper(trim((string) $request->getParam('moeda', '')));
 
+        // Consolidar em BRL (converter USD→BRL e somar tudo numa moeda só)
+        $consolidarBrl = ((string) $request->getParam('consolidar', '')) === 'brl';
+
+        // Formato de saída
+        $format = strtolower(trim((string) $request->getParam('format', 'html')));
+
         // Resolver tabela de itens (ambiente pode ter pedido_itens ou pedido_items)
         $itensTable = $this->resolveItensTable();
 
-        // Resolver nome da coluna de subtotal do item
+        // Resolver nome das colunas relevantes
         $colsItens = $this->describe($itensTable);
         $colSubtotalItem = $this->pick($colsItens, ['subtotal']);
         $colTipoItem = $this->pick($colsItens, ['tipo_item']);
         $colProdutoId = $this->pick($colsItens, ['produto_id']);
 
-        // Colunas de pedidos
         $colsPedidos = $this->describe('pedidos');
         $colMoeda = $this->pick($colsPedidos, ['moeda', 'currency']);
         $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
-        // Definição dos trimestres solicitados
+        // Definição dos trimestres
         $trimestres = [
             ['nome' => __('admin.report_quarterly.q1', '1º Trimestre (Jan - Mar)'), 'meses' => [1, 2, 3]],
             ['nome' => __('admin.report_quarterly.q2', '2º Trimestre (Abr - Jun)'), 'meses' => [4, 5, 6]],
@@ -72,13 +81,20 @@ class AdminRelatorioTrimestralController extends Controller {
             12 => __('admin.months.dec', 'Dezembro'),
         ];
 
-        // Buscar o total de produtos vendidos por mês/moeda do ano inteiro de uma vez
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
+
+        // Buscar o total de produtos vendidos por mês/moeda do ano inteiro
         $porMesMoeda = [];
         if ($colSubtotalItem !== '') {
             $porMesMoeda = $this->totaisPorMesMoeda(
                 $itensTable, $colSubtotalItem, $colTipoItem, $colProdutoId,
                 $colMoeda, $temDeletedAt, $ano, $moedaFilter
             );
+        }
+
+        // Se consolidar em BRL: converter cada moeda para BRL e colapsar em uma só chave 'BRL'.
+        if ($consolidarBrl) {
+            $porMesMoeda = $this->consolidarEmBrl($porMesMoeda, $taxaUsdBrl);
         }
 
         // Montar estrutura consolidada por trimestre
@@ -106,18 +122,21 @@ class AdminRelatorioTrimestralController extends Controller {
             ];
         }
 
-        // Taxa de conversão para consolidar USD→BRL na view (opcional)
-        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
-
         $data = [
             'ano' => $ano,
             'moedaFilter' => $moedaFilter,
+            'consolidarBrl' => $consolidarBrl,
             'relatorio' => $relatorio,
             'totalGeralPorMoeda' => $totalGeralPorMoeda,
             'taxaUsdBrl' => $taxaUsdBrl,
             'itensTable' => $itensTable,
             'subtotalDisponivel' => $colSubtotalItem !== '',
         ];
+
+        if ($format === 'pdf') {
+            $this->renderPdf($data);
+            return;
+        }
 
         extract($data);
 
@@ -128,6 +147,23 @@ class AdminRelatorioTrimestralController extends Controller {
 
         $title = __('admin.report_quarterly.title', 'Relatório Trimestral de Vendas');
         include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
+     * Converte um mapa [mes => [moeda => valor]] para [mes => ['BRL' => total]],
+     * aplicando a taxa USD→BRL. Valores já em BRL são mantidos; demais moedas
+     * (tratadas como USD) são convertidas.
+     */
+    private function consolidarEmBrl(array $porMesMoeda, float $taxa): array {
+        $out = [];
+        foreach ($porMesMoeda as $mes => $moedas) {
+            $totalBrl = 0.0;
+            foreach ($moedas as $moeda => $valor) {
+                $totalBrl += (strtoupper((string) $moeda) === 'BRL') ? (float) $valor : ((float) $valor * $taxa);
+            }
+            $out[$mes] = ['BRL' => $totalBrl];
+        }
+        return $out;
     }
 
     /**
@@ -153,15 +189,11 @@ class AdminRelatorioTrimestralController extends Controller {
         }
 
         // Excluir itens de redirecionamento da soma de produtos vendidos
-        $condRedirec = [];
         if ($colTipoItem !== '') {
-            $condRedirec[] = "COALESCE(pi.{$colTipoItem}, 'produto') <> 'pacote_redirecionamento'";
+            $where[] = "COALESCE(pi.{$colTipoItem}, 'produto') <> 'pacote_redirecionamento'";
         }
         if ($colProdutoId !== '') {
-            $condRedirec[] = "(pi.{$colProdutoId} IS NULL OR pi.{$colProdutoId} < 999990)";
-        }
-        foreach ($condRedirec as $c) {
-            $where[] = $c;
+            $where[] = "(pi.{$colProdutoId} IS NULL OR pi.{$colProdutoId} < 999990)";
         }
 
         if ($moedaFilter !== '' && $colMoeda !== '') {
@@ -195,6 +227,60 @@ class AdminRelatorioTrimestralController extends Controller {
         }
 
         return $out;
+    }
+
+    /**
+     * Renderiza o relatório em PDF. Usa Dompdf quando disponível; caso contrário,
+     * devolve o HTML com auto-impressão (o usuário salva como PDF pelo navegador).
+     */
+    private function renderPdf(array $data): void {
+        extract($data);
+        ob_start();
+        require __DIR__ . '/../Views/admin/relatorio-trimestral/pdf.php';
+        $html = (string) ob_get_clean();
+
+        $filename = 'relatorio-trimestral-' . $ano . ($consolidarBrl ? '-BRL' : '');
+
+        if ($this->bootDompdf()) {
+            try {
+                $dompdf = new \Dompdf\Dompdf([
+                    'isRemoteEnabled' => true,
+                    'isHtml5ParserEnabled' => true,
+                ]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $filename . '.pdf"');
+                echo $dompdf->output();
+                return;
+            } catch (\Throwable $e) {
+                error_log('[RelatorioTrimestral] Falha ao gerar PDF via Dompdf: ' . $e->getMessage());
+                // cai no fallback abaixo
+            }
+        }
+
+        // Fallback: HTML imprimível (o usuário usa "Salvar como PDF" do navegador)
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $html;
+        echo '<script>window.print();</script>';
+    }
+
+    private function bootDompdf(): bool {
+        try {
+            if (class_exists('Dompdf\\Dompdf')) {
+                return true;
+            }
+            $autoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
+            if (!file_exists($autoload)) {
+                return false;
+            }
+            require_once $autoload;
+            return class_exists('Dompdf\\Dompdf');
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private function resolveItensTable(): string {
