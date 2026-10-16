@@ -5,11 +5,14 @@
  */
 $ano = (int) ($ano ?? date('Y'));
 $moedaFilter = strtoupper(trim((string) ($moedaFilter ?? '')));
-$consolidarBrl = (bool) ($consolidarBrl ?? false);
+$consolidar = strtolower(trim((string) ($consolidar ?? ''))); // '', 'brl' ou 'usd'
 $relatorio = $relatorio ?? [];
 $totalGeralPorMoeda = $totalGeralPorMoeda ?? [];
 $taxaUsdBrl = (float) ($taxaUsdBrl ?? 5.5);
 $subtotalDisponivel = (bool) ($subtotalDisponivel ?? true);
+
+// Moeda alvo exibida quando há consolidação
+$moedaConsolidada = $consolidar === 'usd' ? 'USD' : ($consolidar === 'brl' ? 'BRL' : '');
 
 if (!function_exists('fmtTri')) {
     function fmtTri($v) { return number_format((float) ($v ?? 0), 2, ',', '.'); }
@@ -47,7 +50,7 @@ $anoAtual = (int) date('Y');
 // Monta a URL de PDF preservando os filtros atuais
 $pdfParams = ['ano' => $ano, 'format' => 'pdf'];
 if ($moedaFilter !== '') $pdfParams['moeda'] = $moedaFilter;
-if ($consolidarBrl) $pdfParams['consolidar'] = 'brl';
+if ($consolidar !== '') $pdfParams['consolidar'] = $consolidar;
 $pdfUrl = '/admin/relatorio-trimestral?' . http_build_query($pdfParams);
 ?>
 
@@ -92,22 +95,21 @@ $pdfUrl = '/admin/relatorio-trimestral?' . http_build_query($pdfParams);
                     </div>
                     <div class="flex-shrink-0">
                         <label class="form-label small text-muted mb-1"><i class="fas fa-coins me-1"></i><?= __('admin.report_quarterly.currency_upper', 'MOEDA') ?></label>
-                        <select name="moeda" class="form-select form-select-sm" style="min-width:120px;" <?= $consolidarBrl ? 'disabled' : '' ?>>
+                        <select name="moeda" class="form-select form-select-sm" style="min-width:120px;" <?= $consolidar !== '' ? 'disabled' : '' ?>>
                             <option value=""><?= __('admin.report_quarterly.all_f', 'Todas') ?></option>
                             <option value="BRL" <?= $moedaFilter === 'BRL' ? 'selected' : '' ?>>BRL — Real</option>
                             <option value="USD" <?= $moedaFilter === 'USD' ? 'selected' : '' ?>>USD — Dólar</option>
                         </select>
                     </div>
 
-                    <!-- Toggle: converter dólar em real e consolidar -->
+                    <!-- Conversão: consolidar tudo numa moeda só -->
                     <div class="flex-shrink-0">
                         <label class="form-label small text-muted mb-1"><i class="fas fa-right-left me-1"></i><?= __('admin.report_quarterly.consolidate_label', 'CONVERSÃO') ?></label>
-                        <div class="form-check form-switch mt-1">
-                            <input class="form-check-input" type="checkbox" role="switch" id="consolidarBrl" name="consolidar" value="brl" <?= $consolidarBrl ? 'checked' : '' ?>>
-                            <label class="form-check-label small" for="consolidarBrl">
-                                <?= __('admin.report_quarterly.consolidate_brl', 'Converter dólar em real (consolidar em BRL)') ?>
-                            </label>
-                        </div>
+                        <select name="consolidar" id="consolidarSelect" class="form-select form-select-sm" style="min-width:200px;">
+                            <option value="" <?= $consolidar === '' ? 'selected' : '' ?>><?= __('admin.report_quarterly.consolidate_none', 'Sem conversão (cada moeda)') ?></option>
+                            <option value="brl" <?= $consolidar === 'brl' ? 'selected' : '' ?>><?= __('admin.report_quarterly.consolidate_brl_opt', 'Converter tudo em Real (BRL)') ?></option>
+                            <option value="usd" <?= $consolidar === 'usd' ? 'selected' : '' ?>><?= __('admin.report_quarterly.consolidate_usd_opt', 'Converter tudo em Dólar (USD)') ?></option>
+                        </select>
                     </div>
 
                     <div class="flex-shrink-0">
@@ -117,10 +119,14 @@ $pdfUrl = '/admin/relatorio-trimestral?' . http_build_query($pdfParams);
                         <a href="/admin/relatorio-trimestral" class="text-muted small text-decoration-none"><i class="fas fa-times me-1"></i><?= __('admin.report_quarterly.clear', 'Limpar') ?></a>
                     </div>
                 </div>
-                <?php if ($consolidarBrl): ?>
+                <?php if ($consolidar !== ''): ?>
                     <div class="form-text mt-2">
                         <i class="fas fa-info-circle me-1"></i>
-                        <?= __('admin.report_quarterly.consolidate_note', 'Valores em dólar convertidos para real pela taxa atual') ?>
+                        <?php if ($consolidar === 'brl'): ?>
+                            <?= __('admin.report_quarterly.consolidate_note_brl', 'Valores em dólar convertidos para real pela taxa do site') ?>
+                        <?php else: ?>
+                            <?= __('admin.report_quarterly.consolidate_note_usd', 'Valores em real convertidos para dólar pela taxa do site') ?>
+                        <?php endif; ?>
                         (USD → BRL <?= fmtTri($taxaUsdBrl) ?>).
                     </div>
                 <?php endif; ?>
@@ -134,9 +140,9 @@ $pdfUrl = '/admin/relatorio-trimestral?' . http_build_query($pdfParams);
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="text-muted small text-uppercase"><?= __('admin.report_quarterly.grand_total', 'Total Consolidado') ?> — <?= $ano ?></div>
-                    <div class="fs-4 fw-bold"><?= fmtMoedasTri($totalGeralPorMoeda, $consolidarBrl ? 'BRL' : $moedaFilter) ?></div>
+                    <div class="fs-4 fw-bold"><?= fmtMoedasTri($totalGeralPorMoeda, $consolidar !== '' ? $moedaConsolidada : $moedaFilter) ?></div>
                 </div>
-                <?php if (!$consolidarBrl): ?>
+                <?php if ($consolidar === ''): ?>
                 <div class="text-end">
                     <div class="text-muted small text-uppercase"><?= __('admin.report_quarterly.consolidated_brl', 'Equivalente em BRL') ?></div>
                     <div class="fs-4 fw-bold text-success">R$ <?= fmtTri(consolidadoBrlTri($totalGeralPorMoeda, $taxaUsdBrl)) ?></div>
@@ -166,16 +172,16 @@ $pdfUrl = '/admin/relatorio-trimestral?' . http_build_query($pdfParams);
                                 <?php foreach ($tri['meses'] as $mes): ?>
                                     <tr>
                                         <td class="ps-3"><?= htmlspecialchars($mes['nome']) ?></td>
-                                        <td class="text-end pe-3"><?= fmtMoedasTri($mes['por_moeda'], $consolidarBrl ? 'BRL' : $moedaFilter) ?></td>
+                                        <td class="text-end pe-3"><?= fmtMoedasTri($mes['por_moeda'], $consolidar !== '' ? $moedaConsolidada : $moedaFilter) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                             <tfoot>
                                 <tr class="table-light fw-bold">
                                     <td class="ps-3"><?= __('admin.report_quarterly.quarter_total', 'Total do Trimestre') ?></td>
-                                    <td class="text-end pe-3"><?= fmtMoedasTri($tri['total_por_moeda'], $consolidarBrl ? 'BRL' : $moedaFilter) ?></td>
+                                    <td class="text-end pe-3"><?= fmtMoedasTri($tri['total_por_moeda'], $consolidar !== '' ? $moedaConsolidada : $moedaFilter) ?></td>
                                 </tr>
-                                <?php if (!$consolidarBrl): ?>
+                                <?php if ($consolidar === ''): ?>
                                 <tr>
                                     <td class="ps-3 text-muted small"><?= __('admin.report_quarterly.quarter_total_brl', 'Equivalente em BRL') ?></td>
                                     <td class="text-end pe-3 text-success fw-semibold">R$ <?= fmtTri(consolidadoBrlTri($tri['total_por_moeda'], $taxaUsdBrl)) ?></td>
@@ -196,15 +202,17 @@ $pdfUrl = '/admin/relatorio-trimestral?' . http_build_query($pdfParams);
 </div>
 
 <script>
-// Ao marcar "converter em real", a seleção de moeda deixa de fazer sentido
-// (consolidamos tudo em BRL). Desabilitamos o seletor para evitar confusão.
+// Ao escolher uma consolidação (tudo em BRL ou tudo em USD), o filtro de moeda
+// deixa de fazer sentido — desabilitamos para evitar confusão.
 document.addEventListener('DOMContentLoaded', function () {
-    var cb = document.getElementById('consolidarBrl');
-    if (!cb) return;
-    var form = cb.closest('form');
-    var sel = form ? form.querySelector('select[name="moeda"]') : null;
-    cb.addEventListener('change', function () {
-        if (sel) sel.disabled = cb.checked;
-    });
+    var sel = document.getElementById('consolidarSelect');
+    if (!sel) return;
+    var form = sel.closest('form');
+    var moedaSel = form ? form.querySelector('select[name="moeda"]') : null;
+    function sync() {
+        if (moedaSel) moedaSel.disabled = (sel.value !== '');
+    }
+    sel.addEventListener('change', sync);
+    sync();
 });
 </script>

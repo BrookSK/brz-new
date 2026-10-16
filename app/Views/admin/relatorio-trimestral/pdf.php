@@ -5,7 +5,7 @@
  */
 $ano = (int) ($ano ?? date('Y'));
 $moedaFilter = strtoupper(trim((string) ($moedaFilter ?? '')));
-$consolidarBrl = (bool) ($consolidarBrl ?? false);
+$consolidar = strtolower(trim((string) ($consolidar ?? ''))); // '', 'brl' ou 'usd'
 $relatorio = $relatorio ?? [];
 $totalGeralPorMoeda = $totalGeralPorMoeda ?? [];
 $taxaUsdBrl = (float) ($taxaUsdBrl ?? 5.5);
@@ -37,7 +37,8 @@ if (!function_exists('consolidadoBrlTri')) {
     }
 }
 
-$moedaExibicao = $consolidarBrl ? 'BRL' : $moedaFilter;
+$moedaConsolidada = $consolidar === 'usd' ? 'USD' : ($consolidar === 'brl' ? 'BRL' : '');
+$moedaExibicao = $consolidar !== '' ? $moedaConsolidada : $moedaFilter;
 $tituloRelatorio = __('admin.report_quarterly.pdf_title', 'Relatório Trimestral de Vendas');
 ?>
 <!DOCTYPE html>
@@ -79,7 +80,7 @@ $tituloRelatorio = __('admin.report_quarterly.pdf_title', 'Relatório Trimestral
     <div class="meta">
         <span><strong><?= __('admin.report_quarterly.year', 'Ano') ?>:</strong> <?= $ano ?></span>
         <span><strong><?= __('admin.report_quarterly.currency_upper', 'Moeda') ?>:</strong>
-            <?= $consolidarBrl ? 'BRL (consolidado)' : ($moedaFilter !== '' ? htmlspecialchars($moedaFilter) : __('admin.report_quarterly.all_f', 'Todas')) ?>
+            <?= $consolidar !== '' ? ($moedaConsolidada . ' (' . __('admin.report_quarterly.consolidated_word', 'consolidado') . ')') : ($moedaFilter !== '' ? htmlspecialchars($moedaFilter) : __('admin.report_quarterly.all_f', 'Todas')) ?>
         </span>
         <span><strong>USD → BRL:</strong> <?= fmtTri($taxaUsdBrl) ?></span>
         <span><strong><?= __('admin.report_quarterly.pdf_generated_at', 'Gerado em') ?>:</strong> <?= date('d/m/Y H:i') ?></span>
@@ -88,7 +89,7 @@ $tituloRelatorio = __('admin.report_quarterly.pdf_title', 'Relatório Trimestral
     <div class="grand">
         <div class="lbl"><?= __('admin.report_quarterly.grand_total', 'Total Consolidado') ?></div>
         <div class="val"><?= fmtMoedasTri($totalGeralPorMoeda, $moedaExibicao) ?></div>
-        <?php if (!$consolidarBrl): ?>
+        <?php if ($consolidar === ''): ?>
             <div class="lbl" style="margin-top:6px;"><?= __('admin.report_quarterly.consolidated_brl', 'Equivalente em BRL') ?></div>
             <div class="val brl">R$ <?= fmtTri(consolidadoBrlTri($totalGeralPorMoeda, $taxaUsdBrl)) ?></div>
         <?php endif; ?>
@@ -116,7 +117,7 @@ $tituloRelatorio = __('admin.report_quarterly.pdf_title', 'Relatório Trimestral
                     <td><?= __('admin.report_quarterly.quarter_total', 'Total do Trimestre') ?></td>
                     <td class="num"><?= fmtMoedasTri($tri['total_por_moeda'], $moedaExibicao) ?></td>
                 </tr>
-                <?php if (!$consolidarBrl): ?>
+                <?php if ($consolidar === ''): ?>
                     <tr class="brl-row">
                         <td><?= __('admin.report_quarterly.quarter_total_brl', 'Equivalente em BRL') ?></td>
                         <td class="num">R$ <?= fmtTri(consolidadoBrlTri($tri['total_por_moeda'], $taxaUsdBrl)) ?></td>

@@ -39,8 +39,12 @@ class AdminRelatorioTrimestralController extends Controller {
         // Moeda opcional (filtro). Vazio = todas.
         $moedaFilter = strtoupper(trim((string) $request->getParam('moeda', '')));
 
-        // Consolidar em BRL (converter USD→BRL e somar tudo numa moeda só)
-        $consolidarBrl = ((string) $request->getParam('consolidar', '')) === 'brl';
+        // Consolidação de moeda: '' (nenhuma), 'brl' (tudo em real) ou 'usd' (tudo em dólar).
+        // Usa a mesma taxa USD↔BRL do site (configuracoes_sistema), via ExchangeRate.
+        $consolidar = strtolower(trim((string) $request->getParam('consolidar', '')));
+        if (!in_array($consolidar, ['brl', 'usd'], true)) {
+            $consolidar = '';
+        }
 
         // Formato de saída
         $format = strtolower(trim((string) $request->getParam('format', 'html')));
@@ -92,9 +96,9 @@ class AdminRelatorioTrimestralController extends Controller {
             );
         }
 
-        // Se consolidar em BRL: converter cada moeda para BRL e colapsar em uma só chave 'BRL'.
-        if ($consolidarBrl) {
-            $porMesMoeda = $this->consolidarEmBrl($porMesMoeda, $taxaUsdBrl);
+        // Se consolidar: converter todas as moedas para a moeda alvo e colapsar numa chave só.
+        if ($consolidar !== '') {
+            $porMesMoeda = $this->consolidarMoeda($porMesMoeda, strtoupper($consolidar), $taxaUsdBrl);
         }
 
         // Montar estrutura consolidada por trimestre
@@ -125,7 +129,7 @@ class AdminRelatorioTrimestralController extends Controller {
         $data = [
             'ano' => $ano,
             'moedaFilter' => $moedaFilter,
-            'consolidarBrl' => $consolidarBrl,
+            'consolidar' => $consolidar,
             'relatorio' => $relatorio,
             'totalGeralPorMoeda' => $totalGeralPorMoeda,
             'taxaUsdBrl' => $taxaUsdBrl,
@@ -150,18 +154,27 @@ class AdminRelatorioTrimestralController extends Controller {
     }
 
     /**
-     * Converte um mapa [mes => [moeda => valor]] para [mes => ['BRL' => total]],
-     * aplicando a taxa USD→BRL. Valores já em BRL são mantidos; demais moedas
-     * (tratadas como USD) são convertidas.
+     * Converte um mapa [mes => [moeda => valor]] para [mes => [moedaAlvo => total]],
+     * aplicando a taxa USD↔BRL do site. moedaAlvo = 'BRL' ou 'USD'.
+     *
+     * - Alvo BRL: valores em BRL mantidos; demais (tratados como USD) multiplicados pela taxa.
+     * - Alvo USD: valores em USD mantidos; demais (tratados como BRL) divididos pela taxa.
      */
-    private function consolidarEmBrl(array $porMesMoeda, float $taxa): array {
+    private function consolidarMoeda(array $porMesMoeda, string $moedaAlvo, float $taxa): array {
+        $moedaAlvo = ($moedaAlvo === 'USD') ? 'USD' : 'BRL';
         $out = [];
         foreach ($porMesMoeda as $mes => $moedas) {
-            $totalBrl = 0.0;
+            $total = 0.0;
             foreach ($moedas as $moeda => $valor) {
-                $totalBrl += (strtoupper((string) $moeda) === 'BRL') ? (float) $valor : ((float) $valor * $taxa);
+                $moeda = strtoupper((string) $moeda);
+                $valor = (float) $valor;
+                if ($moedaAlvo === 'BRL') {
+                    $total += ($moeda === 'BRL') ? $valor : ($valor * $taxa);
+                } else { // USD
+                    $total += ($moeda === 'USD') ? $valor : ($taxa > 0 ? ($valor / $taxa) : 0.0);
+                }
             }
-            $out[$mes] = ['BRL' => $totalBrl];
+            $out[$mes] = [$moedaAlvo => $total];
         }
         return $out;
     }
@@ -239,7 +252,7 @@ class AdminRelatorioTrimestralController extends Controller {
         require __DIR__ . '/../Views/admin/relatorio-trimestral/pdf.php';
         $html = (string) ob_get_clean();
 
-        $filename = 'relatorio-trimestral-' . $ano . ($consolidarBrl ? '-BRL' : '');
+        $filename = 'relatorio-trimestral-' . $ano . ($consolidar !== '' ? '-' . strtoupper($consolidar) : '');
 
         if ($this->bootDompdf()) {
             try {
