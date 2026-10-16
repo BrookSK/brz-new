@@ -1783,7 +1783,20 @@ class AdminPedidosEditController extends Controller {
             unset($itensDedup);
 
             foreach ($itensParaSalvar as $itemIdx => $item) {
-                $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
+                // Itens de redirecionamento NÃO têm valor de produto: o subtotal
+                // deve permanecer SEMPRE zero (o valor cobrado vem do frete/declaração,
+                // não do item). Sem esta guarda, ao salvar a edição o item recebia
+                // preco_unitario = declaration_value e subtotal = valor * qtd, inflando
+                // pedidos.subtotal/total e os relatórios.
+                $pidItem = (int) ($item['produto_id'] ?? 0);
+                $tipoItemAtual = (string) ($item['tipo_item'] ?? ($dadosExtrasItens[$pidItem]['tipo_item'] ?? ''));
+                $ehRedirecionamento = ($tipoItemAtual === 'pacote_redirecionamento') || ($pidItem >= 999990);
+
+                if ($ehRedirecionamento) {
+                    $subtotalItem = 0.0;
+                } else {
+                    $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
+                }
                 $subtotal += $subtotalItem;
 
                 // Inserir novo item apenas na tabela principal
@@ -1799,7 +1812,7 @@ class AdminPedidosEditController extends Controller {
                         'pedido_id' => $pedidoId,
                         'produto_id' => (int) ($item['produto_id'] ?? 0),
                         'quantidade' => (int) ($item['quantidade'] ?? 0),
-                        'preco_unitario' => (float) ($item['preco_unitario'] ?? 0),
+                        'preco_unitario' => $ehRedirecionamento ? 0.0 : (float) ($item['preco_unitario'] ?? 0),
                         'subtotal' => (float) $subtotalItem,
                         'nome_produto' => (string) ($item['nome_produto'] ?? ''),
                         'produto_nome' => (string) ($item['nome_produto'] ?? ''),
@@ -1839,8 +1852,16 @@ class AdminPedidosEditController extends Controller {
                         }
                     }
 
-                    // Se preco_unitario é 0 mas declaration_value existe, usar como preço
-                    if ((float) ($map['preco_unitario'] ?? 0) <= 0 && !empty($map['declaration_value']) && (float) $map['declaration_value'] > 0) {
+                    // Itens de redirecionamento: manter subtotal/preço zerados mesmo que
+                    // exista declaration_value (o valor declarado serve para etiqueta/invoice,
+                    // NÃO para compor o subtotal do pedido). Preservamos o declaration_value
+                    // já definido acima, mas forçamos preco_unitario e subtotal em zero.
+                    if ($ehRedirecionamento) {
+                        $map['preco_unitario'] = 0.0;
+                        $map['subtotal'] = 0.0;
+                        $subtotalItem = 0.0;
+                    } elseif ((float) ($map['preco_unitario'] ?? 0) <= 0 && !empty($map['declaration_value']) && (float) $map['declaration_value'] > 0) {
+                        // Se preco_unitario é 0 mas declaration_value existe, usar como preço
                         $map['preco_unitario'] = (float) $map['declaration_value'];
                         $map['subtotal'] = (float) $map['declaration_value'] * (int) ($item['quantidade'] ?? 1);
                         $subtotalItem = $map['subtotal'];
