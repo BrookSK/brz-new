@@ -695,6 +695,14 @@ document.addEventListener("DOMContentLoaded", function() {
                         $stIns->bindValue(':' . $key, $val);
                     }
                     $stIns->execute();
+
+                    // BUG FIX: dividir os registros da lista_compras deste produto entre o
+                    // pedido original (parte que fica) e o novo pedido (quantidade separada),
+                    // para que a fila de compras continue coerente após o split.
+                    $prodIdLcParcial = (int) ($item[$colProdutoId] ?? $item['produto_id'] ?? 0);
+                    if ($prodIdLcParcial > 0 && $qtySeparar > 0) {
+                        $this->dividirListaComprasParcial($pedidoId, $novoPedidoId, $prodIdLcParcial, $qtySeparar);
+                    }
                 } else {
                     // Item inteiro: mover para o novo pedido
                     $stmtMove = $this->connection->prepare('UPDATE ' . $itensTable . ' SET pedido_id = :novo_pedido_id WHERE id = :item_id');
@@ -711,6 +719,15 @@ document.addEventListener("DOMContentLoaded", function() {
                                 $stAlt->execute([':novo' => $novoPedidoId, ':orig' => $pedidoId, ':pid' => $prodIdItem]);
                             }
                         } catch (\Throwable $e) {}
+                    }
+
+                    // BUG FIX: mover TAMBÉM os registros da lista_compras deste produto
+                    // para o novo pedido. Sem isso, o item (pendente ou comprado) continua
+                    // vinculado ao pedido original, some da fila de compras e o status do
+                    // pedido filho nunca recalcula corretamente.
+                    $prodIdLc = (int) ($item[$colProdutoId] ?? $item['produto_id'] ?? 0);
+                    if ($prodIdLc > 0) {
+                        $this->moverListaComprasInteiro($pedidoId, $novoPedidoId, $prodIdLc);
                     }
                 }
             }
@@ -801,6 +818,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
             $this->connection->commit();
 
+            // BUG FIX: após mover a lista_compras, recalcular o status de compra dos
+            // dois pedidos (original e filho) para refletir corretamente o que ainda
+            // está pendente de compra em cada um.
+            $this->recalcularStatusCompraPedido($pedidoId);
+            $this->recalcularStatusCompraPedido($novoPedidoId);
+
             // Sucesso
             $novoCodigoPedido = $colCodigo ? $dadosNovoPedido[$colCodigo] : (string) $novoPedidoId;
             $this->redirectWithMessage(
@@ -868,6 +891,187 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         return null;
+    }
+
+    /**
+     * Move os registros da lista_compras de um produto do pedido original para o
+     * novo pedido (usado quando o item é movido INTEIRO no split). Preserva o
+     * status (pendente/comprado) de cada registro — o item acompanha sua situação
+     * de compra para o pedido correto.
+     */
+    private function moverListaComprasInteiro(int $pedidoOrigem, int $pedidoDestino, int $produtoId): void {
+        if ($pedidoOrigem <= 0 || $pedidoDestino <= 0 || $produtoId <= 0) return;
+        if (!$this->tableExists('lista_compras')) return;
+
+        $cols = $this->getTableColumns('lista_compras');
+        if (!in_array('pedido_id', $cols, true) || !in_array('produto_id', $cols, true)) {
+            return;
+        }
+
+        try {
+            $st = $this->connection->prepare(
+                'UPDATE lista_compras SET pedido_id = :novo WHERE pedido_id = :orig AND produto_id = :pid'
+            );
+            $st->execute([':novo' => $pedidoDestino, ':orig' => $pedidoOrigem, ':pid' => $produtoId]);
+        } catch (\Throwable $e) {
+            error_log('[SPLIT] Falha ao mover lista_compras (produto ' . $produtoId . '): ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Divide os registros da lista_compras de um produto entre o pedido original
+     * e o novo pedido, quando o item é separado PARCIALMENTE (parte vai, parte fica).
+     *
+     * Estratégia: criar um registro no pedido novo com a quantidade separada,
+     * priorizando mover primeiro os registros PENDENTES (quem precisa ser comprado
+     * segue o item para o pedido novo). Os registros já 'comprado' permanecem no
+     * pedido original salvo necessidade. Para manter a simplicidade e a correção do
+     * saldo, recriamos as pendências de ambos os lados a partir das quantidades.
+     */
+    private function dividirListaComprasParcial(int $pedidoOrigem, int $pedidoDestino, int $produtoId, int $qtdSeparada): void {
+        if ($pedidoOrigem <= 0 || $pedidoDestino <= 0 || $produtoId <= 0 || $qtdSeparada <= 0) return;
+        if (!$this->tableExists('lista_compras')) return;
+
+        $cols = $this->getTableColumns('lista_compras');
+        if (!in_array('pedido_id', $cols, true) || !in_array('produto_id', $cols, true) || !in_array('status', $cols, true)) {
+            return;
+        }
+
+        $temQtdFaltante = in_array('quantidade_faltante', $cols, true);
+        $temQtdNecessaria = in_array('quantidade_necessaria', $cols, true);
+
+        try {
+            // Buscar registros PENDENTES do produto no pedido original, mais antigos primeiro.
+            $stPend = $this->connection->prepare(
+                "SELECT * FROM lista_compras WHERE pedido_id = :orig AND produto_id = :pid AND status = 'pendente' ORDER BY id ASC"
+            );
+            $stPend->execute([':orig' => $pedidoOrigem, ':pid' => $produtoId]);
+            $pendentes = $stPend->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $restante = $qtdSeparada;
+
+            foreach ($pendentes as $reg) {
+                if ($restante <= 0) break;
+                $regId = (int) ($reg['id'] ?? 0);
+                if ($regId <= 0) continue;
+
+                // Quantidade "efetiva" deste registro (faltante tem prioridade; senão necessária; senão 1)
+                $qtdReg = 0;
+                if ($temQtdFaltante && (int) ($reg['quantidade_faltante'] ?? 0) > 0) {
+                    $qtdReg = (int) $reg['quantidade_faltante'];
+                } elseif ($temQtdNecessaria && (int) ($reg['quantidade_necessaria'] ?? 0) > 0) {
+                    $qtdReg = (int) $reg['quantidade_necessaria'];
+                } else {
+                    $qtdReg = 1;
+                }
+
+                if ($qtdReg <= $restante) {
+                    // Move o registro inteiro para o novo pedido
+                    $this->connection->prepare('UPDATE lista_compras SET pedido_id = :novo WHERE id = :id')
+                        ->execute([':novo' => $pedidoDestino, ':id' => $regId]);
+                    $restante -= $qtdReg;
+                } else {
+                    // Divide: reduz a quantidade no registro original e cria um novo no pedido destino
+                    $ficaNoOrigem = $qtdReg - $restante;
+
+                    $setParts = [];
+                    $paramsUpd = [':id' => $regId];
+                    if ($temQtdFaltante) { $setParts[] = 'quantidade_faltante = :qf'; $paramsUpd[':qf'] = $ficaNoOrigem; }
+                    if ($temQtdNecessaria) { $setParts[] = 'quantidade_necessaria = :qn'; $paramsUpd[':qn'] = $ficaNoOrigem; }
+                    if (!empty($setParts)) {
+                        $this->connection->prepare('UPDATE lista_compras SET ' . implode(', ', $setParts) . ' WHERE id = :id')
+                            ->execute($paramsUpd);
+                    }
+
+                    // Criar registro no pedido destino com a quantidade separada, copiando colunas relevantes
+                    $insCols = ['produto_id', 'pedido_id', 'status'];
+                    $insVals = [':pid', ':novo', "'pendente'"];
+                    $insParams = [':pid' => $produtoId, ':novo' => $pedidoDestino];
+                    if ($temQtdFaltante) { $insCols[] = 'quantidade_faltante'; $insVals[] = ':qf'; $insParams[':qf'] = $restante; }
+                    if ($temQtdNecessaria) { $insCols[] = 'quantidade_necessaria'; $insVals[] = ':qn'; $insParams[':qn'] = $restante; }
+                    if (in_array('loja', $cols, true) && isset($reg['loja'])) { $insCols[] = 'loja'; $insVals[] = ':loja'; $insParams[':loja'] = $reg['loja']; }
+                    if (in_array('loja_id', $cols, true) && isset($reg['loja_id'])) { $insCols[] = 'loja_id'; $insVals[] = ':loja_id'; $insParams[':loja_id'] = $reg['loja_id']; }
+                    if (in_array('prioridade', $cols, true)) { $insCols[] = 'prioridade'; $insVals[] = ':prio'; $insParams[':prio'] = $reg['prioridade'] ?? 'media'; }
+                    if (in_array('data_solicitacao', $cols, true)) { $insCols[] = 'data_solicitacao'; $insVals[] = 'CURDATE()'; }
+
+                    $this->connection->prepare(
+                        'INSERT INTO lista_compras (' . implode(', ', $insCols) . ') VALUES (' . implode(', ', $insVals) . ')'
+                    )->execute($insParams);
+
+                    $restante = 0;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[SPLIT] Falha ao dividir lista_compras (produto ' . $produtoId . '): ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Recalcula o status de compra de UM pedido a partir da lista_compras, usando a
+     * mesma regra de AdminComprasController::atualizarStatusPedidosComprados():
+     *  - sem itens pendentes            → 'itens_comprados'
+     *  - pendente menor que o total     → 'itens_parcialmente_comprados'
+     *  - pendente >= total              → mantém o status atual
+     * Só atua sobre pedidos em 'pago' ou 'itens_parcialmente_comprados'.
+     */
+    private function recalcularStatusCompraPedido(int $pedidoId): void {
+        if ($pedidoId <= 0) return;
+        if (!$this->tableExists('lista_compras')) return;
+
+        $colsLista = $this->getTableColumns('lista_compras');
+        if (!in_array('pedido_id', $colsLista, true) || !in_array('status', $colsLista, true)) {
+            return;
+        }
+
+        try {
+            // Status atual precisa ser pago ou parcialmente comprado
+            $stStatus = $this->connection->prepare('SELECT status FROM pedidos WHERE id = :id LIMIT 1');
+            $stStatus->execute([':id' => $pedidoId]);
+            $statusAtual = strtolower(trim((string) ($stStatus->fetchColumn() ?: '')));
+            if (!in_array($statusAtual, ['pago', 'itens_parcialmente_comprados'], true)) {
+                return;
+            }
+
+            // Total de itens "compráveis" do pedido (exclui redirecionamento)
+            $itensTable = $this->tableExists('pedido_itens') ? 'pedido_itens' : ($this->tableExists('pedido_items') ? 'pedido_items' : '');
+            if ($itensTable === '') return;
+
+            $colsItens = $this->getTableColumns($itensTable);
+            $temTipoItem = in_array('tipo_item', $colsItens, true);
+
+            $sqlCount = "SELECT COALESCE(SUM(quantidade), 0) FROM {$itensTable} WHERE pedido_id = ?";
+            if ($temTipoItem) {
+                $sqlCount .= " AND (tipo_item IS NULL OR tipo_item = 'produto')";
+            } else {
+                $sqlCount .= " AND (produto_id IS NULL OR produto_id < 999990)";
+            }
+            $stCount = $this->connection->prepare($sqlCount);
+            $stCount->execute([$pedidoId]);
+            $totalItens = (int) $stCount->fetchColumn();
+            if ($totalItens <= 0) return;
+
+            // Soma pendente na lista_compras
+            $temQtdFaltante = in_array('quantidade_faltante', $colsLista, true);
+            $pendExpr = $temQtdFaltante ? 'GREATEST(quantidade_faltante, 1)' : '1';
+            $stPend = $this->connection->prepare(
+                "SELECT COALESCE(SUM({$pendExpr}), 0) FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'"
+            );
+            $stPend->execute([$pedidoId]);
+            $pendenteFaltante = (int) $stPend->fetchColumn();
+
+            if ($pendenteFaltante <= 0) {
+                $this->connection->prepare(
+                    "UPDATE pedidos SET status = 'itens_comprados' WHERE id = ? AND status IN ('pago','itens_parcialmente_comprados') LIMIT 1"
+                )->execute([$pedidoId]);
+            } elseif ($pendenteFaltante < $totalItens) {
+                $this->connection->prepare(
+                    "UPDATE pedidos SET status = 'itens_parcialmente_comprados' WHERE id = ? AND status = 'pago' LIMIT 1"
+                )->execute([$pedidoId]);
+            }
+            // pendenteFaltante >= totalItens → ainda tudo pendente, não muda
+        } catch (\Throwable $e) {
+            error_log('[SPLIT] Falha ao recalcular status de compra do pedido ' . $pedidoId . ': ' . $e->getMessage());
+        }
     }
 
     /**
