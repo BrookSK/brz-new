@@ -4073,6 +4073,7 @@ return [
     'admin.labels_wp.col_order' => 'Pedido',
     'admin.labels_wp.col_customer' => 'Cliente',
     'admin.labels_wp.col_weight' => 'Peso',
+    'admin.labels_wp.col_generated_at' => 'Data gerada',
     'admin.labels_wp.col_dimensions' => 'Medidas',
     'admin.labels_wp.no_orders_waiting' => 'Nenhum pedido aguardando',
     'admin.labels_wp.packages_no_container' => 'Pacotes gerados (sem container)',

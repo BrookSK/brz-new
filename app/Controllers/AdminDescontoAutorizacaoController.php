@@ -438,9 +438,14 @@ class AdminDescontoAutorizacaoController
         echo '</div></div></div></body></html>';
     }
 
-    /** Painel de solicitações — protegido por senha */
+    /** Painel de solicitações — acesso restrito a admin logado (sem senha adicional) */
     public function painel(Request $request)
     {
+        // A tela deixou de exigir senha própria: basta estar logado como admin.
+        // O login do admin já protege o acesso, então removemos o campo de senha.
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
         $pdo = Database::getConnection();
         $this->garantirTabela($pdo);
 
@@ -448,19 +453,8 @@ class AdminDescontoAutorizacaoController
 
         $mensagem = '';
         $tipo = '';
-        $autenticado = !empty($_SESSION['desconto_painel_auth']);
-
-        // Login
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$autenticado) {
-            $senha = trim((string) $request->getParam('senha', ''));
-            if ($senha === self::SENHA_AUTORIZACAO) {
-                $_SESSION['desconto_painel_auth'] = true;
-                $autenticado = true;
-            } else {
-                $mensagem = __('admin.discount_auth.wrong_password', 'Senha incorreta.');
-                $tipo = 'danger';
-            }
-        }
+        // Sem senha: quem chegou aqui já passou pela verificação de perfil admin.
+        $autenticado = true;
 
         // Ação de aprovar/negar
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $autenticado) {
@@ -499,20 +493,7 @@ class AdminDescontoAutorizacaoController
 
         if ($mensagem) echo '<div class="alert alert-' . $tipo . '">' . $h($mensagem) . '</div>';
 
-        if (!$autenticado) {
-            echo '<div class="row justify-content-center"><div class="col-md-4">
-                <div class="card"><div class="card-body">
-                    <h5 class="card-title text-center mb-3"><i class="fas fa-lock me-2"></i>' . __('admin.discount_auth.restricted_access', 'Acesso restrito') . '</h5>
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">' . __('admin.discount_auth.authorization_password', 'Senha de autorização') . '</label>
-                            <input type="password" class="form-control" name="senha" required autofocus placeholder="' . htmlspecialchars(__('admin.discount_auth.enter_password_placeholder', 'Digite a senha...'), ENT_QUOTES, 'UTF-8') . '">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-sign-in-alt me-1"></i> ' . __('admin.discount_auth.enter', 'Entrar') . '</button>
-                    </form>
-                </div></div>
-            </div></div>';
-        } else {
+        {
             // Listar solicitações
             $pendentes = $pdo->query("SELECT * FROM desconto_autorizacoes WHERE status = 'pendente' ORDER BY created_at DESC")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             $recentes = $pdo->query("SELECT * FROM desconto_autorizacoes WHERE status != 'pendente' ORDER BY updated_at DESC LIMIT 20")->fetchAll(\PDO::FETCH_ASSOC) ?: [];

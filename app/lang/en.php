@@ -6481,6 +6481,7 @@ return [
     'admin.labels_wp.col_order' => 'Order',
     'admin.labels_wp.col_customer' => 'Customer',
     'admin.labels_wp.col_weight' => 'Weight',
+    'admin.labels_wp.col_generated_at' => 'Generated at',
     'admin.labels_wp.col_dimensions' => 'Dimensions',
     'admin.labels_wp.no_orders_waiting' => 'No orders waiting',
     'admin.labels_wp.packages_no_container' => 'Generated packages (without container)',

@@ -95,8 +95,8 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
                 </div>
             </div>
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
-                <thead class="table-light"><tr><th style="width:30px"><input type="checkbox" id="checkAllPacotes" onclick="toggleAllPacotes()"></th><th><?= __('admin.labels_wp.col_order','Pedido') ?></th><th><?= __('admin.labels_wp.col_customer','Cliente') ?></th><th><?= __('admin.labels_wp.col_tracking','Tracking') ?></th><th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_weight','Peso') ?></th><th><?= __('admin.labels_wp.col_pdf','PDF') ?></th><th><?= __('admin.labels_wp.col_actions','Ações') ?></th></tr></thead>
-                <tbody id="pacotes-body"><tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr></tbody>
+                <thead class="table-light"><tr><th style="width:30px"><input type="checkbox" id="checkAllPacotes" onclick="toggleAllPacotes()"></th><th><?= __('admin.labels_wp.col_order','Pedido') ?></th><th><?= __('admin.labels_wp.col_customer','Cliente') ?></th><th><?= __('admin.labels_wp.col_tracking','Tracking') ?></th><th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_weight','Peso') ?></th><th class="d-none d-md-table-cell"><?= __('admin.labels_wp.col_generated_at','Data gerada') ?></th><th><?= __('admin.labels_wp.col_pdf','PDF') ?></th><th><?= __('admin.labels_wp.col_actions','Ações') ?></th></tr></thead>
+                <tbody id="pacotes-body"><tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr></tbody>
             </table></div>
             <div id="pacotes-pagination" class="d-flex align-items-center justify-content-center py-2" style="display:none;"></div>
             </div></div>
@@ -357,7 +357,7 @@ function filtrarEtiquetas(termo) {
 // Busca direta no WordPress
 async function buscarNoWordPress(termo) {
     const tbody = document.getElementById('pacotes-body');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i> ' + <?= json_encode(__('admin.labels_wp.searching','Buscando...')) ?> + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i> ' + <?= json_encode(__('admin.labels_wp.searching','Buscando...')) ?> + '</td></tr>';
     try {
         const r = await fetch(BASE + '/listar-pacotes?search=' + encodeURIComponent(termo) + '&per_page=50');
         const d = await r.json();
@@ -367,15 +367,27 @@ async function buscarNoWordPress(termo) {
             document.getElementById('pacotes-pagination').innerHTML = '<small class="text-muted"><i class="fas fa-cloud me-1"></i>' + <?= json_encode(__('admin.labels_wp.results_for','{n} resultado(s) para "{q}"')) ?>.replace('{n}', d.data.length).replace('{q}', termo) + '</small>';
             document.getElementById('pacotes-pagination').style.display = 'flex';
         } else {
-            tbody.innerHTML = '<tr><td colspan="7" class="ewp-empty"><i class="fas fa-search"></i> ' + <?= json_encode(__('admin.labels_wp.no_packages_for','Nenhum pacote encontrado para "{q}"')) ?>.replace('{q}', termo) + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="ewp-empty"><i class="fas fa-search"></i> ' + <?= json_encode(__('admin.labels_wp.no_packages_for','Nenhum pacote encontrado para "{q}"')) ?>.replace('{q}', termo) + '</td></tr>';
             document.getElementById('pacotes-pagination').style.display = 'none';
         }
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-danger">' + e.message + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-danger">' + e.message + '</td></tr>';
     }
 }
 
-// Render de uma linha de pacote (7 colunas: checkbox download em massa + badge de mala)
+// Formata a data/hora em que a etiqueta foi gerada (created_at local, formato "Y-m-d H:i:s")
+// para "dd/mm/aaaa hh:mm". Retorna "—" quando não houver data.
+function fmtDataGerada(valor) {
+    if (!valor) return '—';
+    // Normaliza "2026-01-30 14:22:05" para um Date confiável em todos os navegadores.
+    const iso = String(valor).replace(' ', 'T');
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    const p2 = n => String(n).padStart(2, '0');
+    return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+}
+
+// Render de uma linha de pacote (8 colunas: checkbox download em massa + badge de mala + data gerada)
 // tbody opcional: se informado, faz append; sempre retorna a string HTML da linha.
 function renderPacoteRow(tbody, p) {
     // Compatibilidade: permite chamada renderPacoteRow(p) sem tbody
@@ -392,7 +404,8 @@ function renderPacoteRow(tbody, p) {
     const malaBadge = (p.mala_nome && !isCancelado) ? ' <span class="badge bg-info text-dark" style="font-size:0.6rem;">' + escHtmlCnt(p.mala_nome) + '</span>' : '';
     const pdfUrl = (p.wp_post_id && !isCancelado) ? BASE + '/pdf/pacote/' + p.wp_post_id : '';
     const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala();updateNotificarSelecionados()">' : '';
-    const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="' + <?= json_encode(__('admin.labels_wp.regenerate_label','Regerar etiqueta')) ?> + '"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
+    const geradaEm = fmtDataGerada(p.generated_at);
+    const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td class="d-none d-md-table-cell"><span class="small text-muted">' + geradaEm + '</span></td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="' + <?= json_encode(__('admin.labels_wp.regenerate_label','Regerar etiqueta')) ?> + '"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
     if (tbody) tbody.innerHTML += row;
     return row;
 }
@@ -406,7 +419,7 @@ let pacotesPages = 1;
 async function carregarPacotes(page) {
     if (page) pacotesPage = page;
     const tbody = document.getElementById('pacotes-body');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i></td></tr>';
     try {
         const r = await fetch(BASE + '/listar-pacotes?without_container=1&per_page=' + pacotesPerPage + '&page=' + pacotesPage);
         const d = await r.json();
@@ -431,24 +444,24 @@ async function carregarPacotes(page) {
             Object.keys(byMala).forEach(function(malaNome) {
                 const grupo = byMala[malaNome];
                 const pesoKg = (grupo.pesoTotal / 1000).toFixed(1);
-                html += '<tr><td colspan="7" style="background:#eef2ff;padding:6px 12px;border-left:3px solid #3b82f6;"><strong class="small"><i class="fas fa-suitcase me-1 text-primary"></i>' + escHtmlCnt(malaNome) + '</strong> <span class="badge bg-primary ms-1">' + grupo.pacotes.length + ' pct</span> <span class="text-muted small ms-2">' + pesoKg + 'kg</span></td></tr>';
+                html += '<tr><td colspan="8" style="background:#eef2ff;padding:6px 12px;border-left:3px solid #3b82f6;"><strong class="small"><i class="fas fa-suitcase me-1 text-primary"></i>' + escHtmlCnt(malaNome) + '</strong> <span class="badge bg-primary ms-1">' + grupo.pacotes.length + ' pct</span> <span class="text-muted small ms-2">' + pesoKg + 'kg</span></td></tr>';
                 grupo.pacotes.forEach(function(p) { html += renderPacoteRow(p); });
             });
             if (semMala.length > 0) {
                 if (Object.keys(byMala).length > 0) {
-                    html += '<tr><td colspan="7" style="background:#f8fafc;padding:6px 12px;border-left:3px solid #94a3b8;"><strong class="small text-muted"><i class="fas fa-inbox me-1"></i>' + <?= json_encode(__('admin.labels_wp.no_bag','Sem mala')) ?> + '</strong> <span class="badge bg-secondary ms-1">' + semMala.length + '</span></td></tr>';
+                    html += '<tr><td colspan="8" style="background:#f8fafc;padding:6px 12px;border-left:3px solid #94a3b8;"><strong class="small text-muted"><i class="fas fa-inbox me-1"></i>' + <?= json_encode(__('admin.labels_wp.no_bag','Sem mala')) ?> + '</strong> <span class="badge bg-secondary ms-1">' + semMala.length + '</span></td></tr>';
                 }
                 semMala.forEach(function(p) { html += renderPacoteRow(p); });
             }
             tbody.innerHTML = html;
         } else {
-            tbody.innerHTML = '<tr><td colspan="7" class="ewp-empty"><i class="fas fa-inbox"></i>' + <?= json_encode(__('admin.labels_wp.no_packages_without_container','Nenhum pacote sem container')) ?> + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="ewp-empty"><i class="fas fa-inbox"></i>' + <?= json_encode(__('admin.labels_wp.no_packages_without_container','Nenhum pacote sem container')) ?> + '</td></tr>';
             pacotesTotal = 0;
             pacotesPages = 1;
         }
         renderPacotesPagination();
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-danger">' + e.message + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-danger">' + e.message + '</td></tr>';
     }
 }
 

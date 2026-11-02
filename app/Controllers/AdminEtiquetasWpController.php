@@ -1904,12 +1904,17 @@ class AdminEtiquetasWpController extends Controller
                 // Primeiro: buscar por tracking_number na tabela de etiquetas
                 $trackings = array_filter(array_map(function($p) { return $p['tracking_code'] ?? ''; }, $resp['data']));
                 $mapByTracking = [];
+                // Data/hora em que a etiqueta foi gerada localmente (created_at), por tracking.
+                $mapGeradaEmByTracking = [];
                 if (!empty($trackings)) {
                     $in = implode(',', array_fill(0, count($trackings), '?'));
-                    $st = $this->connection->prepare("SELECT tracking_number, pedido_id FROM correios_packet_etiquetas WHERE tracking_number IN ({$in})");
+                    $st = $this->connection->prepare("SELECT tracking_number, pedido_id, created_at FROM correios_packet_etiquetas WHERE tracking_number IN ({$in})");
                     $st->execute(array_values($trackings));
                     foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                         $mapByTracking[$row['tracking_number']] = (int) $row['pedido_id'];
+                        if (!empty($row['created_at'])) {
+                            $mapGeradaEmByTracking[$row['tracking_number']] = (string) $row['created_at'];
+                        }
                     }
                 }
 
@@ -1950,8 +1955,41 @@ class AdminEtiquetasWpController extends Controller
                     } elseif (isset($mapByOrderId[$oid])) {
                         $pkg['pedido_id_local'] = $mapByOrderId[$oid];
                     }
+                    // Data/hora em que a etiqueta foi gerada localmente (created_at), via tracking.
+                    if ($tc !== '' && isset($mapGeradaEmByTracking[$tc])) {
+                        $pkg['generated_at'] = $mapGeradaEmByTracking[$tc];
+                    }
                 }
                 unset($pkg);
+
+                // Fallback: para pacotes ainda sem generated_at, buscar created_at pelo pedido_id local.
+                $pidsSemData = [];
+                foreach ($resp['data'] as $pkg) {
+                    $pid = (int) ($pkg['pedido_id_local'] ?? 0);
+                    if ($pid > 0 && empty($pkg['generated_at'])) {
+                        $pidsSemData[$pid] = $pid;
+                    }
+                }
+                if (!empty($pidsSemData)) {
+                    try {
+                        $inPid = implode(',', array_fill(0, count($pidsSemData), '?'));
+                        $stG = $this->connection->prepare("SELECT pedido_id, MAX(created_at) AS created_at FROM correios_packet_etiquetas WHERE pedido_id IN ({$inPid}) GROUP BY pedido_id");
+                        $stG->execute(array_values($pidsSemData));
+                        $mapGeradaByPedido = [];
+                        foreach ($stG->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                            if (!empty($row['created_at'])) {
+                                $mapGeradaByPedido[(int) $row['pedido_id']] = (string) $row['created_at'];
+                            }
+                        }
+                        foreach ($resp['data'] as &$pkg) {
+                            $pid = (int) ($pkg['pedido_id_local'] ?? 0);
+                            if ($pid > 0 && empty($pkg['generated_at']) && isset($mapGeradaByPedido[$pid])) {
+                                $pkg['generated_at'] = $mapGeradaByPedido[$pid];
+                            }
+                        }
+                        unset($pkg);
+                    } catch (\Exception $e) {}
+                }
 
                 // Enriquecer com nome do cliente a partir do banco local quando não veio da API
                 $pedidoIds = array_filter(array_map(function($p) { return $p['pedido_id_local'] ?? null; }, $resp['data']));
