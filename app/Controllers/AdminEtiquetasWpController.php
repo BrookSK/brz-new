@@ -171,6 +171,87 @@ class AdminEtiquetasWpController extends Controller
         return 5.85;
     }
 
+    /**
+     * Carnê Braziliana: indica se o preco_unitario BRUTO gravado em pedido_itens já está em USD.
+     *
+     * O checkout (e o recálculo de preço cheio do carnê) grava o preço dos produtos em USD,
+     * mesmo com o pedido em BRL. Sem isso a etiqueta dividia o valor pela taxa de câmbio de novo
+     * e declarava um valor muito menor (ex.: US$ 219,99 virava US$ 37,61).
+     *
+     * Só retorna true para pedidos de carnê em BRL cujos itens comprovadamente estão em USD:
+     * compara a soma dos itens com carnes.total_produtos (que é em BRL). Para qualquer outro
+     * pedido retorna false e o fluxo atual da etiqueta segue inalterado.
+     */
+    private function carneItensBrutosEmUsd(int $pedidoId): bool
+    {
+        if ($pedidoId <= 0) return false;
+        try {
+            $stPed = $this->connection->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+            $stPed->execute([$pedidoId]);
+            $ped = $stPed->fetch(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($ped)) return false;
+
+            // Mesma normalização do PedidoEcommerce (vazio = BRL)
+            $moeda = strtoupper(trim((string) ($ped['moeda'] ?? ($ped['currency'] ?? ''))));
+            if (!in_array($moeda, ['', 'BRL', 'R$'], true)) return false;
+
+            // É pedido de carnê? (forma_pagamento ou registro na tabela carnes)
+            $formaPag = strtolower(trim((string) ($ped['forma_pagamento'] ?? '')));
+            $totalProdutosCarneBrl = 0.0;
+            $temCarne = false;
+            if ($this->tableExists('carnes')) {
+                $stCarne = $this->connection->prepare(
+                    "SELECT total_produtos FROM carnes WHERE pedido_id = ?
+                     ORDER BY (LOWER(COALESCE(status,'')) IN ('cancelado','cancelada')) ASC, id DESC LIMIT 1"
+                );
+                $stCarne->execute([$pedidoId]);
+                $rowCarne = $stCarne->fetch(\PDO::FETCH_ASSOC);
+                if ($rowCarne) {
+                    $temCarne = true;
+                    $totalProdutosCarneBrl = (float) ($rowCarne['total_produtos'] ?? 0);
+                }
+            }
+            if (!$temCarne && $formaPag !== 'carne_braziliana') return false;
+
+            // Fallback do total de produtos em BRL: meta gravada na criação do carnê
+            if ($totalProdutosCarneBrl <= 0 && $this->tableExists('pedido_meta')) {
+                try {
+                    $stMeta = $this->connection->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_subtotal_produtos' ORDER BY id DESC LIMIT 1");
+                    $stMeta->execute([$pedidoId]);
+                    $totalProdutosCarneBrl = (float) str_replace(',', '.', (string) ($stMeta->fetchColumn() ?: '0'));
+                } catch (\Throwable $e) {}
+            }
+
+            // Soma bruta dos produtos (pacotes de redirecionamento já são tratados como USD à parte)
+            $itensTable = $this->tableExists('pedido_itens') ? 'pedido_itens' : ($this->tableExists('pedido_items') ? 'pedido_items' : '');
+            if ($itensTable === '') return false;
+            $cols = [];
+            try { $stC = $this->connection->query("DESCRIBE {$itensTable}"); $cols = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
+            $precoCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : (in_array('valor_unitario', $cols, true) ? 'valor_unitario' : '');
+            if ($precoCol === '') return false;
+            $where = 'pedido_id = ?';
+            if (in_array('produto_id', $cols, true)) $where .= ' AND COALESCE(produto_id,0) < 999990';
+            if (in_array('tipo_item', $cols, true)) $where .= " AND COALESCE(tipo_item,'produto') <> 'pacote_redirecionamento'";
+            $stSum = $this->connection->prepare("SELECT COALESCE(SUM(COALESCE({$precoCol},0) * COALESCE(quantidade,1)),0) FROM {$itensTable} WHERE {$where}");
+            $stSum->execute([$pedidoId]);
+            $somaItens = (float) ($stSum->fetchColumn() ?: 0);
+            if ($somaItens <= 0) return false;
+
+            $taxa = (float) ($ped['taxa_conversao'] ?? 0);
+            if ($taxa <= 1.01) $taxa = $this->getUsdToBrlRate();
+            if ($taxa <= 1.01) return false;
+
+            // Sem total do carnê para comparar: seguir a convenção do checkout (itens em USD)
+            if ($totalProdutosCarneBrl <= 0) return true;
+
+            // Itens em USD => soma * taxa fica próxima do total de produtos do carnê (BRL)
+            return abs(($somaItens * $taxa) - $totalProdutosCarneBrl) < abs($somaItens - $totalProdutosCarneBrl);
+        } catch (\Throwable $e) {
+            error_log('[ETIQUETAS_WP][CARNE] Falha ao detectar moeda dos itens do pedido #' . $pedidoId . ': ' . $e->getMessage());
+            return false;
+        }
+    }
+
     private function pickFirstNonEmpty(array $row, array $keys): string
     {
         foreach ($keys as $k) {
@@ -1724,6 +1805,11 @@ class AdminEtiquetasWpController extends Controller
                                     }
                                 }
                             }
+                            // Carnê Braziliana: itens gravados em USD — declarar o valor cheio do produto,
+                            // sem converter BRL→USD de novo.
+                            if (!$todosUsd && $moedaPedido === 'BRL' && $this->carneItensBrutosEmUsd($pedidoId)) {
+                                $todosUsd = true;
+                            }
 
                             foreach ($itemsRows as $it) {
                                 // NCM: prioridade item_ncm > produto_ncm > produto_ncm_join
@@ -2148,6 +2234,7 @@ class AdminEtiquetasWpController extends Controller
             }
         }
 
+        $itensRelidosDoBanco = false;
         if ($precisaBuscarDireto && $pedidoIdLocal > 0) {
             try {
                 $dbDireto = \Config\Database::getConnection();
@@ -2157,6 +2244,7 @@ class AdminEtiquetasWpController extends Controller
                 $stDireto->execute([$pedidoIdLocal]);
                 $itensDireto = $stDireto->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 if (!empty($itensDireto)) {
+                    $itensRelidosDoBanco = true;
                     $itemsIn = [];
                     foreach ($itensDireto as $itD) {
                         $nomeProd = trim((string) ($itD['nome_produto'] ?? ($itD['nome_item'] ?? '')));
@@ -2198,6 +2286,18 @@ class AdminEtiquetasWpController extends Controller
                     }
                 }
             } catch (\Throwable $e) {}
+        }
+
+        // Carnê Braziliana: o preço dos produtos está gravado em USD (valor cheio do produto).
+        // Se os itens chegaram com o valor bruto (não convertidos para BRL pelo model), marcar
+        // como USD para não dividir pela taxa de câmbio de novo — senão a etiqueta declara um
+        // valor bem menor que o real. Pedidos que não são de carnê não passam por aqui.
+        $itensEstaoBrutos = $itensRelidosDoBanco || empty($pedido['__converted_items_to_brl']);
+        if ($itensEstaoBrutos && !empty($itemsIn) && $this->carneItensBrutosEmUsd($pedidoIdLocal)) {
+            foreach ($itemsIn as &$itCarne) {
+                if (is_array($itCarne)) $itCarne['_valor_ja_usd'] = true;
+            }
+            unset($itCarne);
         }
 
         try {
