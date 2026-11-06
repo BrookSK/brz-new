@@ -252,6 +252,55 @@ class AdminEtiquetasWpController extends Controller
         }
     }
 
+    /** @var array<int,float> cache de custo por produto_id */
+    private array $cacheCustoProdutoUsd = [];
+    private ?string $colCustoProdutos = null;
+
+    /**
+     * Preço de custo do produto em USD, usado como valor declarado quando o item do pedido
+     * está zerado (ex.: brinde). Sem isso a etiqueta sai com 0,01 e a Receita pode recusar a caixa.
+     *
+     * O custo do produto é cadastrado em USD ("Preço de Custo (USD)" no editor de produtos),
+     * mesma moeda da declaração, então NÃO passa pela conversão BRL→USD.
+     * Aceita produto_id direto ou, na falta dele, o id da linha em pedido_itens (itens de invoice).
+     * Retorna 0 quando não há custo cadastrado (aí mantém o comportamento atual).
+     */
+    private function custoProdutoUsd(int $produtoId, int $pedidoItemId = 0): float
+    {
+        try {
+            if ($produtoId <= 0 && $pedidoItemId > 0 && $this->tableExists('pedido_itens')) {
+                $stPi = $this->connection->prepare('SELECT produto_id FROM pedido_itens WHERE id = ? LIMIT 1');
+                $stPi->execute([$pedidoItemId]);
+                $produtoId = (int) ($stPi->fetchColumn() ?: 0);
+            }
+            // Pacotes de redirecionamento não têm cadastro de produto
+            if ($produtoId <= 0 || $produtoId >= 999990) return 0.0;
+            if (array_key_exists($produtoId, $this->cacheCustoProdutoUsd)) return $this->cacheCustoProdutoUsd[$produtoId];
+
+            if ($this->colCustoProdutos === null) {
+                $this->colCustoProdutos = '';
+                $stCols = $this->connection->query('DESCRIBE produtos');
+                $colsProd = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                // Mesma prioridade usada na tela de detalhes do pedido (coluna "Custo")
+                foreach (['preco_custo', 'custo', 'cost_price', 'valor_custo'] as $c) {
+                    if (in_array($c, $colsProd, true)) { $this->colCustoProdutos = $c; break; }
+                }
+            }
+            $custo = 0.0;
+            if ($this->colCustoProdutos !== '') {
+                $stCusto = $this->connection->prepare('SELECT ' . $this->colCustoProdutos . ' FROM produtos WHERE id = ? LIMIT 1');
+                $stCusto->execute([$produtoId]);
+                $custo = (float) ($stCusto->fetchColumn() ?: 0);
+            }
+            if ($custo < 0) $custo = 0.0;
+            $this->cacheCustoProdutoUsd[$produtoId] = $custo;
+            return $custo;
+        } catch (\Throwable $e) {
+            error_log('[ETIQUETAS_WP][CUSTO] Falha ao buscar custo do produto #' . $produtoId . ': ' . $e->getMessage());
+            return 0.0;
+        }
+    }
+
     private function pickFirstNonEmpty(array $row, array $keys): string
     {
         foreach ($keys as $k) {
@@ -1826,9 +1875,19 @@ class AdminEtiquetasWpController extends Controller
                                     $val = (float) $it['declaration_value'];
                                 }
 
+                                // Item zerado (ex.: brinde): declarar o preço de custo do produto, já em USD
+                                $valorEhCustoUsd = false;
+                                if ($val <= 0 && !$isPacoteItem) {
+                                    $custoUsd = $this->custoProdutoUsd((int) ($it['produto_id'] ?? 0));
+                                    if ($custoUsd > 0) {
+                                        $val = $custoUsd;
+                                        $valorEhCustoUsd = true;
+                                    }
+                                }
+
                                 // Converter BRL→USD somente se pedido é BRL E valores estão em BRL
                                 // (pedidos mistos com pacotes salvam tudo em USD)
-                                if (!$todosUsd && $moedaPedido === 'BRL' && $val > 0) {
+                                if (!$todosUsd && !$valorEhCustoUsd && $moedaPedido === 'BRL' && $val > 0) {
                                     $val = $val * $brlToUsdRate;
                                 }
 
@@ -2323,6 +2382,8 @@ class AdminEtiquetasWpController extends Controller
                     $itemsIn = [];
                     foreach ($invoiceItems as $invItem) {
                         $itemsIn[] = [
+                            // Referência ao item do pedido: usada só para buscar o custo quando o valor vier zerado
+                            '_pedido_item_id' => (int) ($invItem['pedido_item_id'] ?? 0),
                             'nome_produto' => $invItem['nome_produto'] ?? 'Produto',
                             'nome' => $invItem['nome_produto'] ?? 'Produto',
                             'ncm' => $invItem['ncm'] ?? '',
@@ -2391,8 +2452,18 @@ class AdminEtiquetasWpController extends Controller
                 $val = (float) $it['declaration_value'];
             }
 
+            // Item zerado (ex.: brinde): declarar o preço de custo do produto, já em USD
+            $valorEhCustoUsd = false;
+            if ($val <= 0) {
+                $custoUsd = $this->custoProdutoUsd((int) ($it['produto_id'] ?? 0), (int) ($it['_pedido_item_id'] ?? 0));
+                if ($custoUsd > 0) {
+                    $val = $custoUsd;
+                    $valorEhCustoUsd = true;
+                }
+            }
+
             // Só converter BRL→USD se NÃO for pacote e NÃO tiver flag _valor_ja_usd
-            if (!$isPacote && $moedaPedido === 'BRL' && $val > 0) {
+            if (!$isPacote && !$valorEhCustoUsd && $moedaPedido === 'BRL' && $val > 0) {
                 $val = $val * $brlToUsdRate;
             }
 
