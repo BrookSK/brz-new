@@ -25,6 +25,10 @@
     .cnt-detail-wrap .cnt-info-item span{color:#212529}
     .cnt-detail-wrap .cnt-pkg-table{font-size:.8rem}
     .cnt-detail-wrap .cnt-pkg-table th{font-size:.7rem;text-transform:uppercase;color:#6c757d}
+    /* Pacote com etiqueta já impressa (PDF baixado): fundo verde, inclusive no hover */
+    .table > tbody > tr.ewp-impresso > *{--bs-table-accent-bg:#e3f4e8}
+    .table-hover > tbody > tr.ewp-impresso:hover > *{--bs-table-accent-bg:#cdebd6}
+    .ewp-badge-impresso{font-size:.6rem;background:#198754;color:#fff}
 </style>
 <div class="container-fluid px-2 px-md-4">
     <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom flex-wrap gap-2">
@@ -34,6 +38,7 @@
             <small id="ewp-conn-text" class="text-muted"><?= __('admin.labels_wp.connecting','Conectando...') ?></small>
             <span id="ewp-ambiente" class="ewp-badge" style="display:none;"></span>
             <small id="ewp-saldo" class="text-muted" style="display:none;"></small>
+            <a href="/admin/etiquetas-wp/conferencia" class="btn btn-xs btn-outline-primary"><i class="fas fa-clipboard-check me-1"></i><?= __('admin.labels_wp.conf_button', 'Conferência') ?></a>
             <button class="btn btn-xs btn-outline-secondary" onclick="testarConexaoDetalhado()" title="<?= htmlspecialchars(__('admin.labels_wp.diagnostics','Diagnóstico'), ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-stethoscope"></i></button>
         </div>
     </div>
@@ -387,6 +392,26 @@ function fmtDataGerada(valor) {
     return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
 }
 
+// Badge "Impresso" (etiqueta com PDF já baixado)
+function badgeImpressoHtml(vezes, quando) {
+    const n = parseInt(vezes) || 1;
+    const titulo = <?= json_encode(__('admin.labels_wp.printed_times','Baixada {n}x, última em {d}')) ?>.replace('{n}', n).replace('{d}', fmtDataGerada(quando));
+    return ' <span class="badge ewp-badge-impresso" title="' + escHtmlCnt(titulo) + '"><i class="fas fa-print me-1"></i>' + <?= json_encode(__('admin.labels_wp.printed','Impresso')) ?> + '</span>';
+}
+
+// Marca a linha como impressa na hora do download (o servidor registra a impressão ao servir o PDF)
+function marcarImpressoUi(wpPostId) {
+    if (!wpPostId) return;
+    document.querySelectorAll('#pacotes-body tr[data-wp-post-id="' + parseInt(wpPostId) + '"]').forEach(function(tr) {
+        if (tr.classList.contains('ewp-impresso') || tr.classList.contains('text-muted')) return;
+        tr.classList.add('ewp-impresso');
+        const cel = tr.children[1];
+        const a = new Date(), p2 = n => String(n).padStart(2, '0');
+        const agora = a.getFullYear() + '-' + p2(a.getMonth() + 1) + '-' + p2(a.getDate()) + ' ' + p2(a.getHours()) + ':' + p2(a.getMinutes()) + ':00';
+        if (cel) cel.insertAdjacentHTML('beforeend', badgeImpressoHtml(1, agora));
+    });
+}
+
 // Render de uma linha de pacote (8 colunas: checkbox download em massa + badge de mala + data gerada)
 // tbody opcional: se informado, faz append; sempre retorna a string HTML da linha.
 function renderPacoteRow(tbody, p) {
@@ -399,13 +424,16 @@ function renderPacoteRow(tbody, p) {
     }
     const clienteNome = p.recipient_name || '-';
     const isCancelado = p.package_status === 'cancelado';
-    const rowClass = isCancelado ? ' class="text-muted" style="opacity:0.5;text-decoration:line-through;"' : '';
-    const badge = isCancelado ? ' <span class="badge bg-secondary" style="font-size:0.65rem;">' + <?= json_encode(__('admin.labels_wp.cancelled','Cancelado')) ?> + '</span>' : '';
+    const isImpresso = !isCancelado && !!p.impresso_em;
+    const wpIdAttr = p.wp_post_id ? ' data-wp-post-id="' + parseInt(p.wp_post_id) + '"' : '';
+    const rowClass = (isCancelado ? ' class="text-muted" style="opacity:0.5;text-decoration:line-through;"' : (isImpresso ? ' class="ewp-impresso"' : '')) + wpIdAttr;
+    const badge = (isCancelado ? ' <span class="badge bg-secondary" style="font-size:0.65rem;">' + <?= json_encode(__('admin.labels_wp.cancelled','Cancelado')) ?> + '</span>' : '')
+        + (isImpresso ? badgeImpressoHtml(p.impresso_vezes, p.impresso_ultima_em || p.impresso_em) : '');
     const malaBadge = (p.mala_nome && !isCancelado) ? ' <span class="badge bg-info text-dark" style="font-size:0.6rem;">' + escHtmlCnt(p.mala_nome) + '</span>' : '';
     const pdfUrl = (p.wp_post_id && !isCancelado) ? BASE + '/pdf/pacote/' + p.wp_post_id : '';
-    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala();updateNotificarSelecionados()">' : '';
+    const checkboxHtml = (!isCancelado && pdfUrl) ? '<input type="checkbox" class="form-check-input chk-pacote-dl" data-pdf-url="' + pdfUrl + '" data-wp-post-id="' + (parseInt(p.wp_post_id) || '') + '" data-pedido="' + pedidoLabel + '" data-tracking="' + (p.tracking_code || '') + '" data-pedido-id="' + (pedidoIdLocal || '') + '" data-mala-nome="' + escHtmlCnt(p.mala_nome || '') + '" onchange="updateBaixarMassa();updateMoverMala();updateNotificarSelecionados()">' : '';
     const geradaEm = fmtDataGerada(p.generated_at);
-    const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td class="d-none d-md-table-cell"><span class="small text-muted">' + geradaEm + '</span></td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="' + <?= json_encode(__('admin.labels_wp.regenerate_label','Regerar etiqueta')) ?> + '"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
+    const row = '<tr' + rowClass + '><td>' + checkboxHtml + '</td><td>' + pedidoLabel + badge + malaBadge + '</td><td>' + clienteNome + '</td><td><code class="small">' + (p.tracking_code || '-') + '</code></td><td class="d-none d-md-table-cell">' + (p.total_weight ? (p.total_weight / 1000).toFixed(1) + 'kg' : '-') + '</td><td class="d-none d-md-table-cell"><span class="small text-muted">' + geradaEm + '</span></td><td>' + (p.wp_post_id && !isCancelado ? '<a href="' + BASE + '/pdf/pacote/' + p.wp_post_id + '" target="_blank" class="btn btn-xs btn-outline-danger" onclick="marcarImpressoUi(' + parseInt(p.wp_post_id) + ')"><i class="fas fa-file-pdf"></i></a>' : '') + '</td><td>' + (pedidoIdLocal && !isCancelado ? '<button class="btn btn-xs btn-outline-warning" onclick="regerarEtiquetaWp(' + pedidoIdLocal + ')" title="' + <?= json_encode(__('admin.labels_wp.regenerate_label','Regerar etiqueta')) ?> + '"><i class="fas fa-redo"></i></button>' : '') + '</td></tr>';
     if (tbody) tbody.innerHTML += row;
     return row;
 }
@@ -493,7 +521,7 @@ async function gerarEtiquetasMassa(){const ids=[...document.querySelectorAll('.c
 // TOGGLE ALL PACOTES (download em massa)
 function toggleAllPacotes(){const checked=document.getElementById('checkAllPacotes').checked;document.querySelectorAll('.chk-pacote-dl').forEach(cb=>{cb.checked=checked;});updateBaixarMassa();updateMoverMala();updateNotificarSelecionados();}
 function updateBaixarMassa(){const checked=document.querySelectorAll('.chk-pacote-dl:checked').length;const btn=document.getElementById('btnBaixarMassa');const txt=document.getElementById('btnBaixarMassaText');if(btn){btn.style.display=checked>0?'':'none';}if(txt){txt.textContent=checked>1?(<?= json_encode(__('admin.labels_wp.download_n_labels','Baixar {n} Etiquetas')) ?>.replace('{n}', checked)):<?= json_encode(__('admin.labels_wp.download_label','Baixar Etiqueta')) ?>;}}
-async function baixarEtiquetasMassa(){const checks=[...document.querySelectorAll('.chk-pacote-dl:checked')];if(!checks.length){alert(<?= json_encode(__('admin.labels_wp.select_at_least_one_label','Selecione pelo menos 1 etiqueta.')) ?>);return;}const btn=document.getElementById('btnBaixarMassa');if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>'+<?= json_encode(__('admin.labels_wp.downloading','Baixando...')) ?>;}let downloaded=0;for(const cb of checks){const url=cb.getAttribute('data-pdf-url');const pedido=cb.getAttribute('data-pedido')||'etiqueta';if(!url)continue;try{const resp=await fetch(url);if(!resp.ok)continue;const blob=await resp.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='etiqueta_'+pedido.replace('#','')+'.pdf';document.body.appendChild(link);link.click();document.body.removeChild(link);URL.revokeObjectURL(link.href);downloaded++;await new Promise(r=>setTimeout(r,300));}catch(e){console.error('Erro baixando '+url,e);}}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-download me-1"></i><span id="btnBaixarMassaText">'+<?= json_encode(__('admin.labels_wp.download_labels','Baixar Etiquetas')) ?>+'</span>';updateBaixarMassa();}if(downloaded>0)alert(<?= json_encode(__('admin.labels_wp.n_labels_downloaded','{n} etiqueta(s) baixada(s) com sucesso!')) ?>.replace('{n}', downloaded));}
+async function baixarEtiquetasMassa(){const checks=[...document.querySelectorAll('.chk-pacote-dl:checked')];if(!checks.length){alert(<?= json_encode(__('admin.labels_wp.select_at_least_one_label','Selecione pelo menos 1 etiqueta.')) ?>);return;}const btn=document.getElementById('btnBaixarMassa');if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>'+<?= json_encode(__('admin.labels_wp.downloading','Baixando...')) ?>;}let downloaded=0;for(const cb of checks){const url=cb.getAttribute('data-pdf-url');const pedido=cb.getAttribute('data-pedido')||'etiqueta';if(!url)continue;try{const resp=await fetch(url);if(!resp.ok)continue;const blob=await resp.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='etiqueta_'+pedido.replace('#','')+'.pdf';document.body.appendChild(link);link.click();document.body.removeChild(link);URL.revokeObjectURL(link.href);downloaded++;marcarImpressoUi(cb.getAttribute('data-wp-post-id'));await new Promise(r=>setTimeout(r,300));}catch(e){console.error('Erro baixando '+url,e);}}if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-download me-1"></i><span id="btnBaixarMassaText">'+<?= json_encode(__('admin.labels_wp.download_labels','Baixar Etiquetas')) ?>+'</span>';updateBaixarMassa();}if(downloaded>0)alert(<?= json_encode(__('admin.labels_wp.n_labels_downloaded','{n} etiqueta(s) baixada(s) com sucesso!')) ?>.replace('{n}', downloaded));}
 
 // NOTIFICAR CLIENTES SELECIONADOS (e-mail + WhatsApp com o rastreio)
 // Mostra/esconde o botão conforme houver pacotes selecionados COM pedido local vinculado.

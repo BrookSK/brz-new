@@ -410,17 +410,29 @@ function brz_api_list_packages(WP_REST_Request $request) {
         while ($query->have_posts()) {
             $query->the_post();
             $id = get_the_ID();
-            $packages[] = [
+            $pkg = [
                 'wp_post_id' => $id,
                 'order_id' => get_post_meta($id, '_package_order_id', true),
                 'tracking_code' => get_post_meta($id, '_correios_tracking_code', true),
                 'container_id' => get_post_meta($id, '_container_id', true),
                 'total_weight' => get_post_meta($id, '_total_weight', true),
+                // Medidas enviadas aos Correios na criação (usadas na tela de conferência do sistema)
+                'package_length' => get_post_meta($id, '_package_length', true),
+                'package_width' => get_post_meta($id, '_package_width', true),
+                'package_height' => get_post_meta($id, '_package_height', true),
                 'recipient_name' => get_post_meta($id, '_recipient_name', true),
                 'pedido_id_local' => get_post_meta($id, '_pedido_id_local', true),
                 'package_status' => get_post_meta($id, '_package_status', true) ?: 'ativo',
                 'created_at' => get_the_date('Y-m-d H:i:s'),
             ];
+            // Itens declarados (descrição/NCM/valor) só quando pedido, para não pesar a listagem normal
+            if ($request->get_param('with_details') === '1') {
+                $items_json = get_post_meta($id, '_items_json', true);
+                $items_dec = $items_json ? json_decode($items_json, true) : [];
+                $pkg['items'] = is_array($items_dec) ? $items_dec : [];
+                $pkg['freight_paid_value'] = get_post_meta($id, '_freight_paid_value', true);
+            }
+            $packages[] = $pkg;
         }
     }
     wp_reset_postdata();

@@ -252,6 +252,90 @@ class AdminEtiquetasWpController extends Controller
         }
     }
 
+    private bool $impressoesTabelaOk = false;
+
+    /** Garante a tabela de controle de impressão das etiquetas (migration 225). */
+    private function ensureImpressoesTable(): bool
+    {
+        if ($this->impressoesTabelaOk) return true;
+        try {
+            $this->connection->exec("CREATE TABLE IF NOT EXISTS etiquetas_wp_impressoes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                wp_post_id INT NOT NULL,
+                pedido_id INT NULL,
+                tracking_code VARCHAR(120) NULL,
+                vezes INT NOT NULL DEFAULT 1,
+                primeira_impressao_em DATETIME NOT NULL,
+                ultima_impressao_em DATETIME NOT NULL,
+                ultimo_usuario_id INT NULL,
+                UNIQUE KEY uniq_wp_post (wp_post_id),
+                KEY idx_pedido (pedido_id),
+                KEY idx_tracking (tracking_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            $this->impressoesTabelaOk = true;
+        } catch (\Throwable $e) {
+            error_log('[ETIQUETAS_WP][IMPRESSAO] Falha ao criar tabela etiquetas_wp_impressoes: ' . $e->getMessage());
+        }
+        return $this->impressoesTabelaOk;
+    }
+
+    /**
+     * Marca a etiqueta como impressa (chamado quando o PDF do pacote é baixado com sucesso).
+     * Best-effort: nunca impede o download.
+     */
+    private function registrarImpressao(int $wpPostId, ?int $pedidoId = null): void
+    {
+        if ($wpPostId <= 0 || !$this->ensureImpressoesTable()) return;
+        try {
+            $tracking = null;
+            try {
+                $stT = $this->connection->prepare('SELECT pedido_id, tracking_number FROM correios_packet_etiquetas WHERE wp_post_id = ? ORDER BY id DESC LIMIT 1');
+                $stT->execute([$wpPostId]);
+                $rowT = $stT->fetch(\PDO::FETCH_ASSOC);
+                if ($rowT) {
+                    $tracking = trim((string) ($rowT['tracking_number'] ?? '')) ?: null;
+                    if (!$pedidoId) $pedidoId = (int) ($rowT['pedido_id'] ?? 0) ?: null;
+                }
+            } catch (\Throwable $e) {}
+
+            $uid = isset($_SESSION['usuario_id']) ? (int) $_SESSION['usuario_id'] : null;
+            $st = $this->connection->prepare(
+                'INSERT INTO etiquetas_wp_impressoes (wp_post_id, pedido_id, tracking_code, vezes, primeira_impressao_em, ultima_impressao_em, ultimo_usuario_id)
+                 VALUES (?, ?, ?, 1, NOW(), NOW(), ?)
+                 ON DUPLICATE KEY UPDATE vezes = vezes + 1, ultima_impressao_em = NOW(), ultimo_usuario_id = VALUES(ultimo_usuario_id),
+                    pedido_id = COALESCE(VALUES(pedido_id), pedido_id), tracking_code = COALESCE(VALUES(tracking_code), tracking_code)'
+            );
+            $st->execute([$wpPostId, $pedidoId ?: null, $tracking, $uid ?: null]);
+        } catch (\Throwable $e) {
+            error_log('[ETIQUETAS_WP][IMPRESSAO] Falha ao registrar impressão do pacote ' . $wpPostId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Impressões por wp_post_id: [wp_post_id => ['primeira' => ..., 'ultima' => ..., 'vezes' => n]].
+     */
+    private function buscarImpressoes(array $wpPostIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $wpPostIds), fn($v) => $v > 0)));
+        if (empty($ids) || !$this->ensureImpressoesTable()) return [];
+        try {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $st = $this->connection->prepare("SELECT wp_post_id, vezes, primeira_impressao_em, ultima_impressao_em FROM etiquetas_wp_impressoes WHERE wp_post_id IN ({$in})");
+            $st->execute($ids);
+            $map = [];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $map[(int) $r['wp_post_id']] = [
+                    'primeira' => (string) $r['primeira_impressao_em'],
+                    'ultima' => (string) $r['ultima_impressao_em'],
+                    'vezes' => (int) $r['vezes'],
+                ];
+            }
+            return $map;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     /** @var array<int,float> cache de custo por produto_id */
     private array $cacheCustoProdutoUsd = [];
     private ?string $colCustoProdutos = null;
@@ -386,6 +470,235 @@ class AdminEtiquetasWpController extends Controller
 
         $this->view('admin/etiquetas-wp/index', [
             'sidebarActive' => 'correios-mundial',
+        ]);
+    }
+
+    // =========================================================
+    // CONFERÊNCIA DE ETIQUETAS (peso, medidas e valores enviados)
+    // =========================================================
+
+    /**
+     * Tela de conferência: compara o que foi enviado aos Correios em cada etiqueta
+     * (peso, medidas, valores declarados) com o que o pedido tem hoje no sistema.
+     * GET /admin/etiquetas-wp/conferencia?q=...
+     * q: ID do pedido, código de rastreio ou nome do cliente. Vazio = últimas etiquetas.
+     */
+    public function conferencia(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $q = trim((string) $request->getParam('q', ''));
+        $params = ['with_details' => '1'];
+        $qPedidoId = 0;
+        if ($q === '') {
+            $params['per_page'] = 30;
+        } elseif (preg_match('/^#?0*(\d{1,9})$/', $q, $mId)) {
+            $qPedidoId = (int) $mId[1];
+            $params['pedido_id_local'] = $qPedidoId;
+            $params['per_page'] = 50;
+        } elseif (preg_match('/^[A-Z]{2}\d{9}[A-Z]{2}$/i', $q)) {
+            $params['tracking_code'] = strtoupper($q);
+            $params['per_page'] = 20;
+        } else {
+            $params['search'] = $q;
+            $params['per_page'] = 50;
+        }
+
+        $erro = null;
+        $pacotes = [];
+        $resp = $this->wp->listPackages($params);
+        if (empty($resp['success'])) {
+            $erro = (string) ($resp['error'] ?? __('admin.labels_wp.wp_error', 'Erro WordPress'));
+        } elseif (!empty($resp['data']) && is_array($resp['data'])) {
+            $pacotes = $resp['data'];
+        }
+
+        // Etiquetas locais (rastreio atual de cada pedido + resumo do que foi enviado na criação)
+        $trackings = array_values(array_filter(array_map(fn($p) => trim((string) ($p['tracking_code'] ?? '')), $pacotes)));
+        $locaisPorTracking = [];
+        $locaisPorPedido = [];
+        try {
+            $pidsWp = array_values(array_filter(array_map(fn($p) => (int) ($p['pedido_id_local'] ?? 0), $pacotes)));
+            $conds = [];
+            $bind = [];
+            if (!empty($trackings)) { $conds[] = 'tracking_number IN (' . implode(',', array_fill(0, count($trackings), '?')) . ')'; $bind = array_merge($bind, $trackings); }
+            if (!empty($pidsWp)) { $conds[] = 'pedido_id IN (' . implode(',', array_fill(0, count($pidsWp), '?')) . ')'; $bind = array_merge($bind, $pidsWp); }
+            if (!empty($conds) && $this->tableExists('correios_packet_etiquetas')) {
+                $colsCpe = [];
+                try { $stC = $this->connection->query('DESCRIBE correios_packet_etiquetas'); $colsCpe = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
+                $selReq = in_array('last_request_json', $colsCpe, true) ? ', last_request_json' : ', NULL AS last_request_json';
+                $st = $this->connection->prepare('SELECT pedido_id, tracking_number, created_at' . $selReq . ' FROM correios_packet_etiquetas WHERE ' . implode(' OR ', $conds));
+                $st->execute($bind);
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                    $tn = trim((string) ($r['tracking_number'] ?? ''));
+                    if ($tn !== '') $locaisPorTracking[$tn] = $r;
+                    $locaisPorPedido[(int) $r['pedido_id']] = $r;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // Pedidos (peso/medidas atuais)
+        $pedidos = [];
+        try {
+            $pids = [];
+            foreach ($pacotes as $p) {
+                $pid = (int) ($p['pedido_id_local'] ?? 0);
+                $tc = trim((string) ($p['tracking_code'] ?? ''));
+                if ($pid <= 0 && $tc !== '' && isset($locaisPorTracking[$tc])) $pid = (int) $locaisPorTracking[$tc]['pedido_id'];
+                if ($pid > 0) $pids[$pid] = $pid;
+            }
+            if (!empty($pids)) {
+                $in = implode(',', array_fill(0, count($pids), '?'));
+                $st = $this->connection->prepare("SELECT p.id, p.numero_pedido, p.status, p.peso_total, p.comprimento, p.largura, p.altura, u.nome AS cliente_nome
+                    FROM pedidos p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.id IN ({$in})");
+                $st->execute(array_values($pids));
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) $pedidos[(int) $r['id']] = $r;
+            }
+        } catch (\Throwable $e) {}
+
+        $impressoes = $this->buscarImpressoes(array_map(fn($p) => (int) ($p['wp_post_id'] ?? 0), $pacotes));
+
+        $num = function ($v): ?float {
+            if ($v === null || $v === '') return null;
+            $f = (float) str_replace(',', '.', (string) $v);
+            return $f > 0 ? $f : null;
+        };
+
+        $linhas = [];
+        foreach ($pacotes as $p) {
+            $tc = trim((string) ($p['tracking_code'] ?? ''));
+            $pid = (int) ($p['pedido_id_local'] ?? 0);
+            if ($pid <= 0 && $tc !== '' && isset($locaisPorTracking[$tc])) $pid = (int) $locaisPorTracking[$tc]['pedido_id'];
+            $ped = $pedidos[$pid] ?? null;
+            $local = ($tc !== '' && isset($locaisPorTracking[$tc])) ? $locaisPorTracking[$tc] : null;
+            $snapshot = [];
+            if ($local && !empty($local['last_request_json'])) {
+                $dec = json_decode((string) $local['last_request_json'], true);
+                if (is_array($dec)) $snapshot = $dec;
+            }
+
+            $cancelado = (($p['package_status'] ?? 'ativo') === 'cancelado');
+            $localAtual = $locaisPorPedido[$pid] ?? null;
+            $ehAtual = !$cancelado && $localAtual && trim((string) ($localAtual['tracking_number'] ?? '')) === $tc;
+
+            // Enviado aos Correios (WP guarda o que foi enviado na criação; fallback: resumo local)
+            $envPeso = $num($p['total_weight'] ?? null) ?? $num($snapshot['totalWeight'] ?? null);
+            $envC = $num($p['package_length'] ?? null) ?? $num($snapshot['packagingLength'] ?? null);
+            $envL = $num($p['package_width'] ?? null) ?? $num($snapshot['packagingWidth'] ?? null);
+            $envA = $num($p['package_height'] ?? null) ?? $num($snapshot['packagingHeight'] ?? null);
+
+            // Pedido hoje (peso em kg; valores > 500 estão em gramas, mesma regra das malas)
+            $pedPesoKg = $ped ? $num($ped['peso_total'] ?? null) : null;
+            if ($pedPesoKg !== null && $pedPesoKg > 500) $pedPesoKg = $pedPesoKg / 1000;
+            $pedPesoG = $pedPesoKg !== null ? (int) round($pedPesoKg * 1000) : null;
+            $pedC = $ped ? $num($ped['comprimento'] ?? null) : null;
+            $pedL = $ped ? $num($ped['largura'] ?? null) : null;
+            $pedA = $ped ? $num($ped['altura'] ?? null) : null;
+
+            $alertas = [];
+            $nivel = 'ok';
+            $subir = function (string $n) use (&$nivel) {
+                $ordem = ['ok' => 0, 'info' => 1, 'warning' => 2, 'danger' => 3];
+                if ($ordem[$n] > $ordem[$nivel]) $nivel = $n;
+            };
+            $mesmo = fn(?float $a, ?float $b) => $a !== null && $b !== null && abs($a - $b) < 0.01;
+
+            if ($envPeso === null) {
+                $alertas[] = ['danger', __('admin.labels_wp.conf_no_weight_sent', 'Peso enviado não encontrado.')];
+                $subir('danger');
+            } elseif ($pedPesoG !== null && abs($envPeso - $pedPesoG) > 1) {
+                $alertas[] = ['danger', __('admin.labels_wp.conf_weight_diff', 'Peso enviado diferente do peso do pedido.')];
+                $subir('danger');
+            }
+
+            if ($envC === null || $envL === null || $envA === null) {
+                $alertas[] = ['info', __('admin.labels_wp.conf_no_dims_sent', 'Medidas enviadas indisponíveis (atualize o snippet do WordPress).')];
+                $subir('info');
+            } else {
+                $ehPadrao = $mesmo($envC, 16.0) && $mesmo($envL, 11.0) && $mesmo($envA, 2.0);
+                $pedidoEhPadrao = $mesmo($pedC, 16.0) && $mesmo($pedL, 11.0) && $mesmo($pedA, 2.0);
+                if ($ehPadrao && !$pedidoEhPadrao) {
+                    $alertas[] = ['danger', __('admin.labels_wp.conf_default_dims', 'Etiqueta saiu com a medida padrão 16×11×2 (medidas vazias na geração).')];
+                    $subir('danger');
+                } elseif ($pedC !== null && $pedL !== null && $pedA !== null && !($mesmo($envC, $pedC) && $mesmo($envL, $pedL) && $mesmo($envA, $pedA))) {
+                    $alertas[] = ['warning', __('admin.labels_wp.conf_dims_diff', 'Medidas enviadas diferentes das medidas do pedido.')];
+                    $subir('warning');
+                }
+            }
+            if ($ped && ($pedPesoG === null || $pedC === null || $pedL === null || $pedA === null)) {
+                $alertas[] = ['warning', __('admin.labels_wp.conf_order_missing_dims', 'O pedido está sem peso ou medidas preenchidos.')];
+                $subir('warning');
+            }
+
+            // Itens declarados (o que está no PDF)
+            $itens = [];
+            $totalDecl = 0.0;
+            $temItemMinimo = false;
+            foreach ((is_array($p['items'] ?? null) ? $p['items'] : []) as $it) {
+                if (!is_array($it)) continue;
+                $qtd = (int) ($it['quantity'] ?? 1);
+                $val = (float) ($it['value'] ?? 0);
+                $totalDecl += $val * max(1, $qtd);
+                if ($val <= 0.01) $temItemMinimo = true;
+                $itens[] = [
+                    'descricao' => (string) ($it['description'] ?? ''),
+                    'ncm' => (string) ($it['hsCode'] ?? ''),
+                    'qtd' => $qtd,
+                    'valor' => $val,
+                    'peso' => (float) ($it['weight'] ?? 0),
+                ];
+            }
+            if ($temItemMinimo) {
+                $alertas[] = ['warning', __('admin.labels_wp.conf_item_min_value', 'Há item declarado com valor US$ 0,01.')];
+                $subir('warning');
+            }
+            // Valor do PDF x valor enviado na criação (o PDF é atualizado a cada download; nos Correios fica o da criação)
+            if (!empty($snapshot['items']) && is_array($snapshot['items']) && !empty($itens)) {
+                $totalCriacao = 0.0;
+                foreach ($snapshot['items'] as $it) {
+                    if (is_array($it)) $totalCriacao += (float) ($it['value'] ?? 0) * max(1, (int) ($it['quantity'] ?? 1));
+                }
+                if (abs($totalCriacao - $totalDecl) > 0.01) {
+                    $alertas[] = ['warning', __('admin.labels_wp.conf_value_pdf_diff', 'Valor no PDF (US$ {pdf}) diferente do enviado aos Correios na criação (US$ {env}).', [
+                        'pdf' => number_format($totalDecl, 2, ',', '.'),
+                        'env' => number_format($totalCriacao, 2, ',', '.'),
+                    ])];
+                    $subir('warning');
+                }
+            }
+
+            if ($cancelado) $nivel = 'cancelado';
+
+            $linhas[] = [
+                'wp_post_id' => (int) ($p['wp_post_id'] ?? 0),
+                'tracking' => $tc,
+                'pedido_id' => $pid,
+                'numero_pedido' => $ped['numero_pedido'] ?? ($p['order_id'] ?? ''),
+                'status_pedido' => $ped['status'] ?? '',
+                'cliente' => $ped['cliente_nome'] ?? ($p['recipient_name'] ?? ''),
+                'gerada_em' => $local['created_at'] ?? ($p['created_at'] ?? ''),
+                'cancelado' => $cancelado,
+                'atual' => $ehAtual,
+                'container_id' => (string) ($p['container_id'] ?? ''),
+                'impressao' => $impressoes[(int) ($p['wp_post_id'] ?? 0)] ?? null,
+                'env_peso_g' => $envPeso,
+                'env_c' => $envC, 'env_l' => $envL, 'env_a' => $envA,
+                'ped_peso_g' => $pedPesoG,
+                'ped_c' => $pedC, 'ped_l' => $pedL, 'ped_a' => $pedA,
+                'itens' => $itens,
+                'total_declarado' => $totalDecl,
+                'frete' => $num($p['freight_paid_value'] ?? null),
+                'alertas' => $alertas,
+                'nivel' => $nivel,
+            ];
+        }
+
+        $this->view('admin/etiquetas-wp/conferencia', [
+            'sidebarActive' => 'correios-mundial',
+            'q' => $q,
+            'linhas' => $linhas,
+            'erro' => $erro,
         ]);
     }
 
@@ -548,7 +861,7 @@ class AdminEtiquetasWpController extends Controller
             $tracking = $resp['tracking_number'] ?? '';
 
             // Salvar no banco local também (retorna false se falhar ao persistir).
-            $salvouLocal = $this->salvarEtiquetaLocal($pedidoId, $packageData['customerControlCode'], $tracking, $resp);
+            $salvouLocal = $this->salvarEtiquetaLocal($pedidoId, $packageData['customerControlCode'], $tracking, $resp, $packageData);
 
             // Fallback: se não gravou local, buscar do WP e regravar (garante rastreio na conta/admin).
             if ($this->pedidoSemTrackingLocal($pedidoId)) {
@@ -661,7 +974,7 @@ class AdminEtiquetasWpController extends Controller
 
                 if (!empty($resp['success'])) {
                     $tracking = $resp['tracking_number'] ?? '';
-                    $this->salvarEtiquetaLocal($pid, $packageData['customerControlCode'], $tracking, $resp);
+                    $this->salvarEtiquetaLocal($pid, $packageData['customerControlCode'], $tracking, $resp, $packageData);
 
                     // Garantir que o rastreio ficou salvo localmente. Se por algum motivo não
                     // gravou (tracking vazio na resposta, etc.), buscar do WP e regravar — assim
@@ -1962,6 +2275,10 @@ class AdminEtiquetasWpController extends Controller
         }
 
         $result = $this->wp->downloadPackagePdf($wpPostId);
+        // PDF baixado com sucesso => marcar a etiqueta como impressa (vale para o botão individual e o download em massa)
+        if (is_string($result) && $result !== '') {
+            $this->registrarImpressao($wpPostId, isset($pedidoId) ? (int) $pedidoId : null);
+        }
         $this->servePdf($result, 'etiqueta_' . $wpPostId . '.pdf');
     }
 
@@ -2182,6 +2499,22 @@ class AdminEtiquetasWpController extends Controller
                     unset($pkg);
                 }
             } catch (\Exception $e) {}
+        }
+
+        // Enriquecer com controle de impressão (PDF da etiqueta já baixado)
+        if (!empty($resp['success']) && !empty($resp['data']) && is_array($resp['data'])) {
+            $mapImp = $this->buscarImpressoes(array_map(fn($p) => (int) ($p['wp_post_id'] ?? 0), $resp['data']));
+            if (!empty($mapImp)) {
+                foreach ($resp['data'] as &$pkg) {
+                    $wid = (int) ($pkg['wp_post_id'] ?? 0);
+                    if (isset($mapImp[$wid])) {
+                        $pkg['impresso_em'] = $mapImp[$wid]['primeira'];
+                        $pkg['impresso_ultima_em'] = $mapImp[$wid]['ultima'];
+                        $pkg['impresso_vezes'] = $mapImp[$wid]['vezes'];
+                    }
+                }
+                unset($pkg);
+            }
         }
 
         $this->json($resp);
@@ -2515,7 +2848,28 @@ class AdminEtiquetasWpController extends Controller
         return $payload;
     }
 
-    private function salvarEtiquetaLocal(int $pedidoId, string $controlCode, string $tracking, array $resp): bool
+    /**
+     * Resumo do que foi enviado ao WordPress/Correios na criação da etiqueta (peso, medidas, itens).
+     * Guardado em correios_packet_etiquetas.last_request_json para a tela de conferência.
+     * Não guarda os dados pessoais do destinatário.
+     */
+    private function resumoEnvioEtiqueta(array $packageData): array
+    {
+        if (empty($packageData)) return [];
+        return [
+            'totalWeight' => $packageData['totalWeight'] ?? null,
+            'packagingLength' => $packageData['packagingLength'] ?? null,
+            'packagingWidth' => $packageData['packagingWidth'] ?? null,
+            'packagingHeight' => $packageData['packagingHeight'] ?? null,
+            'freightPaidValue' => $packageData['freightPaidValue'] ?? null,
+            'insurancePaidValue' => $packageData['insurancePaidValue'] ?? null,
+            'currency' => $packageData['currency'] ?? null,
+            'items' => $packageData['items'] ?? [],
+            'enviado_em' => date('Y-m-d H:i:s'),
+        ];
+    }
+
+    private function salvarEtiquetaLocal(int $pedidoId, string $controlCode, string $tracking, array $resp, array $packageData = []): bool
     {
         // Fallback robusto: se o tracking veio vazio, tentar extrair de formatos alternativos
         // que o WordPress/Correios possam retornar (aninhado, camelCase, etc.).
@@ -2580,6 +2934,13 @@ class AdminEtiquetasWpController extends Controller
                     // Segue sem a coluna — o INSERT abaixo simplesmente não a inclui.
                 }
             }
+            $resumoEnvio = $this->resumoEnvioEtiqueta($packageData);
+            if (!empty($resumoEnvio) && !empty($cols) && !in_array('last_request_json', $cols, true)) {
+                try {
+                    $this->connection->exec('ALTER TABLE correios_packet_etiquetas ADD COLUMN last_request_json LONGTEXT NULL');
+                    $cols[] = 'last_request_json';
+                } catch (\Exception $e) {}
+            }
 
             // Montar dinamicamente colunas/valores conforme o schema real.
             $dados = [
@@ -2590,6 +2951,11 @@ class AdminEtiquetasWpController extends Controller
                 'wp_post_id' => $resp['wp_post_id'] ?? null,
                 'last_response_json' => json_encode($resp),
             ];
+            // Só grava o resumo do envio quando ele existe (criação/regeração); a sincronização
+            // com o WP não sobrescreve o que foi enviado.
+            if (!empty($resumoEnvio)) {
+                $dados['last_request_json'] = json_encode($resumoEnvio, JSON_UNESCAPED_UNICODE);
+            }
             $insertCols = [];
             $placeholders = [];
             $valores = [];
