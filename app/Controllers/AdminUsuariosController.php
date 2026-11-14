@@ -19,9 +19,18 @@ class AdminUsuariosController extends Controller {
             $busca = $request->getParam('busca', '');
             $ordem = $request->getParam('ordem', 'nome_asc');
             $tipo = $request->getParam('tipo', '');
+            // Filtro "Cadastrados em" (últimos cadastros)
+            $periodo = (string) $request->getParam('periodo', '');
+            if (!in_array($periodo, ['hoje', '7d', '30d', 'datas'], true)) $periodo = '';
+            $de = trim((string) $request->getParam('de', ''));
+            $ate = trim((string) $request->getParam('ate', ''));
+            // "Mais recentes" antigamente tinha value="" e caía na ordem por nome
+            if ($ordem === '') $ordem = 'recentes';
+            // Filtrando por período sem escolher ordem: mostrar do mais novo para o mais antigo
+            if ($periodo !== '' && $request->getParam('ordem') === null) $ordem = 'recentes';
             
-            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset, $ordem, $tipo);
-            $total = $helper->getTotalUsuarios($busca, $tipo);
+            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset, $ordem, $tipo, $periodo, $de, $ate);
+            $total = $helper->getTotalUsuarios($busca, $tipo, $periodo, $de, $ate);
             $totalPaginas = ceil($total / $limite);
             $stats = $helper->getStatsUsuarios();
             
@@ -33,15 +42,31 @@ class AdminUsuariosController extends Controller {
             $erro = $e->getMessage();
         }
 
+        $periodo = $periodo ?? '';
+        $tipo = $tipo ?? '';
+        $de = $de ?? '';
+        $ate = $ate ?? '';
+        $ordemRecentes = (($ordem ?? '') === 'recentes');
+
         // Group users by first letter for alphabetical view
+        // (na ordem "Mais recentes" a lista fica numa seção só, do cadastro mais novo para o mais antigo)
         $usersGrouped = [];
-        foreach ($usuarios as $u) {
+        if ($ordemRecentes) {
+            if (!empty($usuarios)) $usersGrouped[__('admin.users.recent_header', 'Últimos cadastros')] = $usuarios;
+        } else foreach ($usuarios as $u) {
             $nome = trim($u['nome'] ?? '');
             $letter = mb_strtoupper(mb_substr($nome, 0, 1, 'UTF-8'), 'UTF-8');
             if (!preg_match('/[A-Z]/', $letter)) $letter = '#';
             $usersGrouped[$letter][] = $u;
         }
-        ksort($usersGrouped);
+        if (!$ordemRecentes) ksort($usersGrouped);
+
+        // Data de cadastro (linha abaixo do e-mail)
+        $fmtCadastro = function($u) {
+            $t = !empty($u['created_at']) ? strtotime((string) $u['created_at']) : false;
+            if (!$t) return '';
+            return '<div class="user-suite"><i class="bi bi-calendar-plus"></i> ' . __('admin.users.registered_on', 'Cadastrado em') . ' ' . date('d/m/Y H:i', $t) . '</div>';
+        };
 
         // Helper: get initials from name
         $getInitials = function($nome) {
@@ -157,10 +182,10 @@ class AdminUsuariosController extends Controller {
                     <div class="kpi-label">' . __('admin.users.kpi_active_users', 'Usuários Ativos') . '</div>
                     <div class="kpi-value">' . $usuariosAtivos . '</div>
                 </div>
-                <div class="kpi-card">
+                <a class="kpi-card" href="/admin/usuarios?periodo=hoje&amp;ordem=recentes" style="text-decoration:none;color:inherit;" title="' . htmlspecialchars(__('admin.users.see_new_today', 'Ver cadastros de hoje'), ENT_QUOTES, 'UTF-8') . '">
                     <div class="kpi-label">' . __('admin.users.kpi_new_today', 'Novos Hoje') . '</div>
                     <div class="kpi-value">' . $novosHoje . '</div>
-                </div>
+                </a>
             </div>';
 
         // === FILTERS CARD ===
@@ -173,7 +198,7 @@ class AdminUsuariosController extends Controller {
                     <select name="ordem" onchange="this.form.submit()">
                         <option value="nome_asc"' . ($ordem === 'nome_asc' ? ' selected' : '') . '>' . __('admin.users.sort_name_asc', 'Nome A→Z') . '</option>
                         <option value="nome_desc"' . ($ordem === 'nome_desc' ? ' selected' : '') . '>' . __('admin.users.sort_name_desc', 'Nome Z→A') . '</option>
-                        <option value=""' . ($ordem === '' ? ' selected' : '') . '>' . __('admin.users.sort_recent', 'Mais recentes') . '</option>
+                        <option value="recentes"' . ($ordem === 'recentes' ? ' selected' : '') . '>' . __('admin.users.sort_recent', 'Mais recentes') . '</option>
                         <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>' . __('admin.users.sort_wallet_desc', 'Carteira maior→menor') . '</option>
                         <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>' . __('admin.users.sort_wallet_asc', 'Carteira menor→maior') . '</option>
                     </select>
@@ -181,6 +206,19 @@ class AdminUsuariosController extends Controller {
                         <option value="">' . __('admin.users.type_all', 'Todos os tipos') . '</option>
                         <option value="desapeguista"' . ($request->getParam('tipo') === 'desapeguista' ? ' selected' : '') . '>' . __('admin.users.type_desapeguistas', 'Desapeguistas') . '</option>
                     </select>
+                    <select name="periodo" onchange="usrPeriodoChange(this)">
+                        <option value="">' . __('admin.users.period_any', 'Cadastrados: qualquer data') . '</option>
+                        <option value="hoje"' . ($periodo === 'hoje' ? ' selected' : '') . '>' . __('admin.users.period_today', 'Cadastrados hoje') . '</option>
+                        <option value="7d"' . ($periodo === '7d' ? ' selected' : '') . '>' . __('admin.users.period_7d', 'Cadastrados nos últimos 7 dias') . '</option>
+                        <option value="30d"' . ($periodo === '30d' ? ' selected' : '') . '>' . __('admin.users.period_30d', 'Cadastrados nos últimos 30 dias') . '</option>
+                        <option value="datas"' . ($periodo === 'datas' ? ' selected' : '') . '>' . __('admin.users.period_range', 'Cadastrados entre datas...') . '</option>
+                    </select>
+                    <span id="usr-periodo-datas" style="display:' . ($periodo === 'datas' ? 'inline-flex' : 'none') . ';gap:6px;align-items:center;flex-wrap:wrap;">
+                        <input type="date" name="de" value="' . htmlspecialchars($de, ENT_QUOTES, 'UTF-8') . '" class="form-control form-control-sm" style="width:auto;" title="' . htmlspecialchars(__('admin.users.period_from', 'De'), ENT_QUOTES, 'UTF-8') . '">
+                        <span class="text-muted small">' . __('admin.users.period_to', 'até') . '</span>
+                        <input type="date" name="ate" value="' . htmlspecialchars($ate, ENT_QUOTES, 'UTF-8') . '" class="form-control form-control-sm" style="width:auto;">
+                    </span>
+                    <script>function usrPeriodoChange(s){var d=document.getElementById("usr-periodo-datas");if(s.value==="datas"){d.style.display="inline-flex";return;}d.style.display="none";var o=s.form.querySelector("select[name=ordem]");if(s.value!==""&&o)o.value="recentes";s.form.submit();}</script>
                     <button type="submit" class="btn btn-search"><i class="bi bi-search"></i> ' . __('admin.users.search', 'Buscar') . '</button>
                     <a href="/admin/usuarios" class="btn btn-clear"><i class="bi bi-x-lg"></i> ' . __('admin.users.clear', 'Limpar') . '</a>
                 </form>
@@ -197,7 +235,7 @@ class AdminUsuariosController extends Controller {
             echo '<div class="alphabetical-list">';
             foreach ($usersGrouped as $letter => $users) {
                 echo '<div class="letter-section">
-                    <div class="letter-header"><span>' . htmlspecialchars($letter) . '</span></div>
+                    <div class="letter-header"><span' . ($ordemRecentes ? ' style="width:auto;padding:0 12px;font-size:13px;white-space:nowrap;"' : '') . '>' . htmlspecialchars($letter) . '</span></div>
                     <div class="users-list">';
 
                 foreach ($users as $u) {
@@ -210,6 +248,7 @@ class AdminUsuariosController extends Controller {
                     $suite = htmlspecialchars($u['suite'] ?? '');
                     $pedidos = (int)($u['total_pedidos'] ?? 0);
                     $userId = (int)$u['id'];
+                    $cadastroHtml = $fmtCadastro($u);
                     $isDesapeguista = !empty($u['is_desapeguista']);
                     $desapeguistaBadge = $isDesapeguista ? ' <span class="role-badge" style="background:rgba(8,145,178,.12);color:#0891b2;font-size:.7rem;"><i class="bi bi-heart-fill"></i> ' . __('admin.users.desapeguista', 'Desapeguista') . '</span>' : '';
 
@@ -223,7 +262,8 @@ class AdminUsuariosController extends Controller {
                                     <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>' . $desapeguistaBadge . '
                                 </div>
                                 <div class="user-email">' . $email . '</div>'
-                                . ($suite ? '<div class="user-suite">' . __('admin.users.suite_label', 'Suite:') . ' ' . $suite . '</div>' : '') .
+                                . ($suite ? '<div class="user-suite">' . __('admin.users.suite_label', 'Suite:') . ' ' . $suite . '</div>' : '')
+                                . $cadastroHtml .
                             '</div>
                         </div>
                         <div>
@@ -257,7 +297,8 @@ class AdminUsuariosController extends Controller {
                                     <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>' . $desapeguistaBadge . '
                                 </div>
                                 <div class="user-email">' . $email . '</div>'
-                                . ($suite ? '<div class="user-suite">' . __('admin.users.suite_label', 'Suite:') . ' ' . $suite . '</div>' : '') .
+                                . ($suite ? '<div class="user-suite">' . __('admin.users.suite_label', 'Suite:') . ' ' . $suite . '</div>' : '')
+                                . $cadastroHtml .
                             '</div>
                         </div>
                         <div class="mobile-metrics">
@@ -295,11 +336,15 @@ class AdminUsuariosController extends Controller {
             $paginaAtual = (int) $pagina;
             if ($paginaAtual < 1) $paginaAtual = 1;
             if ($paginaAtual > (int) $totalPaginas) $paginaAtual = (int) $totalPaginas;
-            $mkUrl = function(int $p) use ($busca, $ordem): string {
+            $mkUrl = function(int $p) use ($busca, $ordem, $tipo, $periodo, $de, $ate): string {
                 $url = "/admin/usuarios?pagina={$p}";
                 if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
                 if (!empty($ordem)) $url .= "&ordem=" . urlencode($ordem);
-                return $url;
+                if (!empty($tipo)) $url .= "&tipo=" . urlencode($tipo);
+                if ($periodo !== '') $url .= "&periodo=" . urlencode($periodo);
+                if ($periodo === 'datas' && $de !== '') $url .= "&de=" . urlencode($de);
+                if ($periodo === 'datas' && $ate !== '') $url .= "&ate=" . urlencode($ate);
+                return htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
             };
 
             $start = max(1, $paginaAtual - 1);

@@ -55,7 +55,26 @@ class AdminUsuariosHelper {
         return substr($text, 0, 120);
     }
     
-    public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0, $ordem = '', $tipo = '') {
+    /**
+     * Filtro "Cadastrados em": hoje, 7d, 30d ou 'datas' (de/até, formato Y-m-d).
+     * Retorna o trecho SQL (com AND) e preenche os parâmetros.
+     */
+    private function sqlFiltroCadastro(string $periodo, string $de, string $ate, array &$params): string {
+        $periodo = trim($periodo);
+        if ($periodo === 'hoje') return ' AND DATE(u.created_at) = CURDATE()';
+        if ($periodo === '7d') return ' AND u.created_at >= (CURDATE() - INTERVAL 6 DAY)';
+        if ($periodo === '30d') return ' AND u.created_at >= (CURDATE() - INTERVAL 29 DAY)';
+        if ($periodo === 'datas') {
+            $sql = '';
+            $valida = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && strtotime($d) !== false;
+            if ($valida($de)) { $sql .= ' AND u.created_at >= :cad_de'; $params[':cad_de'] = $de . ' 00:00:00'; }
+            if ($valida($ate)) { $sql .= ' AND u.created_at <= :cad_ate'; $params[':cad_ate'] = $ate . ' 23:59:59'; }
+            return $sql;
+        }
+        return '';
+    }
+
+    public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0, $ordem = '', $tipo = '', $periodo = '', $de = '', $ate = '') {
         $colunasUsuarios = $this->getColunasUsuarios();
         $buscaCols = ['u.nome', 'u.email'];
         if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
@@ -90,7 +109,11 @@ class AdminUsuariosHelper {
             $sql .= " AND u.is_desapeguista = 1";
         }
 
-        if ($ordem === 'carteira_desc') {
+        $sql .= $this->sqlFiltroCadastro((string) $periodo, (string) $de, (string) $ate, $params);
+
+        if ($ordem === 'recentes') {
+            $sql .= " ORDER BY u.created_at DESC, u.id DESC";
+        } elseif ($ordem === 'carteira_desc') {
             $sql .= " ORDER BY (COALESCE(w.saldo_usd, 0) + COALESCE(w.saldo_brl, 0)) DESC";
         } elseif ($ordem === 'carteira_asc') {
             $sql .= " ORDER BY (COALESCE(w.saldo_usd, 0) + COALESCE(w.saldo_brl, 0)) ASC";
@@ -128,7 +151,7 @@ class AdminUsuariosHelper {
         return $usuarios;
     }
     
-    public function getTotalUsuarios($busca = '', $tipo = '') {
+    public function getTotalUsuarios($busca = '', $tipo = '', $periodo = '', $de = '', $ate = '') {
         $colunasUsuarios = $this->getColunasUsuarios();
         $buscaCols = ['nome', 'email'];
         if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
@@ -157,6 +180,8 @@ class AdminUsuariosHelper {
         if ($tipo === 'desapeguista' && is_array($colunasUsuarios) && in_array('is_desapeguista', $colunasUsuarios, true)) {
             $sql .= " AND u.is_desapeguista = 1";
         }
+
+        $sql .= $this->sqlFiltroCadastro((string) $periodo, (string) $de, (string) $ate, $params);
         
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $key => $value) $stmt->bindValue($key, $value);
