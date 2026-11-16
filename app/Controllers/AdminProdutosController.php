@@ -3985,6 +3985,16 @@ HTML;
             $dir = 'ASC';
         }
         $lojaFiltro = (string) $request->getParam('loja_filtro', '');
+        // Filtro "Cadastrados em" (produtos mais recentes) — mesmo padrão da tela de Usuários
+        $periodo = (string) $request->getParam('periodo', '');
+        if (!in_array($periodo, ['hoje', '7d', '30d', 'datas'], true)) $periodo = '';
+        $de = trim((string) $request->getParam('de', ''));
+        $ate = trim((string) $request->getParam('ate', ''));
+        // Filtrando por período sem escolher ordem: mostrar do mais novo para o mais antigo
+        if ($periodo !== '' && $request->getParam('sort') === null) {
+            $sort = 'cadastro';
+            $dir = 'DESC';
+        }
 
         try {
             $pdo = \Config\Database::getConnection();
@@ -4112,6 +4122,21 @@ HTML;
                     $where .= " AND (p.oculto = 0 OR p.oculto IS NULL) ";
                 }
             }
+            // Filtro por data de cadastro
+            if ($periodo !== '' && $createdCol !== null) {
+                $cc = 'p.' . $createdCol;
+                if ($periodo === 'hoje') {
+                    $where .= " AND DATE({$cc}) = CURDATE() ";
+                } elseif ($periodo === '7d') {
+                    $where .= " AND {$cc} >= (CURDATE() - INTERVAL 6 DAY) ";
+                } elseif ($periodo === '30d') {
+                    $where .= " AND {$cc} >= (CURDATE() - INTERVAL 29 DAY) ";
+                } elseif ($periodo === 'datas') {
+                    $dataValida = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && strtotime($d) !== false;
+                    if ($dataValida($de)) { $where .= " AND {$cc} >= :cad_de "; $params[':cad_de'] = $de . ' 00:00:00'; }
+                    if ($dataValida($ate)) { $where .= " AND {$cc} <= :cad_ate "; $params[':cad_ate'] = $ate . ' 23:59:59'; }
+                }
+            }
 
             // Quando há busca ativa, retornar todos os resultados sem paginação
             $buscaAtiva = (trim($busca) !== '');
@@ -4177,6 +4202,7 @@ HTML;
                     'imagem' => $img,
                     'loja_id' => (int) ($r['loja_id'] ?? 0),
                     'loja_nome' => '',
+                    'cadastrado_em' => $createdCol !== null ? (string) ($r[$createdCol] ?? '') : '',
                 ];
             }
             // Resolver nomes de loja
@@ -4267,10 +4293,27 @@ HTML;
             . '<option value="DESC"' . ($dir === 'DESC' ? ' selected' : '') . '>DESC</option>'
             . '</select>'
             . '</div>'
+            . '<div class="col-md-3">'
+            . '<select class="form-select" name="periodo" onchange="prodPeriodoChange(this)">'
+            . '<option value="">' . __('admin.products.period_any', 'Cadastrados: qualquer data') . '</option>'
+            . '<option value="hoje"' . ($periodo === 'hoje' ? ' selected' : '') . '>' . __('admin.products.period_today', 'Cadastrados hoje') . '</option>'
+            . '<option value="7d"' . ($periodo === '7d' ? ' selected' : '') . '>' . __('admin.products.period_7d', 'Cadastrados nos últimos 7 dias') . '</option>'
+            . '<option value="30d"' . ($periodo === '30d' ? ' selected' : '') . '>' . __('admin.products.period_30d', 'Cadastrados nos últimos 30 dias') . '</option>'
+            . '<option value="datas"' . ($periodo === 'datas' ? ' selected' : '') . '>' . __('admin.products.period_range', 'Cadastrados entre datas...') . '</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-4" id="prod-periodo-datas" style="display:' . ($periodo === 'datas' ? 'flex' : 'none') . ';gap:6px;align-items:center;">'
+            . '<input type="date" name="de" class="form-control" value="' . htmlspecialchars($de, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars(__('admin.products.period_from', 'De'), ENT_QUOTES, 'UTF-8') . '">'
+            . '<span class="text-muted small">' . __('admin.products.period_to', 'até') . '</span>'
+            . '<input type="date" name="ate" class="form-control" value="' . htmlspecialchars($ate, ENT_QUOTES, 'UTF-8') . '">'
+            . '</div>'
             . '<div class="col-md-1">'
             . '<button type="submit" class="btn btn-outline-primary w-100"><i class="fas fa-search"></i></button>'
             . '</div>'
-            . '</form>';
+            . '</form>'
+            // Ao escolher um período: ordenar por cadastro (mais novo primeiro) e aplicar na hora.
+            // "Entre datas" só mostra os campos (aplica no botão de busca).
+            . '<script>function prodPeriodoChange(s){var d=document.getElementById("prod-periodo-datas");if(s.value==="datas"){d.style.display="flex";return;}d.style.display="none";if(s.value!==""){var o=s.form.querySelector("select[name=sort]"),r=s.form.querySelector("select[name=dir]");if(o)o.value="cadastro";if(r)r.value="DESC";}s.form.submit();}</script>';
 
         echo '<div class="table-responsive">'
             . '<form id="formMassa" method="POST" action="/admin/produtos/acoes-massa">'
@@ -4307,7 +4350,9 @@ HTML;
             echo '<tr>'
                 . '<td><input type="checkbox" name="ids[]" value="' . (int) $produto['id'] . '" class="form-check-input check-produto"></td>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
-                . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div>'
+                . (($tsCad = ($produto['cadastrado_em'] !== '' ? strtotime($produto['cadastrado_em']) : false)) ? '<div class="text-muted small"><i class="far fa-calendar-plus me-1"></i>' . __('admin.products.registered_on', 'Cadastrado em') . ' ' . date('d/m/Y H:i', $tsCad) . '</div>' : '')
+                . '</td>'
                 . '<td><span class="text-muted small">' . ($lojaNome !== '' ? $lojaNome : '<em class="text-secondary">—</em>') . '</span></td>'
                 . '<td><span class="text-muted small">' . $peso . ' kg</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
@@ -4629,8 +4674,11 @@ HTML;
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
             if (!isset($outletFiltro)) $outletFiltro = '';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro, $ocultoFiltro, $statusFiltro): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro, $grupoFiltro, $ocultoFiltro, $statusFiltro, $periodo, $de, $ate): string {
                 $url = $base . "?pagina={$p}";
+                if ($periodo !== '') $url .= "&periodo=" . urlencode($periodo);
+                if ($periodo === 'datas' && $de !== '') $url .= "&de=" . urlencode($de);
+                if ($periodo === 'datas' && $ate !== '') $url .= "&ate=" . urlencode($ate);
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
                 }
