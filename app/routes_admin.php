@@ -35,6 +35,7 @@ $router->post('/admin/produtos/remover-capa/{id}', 'AdminProdutosController', 'r
 $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
 $router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', 'salvarOrdemGaleria');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
+$router->post('/admin/produtos/duplicar/{id}', 'AdminProdutosController', 'duplicar');
 
 // NCM (atalhos AJAX)
 $router->post('/admin/produtos/ncm/search', 'AdminProdutosController', 'ncmSearch');

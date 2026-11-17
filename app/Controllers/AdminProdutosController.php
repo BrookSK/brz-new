@@ -4360,6 +4360,8 @@ HTML;
                 . '<td>'
                 . '<div class="btn-group btn-group-sm" role="group">'
                 . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-warning" title="' . htmlspecialchars(__('admin.products.edit', 'Editar'), ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-edit"></i></a>'
+                // Duplicar: usa o formulário #formDuplicarProduto (fora do formulário de ações em massa)
+                . (!$isRepresentante ? '<button type="submit" form="formDuplicarProduto" formaction="/admin/produtos/duplicar/' . (int) $produto['id'] . '" class="btn btn-outline-primary" title="' . htmlspecialchars(__('admin.products.duplicate', 'Duplicar'), ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(' . htmlspecialchars(json_encode(__('admin.products.confirm_duplicate', 'Duplicar este produto? A cópia é criada como Rascunho/Inativo e abre para edição.')), ENT_QUOTES, 'UTF-8') . ')"><i class="fas fa-copy"></i></button>' : '')
                 . '<a href="/admin/produtos/excluir/' . (int) $produto['id'] . '" class="btn btn-outline-danger" title="' . htmlspecialchars(__('admin.products.delete', 'Excluir'), ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'' . htmlspecialchars(__('admin.products.confirm_delete_product', 'Tem certeza que deseja excluir este produto?'), ENT_QUOTES, 'UTF-8') . '\')"><i class="fas fa-trash"></i></a>'
                 . '</div>'
                 . '</td>'
@@ -4369,6 +4371,11 @@ HTML;
         echo '</tbody></table>'
             . '</form>'
             . '</div>';
+        if (!$isRepresentante) {
+            echo '<form id="formDuplicarProduto" method="POST" action="/admin/produtos/duplicar/0" style="display:none;">'
+                . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) $auth->getCSRFToken(), ENT_QUOTES, 'UTF-8') . '">'
+                . '</form>';
+        }
 
         // Modal de ações em massa — buscar categorias e grupos para selects
         $categoriasSelect = [];
@@ -6460,11 +6467,29 @@ HTML;
 
         $debugSuffix = $request->getParam('debug_loja') ? '?debug_loja=1' : '';
 
+        // Duplicar (não disponível para representante) + aviso quando esta página é uma cópia recém-criada
+        $podeDuplicar = ($this->getSessionPerfil() !== 'representante');
+        $btnDuplicarHtml = '';
+        if ($podeDuplicar) {
+            $btnDuplicarHtml = '<form method="POST" action="/admin/produtos/duplicar/' . (int) $id . '" class="d-inline m-0" onsubmit="return confirm(' . htmlspecialchars(json_encode(__('admin.products.confirm_duplicate', 'Duplicar este produto? A cópia é criada como Rascunho/Inativo e abre para edição.')), ENT_QUOTES, 'UTF-8') . ')">'
+                . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) $auth->getCSRFToken(), ENT_QUOTES, 'UTF-8') . '">'
+                . '<button type="submit" class="btn btn-outline-primary"><i class="fas fa-copy"></i> ' . __('admin.products.duplicate', 'Duplicar') . '</button>'
+                . '</form>';
+        }
+        $duplicadoDe = (int) $request->getParam('duplicado', 0);
+        $avisoDuplicadoHtml = '';
+        if ($duplicadoDe > 0) {
+            $avisoDuplicadoHtml = '<div class="alert alert-info"><i class="fas fa-copy me-1"></i>'
+                . htmlspecialchars(__('admin.products.duplicated_notice', 'Esta é uma cópia do produto #{id}, com fotos, variações e demais dados. Ela está como Rascunho e Inativa, então não aparece no site. Ajuste o que precisar (nome, SKU...), mude Status para Publicado e Ativo para Ativo e salve.', ['id' => $duplicadoDe]), ENT_QUOTES, 'UTF-8')
+                . ' <a href="/admin/produtos/editar/' . $duplicadoDe . '" class="alert-link">' . __('admin.products.see_original', 'Ver original') . '</a></div>';
+        }
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom gap-2">
                     <h1 class="page-title">Editar Produto</h1>
-                    <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <div class="d-flex gap-2 flex-wrap">' . $btnDuplicarHtml . '<a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a></div>
                 </div>
+                ' . $avisoDuplicadoHtml . '
 
                 <form method="POST" action="/admin/produtos/atualizar/' . $id . $debugSuffix . '" enctype="multipart/form-data">
                     <div class="row">
@@ -8472,6 +8497,183 @@ HTMLSCRIPT;
         }
     }
     
+    /**
+     * Copia o arquivo de uma imagem de produto para um arquivo novo (mesma pasta) e devolve o
+     * caminho web da cópia. Cada produto precisa do próprio arquivo: remover a foto de um
+     * produto apaga o arquivo do disco, e isso não pode afetar o outro.
+     * Imagens externas (URL de outro site) ou que não existem no disco mantêm a referência.
+     */
+    private function copiarArquivoImagemProduto(string $caminho, array &$arquivosCriados): string {
+        $caminho = trim($caminho);
+        if ($caminho === '') return $caminho;
+        $web = $this->normalizeUploadsWebPath($caminho);
+        if ($web === null) return $caminho;
+        $origem = $this->resolveUploadsPublicPath($web);
+        if ($origem === null || !is_file($origem)) return $caminho;
+
+        $base = basename($origem);
+        // Tira o prefixo de timestamp do upload original ("1731600000_0_foto.jpg" -> "foto.jpg")
+        $base = (string) preg_replace('/^\d{9,}_(\d+_)?/', '', $base);
+        $base = (string) preg_replace('/[^A-Za-z0-9\-_\.]/', '', $base);
+        if ($base === '' || $base === '.') $base = 'foto.jpg';
+        if (strlen($base) > 150) $base = substr($base, -150);
+        $novoNome = time() . '_' . bin2hex(random_bytes(3)) . '_' . $base;
+        $destino = dirname($origem) . '/' . $novoNome;
+        if (!@copy($origem, $destino)) {
+            throw new \Exception('Falha ao copiar a imagem ' . basename($origem));
+        }
+        $arquivosCriados[] = $destino;
+        return rtrim(str_replace('\\', '/', dirname($web)), '/') . '/' . $novoNome;
+    }
+
+    /**
+     * Copia as linhas de $tabela onde $fkCol = $deId para $paraId. $ajuste pode alterar a linha
+     * (ou devolver null para pular). Retorna o mapa id antigo => id novo.
+     */
+    private function duplicarLinhasProduto(\PDO $pdo, string $tabela, string $fkCol, int $deId, int $paraId, ?callable $ajuste = null): array {
+        if (!$this->tableExists($pdo, $tabela)) return [];
+        $cols = $this->getTableColumns($pdo, $tabela);
+        if (!in_array($fkCol, $cols, true)) return [];
+        $temId = in_array('id', $cols, true);
+        $st = $pdo->prepare('SELECT * FROM `' . $tabela . '` WHERE `' . $fkCol . '` = ?' . ($temId ? ' ORDER BY id ASC' : ''));
+        $st->execute([$deId]);
+        $agora = date('Y-m-d H:i:s');
+        $mapa = [];
+        foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $linha) {
+            $idAntigo = (int) ($linha['id'] ?? 0);
+            unset($linha['id']);
+            $linha[$fkCol] = $paraId;
+            if (array_key_exists('created_at', $linha)) $linha['created_at'] = $agora;
+            if (array_key_exists('updated_at', $linha)) $linha['updated_at'] = $agora;
+            if ($ajuste !== null) {
+                $linha = $ajuste($linha);
+                if ($linha === null) continue;
+            }
+            $colsIns = array_keys($linha);
+            $sql = 'INSERT INTO `' . $tabela . '` (`' . implode('`, `', $colsIns) . '`) VALUES (' . implode(', ', array_fill(0, count($colsIns), '?')) . ')';
+            $pdo->prepare($sql)->execute(array_values($linha));
+            if ($temId) $mapa[$idAntigo] = (int) $pdo->lastInsertId();
+        }
+        return $mapa;
+    }
+
+    /**
+     * Duplicar produto: cria uma cópia completa (dados, capa e galeria com arquivos próprios,
+     * atributos, variações com fotos, brindes, meta e descrição IA) como Rascunho + Inativo,
+     * para não aparecer no site antes de ser revisada, e abre a edição da cópia.
+     * POST /admin/produtos/duplicar/{id}
+     */
+    public function duplicar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $id = (int) ($id ?? $request->getParam('id'));
+
+        if (!$auth->validarCSRF((string) $request->getParam('csrf_token', ''))) {
+            http_response_code(403);
+            echo '<div class="alert alert-danger">' . __('admin.products.invalid_csrf', 'Token de segurança inválido. Recarregue a página e tente de novo.') . '</div>';
+            exit;
+        }
+
+        $arquivosCriados = [];
+        $pdo = null;
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare('SELECT * FROM produtos WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $original = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$original) {
+                throw new \Exception('Produto não encontrado');
+            }
+
+            $agora = date('Y-m-d H:i:s');
+            $sufixo = ' ' . __('admin.products.copy_suffix', '(cópia)');
+            $novo = $original;
+            unset($novo['id']);
+            foreach (['name', 'nome'] as $c) {
+                if (array_key_exists($c, $novo) && trim((string) $novo[$c]) !== '') {
+                    $novo[$c] = mb_substr(trim((string) $novo[$c]) . $sufixo, 0, 255, 'UTF-8');
+                }
+            }
+            // SKU é usado como chave na importação de produtos: a cópia precisa de um SKU próprio
+            if (array_key_exists('sku', $novo) && trim((string) $novo['sku']) !== '') {
+                $baseSku = substr(trim((string) $novo['sku']), 0, 88) . '-COPIA';
+                $skuNovo = $baseSku;
+                $stSku = $pdo->prepare('SELECT 1 FROM produtos WHERE sku = ? LIMIT 1');
+                for ($n = 2; $n < 100; $n++) {
+                    $stSku->execute([$skuNovo]);
+                    if (!$stSku->fetchColumn()) break;
+                    $skuNovo = $baseSku . '-' . $n;
+                }
+                $novo['sku'] = $skuNovo;
+            }
+            if (array_key_exists('slug', $novo)) $novo['slug'] = null;
+            // Fica fora do site até ser revisada e publicada
+            if (array_key_exists('status', $novo)) $novo['status'] = 'draft';
+            if (array_key_exists('active', $novo)) $novo['active'] = 0;
+            if (array_key_exists('views', $novo)) $novo['views'] = 0;
+            if (array_key_exists('published_at', $novo)) $novo['published_at'] = null;
+            if (array_key_exists('created_at', $novo)) $novo['created_at'] = $agora;
+            if (array_key_exists('updated_at', $novo)) $novo['updated_at'] = $agora;
+            if (!empty($novo['foto_principal'])) {
+                $novo['foto_principal'] = $this->copiarArquivoImagemProduto((string) $novo['foto_principal'], $arquivosCriados);
+            }
+
+            $pdo->beginTransaction();
+
+            $colsIns = array_keys($novo);
+            $sqlIns = 'INSERT INTO produtos (`' . implode('`, `', $colsIns) . '`) VALUES (' . implode(', ', array_fill(0, count($colsIns), '?')) . ')';
+            $pdo->prepare($sqlIns)->execute(array_values($novo));
+            $novoId = (int) $pdo->lastInsertId();
+            if ($novoId <= 0) {
+                throw new \Exception('Não foi possível criar a cópia do produto.');
+            }
+
+            $copiarFoto = function (array $linha) use (&$arquivosCriados) {
+                if (!empty($linha['nome_arquivo'])) {
+                    $linha['nome_arquivo'] = $this->copiarArquivoImagemProduto((string) $linha['nome_arquivo'], $arquivosCriados);
+                }
+                return $linha;
+            };
+
+            // Galeria
+            $this->duplicarLinhasProduto($pdo, 'produto_fotos', 'produto_id', $id, $novoId, $copiarFoto);
+            // Atributos e opções escolhidas
+            $this->duplicarLinhasProduto($pdo, 'produto_atributos', 'produto_id', $id, $novoId);
+            $this->duplicarLinhasProduto($pdo, 'produto_atributo_opcoes', 'produto_id', $id, $novoId);
+            // Variações (combinações + fotos de cada variação)
+            $mapaVariacoes = $this->duplicarLinhasProduto($pdo, 'produto_variacoes', 'produto_id', $id, $novoId);
+            foreach ($mapaVariacoes as $varAntiga => $varNova) {
+                if ($varAntiga <= 0 || $varNova <= 0) continue;
+                $this->duplicarLinhasProduto($pdo, 'produto_variacao_itens', 'produto_variacao_id', $varAntiga, $varNova);
+                $this->duplicarLinhasProduto($pdo, 'produto_variacao_fotos', 'produto_variacao_id', $varAntiga, $varNova, $copiarFoto);
+            }
+            // Brindes que este produto oferece
+            $this->duplicarLinhasProduto($pdo, 'produto_brindes', 'produto_id', $id, $novoId);
+            // Meta (sem os identificadores externos usados pela importação para achar o produto)
+            $chavesExternas = ['ID', 'Id', 'id', 'product_id', 'produto_id', 'woo_id', 'external_id'];
+            $this->duplicarLinhasProduto($pdo, 'produto_meta', 'produto_id', $id, $novoId, function (array $linha) use ($chavesExternas) {
+                return in_array((string) ($linha['meta_key'] ?? ''), $chavesExternas, true) ? null : $linha;
+            });
+            // Descrição gerada por IA (a versão em inglês aparece na página do produto)
+            $this->duplicarLinhasProduto($pdo, 'produto_descricoes_ia', 'produto_id', $id, $novoId);
+
+            $pdo->commit();
+
+            header('Location: /admin/produtos/editar/' . $novoId . '?duplicado=' . $id);
+            exit;
+        } catch (\Throwable $e) {
+            if ($pdo instanceof \PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            foreach ($arquivosCriados as $arq) {
+                if (is_file($arq)) @unlink($arq);
+            }
+            error_log('[ADMIN-PRODUTO][duplicar] produto #' . $id . ': ' . $e->getMessage());
+            echo '<div class="alert alert-danger">' . __('admin.products.duplicate_error', 'Não foi possível duplicar o produto:') . ' ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</div>';
+            exit;
+        }
+    }
+
     public function excluir(Request $request, $id = null) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
