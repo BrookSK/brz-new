@@ -4865,15 +4865,13 @@ class CheckoutController extends Controller {
                             // Quando moeda é USD, converter valores do AppMax para BRL (AppMax só aceita BRL)
                             $splitTaxaConversao = 1.0;
                             if ($moedaPedidoPay === 'USD') {
+                                // Taxa central (Configurações > Sistema > Taxa de conversão USD → BRL)
                                 try {
-                                    $dbTxSplit = \Config\Database::getConnection();
-                                    $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                    $stTxSplit->execute();
-                                    $txSplit = (float) str_replace(',', '.', (string) ($stTxSplit->fetchColumn() ?: '0'));
+                                    $txSplit = (float) \App\Core\ExchangeRate::getUsdToBrl();
                                     if ($txSplit > 1.01) {
                                         $splitTaxaConversao = $txSplit;
                                     }
-                                } catch (\Exception $e) {}
+                                } catch (\Throwable $e) {}
 
                                 // Converter taxa/impostos para BRL para o AppMax
                                 $valorTaxa = round($valorTaxa * $splitTaxaConversao, 2);

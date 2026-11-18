@@ -64,17 +64,14 @@ class PaymentLinkController extends Controller {
         // Checkout usa valores base em USD e converte via exchangeRates.
         // No Payment Link em BRL, os valores já estão em BRL e NÃO devem ser convertidos.
         // Ainda assim, precisamos da cotação USD->BRL real para o preview de taxas (envio/IOF/tarifa/VET).
-        $rateBRL = 5.5;
+        // Taxa central (Configurações > Sistema > Taxa de conversão USD → BRL)
+        $rateBRL = 5.85;
         try {
-            $dbTx = \Config\Database::getConnection();
-            $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-            $stTx->execute();
-            $v = (string) ($stTx->fetchColumn() ?: '0');
-            $tx2 = (float) str_replace(',', '.', $v);
+            $tx2 = (float) \App\Core\ExchangeRate::getUsdToBrl();
             if ($tx2 > 1.01) {
                 $rateBRL = $tx2;
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
         }
 
         $exchangeRates = [
